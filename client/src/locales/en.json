@@ -1,0 +1,178 @@
+{
+    "app": {
+        "name": "Construction ERP",
+        "tagline": "Engineering & Accounting Management"
+    },
+    "auth": {
+        "login": "Sign In",
+        "signup": "Create Account",
+        "logout": "Logout",
+        "email": "Email Address",
+        "password": "Password",
+        "confirmPassword": "Confirm Password",
+        "name": "Full Name",
+        "company": "Company Name",
+        "phone": "Phone Number",
+        "welcomeBack": "Welcome Back",
+        "createAccount": "Create Account",
+        "alreadyHaveAccount": "Already have an account?",
+        "dontHaveAccount": "Don't have an account?",
+        "signingIn": "Signing In...",
+        "creatingAccount": "Creating Account..."
+    },
+    "nav": {
+        "dashboard": "Dashboard",
+        "projects": "Projects",
+        "clients": "Clients",
+        "suppliers": "Suppliers",
+        "inventory": "Raw Materials",
+        "labor": "Workmen",
+        "workmanship": "Workmanship",
+        "finance": "Accounting",
+        "chat": "Chat Assistant",
+        "reports": "Reports"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "welcome": "Welcome back, {{name}}! Here's your project overview.",
+        "totalProjects": "Total Projects",
+        "activeProjects": "Active",
+        "totalIncome": "Total Income",
+        "totalExpenses": "Total Expenses",
+        "netBalance": "Net Balance",
+        "activeClients": "Active Clients",
+        "suppliers": "Suppliers",
+        "profit": "Profit",
+        "loss": "Loss",
+        "revenue": "Revenue",
+        "costs": "Costs",
+        "viewAll": "View All",
+        "recentProjects": "Recent Projects",
+        "expensesByCategory": "Expenses by Category",
+        "incomeVsExpenses": "Income vs Expenses"
+    },
+    "projects": {
+        "title": "Projects",
+        "subtitle": "Manage your engineering projects",
+        "newProject": "New Project",
+        "noProjects": "No Projects Yet",
+        "createFirst": "Create your first project to get started",
+        "budget": "Budget",
+        "spent": "Spent",
+        "status": {
+            "planning": "Planning",
+            "inProgress": "In Progress",
+            "onHold": "On Hold",
+            "completed": "Completed",
+            "cancelled": "Cancelled"
+        }
+    },
+    "clients": {
+        "title": "Clients",
+        "subtitle": "Manage your client relationships",
+        "newClient": "New Client",
+        "noClients": "No Clients Yet",
+        "addFirst": "Add your first client to get started",
+        "email": "Email",
+        "phone": "Phone",
+        "company": "Company",
+        "status": {
+            "active": "Active",
+            "inactive": "Inactive",
+            "pending": "Pending"
+        }
+    },
+    "suppliers": {
+        "title": "Suppliers",
+        "subtitle": "Manage your supplier network",
+        "newSupplier": "New Supplier",
+        "noSuppliers": "No Suppliers Yet",
+        "addFirst": "Add your first supplier to get started",
+        "category": "Category",
+        "email": "Email",
+        "phone": "Phone"
+    },
+    "inventory": {
+        "title": "Raw Materials",
+        "subtitle": "Track material inventory and usage",
+        "newMaterial": "Add Material",
+        "stockLevel": "Stock Level",
+        "unitPrice": "Unit Price",
+        "reorderLevel": "Reorder Level"
+    },
+    "labor": {
+        "title": "Workmen",
+        "subtitle": "Manage your workforce",
+        "newWorkman": "Add Workman",
+        "trade": "Trade",
+        "dailyRate": "Daily Rate",
+        "trades": {
+            "carpenter": "Carpenter",
+            "mason": "Mason",
+            "electrician": "Electrician",
+            "plumber": "Plumber",
+            "painter": "Painter",
+            "welder": "Welder",
+            "laborer": "Laborer",
+            "foreman": "Foreman",
+            "other": "Other"
+        }
+    },
+    "workmanship": {
+        "title": "Workmanship (Musanaiyah)",
+        "subtitle": "Track contracted work and payments",
+        "agreedAmount": "Agreed Amount",
+        "paidAmount": "Paid Amount",
+        "outstanding": "Outstanding"
+    },
+    "finance": {
+        "title": "Accounting",
+        "subtitle": "Financial management and ledger",
+        "newTransaction": "New Transaction",
+        "income": "Income",
+        "expense": "Expense",
+        "debit": "Debit",
+        "credit": "Credit"
+    },
+    "chat": {
+        "title": "Chat Assistant",
+        "subtitle": "Add data using text or voice commands",
+        "startConversation": "Start a Conversation",
+        "helpText": "I can help you add transactions, projects, clients, and suppliers. Just type or speak your request!",
+        "typeMessage": "Type your message or use voice...",
+        "recording": "Recording... Click to stop",
+        "tips": "Tips",
+        "tip1": "Try: \"Add a new expense of $500 for materials\"",
+        "tip2": "Try: \"Create a project for residential building\"",
+        "tip3": "Try: \"Show me all active projects\"",
+        "tip4": "Use the microphone button to speak your commands"
+    },
+    "reports": {
+        "title": "Reports",
+        "subtitle": "Financial reports and analytics",
+        "exportReport": "Export Report",
+        "noData": "No Data Available",
+        "addTransactions": "Add some transactions to see reports"
+    },
+    "common": {
+        "loading": "Loading...",
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "add": "Add",
+        "search": "Search",
+        "filter": "Filter",
+        "export": "Export",
+        "import": "Import",
+        "yes": "Yes",
+        "no": "No",
+        "confirm": "Confirm",
+        "close": "Close",
+        "back": "Back",
+        "next": "Next",
+        "previous": "Previous",
+        "submit": "Submit",
+        "reset": "Reset"
+    }
+}

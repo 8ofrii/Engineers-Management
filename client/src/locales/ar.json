@@ -1,0 +1,178 @@
+{
+    "app": {
+        "name": "نظام إدارة البناء",
+        "tagline": "إدارة الهندسة والمحاسبة"
+    },
+    "auth": {
+        "login": "تسجيل الدخول",
+        "signup": "إنشاء حساب",
+        "logout": "تسجيل الخروج",
+        "email": "البريد الإلكتروني",
+        "password": "كلمة المرور",
+        "confirmPassword": "تأكيد كلمة المرور",
+        "name": "الاسم الكامل",
+        "company": "اسم الشركة",
+        "phone": "رقم الهاتف",
+        "welcomeBack": "مرحباً بعودتك",
+        "createAccount": "إنشاء حساب",
+        "alreadyHaveAccount": "هل لديك حساب بالفعل؟",
+        "dontHaveAccount": "ليس لديك حساب؟",
+        "signingIn": "جاري تسجيل الدخول...",
+        "creatingAccount": "جاري إنشاء الحساب..."
+    },
+    "nav": {
+        "dashboard": "لوحة التحكم",
+        "projects": "المشاريع",
+        "clients": "العملاء",
+        "suppliers": "الموردين",
+        "inventory": "المواد الخام",
+        "labor": "العمال",
+        "workmanship": "المصنعية",
+        "finance": "المحاسبة",
+        "chat": "المساعد الذكي",
+        "reports": "التقارير"
+    },
+    "dashboard": {
+        "title": "لوحة التحكم",
+        "welcome": "مرحباً بعودتك، {{name}}! إليك نظرة عامة على مشاريعك.",
+        "totalProjects": "إجمالي المشاريع",
+        "activeProjects": "نشط",
+        "totalIncome": "إجمالي الإيرادات",
+        "totalExpenses": "إجمالي المصروفات",
+        "netBalance": "صافي الرصيد",
+        "activeClients": "العملاء النشطون",
+        "suppliers": "الموردين",
+        "profit": "ربح",
+        "loss": "خسارة",
+        "revenue": "إيرادات",
+        "costs": "تكاليف",
+        "viewAll": "عرض الكل",
+        "recentProjects": "المشاريع الأخيرة",
+        "expensesByCategory": "المصروفات حسب الفئة",
+        "incomeVsExpenses": "الإيرادات مقابل المصروفات"
+    },
+    "projects": {
+        "title": "المشاريع",
+        "subtitle": "إدارة مشاريعك الهندسية",
+        "newProject": "مشروع جديد",
+        "noProjects": "لا توجد مشاريع بعد",
+        "createFirst": "أنشئ مشروعك الأول للبدء",
+        "budget": "الميزانية",
+        "spent": "المصروف",
+        "status": {
+            "planning": "تخطيط",
+            "inProgress": "قيد التنفيذ",
+            "onHold": "معلق",
+            "completed": "مكتمل",
+            "cancelled": "ملغي"
+        }
+    },
+    "clients": {
+        "title": "العملاء",
+        "subtitle": "إدارة علاقاتك مع العملاء",
+        "newClient": "عميل جديد",
+        "noClients": "لا يوجد عملاء بعد",
+        "addFirst": "أضف عميلك الأول للبدء",
+        "email": "البريد الإلكتروني",
+        "phone": "الهاتف",
+        "company": "الشركة",
+        "status": {
+            "active": "نشط",
+            "inactive": "غير نشط",
+            "pending": "قيد الانتظار"
+        }
+    },
+    "suppliers": {
+        "title": "الموردين",
+        "subtitle": "إدارة شبكة الموردين",
+        "newSupplier": "مورد جديد",
+        "noSuppliers": "لا يوجد موردين بعد",
+        "addFirst": "أضف موردك الأول للبدء",
+        "category": "الفئة",
+        "email": "البريد الإلكتروني",
+        "phone": "الهاتف"
+    },
+    "inventory": {
+        "title": "المواد الخام",
+        "subtitle": "تتبع مخزون المواد والاستخدام",
+        "newMaterial": "إضافة مادة",
+        "stockLevel": "مستوى المخزون",
+        "unitPrice": "سعر الوحدة",
+        "reorderLevel": "مستوى إعادة الطلب"
+    },
+    "labor": {
+        "title": "العمال",
+        "subtitle": "إدارة القوى العاملة",
+        "newWorkman": "إضافة عامل",
+        "trade": "المهنة",
+        "dailyRate": "الأجر اليومي",
+        "trades": {
+            "carpenter": "نجار",
+            "mason": "بناء",
+            "electrician": "كهربائي",
+            "plumber": "سباك",
+            "painter": "دهان",
+            "welder": "لحام",
+            "laborer": "عامل",
+            "foreman": "مشرف",
+            "other": "أخرى"
+        }
+    },
+    "workmanship": {
+        "title": "المصنعية",
+        "subtitle": "تتبع الأعمال المتعاقد عليها والمدفوعات",
+        "agreedAmount": "المبلغ المتفق عليه",
+        "paidAmount": "المبلغ المدفوع",
+        "outstanding": "المتبقي"
+    },
+    "finance": {
+        "title": "المحاسبة",
+        "subtitle": "الإدارة المالية ودفتر الأستاذ",
+        "newTransaction": "معاملة جديدة",
+        "income": "إيراد",
+        "expense": "مصروف",
+        "debit": "مدين",
+        "credit": "دائن"
+    },
+    "chat": {
+        "title": "المساعد الذكي",
+        "subtitle": "أضف البيانات باستخدام النص أو الصوت",
+        "startConversation": "ابدأ محادثة",
+        "helpText": "يمكنني مساعدتك في إضافة المعاملات والمشاريع والعملاء والموردين. فقط اكتب أو تحدث بطلبك!",
+        "typeMessage": "اكتب رسالتك أو استخدم الصوت...",
+        "recording": "جاري التسجيل... انقر للإيقاف",
+        "tips": "نصائح",
+        "tip1": "جرب: \"أضف مصروف جديد بقيمة 500 دولار للمواد\"",
+        "tip2": "جرب: \"أنشئ مشروع لمبنى سكني\"",
+        "tip3": "جرب: \"اعرض لي جميع المشاريع النشطة\"",
+        "tip4": "استخدم زر الميكروفون للتحدث بأوامرك"
+    },
+    "reports": {
+        "title": "التقارير",
+        "subtitle": "التقارير المالية والتحليلات",
+        "exportReport": "تصدير التقرير",
+        "noData": "لا توجد بيانات متاحة",
+        "addTransactions": "أضف بعض المعاملات لرؤية التقارير"
+    },
+    "common": {
+        "loading": "جاري التحميل...",
+        "save": "حفظ",
+        "cancel": "إلغاء",
+        "delete": "حذف",
+        "edit": "تعديل",
+        "add": "إضافة",
+        "search": "بحث",
+        "filter": "تصفية",
+        "export": "تصدير",
+        "import": "استيراد",
+        "yes": "نعم",
+        "no": "لا",
+        "confirm": "تأكيد",
+        "close": "إغلاق",
+        "back": "رجوع",
+        "next": "التالي",
+        "previous": "السابق",
+        "submit": "إرسال",
+        "reset": "إعادة تعيين"
+    }
+}

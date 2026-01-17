@@ -1,0 +1,148 @@
+import { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
+import {
+    LayoutDashboard,
+    FolderKanban,
+    Users,
+    Package,
+    MessageSquare,
+    FileText,
+    LogOut,
+    Menu,
+    X,
+    Building2,
+    Moon,
+    Sun,
+    Languages
+} from 'lucide-react';
+import './Layout.css';
+
+export default function Layout({ children }) {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
+    const { t, i18n } = useTranslation();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [darkMode, setDarkMode] = useState(true);
+
+    useEffect(() => {
+        // Set RTL direction for Arabic
+        document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
+    }, [i18n.language]);
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
+
+    const toggleTheme = () => {
+        setDarkMode(!darkMode);
+        document.body.classList.toggle('light-mode');
+    };
+
+    const toggleLanguage = () => {
+        const newLang = i18n.language === 'en' ? 'ar' : 'en';
+        i18n.changeLanguage(newLang);
+    };
+
+    const navItems = [
+        { path: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+        { path: '/projects', icon: FolderKanban, label: t('nav.projects') },
+        { path: '/clients', icon: Users, label: t('nav.clients') },
+        { path: '/suppliers', icon: Package, label: t('nav.suppliers') },
+        { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
+        { path: '/reports', icon: FileText, label: t('nav.reports') }
+    ];
+
+    return (
+        <div className="layout">
+            {/* Sidebar */}
+            <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
+                <div className="sidebar-header">
+                    <div className="sidebar-logo">
+                        <Building2 size={28} />
+                        <span>{t('app.name')}</span>
+                    </div>
+                    <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <nav className="sidebar-nav">
+                    {navItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.path;
+                        return (
+                            <Link
+                                key={item.path}
+                                to={item.path}
+                                className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
+                                onClick={() => setSidebarOpen(false)}
+                            >
+                                <Icon size={20} />
+                                <span>{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                <div className="sidebar-footer">
+                    <div className="user-info">
+                        <div className="user-avatar">
+                            {user?.name?.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="user-details">
+                            <div className="user-name">{user?.name}</div>
+                            <div className="user-email">{user?.email}</div>
+                        </div>
+                    </div>
+                    <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
+                        <LogOut size={16} />
+                        {t('auth.logout')}
+                    </button>
+                </div>
+            </aside>
+
+            {/* Overlay */}
+            {sidebarOpen && (
+                <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>
+            )}
+
+            {/* Main Content */}
+            <div className="main-content">
+                <header className="topbar">
+                    <button className="menu-btn" onClick={() => setSidebarOpen(true)}>
+                        <Menu size={24} />
+                    </button>
+
+                    {/* Only show language and theme toggles on dashboard */}
+                    {location.pathname === '/dashboard' && (
+                        <div className="topbar-actions">
+                            <button
+                                className="theme-toggle"
+                                onClick={toggleLanguage}
+                                title="Switch Language"
+                            >
+                                <Languages size={20} />
+                                <span style={{ fontSize: '11px', marginLeft: '4px', fontWeight: '600' }}>
+                                    {i18n.language === 'en' ? 'AR' : 'EN'}
+                                </span>
+                            </button>
+                            <button className="theme-toggle" onClick={toggleTheme}>
+                                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+                        </div>
+                    )}
+                </header>
+
+                <main className="content">
+                    <div className="container">
+                        {children}
+                    </div>
+                </main>
+            </div>
+        </div>
+    );
+}

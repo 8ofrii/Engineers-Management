@@ -1,0 +1,460 @@
+// Prisma Schema for Construction ERP
+// PostgreSQL Database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+enum UserRole {
+  ADMIN
+  ENGINEER
+  ACCOUNTANT
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(ENGINEER)
+  company   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  projects      Project[]
+  transactions  Transaction[]
+  chatMessages  ChatMessage[]
+  workmanships  Workmanship[]
+  materialUsage MaterialUsage[]
+
+  @@map("users")
+}
+
+// ============================================
+// CLIENTS & SUPPLIERS
+// ============================================
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+model Client {
+  id             String       @id @default(uuid())
+  name           String
+  email          String
+  phone          String
+  company        String?
+  taxId          String?
+  paymentTerms   String       @default("Net 30")
+  status         ClientStatus @default(ACTIVE)
+  
+  // Address
+  street         String?
+  city           String?
+  state          String?
+  zipCode        String?
+  country        String?
+  
+  // Contact Person
+  contactName    String?
+  contactPosition String?
+  contactPhone   String?
+  contactEmail   String?
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  projects       Project[]
+  transactions   Transaction[]
+
+  @@map("clients")
+}
+
+enum SupplierCategory {
+  MATERIALS
+  EQUIPMENT
+  SERVICES
+  LABOR
+  OTHER
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  BLACKLISTED
+}
+
+model Supplier {
+  id           String           @id @default(uuid())
+  name         String
+  email        String
+  phone        String
+  company      String?
+  category     SupplierCategory @default(OTHER)
+  taxId        String?
+  paymentTerms String           @default("Net 30")
+  rating       Int              @default(3)
+  status       SupplierStatus   @default(ACTIVE)
+  
+  // Address
+  street       String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String?
+  
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  // Relations
+  transactions Transaction[]
+  materials    Material[]
+
+  @@map("suppliers")
+}
+
+// ============================================
+// PROJECTS
+// ============================================
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  INFRASTRUCTURE
+  INDUSTRIAL
+  OTHER
+}
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  projectType ProjectType   @default(OTHER)
+  location    String?
+  
+  // Dates
+  startDate   DateTime
+  endDate     DateTime?
+  
+  // Financial
+  budget      Decimal       @db.Decimal(15, 2)
+  actualCost  Decimal       @default(0) @db.Decimal(15, 2)
+  
+  // Relations
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  engineerId  String
+  engineer    User          @relation(fields: [engineerId], references: [id])
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  transactions  Transaction[]
+  workmanships  Workmanship[]
+  materialUsage MaterialUsage[]
+  documents     Document[]
+  notes         Note[]
+
+  @@map("projects")
+}
+
+// ============================================
+// MATERIALS (RAW MATERIALS INVENTORY)
+// ============================================
+
+enum MaterialUnit {
+  M3        // Cubic Meter
+  TON       // Ton
+  KG        // Kilogram
+  M2        // Square Meter
+  M         // Meter
+  PIECE     // Piece/Unit
+  LITER     // Liter
+  BAG       // Bag
+}
+
+model Material {
+  id          String       @id @default(uuid())
+  name        String
+  nameAr      String?      // Arabic name
+  description String?
+  unit        MaterialUnit
+  stockLevel  Decimal      @default(0) @db.Decimal(10, 2)
+  unitPrice   Decimal      @db.Decimal(10, 2)
+  reorderLevel Decimal?    @db.Decimal(10, 2)
+  
+  // Supplier
+  supplierId  String?
+  supplier    Supplier?    @relation(fields: [supplierId], references: [id])
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  usage       MaterialUsage[]
+
+  @@map("materials")
+}
+
+model MaterialUsage {
+  id          String   @id @default(uuid())
+  quantity    Decimal  @db.Decimal(10, 2)
+  notes       String?
+  usageDate   DateTime @default(now())
+  
+  // Relations
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  recordedBy  String
+  user        User     @relation(fields: [recordedBy], references: [id])
+  
+  createdAt   DateTime @default(now())
+
+  @@map("material_usage")
+}
+
+// ============================================
+// WORKMEN & WORKMANSHIP (MUSANAIYAH)
+// ============================================
+
+enum WorkmanTrade {
+  CARPENTER
+  MASON
+  ELECTRICIAN
+  PLUMBER
+  PAINTER
+  WELDER
+  LABORER
+  FOREMAN
+  OTHER
+}
+
+model Workman {
+  id          String       @id @default(uuid())
+  name        String
+  nameAr      String?      // Arabic name
+  trade       WorkmanTrade
+  dailyRate   Decimal      @db.Decimal(10, 2)
+  phone       String?
+  nationalId  String?
+  isActive    Boolean      @default(true)
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  workmanships Workmanship[]
+
+  @@map("workmen")
+}
+
+enum WorkmanshipStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  PAID
+}
+
+model Workmanship {
+  id            String            @id @default(uuid())
+  description   String
+  descriptionAr String?           // Arabic description
+  
+  // Contract
+  agreedAmount  Decimal           @db.Decimal(10, 2)
+  paidAmount    Decimal           @default(0) @db.Decimal(10, 2)
+  outstandingAmount Decimal       @default(0) @db.Decimal(10, 2)
+  
+  status        WorkmanshipStatus @default(PENDING)
+  startDate     DateTime?
+  completionDate DateTime?
+  
+  // Relations
+  workmanId     String
+  workman       Workman           @relation(fields: [workmanId], references: [id], onDelete: Cascade)
+  
+  projectId     String
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  managedBy     String
+  manager       User              @relation(fields: [managedBy], references: [id])
+  
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@map("workmanships")
+}
+
+// ============================================
+// TRANSACTIONS (ACCOUNTING)
+// ============================================
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionCategory {
+  MATERIALS
+  LABOR
+  EQUIPMENT
+  SERVICES
+  PAYMENT
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  BANK_TRANSFER
+  CREDIT_CARD
+  OTHER
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  type          TransactionType
+  category      TransactionCategory
+  amount        Decimal           @db.Decimal(15, 2)
+  description   String
+  descriptionAr String?           // Arabic description
+  
+  // Accounting
+  debit         Decimal?          @db.Decimal(15, 2)
+  credit        Decimal?          @db.Decimal(15, 2)
+  
+  transactionDate DateTime        @default(now())
+  paymentMethod PaymentMethod     @default(BANK_TRANSFER)
+  invoiceNumber String?
+  status        TransactionStatus @default(COMPLETED)
+  notes         String?
+  
+  // Relations
+  projectId     String?
+  project       Project?          @relation(fields: [projectId], references: [id])
+  
+  supplierId    String?
+  supplier      Supplier?         @relation(fields: [supplierId], references: [id])
+  
+  clientId      String?
+  client        Client?           @relation(fields: [clientId], references: [id])
+  
+  createdBy     String
+  user          User              @relation(fields: [createdBy], references: [id])
+  
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([projectId, transactionDate])
+  @@index([type, category])
+  @@map("transactions")
+}
+
+// ============================================
+// CHAT & COMMUNICATION
+// ============================================
+
+enum MessageType {
+  TEXT
+  AUDIO
+  COMMAND
+}
+
+enum MessageIntent {
+  ADD_TRANSACTION
+  ADD_PROJECT
+  ADD_CLIENT
+  ADD_SUPPLIER
+  ADD_MATERIAL
+  ADD_WORKMAN
+  QUERY
+  GENERAL
+}
+
+model ChatMessage {
+  id            String         @id @default(uuid())
+  messageType   MessageType    @default(TEXT)
+  content       String
+  audioUrl      String?
+  transcript    String?
+  intent        MessageIntent  @default(GENERAL)
+  extractedData Json?
+  processed     Boolean        @default(false)
+  response      String?
+  
+  // Relations
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime       @default(now())
+
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+// ============================================
+// DOCUMENTS & NOTES
+// ============================================
+
+model Document {
+  id          String   @id @default(uuid())
+  name        String
+  url         String
+  fileType    String?
+  fileSize    Int?
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  uploadedAt  DateTime @default(now())
+
+  @@map("documents")
+}
+
+model Note {
+  id          String   @id @default(uuid())
+  content     String
+  
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+
+  @@map("notes")
+}
