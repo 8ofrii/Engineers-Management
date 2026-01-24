@@ -70,7 +70,6 @@ model Client {
   phone        String
   company      String?
   taxId        String?
-  paymentTerms String       @default("Net 30")
   status       ClientStatus @default(ACTIVE)
 
   // Address
@@ -188,6 +187,7 @@ model Project {
 
   // NEW: Fund Splitting (The "Income Splitter" Engine)
   totalContractValue Decimal? @db.Decimal(15, 2) // Total contract amount
+  paymentTerms       String   @default("Net 30") // Moved from Client to Project
   operationalFund    Decimal  @default(0) @db.Decimal(15, 2) // Cash for site work (80%)
   officeRevenue      Decimal  @default(0) @db.Decimal(15, 2) // Company profit (20%)
 

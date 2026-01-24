@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { Mic, Send, Trash2, StopCircle } from 'lucide-react';
 import api from '../services/api';
 import Layout from '../components/Layout';
 import './ChatAssistant.css';
 
 export default function ChatAssistant() {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState('');
@@ -77,7 +79,7 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Microphone access denied:', error);
-            alert('Please allow microphone access to use voice input');
+            alert(t('chat.micError'));
         }
     };
 
@@ -124,7 +126,7 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Failed to send voice message:', error);
-            alert('Failed to process voice message. Please try again.');
+            alert(t('chat.error'));
         } finally {
             setIsProcessing(false);
         }
@@ -164,7 +166,7 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Failed to send message:', error);
-            alert('Failed to send message. Please try again.');
+            alert(t('chat.error'));
         } finally {
             setIsProcessing(false);
         }
@@ -172,7 +174,7 @@ export default function ChatAssistant() {
 
     // Clear chat history
     const clearHistory = async () => {
-        if (!confirm('Are you sure you want to clear all chat history?')) return;
+        if (!confirm(t('chat.confirmClear'))) return;
 
         try {
             await api.delete('/chat/history');
@@ -193,12 +195,12 @@ export default function ChatAssistant() {
         <Layout>
             <div className="chat-assistant">
                 <div className="chat-header">
-                    <h1>Chat Assistant</h1>
-                    <p>I can help you add transactions, projects, clients, and suppliers. Just type or speak your request!</p>
+                    <h1>{t('chat.title')}</h1>
+                    <p>{t('chat.helpText')}</p>
                     {messages.length > 0 && (
                         <button className="clear-btn" onClick={clearHistory}>
                             <Trash2 size={16} />
-                            Clear History
+                            {t('chat.clearHistory')}
                         </button>
                     )}
                 </div>
@@ -207,8 +209,8 @@ export default function ChatAssistant() {
                     {messages.length === 0 ? (
                         <div className="chat-empty">
                             <div className="chat-icon">💬</div>
-                            <h2>Start a Conversation</h2>
-                            <p>I can help you add transactions, projects, clients, and suppliers. Just type or speak your request!</p>
+                            <h2>{t('chat.startConversation')}</h2>
+                            <p>{t('chat.helpText')}</p>
                         </div>
                     ) : (
                         messages.map((msg) => (
@@ -218,7 +220,7 @@ export default function ChatAssistant() {
                             >
                                 <div className="message-content">
                                     {msg.transcribed && (
-                                        <span className="transcribed-badge">🎤 Transcribed</span>
+                                        <span className="transcribed-badge">🎤 {t('chat.transcribed')}</span>
                                     )}
                                     <p>{msg.content}</p>
                                 </div>
@@ -252,14 +254,14 @@ export default function ChatAssistant() {
                                 onClick={stopRecording}
                             >
                                 <StopCircle size={24} />
-                                Stop Recording
+                                {t('chat.stopRecording')}
                             </button>
                         </div>
                     ) : (
                         <form onSubmit={sendTextMessage} className="chat-input-form">
                             <input
                                 type="text"
-                                placeholder="Type your message or use voice..."
+                                placeholder={t('chat.typeMessage')}
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}
                                 disabled={isProcessing}
@@ -270,7 +272,7 @@ export default function ChatAssistant() {
                                 className="voice-btn"
                                 onClick={startRecording}
                                 disabled={isProcessing}
-                                title="Record voice message"
+                                title={t('chat.recordVoice')}
                             >
                                 <Mic size={20} />
                             </button>
@@ -287,11 +289,11 @@ export default function ChatAssistant() {
 
                 {/* Tips section */}
                 <div className="chat-tips">
-                    <h3>Tips</h3>
+                    <h3>{t('chat.tips')}</h3>
                     <ul>
-                        <li>🎤 Click the microphone to record your voice</li>
-                        <li>💬 Or type your message in Arabic or English</li>
-                        <li>📝 Ask me to add expenses, check projects, or view reports</li>
+                        <li>🎤 {t('chat.tipMic')}</li>
+                        <li>💬 {t('chat.tipLang')}</li>
+                        <li>📝 {t('chat.tipExamples')}</li>
                     </ul>
                 </div>
             </div>
