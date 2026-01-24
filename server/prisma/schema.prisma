@@ -1,5 +1,6 @@
-// Prisma Schema for Construction ERP
+// Prisma Schema for Construction ERP - AI-First Cash-to-Cost System
 // PostgreSQL Database
+// Updated: V1 with Custody Management, Income Splitting, and AI Voice Workflow
 
 generator client {
   provider = "prisma-client-js"
@@ -11,33 +12,42 @@ datasource db {
 }
 
 // ============================================
-// USER & AUTHENTICATION
+// USER & AUTHENTICATION (Enhanced for Custody)
 // ============================================
 
 enum UserRole {
   ADMIN
-  ENGINEER
+  PROJECT_MANAGER // New: Approver role
+  ENGINEER // Site Engineer - Wallet Holder
   ACCOUNTANT
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      UserRole @default(ENGINEER)
-  company   String?
-  phone     String?
-  isActive  Boolean  @default(true)
+  id       String   @id @default(uuid())
+  email    String   @unique
+  password String
+  name     String
+  role     UserRole @default(ENGINEER)
+  company  String?
+  phone    String?
+  isActive Boolean  @default(true)
+
+  // NEW: Financial Custody Tracking (Al-Ohda)
+  currentCustodyBalance Decimal @default(0) @db.Decimal(15, 2) // Money currently in engineer's hand
+  pendingClearance      Decimal @default(0) @db.Decimal(15, 2) // Receipts uploaded but not approved yet
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  projects      Project[]
-  transactions  Transaction[]
-  chatMessages  ChatMessage[]
-  workmanships  Workmanship[]
-  materialUsage MaterialUsage[]
+  projects             Project[]
+  transactions         Transaction[]
+  approvedTransactions Transaction[]     @relation("ApprovedBy")
+  chatMessages         ChatMessage[]
+  workmanships         Workmanship[]
+  materialUsage        MaterialUsage[]
+  materialBatches      MaterialBatch[]
+  custodyTransfers     CustodyTransfer[]
 
   @@map("users")
 }
@@ -53,34 +63,34 @@ enum ClientStatus {
 }
 
 model Client {
-  id             String       @id @default(uuid())
-  name           String
-  email          String
-  phone          String
-  company        String?
-  taxId          String?
-  paymentTerms   String       @default("Net 30")
-  status         ClientStatus @default(ACTIVE)
-  
+  id           String       @id @default(uuid())
+  name         String
+  email        String
+  phone        String
+  company      String?
+  taxId        String?
+  paymentTerms String       @default("Net 30")
+  status       ClientStatus @default(ACTIVE)
+
   // Address
-  street         String?
-  city           String?
-  state          String?
-  zipCode        String?
-  country        String?
-  
+  street  String?
+  city    String?
+  state   String?
+  zipCode String?
+  country String?
+
   // Contact Person
-  contactName    String?
+  contactName     String?
   contactPosition String?
-  contactPhone   String?
-  contactEmail   String?
-  
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  contactPhone    String?
+  contactEmail    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  projects       Project[]
-  transactions   Transaction[]
+  projects     Project[]
+  transactions Transaction[]
 
   @@map("clients")
 }
@@ -110,16 +120,16 @@ model Supplier {
   paymentTerms String           @default("Net 30")
   rating       Int              @default(3)
   status       SupplierStatus   @default(ACTIVE)
-  
+
   // Address
-  street       String?
-  city         String?
-  state        String?
-  zipCode      String?
-  country      String?
-  
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  street  String?
+  city    String?
+  state   String?
+  zipCode String?
+  country String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   transactions Transaction[]
@@ -129,7 +139,7 @@ model Supplier {
 }
 
 // ============================================
-// PROJECTS
+// PROJECTS (Enhanced for Revenue Models & Income Splitting)
 // ============================================
 
 enum ProjectStatus {
@@ -148,6 +158,13 @@ enum ProjectType {
   OTHER
 }
 
+// NEW: Revenue Model Types
+enum RevenueModel {
+  DESIGN_ONLY_AREA // Area * Rate (Design fees)
+  EXECUTION_COST_PLUS // Expenses + Management Fee %
+  EXECUTION_LUMP_SUM // Fixed Contract Price
+}
+
 model Project {
   id          String        @id @default(uuid())
   name        String
@@ -155,31 +172,41 @@ model Project {
   status      ProjectStatus @default(PLANNING)
   projectType ProjectType   @default(OTHER)
   location    String?
-  
+
   // Dates
-  startDate   DateTime
-  endDate     DateTime?
-  
-  // Financial
-  budget      Decimal       @db.Decimal(15, 2)
-  actualCost  Decimal       @default(0) @db.Decimal(15, 2)
-  
-  // Relations
-  clientId    String
-  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  
-  engineerId  String
-  engineer    User          @relation(fields: [engineerId], references: [id])
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  startDate DateTime
+  endDate   DateTime?
+
+  // Financial (Original)
+  budget     Decimal @db.Decimal(15, 2)
+  actualCost Decimal @default(0) @db.Decimal(15, 2)
+
+  // NEW: Revenue Logic
+  revenueModel         RevenueModel @default(EXECUTION_COST_PLUS)
+  managementFeePercent Decimal?     @db.Decimal(5, 2) // e.g., 20.00% for Cost-Plus
+
+  // NEW: Fund Splitting (The "Income Splitter" Engine)
+  totalContractValue Decimal? @db.Decimal(15, 2) // Total contract amount
+  operationalFund    Decimal  @default(0) @db.Decimal(15, 2) // Cash for site work (80%)
+  officeRevenue      Decimal  @default(0) @db.Decimal(15, 2) // Company profit (20%)
 
   // Relations
-  transactions  Transaction[]
-  workmanships  Workmanship[]
-  materialUsage MaterialUsage[]
-  documents     Document[]
-  notes         Note[]
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  engineerId String
+  engineer   User   @relation(fields: [engineerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactions    Transaction[]
+  workmanships    Workmanship[]
+  materialUsage   MaterialUsage[]
+  materialBatches MaterialBatch[]
+  documents       Document[]
+  notes           Note[]
 
   @@map("projects")
 }
@@ -189,58 +216,96 @@ model Project {
 // ============================================
 
 enum MaterialUnit {
-  M3        // Cubic Meter
-  TON       // Ton
-  KG        // Kilogram
-  M2        // Square Meter
-  M         // Meter
-  PIECE     // Piece/Unit
-  LITER     // Liter
-  BAG       // Bag
+  M3 // Cubic Meter
+  TON // Ton
+  KG // Kilogram
+  M2 // Square Meter
+  M // Meter
+  PIECE // Piece/Unit
+  LITER // Liter
+  BAG // Bag
 }
 
 model Material {
-  id          String       @id @default(uuid())
-  name        String
-  nameAr      String?      // Arabic name
-  description String?
-  unit        MaterialUnit
-  stockLevel  Decimal      @default(0) @db.Decimal(10, 2)
-  unitPrice   Decimal      @db.Decimal(10, 2)
-  reorderLevel Decimal?    @db.Decimal(10, 2)
-  
+  id           String       @id @default(uuid())
+  name         String
+  nameAr       String? // Arabic name
+  description  String?
+  unit         MaterialUnit
+  stockLevel   Decimal      @default(0) @db.Decimal(10, 2)
+  unitPrice    Decimal      @db.Decimal(10, 2)
+  reorderLevel Decimal?     @db.Decimal(10, 2)
+
   // Supplier
-  supplierId  String?
-  supplier    Supplier?    @relation(fields: [supplierId], references: [id])
-  
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  usage       MaterialUsage[]
+  usage MaterialUsage[]
 
   @@map("materials")
 }
 
 model MaterialUsage {
-  id          String   @id @default(uuid())
-  quantity    Decimal  @db.Decimal(10, 2)
-  notes       String?
-  usageDate   DateTime @default(now())
-  
+  id        String   @id @default(uuid())
+  quantity  Decimal  @db.Decimal(10, 2)
+  notes     String?
+  usageDate DateTime @default(now())
+
   // Relations
-  materialId  String
-  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  recordedBy  String
-  user        User     @relation(fields: [recordedBy], references: [id])
-  
-  createdAt   DateTime @default(now())
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  recordedBy String
+  user       User   @relation(fields: [recordedBy], references: [id])
+
+  createdAt DateTime @default(now())
 
   @@map("material_usage")
+}
+
+// ============================================
+// MATERIAL BATCH - The "Landing Zone" Inventory (V1)
+// ============================================
+
+enum BatchStatus {
+  AVAILABLE // Full value remaining
+  PARTIALLY_USED // Some value consumed
+  CONSUMED // Fully used
+}
+
+model MaterialBatch {
+  id            String  @id @default(uuid())
+  description   String // e.g., "10 Tons Steel Rebar"
+  descriptionAr String? // Arabic description
+
+  // Value Tracking (Not Quantity - We track VALUE)
+  initialValue   Decimal @db.Decimal(15, 2) // Original purchase amount
+  remainingValue Decimal @db.Decimal(15, 2) // What's left in stock
+
+  status BatchStatus @default(AVAILABLE)
+
+  // Relations
+  projectId String // Materials belong to a specific project site
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  originalReceiptId String? // Link to the purchase transaction
+
+  recordedBy String
+  user       User   @relation(fields: [recordedBy], references: [id])
+
+  purchaseDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([projectId, status])
+  @@map("material_batches")
 }
 
 // ============================================
@@ -260,17 +325,17 @@ enum WorkmanTrade {
 }
 
 model Workman {
-  id          String       @id @default(uuid())
-  name        String
-  nameAr      String?      // Arabic name
-  trade       WorkmanTrade
-  dailyRate   Decimal      @db.Decimal(10, 2)
-  phone       String?
-  nationalId  String?
-  isActive    Boolean      @default(true)
-  
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id         String       @id @default(uuid())
+  name       String
+  nameAr     String? // Arabic name
+  trade      WorkmanTrade
+  dailyRate  Decimal      @db.Decimal(10, 2)
+  phone      String?
+  nationalId String?
+  isActive   Boolean      @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   workmanships Workmanship[]
@@ -286,37 +351,37 @@ enum WorkmanshipStatus {
 }
 
 model Workmanship {
-  id            String            @id @default(uuid())
+  id            String  @id @default(uuid())
   description   String
-  descriptionAr String?           // Arabic description
-  
+  descriptionAr String? // Arabic description
+
   // Contract
-  agreedAmount  Decimal           @db.Decimal(10, 2)
-  paidAmount    Decimal           @default(0) @db.Decimal(10, 2)
-  outstandingAmount Decimal       @default(0) @db.Decimal(10, 2)
-  
-  status        WorkmanshipStatus @default(PENDING)
-  startDate     DateTime?
+  agreedAmount      Decimal @db.Decimal(10, 2)
+  paidAmount        Decimal @default(0) @db.Decimal(10, 2)
+  outstandingAmount Decimal @default(0) @db.Decimal(10, 2)
+
+  status         WorkmanshipStatus @default(PENDING)
+  startDate      DateTime?
   completionDate DateTime?
-  
+
   // Relations
-  workmanId     String
-  workman       Workman           @relation(fields: [workmanId], references: [id], onDelete: Cascade)
-  
-  projectId     String
-  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  managedBy     String
-  manager       User              @relation(fields: [managedBy], references: [id])
-  
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  workmanId String
+  workman   Workman @relation(fields: [workmanId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  managedBy String
+  manager   User   @relation(fields: [managedBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("workmanships")
 }
 
 // ============================================
-// TRANSACTIONS (ACCOUNTING)
+// TRANSACTIONS (The 3-Step AI Workflow)
 // ============================================
 
 enum TransactionType {
@@ -330,6 +395,7 @@ enum TransactionCategory {
   EQUIPMENT
   SERVICES
   PAYMENT
+  CUSTODY_TRANSFER // NEW: For Tamweel (funding engineer wallet)
   OTHER
 }
 
@@ -338,52 +404,110 @@ enum PaymentMethod {
   CHECK
   BANK_TRANSFER
   CREDIT_CARD
+  CUSTODY_WALLET // NEW: Paid from engineer's custody
   OTHER
 }
 
+// NEW: The Workflow State Machine
 enum TransactionStatus {
-  PENDING
-  COMPLETED
-  CANCELLED
+  DRAFT // AI created, waiting for engineer to verify
+  PENDING_APPROVAL // Engineer submitted, waiting for Manager
+  APPROVED // Manager approved, deducted from wallet
+  REJECTED // Manager rejected, returned to engineer
+  CANCELLED // Cancelled by user
 }
 
 model Transaction {
-  id            String            @id @default(uuid())
+  id            String              @id @default(uuid())
   type          TransactionType
   category      TransactionCategory
-  amount        Decimal           @db.Decimal(15, 2)
+  amount        Decimal             @db.Decimal(15, 2)
   description   String
-  descriptionAr String?           // Arabic description
-  
+  descriptionAr String? // Arabic description
+
   // Accounting
-  debit         Decimal?          @db.Decimal(15, 2)
-  credit        Decimal?          @db.Decimal(15, 2)
-  
-  transactionDate DateTime        @default(now())
-  paymentMethod PaymentMethod     @default(BANK_TRANSFER)
-  invoiceNumber String?
-  status        TransactionStatus @default(COMPLETED)
-  notes         String?
-  
+  debit  Decimal? @db.Decimal(15, 2)
+  credit Decimal? @db.Decimal(15, 2)
+
+  transactionDate DateTime      @default(now())
+  paymentMethod   PaymentMethod @default(BANK_TRANSFER)
+  invoiceNumber   String?
+
+  // NEW: The Workflow State
+  status          TransactionStatus @default(DRAFT)
+  rejectionReason String? // Why manager rejected it
+
+  // NEW: Source Logic (Custody Tracking)
+  custodyWalletId String? // Which engineer's wallet paid this?
+
+  // NEW: AI Voice Input Data
+  voiceNoteUrl    String? // URL to the recorded voice note
+  aiRawText       String? // Whisper API transcription
+  aiExtractedData Json? // LLM structured output { vendor, amount, category }
+
+  // NEW: Receipt Photo
+  receiptPhotoUrl String? // Engineer uploads receipt photo
+
+  notes String?
+
   // Relations
-  projectId     String?
-  project       Project?          @relation(fields: [projectId], references: [id])
-  
-  supplierId    String?
-  supplier      Supplier?         @relation(fields: [supplierId], references: [id])
-  
-  clientId      String?
-  client        Client?           @relation(fields: [clientId], references: [id])
-  
-  createdBy     String
-  user          User              @relation(fields: [createdBy], references: [id])
-  
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  createdBy String
+  user      User   @relation(fields: [createdBy], references: [id])
+
+  // NEW: Approver Tracking
+  approvedBy String?
+  approver   User?     @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  approvedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId, transactionDate])
   @@index([type, category])
+  @@index([status]) // NEW: For filtering pending approvals
   @@map("transactions")
+}
+
+// ============================================
+// CUSTODY TRANSFER (Al-Ohda / Tamweel & Tasweya)
+// ============================================
+
+enum CustodyTransferType {
+  FUNDING // Tamweel: Office → Engineer Wallet
+  CLEARANCE // Tasweya: Expense Approved, deduct from wallet
+  RETURN // Engineer returns unused cash
+}
+
+model CustodyTransfer {
+  id          String              @id @default(uuid())
+  type        CustodyTransferType
+  amount      Decimal             @db.Decimal(15, 2)
+  description String
+
+  // Relations
+  engineerId String
+  engineer   User   @relation(fields: [engineerId], references: [id])
+
+  // Balances (Snapshot at time of transfer)
+  balanceBefore Decimal @db.Decimal(15, 2)
+  balanceAfter  Decimal @db.Decimal(15, 2)
+
+  // Optional link to related transaction (for clearance)
+  relatedTransactionId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([engineerId, createdAt])
+  @@map("custody_transfers")
 }
 
 // ============================================
@@ -408,21 +532,21 @@ enum MessageIntent {
 }
 
 model ChatMessage {
-  id            String         @id @default(uuid())
-  messageType   MessageType    @default(TEXT)
+  id            String        @id @default(uuid())
+  messageType   MessageType   @default(TEXT)
   content       String
   audioUrl      String?
   transcript    String?
-  intent        MessageIntent  @default(GENERAL)
+  intent        MessageIntent @default(GENERAL)
   extractedData Json?
-  processed     Boolean        @default(false)
+  processed     Boolean       @default(false)
   response      String?
-  
+
   // Relations
-  userId        String
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  createdAt     DateTime       @default(now())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
   @@map("chat_messages")
@@ -433,28 +557,28 @@ model ChatMessage {
 // ============================================
 
 model Document {
-  id          String   @id @default(uuid())
-  name        String
-  url         String
-  fileType    String?
-  fileSize    Int?
-  
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  uploadedAt  DateTime @default(now())
+  id       String  @id @default(uuid())
+  name     String
+  url      String
+  fileType String?
+  fileSize Int?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  uploadedAt DateTime @default(now())
 
   @@map("documents")
 }
 
 model Note {
-  id          String   @id @default(uuid())
-  content     String
-  
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
-  createdAt   DateTime @default(now())
+  id      String @id @default(uuid())
+  content String
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@map("notes")
 }
