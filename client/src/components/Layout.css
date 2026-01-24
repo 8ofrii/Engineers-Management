@@ -186,6 +186,8 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
+    margin-left: auto;
+    /* THIS IS THE KEY CHANGE - pushes everything to the right */
 }
 
 .theme-toggle {
@@ -293,5 +295,52 @@
     .nav-item {
         padding: var(--spacing-sm) var(--spacing-md);
         font-size: var(--font-size-sm);
+    }
+}
+
+/* RTL Support for Arabic */
+[dir="rtl"] .topbar-actions {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+[dir="rtl"] .nav-item:hover {
+    transform: translateX(-4px);
+}
+
+[dir="rtl"] .sidebar {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--border-color);
+}
+
+[dir="rtl"] .main-content {
+    margin-left: 0;
+    margin-right: 280px;
+}
+
+[dir="rtl"] .notification-dropdown {
+    right: auto;
+    left: 0;
+}
+
+[dir="rtl"] .notification-badge {
+    right: auto;
+    left: 4px;
+}
+
+/* RTL Mobile */
+@media (max-width: 1024px) {
+    [dir="rtl"] .sidebar {
+        transform: translateX(100%);
+    }
+
+    [dir="rtl"] .sidebar-open {
+        transform: translateX(0);
+    }
+
+    [dir="rtl"] .main-content {
+        margin-right: 0;
     }
 }

@@ -173,3 +173,94 @@ export const deleteProject = async (req, res, next) => {
         next(error);
     }
 };
+
+// @desc    Get project financials (for dashboard charts)
+// @route   GET /api/projects/:id/financials
+// @access  Private (Admin, Manager, Accountant)
+export const getProjectFinancials = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const project = await prisma.project.findUnique({
+            where: { id },
+            include: {
+                transactions: {
+                    where: {
+                        status: 'APPROVED',
+                        paymentMethod: 'CUSTODY_WALLET'
+                    },
+                    select: {
+                        createdBy: true,
+                        amount: true
+                    }
+                }
+            }
+        });
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: 'Project not found'
+            });
+        }
+
+        // Calculate custody holdings for this project
+        // Sum all approved custody transactions grouped by engineer
+        const custodyByEngineer = {};
+        project.transactions.forEach(tx => {
+            if (!custodyByEngineer[tx.createdBy]) {
+                custodyByEngineer[tx.createdBy] = 0;
+            }
+            custodyByEngineer[tx.createdBy] += Number(tx.amount);
+        });
+
+        const totalCustodyHoldings = Object.values(custodyByEngineer).reduce((sum, val) => sum + val, 0);
+
+        // Calculate burn rate (percentage of ops fund used)
+        const opsUsed = Number(project.actualCost);
+        const opsTotal = Number(project.operationalFund) + opsUsed; // Total that was available
+        const burnRate = opsTotal > 0 ? ((opsUsed / opsTotal) * 100).toFixed(2) : 0;
+
+        // Calculate remaining budget
+        const totalBudget = Number(project.budget);
+        const totalSpent = Number(project.actualCost);
+        const remainingBudget = totalBudget - totalSpent;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                // Main financial metrics
+                totalBudget: totalBudget,
+                operationalFund: Number(project.operationalFund),    // Blue Bar - Money available for ops
+                officeRevenue: Number(project.officeRevenue),        // Green Bar - Company profit
+                actualCost: Number(project.actualCost),              // Red Bar - Money spent
+                custodyHoldings: totalCustodyHoldings,               // Yellow Bar - Money in engineers' hands
+
+                // Additional metrics
+                remainingBudget: remainingBudget,
+                burnRate: `${burnRate}%`,
+
+                // Project details
+                projectName: project.name,
+                revenueModel: project.revenueModel,
+                managementFeePercent: Number(project.managementFeePercent || 0),
+
+                // Chart data structure
+                chartData: {
+                    labels: ['Operational Fund', 'Office Revenue', 'Actual Cost', 'Custody Holdings'],
+                    values: [
+                        Number(project.operationalFund),
+                        Number(project.officeRevenue),
+                        Number(project.actualCost),
+                        totalCustodyHoldings
+                    ],
+                    colors: ['#3b82f6', '#10b981', '#ef4444', '#f59e0b'] // Blue, Green, Red, Yellow
+                }
+            }
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+

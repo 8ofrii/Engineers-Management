@@ -13,6 +13,10 @@ import projectRoutes from './routes/projects.js';
 import clientRoutes from './routes/clients.js';
 import supplierRoutes from './routes/suppliers.js';
 import transactionRoutes from './routes/transactions.js';
+import custodyRoutes from './routes/custody.js';
+import notificationRoutes from './routes/notifications.js';
+import materialBatchRoutes from './routes/materialBatches.js';
+import chatRoutes from './routes/chat.js';
 
 // Load env vars
 dotenv.config();
@@ -47,6 +51,10 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/custody', custodyRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/material-batches', materialBatchRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

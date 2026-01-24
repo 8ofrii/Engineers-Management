@@ -9,7 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Clients from './pages/Clients';
 import Suppliers from './pages/Suppliers';
-import Chat from './pages/Chat';
+import ChatAssistant from './pages/ChatAssistant';
 import Reports from './pages/Reports';
 
 function App() {
@@ -58,7 +58,7 @@ function App() {
                         path="/chat"
                         element={
                             <PrivateRoute>
-                                <Chat />
+                                <ChatAssistant />
                             </PrivateRoute>
                         }
                     />
