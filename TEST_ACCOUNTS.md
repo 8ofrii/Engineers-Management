@@ -9,18 +9,25 @@ Password: password123
 Role: Full system access
 ```
 
+### 👔 PROJECT MANAGER Account (NEW)
+```
+Email: manager@construction.com
+Password: password123
+Role: Approval Queue, Transaction Reviews
+```
+
 ### 🔧 ENGINEER Account
 ```
 Email: engineer@construction.com
 Password: password123
-Role: Projects, Materials, Workmen
+Role: Projects, Materials, Workmen, Voice Input, Custody Wallet
 ```
 
 ### 💰 ACCOUNTANT Account
 ```
 Email: accountant@construction.com
 Password: password123
-Role: Finance, Transactions, Reports
+Role: Finance, Transactions, Reports, Income Splitting
 ```
 
 ---

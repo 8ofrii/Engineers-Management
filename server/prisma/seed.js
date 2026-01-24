@@ -57,13 +57,33 @@ async function main() {
     });
     console.log('✅ Created Accountant:', accountant.email);
 
+    // Create Project Manager User (NEW)
+    const manager = await prisma.user.upsert({
+        where: { email: 'manager@construction.com' },
+        update: {},
+        create: {
+            email: 'manager@construction.com',
+            password: password,
+            name: 'Omar Manager',
+            role: 'PROJECT_MANAGER',
+            company: 'Construction ERP',
+            phone: '+1234567893',
+            isActive: true
+        }
+    });
+    console.log('✅ Created Project Manager:', manager.email);
+
     console.log('\n📋 Test Accounts Created:');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('👤 ADMIN:');
     console.log('   Email: admin@construction.com');
     console.log('   Password: password123');
     console.log('');
-    console.log('🔧 ENGINEER:');
+    console.log('👔 PROJECT MANAGER (Approver):');
+    console.log('   Email: manager@construction.com');
+    console.log('   Password: password123');
+    console.log('');
+    console.log('🔧 ENGINEER (Site Engineer):');
     console.log('   Email: engineer@construction.com');
     console.log('   Password: password123');
     console.log('');
