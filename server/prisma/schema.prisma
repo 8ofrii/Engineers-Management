@@ -48,6 +48,7 @@ model User {
   materialUsage        MaterialUsage[]
   materialBatches      MaterialBatch[]
   custodyTransfers     CustodyTransfer[]
+  notifications        Notification[]
 
   @@map("users")
 }
@@ -550,6 +551,34 @@ model ChatMessage {
 
   @@index([userId, createdAt])
   @@map("chat_messages")
+}
+
+// ============================================
+// NOTIFICATIONS (In-App Alert System)
+// ============================================
+
+enum NotificationType {
+  ACTION_REQUIRED // e.g., "New Expense Needs Approval"
+  INFO // e.g., "Your Receipt was Approved"
+  ALERT // e.g., "Low Custody Balance"
+}
+
+model Notification {
+  id     String @id @default(uuid())
+  userId String // Who receives this notification
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type         NotificationType
+  title        String
+  message      String
+  resourceId   String? // Link to Transaction ID, Project ID, etc.
+  resourceType String? // 'transaction', 'project', 'custody', etc.
+  isRead       Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
 }
 
 // ============================================
