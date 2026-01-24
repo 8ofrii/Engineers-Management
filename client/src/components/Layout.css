@@ -15,6 +15,8 @@
     top: 0;
     bottom: 0;
     z-index: 100;
+    transform: translateX(0);
+    /* Visible by default on desktop */
     transition: transform var(--transition-base);
 }
 
