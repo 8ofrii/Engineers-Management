@@ -26,7 +26,7 @@
         "clients": "العملاء",
         "suppliers": "الموردين",
         "inventory": "المواد الخام",
-        "labor": "العمال",
+        "labor": "الصنايعية",
         "workmanship": "المصنعية",
         "finance": "المحاسبة",
         "chat": "المساعد الذكي",
@@ -190,21 +190,33 @@
         "reorderLevel": "مستوى إعادة الطلب"
     },
     "labor": {
-        "title": "العمال",
+        "title": "الصنايعية",
         "subtitle": "إدارة القوى العاملة",
         "newWorkman": "إضافة عامل",
         "trade": "المهنة",
         "dailyRate": "الأجر اليومي",
+        "phone": "الهاتف",
+        "nationalId": "الرقم القومي",
+        "totalPaid": "إجمالي المدفوع",
+        "noWorkmen": "لا يوجد عمال بعد",
+        "addFirst": "أضف أول عامل للبدء",
+        "customTrade": "حدد المهنة",
+        "customTradePlaceholder": "أدخل اسم المهنة (مثال: مبلط سيراميك، عزل)",
         "trades": {
-            "carpenter": "نجار",
-            "mason": "بناء",
-            "electrician": "كهربائي",
-            "plumber": "سباك",
-            "painter": "دهان",
-            "welder": "لحام",
-            "laborer": "عامل",
-            "foreman": "مشرف",
-            "other": "أخرى"
+            "CARPENTER": "نجار",
+            "MASON": "بناء",
+            "ELECTRICIAN": "كهربائي",
+            "PLUMBER": "سباك",
+            "PAINTER": "نقاش",
+            "WELDER": "لحام",
+            "LABORER": "عامل عادي",
+            "FOREMAN": "رئيس عمال",
+            "CONCRETE": "مسلح",
+            "PLASTERER": "مبيض",
+            "FLOORING": "مبلط",
+            "GYPSUM": "جبس",
+            "ALUMINUM": "ألوميتال",
+            "OTHER": "أخرى"
         }
     },
     "workmanship": {
@@ -276,6 +288,45 @@
         "deleteConfirmTitle": "تأكيد الحذف",
         "deleteConfirmMessage": "هل أنت متأكد أنك تريد حذف هذا العنصر؟",
         "deleteWarning": "لا يمكن التراجع عن هذا الإجراء.",
-        "reset": "إعادة تعيين"
+        "reset": "إعادة تعيين",
+        "all": "الكل",
+        "active": "نشط",
+        "inactive": "غير نشط",
+        "name": "الاسم",
+        "nameAr": "الاسم بالعربية",
+        "required": "هذا الحقل مطلوب",
+        "error": "حدث خطأ"
+    },
+    "profile": {
+        "title": "تعديل الملف الشخصي",
+        "sections": {
+            "picture": "الصورة الشخصية",
+            "basic": "المعلومات الأساسية",
+            "password": "تغيير كلمة المرور"
+        },
+        "fields": {
+            "name": "الاسم الكامل",
+            "email": "البريد الإلكتروني",
+            "phone": "رقم الهاتف",
+            "company": "الشركة",
+            "currentPassword": "كلمة المرور الحالية",
+            "newPassword": "كلمة المرور الجديدة",
+            "confirmPassword": "تأكيد كلمة المرور"
+        },
+        "uploadPicture": "رفع صورة",
+        "passwordHint": "اتركه فارغًا للاحتفاظ بكلمة المرور الحالية",
+        "saveChanges": "حفظ التغييرات",
+        "updateSuccess": "تم تحديث الملف الشخصي بنجاح!",
+        "updateError": "فشل تحديث الملف الشخصي. يرجى المحاولة مرة أخرى.",
+        "errors": {
+            "nameRequired": "الاسم مطلوب",
+            "emailRequired": "البريد الإلكتروني مطلوب",
+            "emailInvalid": "البريد الإلكتروني غير صالح",
+            "currentPasswordRequired": "كلمة المرور الحالية مطلوبة لتغيير كلمة المرور",
+            "passwordTooShort": "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل",
+            "passwordMismatch": "كلمات المرور غير متطابقة",
+            "invalidImage": "يرجى رفع ملف صورة صالح",
+            "imageTooLarge": "يجب أن يكون حجم الصورة أقل من 5 ميجابايت"
+        }
     }
 }

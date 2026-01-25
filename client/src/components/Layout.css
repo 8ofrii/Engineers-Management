@@ -21,7 +21,8 @@
 }
 
 .sidebar-header {
-    padding: var(--spacing-xl);
+    height: 70px;
+    padding: 0 var(--spacing-xl);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
@@ -91,31 +92,34 @@
 }
 
 .sidebar-footer {
-    padding: var(--spacing-lg);
+    padding: var(--spacing-md);
     border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
 }
 
 .user-info {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-    padding: var(--spacing-md);
-    background: var(--bg-tertiary);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    background: transparent;
     border-radius: var(--radius-md);
+    transition: background 0.2s;
 }
 
 .user-avatar {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: var(--radius-full);
     background: var(--gradient-primary);
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    font-weight: 700;
-    font-size: var(--font-size-lg);
+    font-weight: 600;
+    font-size: var(--font-size-base);
     flex-shrink: 0;
 }
 
@@ -127,18 +131,30 @@
 .user-name {
     font-weight: 600;
     color: var(--text-primary);
-    font-size: var(--font-size-sm);
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .user-email {
-    font-size: var(--font-size-xs);
+    font-size: 11px;
     color: var(--text-tertiary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.sidebar-footer .btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    width: 100%;
+    justify-content: center;
+}
+
+.sidebar-footer .btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 .sidebar-overlay {

@@ -30,6 +30,7 @@ model User {
   role     UserRole @default(ENGINEER)
   company  String?
   phone    String?
+  profilePicture String? // URL to profile picture
   isActive Boolean  @default(true)
 
   // NEW: Financial Custody Tracking (Al-Ohda)
@@ -314,15 +315,20 @@ model MaterialBatch {
 // ============================================
 
 enum WorkmanTrade {
-  CARPENTER
-  MASON
-  ELECTRICIAN
-  PLUMBER
-  PAINTER
-  WELDER
-  LABORER
-  FOREMAN
-  OTHER
+  CARPENTER   // Naggar (نجار)
+  MASON       // Banna (مباني)
+  ELECTRICIAN // Kahraba'i (كهربائي)
+  PLUMBER     // Sabbak (سباك)
+  PAINTER     // Naqqash (نقاش)
+  WELDER      // Laham (لحام)
+  LABORER     // 3amel (عامل)
+  FOREMAN     // Rayes (رئيس)
+  CONCRETE    // Musalaha - Formwork/Steel (مسلح)
+  PLASTERER   // Mbayad (مبيض)
+  FLOORING    // Mbalat - Ceramic/Marble (مبلط)
+  GYPSUM      // Jebs (جبس)
+  ALUMINUM    // Alumetal (ألوميتال)
+  OTHER       // أخرى
 }
 
 model Workman {
@@ -335,11 +341,15 @@ model Workman {
   nationalId String?
   isActive   Boolean      @default(true)
 
+  // Financial Tracking
+  totalPaid Decimal @default(0) @db.Decimal(15, 2) // Total cash given to this workman
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   workmanships Workmanship[]
+  transactions Transaction[] // Link to their payments
 
   @@map("workmen")
 }
@@ -460,6 +470,9 @@ model Transaction {
 
   clientId String?
   client   Client? @relation(fields: [clientId], references: [id])
+
+  workmanId String?
+  workman   Workman? @relation(fields: [workmanId], references: [id])
 
   createdBy String
   user      User   @relation(fields: [createdBy], references: [id])

@@ -79,6 +79,15 @@ export const suppliersAPI = {
     delete: (id) => api.delete(`/suppliers/${id}`)
 };
 
+// Workmen API
+export const workmenAPI = {
+    getAll: (params) => api.get('/workmen', { params }),
+    getOne: (id) => api.get(`/workmen/${id}`),
+    create: (data) => api.post('/workmen', data),
+    update: (id, data) => api.put(`/workmen/${id}`, data),
+    delete: (id) => api.delete(`/workmen/${id}`)
+};
+
 // Chat API
 export const chatAPI = {
     getMessages: () => api.get('/chat'),

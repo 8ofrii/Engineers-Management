@@ -1,7 +1,7 @@
 import express from 'express';
 import * as chatController from '../controllers/chatController.js';
 import { protect } from '../middleware/auth.js';
-import upload from '../middleware/upload.js';
+import { audioUpload } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ router.use(protect);
 // Send message (text or voice)
 router.post(
     '/message',
-    upload.single('audio'), // Handle audio file upload
+    audioUpload.single('audio'), // Handle audio file upload
     chatController.sendMessage
 );
 

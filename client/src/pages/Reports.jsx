@@ -26,9 +26,9 @@ export default function Reports() {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat('en-EG', {
             style: 'currency',
-            currency: 'USD'
+            currency: 'EGP'
         }).format(amount);
     };
 

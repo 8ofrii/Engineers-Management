@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Clients from './pages/Clients';
 import Suppliers from './pages/Suppliers';
+import Workforce from './pages/Workforce';
 import ChatAssistant from './pages/ChatAssistant';
 import Reports from './pages/Reports';
 
@@ -51,6 +52,14 @@ function App() {
                         element={
                             <PrivateRoute>
                                 <Suppliers />
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
+                        path="/workforce"
+                        element={
+                            <PrivateRoute>
+                                <Workforce />
                             </PrivateRoute>
                         }
                     />

@@ -26,7 +26,7 @@
         "clients": "Clients",
         "suppliers": "Suppliers",
         "inventory": "Raw Materials",
-        "labor": "Workmen",
+        "labor": "Workforce",
         "workmanship": "Workmanship",
         "finance": "Accounting",
         "chat": "Chat Assistant",
@@ -190,21 +190,33 @@
         "reorderLevel": "Reorder Level"
     },
     "labor": {
-        "title": "Workmen",
-        "subtitle": "Manage your workforce",
+        "title": "Workforce",
+        "subtitle": "Manage your workforce (Sanaieya)",
         "newWorkman": "Add Workman",
         "trade": "Trade",
         "dailyRate": "Daily Rate",
+        "phone": "Phone",
+        "nationalId": "National ID",
+        "totalPaid": "Total Paid",
+        "noWorkmen": "No Workmen Yet",
+        "addFirst": "Add your first workman to get started",
+        "customTrade": "Specify Trade",
+        "customTradePlaceholder": "Enter trade name (e.g., Tile Setter, Waterproofing)",
         "trades": {
-            "carpenter": "Carpenter",
-            "mason": "Mason",
-            "electrician": "Electrician",
-            "plumber": "Plumber",
-            "painter": "Painter",
-            "welder": "Welder",
-            "laborer": "Laborer",
-            "foreman": "Foreman",
-            "other": "Other"
+            "CARPENTER": "Carpenter",
+            "MASON": "Builder",
+            "ELECTRICIAN": "Electrician",
+            "PLUMBER": "Plumber",
+            "PAINTER": "Painter",
+            "WELDER": "Welder",
+            "LABORER": "Laborer",
+            "FOREMAN": "Foreman",
+            "CONCRETE": "Concrete Worker",
+            "PLASTERER": "Plasterer",
+            "FLOORING": "Flooring",
+            "GYPSUM": "Gypsum",
+            "ALUMINUM": "Aluminum",
+            "OTHER": "Other"
         }
     },
     "workmanship": {
@@ -276,6 +288,45 @@
         "deleteConfirmTitle": "Confirm Deletion",
         "deleteConfirmMessage": "Are you sure you want to delete this item?",
         "deleteWarning": "This action cannot be undone.",
-        "reset": "Reset"
+        "reset": "Reset",
+        "all": "All",
+        "active": "Active",
+        "inactive": "Inactive",
+        "name": "Name",
+        "nameAr": "Arabic Name",
+        "required": "This field is required",
+        "error": "An error occurred"
+    },
+    "profile": {
+        "title": "Edit Profile",
+        "sections": {
+            "picture": "Profile Picture",
+            "basic": "Basic Information",
+            "password": "Change Password"
+        },
+        "fields": {
+            "name": "Full Name",
+            "email": "Email Address",
+            "phone": "Phone Number",
+            "company": "Company",
+            "currentPassword": "Current Password",
+            "newPassword": "New Password",
+            "confirmPassword": "Confirm Password"
+        },
+        "uploadPicture": "Upload Picture",
+        "passwordHint": "Leave blank to keep current password",
+        "saveChanges": "Save Changes",
+        "updateSuccess": "Profile updated successfully!",
+        "updateError": "Failed to update profile. Please try again.",
+        "errors": {
+            "nameRequired": "Name is required",
+            "emailRequired": "Email is required",
+            "emailInvalid": "Email is invalid",
+            "currentPasswordRequired": "Current password is required to change password",
+            "passwordTooShort": "Password must be at least 6 characters",
+            "passwordMismatch": "Passwords do not match",
+            "invalidImage": "Please upload a valid image file",
+            "imageTooLarge": "Image size must be less than 5MB"
+        }
     }
 }

@@ -15,9 +15,12 @@ import {
     Building2,
     Moon,
     Sun,
-    Languages
+    Languages,
+    User as UserIcon,
+    HardHat
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import ProfileModal from './ProfileModal';
 import './Layout.css';
 
 export default function Layout({ children }) {
@@ -27,6 +30,17 @@ export default function Layout({ children }) {
     const { t, i18n } = useTranslation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(true);
+    const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+    // Helper function to get full image URL
+    const getImageUrl = (path) => {
+        if (!path) return null;
+        // If path already includes http/https, return as is
+        if (path.startsWith('http')) return path;
+        // Otherwise, prepend the API base URL
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        return `${apiUrl}${path}`;
+    };
 
     useEffect(() => {
         // Set RTL direction for Arabic
@@ -53,6 +67,7 @@ export default function Layout({ children }) {
         { path: '/projects', icon: FolderKanban, label: t('nav.projects') },
         { path: '/clients', icon: Users, label: t('nav.clients') },
         { path: '/suppliers', icon: Package, label: t('nav.suppliers') },
+        { path: '/workforce', icon: HardHat, label: t('nav.labor') },
         { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
         { path: '/reports', icon: FileText, label: t('nav.reports') }
     ];
@@ -90,9 +105,23 @@ export default function Layout({ children }) {
                 </nav>
 
                 <div className="sidebar-footer">
-                    <div className="user-info">
+                    <div
+                        className="user-info"
+                        onClick={() => setProfileModalOpen(true)}
+                        style={{ cursor: 'pointer', transition: 'background 0.2s' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
                         <div className="user-avatar">
-                            {user?.name?.charAt(0).toUpperCase()}
+                            {user?.profilePicture ? (
+                                <img
+                                    src={getImageUrl(user.profilePicture)}
+                                    alt={user.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                                />
+                            ) : (
+                                user?.name?.charAt(0).toUpperCase()
+                            )}
                         </div>
                         <div className="user-details">
                             <div className="user-name">{user?.name}</div>
@@ -148,6 +177,12 @@ export default function Layout({ children }) {
                     </div>
                 </main>
             </div>
+
+            {/* Profile Modal */}
+            <ProfileModal
+                isOpen={profileModalOpen}
+                onClose={() => setProfileModalOpen(false)}
+            />
         </div>
     );
 }

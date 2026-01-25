@@ -133,6 +133,7 @@ export const getMe = async (req, res, next) => {
                 role: true,
                 company: true,
                 phone: true,
+                profilePicture: true,
                 isActive: true,
                 createdAt: true
             }
@@ -146,3 +147,85 @@ export const getMe = async (req, res, next) => {
         next(error);
     }
 };
+
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+export const updateProfile = async (req, res, next) => {
+    try {
+        const { name, email, phone, company, currentPassword, newPassword } = req.body;
+        const userId = req.user.id;
+
+        // Get current user
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Prepare update data
+        const updateData = {};
+
+        if (name) updateData.name = name;
+        if (email && email !== user.email) {
+            // Check if email is already taken
+            const emailExists = await prisma.user.findUnique({ where: { email } });
+            if (emailExists) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email already in use'
+                });
+            }
+            updateData.email = email;
+        }
+        if (phone !== undefined) updateData.phone = phone;
+        if (company !== undefined) updateData.company = company;
+
+        // Handle profile picture upload
+        if (req.file) {
+            updateData.profilePicture = `/uploads/images/${req.file.filename}`;
+        }
+
+        // Handle password change
+        if (currentPassword && newPassword) {
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Current password is incorrect'
+                });
+            }
+
+            const salt = await bcrypt.genSalt(10);
+            updateData.password = await bcrypt.hash(newPassword, salt);
+        }
+
+        // Update user
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: updateData,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                company: true,
+                phone: true,
+                profilePicture: true,
+                isActive: true,
+                createdAt: true
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: updatedUser,
+            message: 'Profile updated successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+

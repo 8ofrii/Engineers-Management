@@ -44,9 +44,9 @@ export default function Projects() {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat('en-EG', {
             style: 'currency',
-            currency: 'USD'
+            currency: 'EGP'
         }).format(amount);
     };
 

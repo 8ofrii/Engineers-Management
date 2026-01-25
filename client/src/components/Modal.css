@@ -198,6 +198,82 @@
     margin-top: 4px;
 }
 
+/* Custom styled number input spinners */
+.form-group input[type="number"] {
+    -moz-appearance: textfield;
+    padding-right: 40px;
+    /* Make room for custom spinners */
+}
+
+/* Hide default spinners in webkit browsers */
+.form-group input[type="number"]::-webkit-inner-spin-button,
+.form-group input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Number input wrapper for custom spinners */
+.number-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.number-input-wrapper input {
+    flex: 1;
+}
+
+/* Custom spinner buttons */
+.number-spinners {
+    position: absolute;
+    right: 1px;
+    top: 1px;
+    bottom: 1px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0 7px 7px 0;
+    overflow: hidden;
+}
+
+.spinner-btn {
+    flex: 1;
+    width: 32px;
+    background: var(--bg-tertiary);
+    border: none;
+    border-left: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.spinner-btn:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+.spinner-btn:active {
+    transform: scale(0.95);
+}
+
+.spinner-btn:first-child {
+    border-bottom: 0.5px solid var(--border-color);
+}
+
+.spinner-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.spinner-btn:disabled:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
 .field-hint {
     color: var(--text-tertiary);
     font-size: 12px;

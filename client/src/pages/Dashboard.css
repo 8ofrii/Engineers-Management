@@ -62,11 +62,11 @@
 }
 
 .stat-value {
-    font-size: var(--font-size-3xl);
+    font-size: var(--font-size-2xl);
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: var(--spacing-sm);
-    line-height: 1;
+    line-height: 1.2;
 }
 
 .stat-meta {
