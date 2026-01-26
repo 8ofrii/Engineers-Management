@@ -3,12 +3,26 @@ import prisma from '../lib/prisma.js';
 // @desc    Get all projects
 // @route   GET /api/projects
 // @access  Private
+// @desc    Get all projects
+// @route   GET /api/projects
+// @access  Private
 export const getProjects = async (req, res, next) => {
     try {
+        // Enforce Tenant Isolation
+        const whereClause = {
+            tenantId: req.user.tenantId
+        };
+
+        // If Engineer, show only assigned projects? 
+        // Or all company projects? Usually Engineeers see only theirs.
+        // Let's keep logic: if ENGINEER, see only own projects.
+        // If ADMIN/Manager, see all tenant projects.
+        if (req.user.role === 'ENGINEER') {
+            whereClause.engineerId = req.user.id;
+        }
+
         const projects = await prisma.project.findMany({
-            where: {
-                engineerId: req.user.id
-            },
+            where: whereClause,
             include: {
                 client: true,
                 engineer: {
@@ -39,8 +53,12 @@ export const getProjects = async (req, res, next) => {
 // @access  Private
 export const getProject = async (req, res, next) => {
     try {
-        const project = await prisma.project.findUnique({
-            where: { id: req.params.id },
+        // Use findFirst to enforce tenantId check alongside ID
+        const project = await prisma.project.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 client: true,
                 engineer: true,
@@ -55,8 +73,8 @@ export const getProject = async (req, res, next) => {
             });
         }
 
-        // Check ownership
-        if (project.engineerId !== req.user.id && req.user.role !== 'ADMIN') {
+        // Check ownership (Engineer specific)
+        if (req.user.role === 'ENGINEER' && project.engineerId !== req.user.id) {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to access this project'
@@ -80,7 +98,8 @@ export const createProject = async (req, res, next) => {
         const project = await prisma.project.create({
             data: {
                 ...req.body,
-                engineerId: req.user.id
+                engineerId: req.user.id,
+                tenantId: req.user.tenantId // Critical: Assign to Tenant
             },
             include: {
                 client: true
@@ -101,8 +120,11 @@ export const createProject = async (req, res, next) => {
 // @access  Private
 export const updateProject = async (req, res, next) => {
     try {
-        const project = await prisma.project.findUnique({
-            where: { id: req.params.id }
+        const project = await prisma.project.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!project) {
@@ -142,8 +164,11 @@ export const updateProject = async (req, res, next) => {
 // @access  Private
 export const deleteProject = async (req, res, next) => {
     try {
-        const project = await prisma.project.findUnique({
-            where: { id: req.params.id }
+        const project = await prisma.project.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!project) {

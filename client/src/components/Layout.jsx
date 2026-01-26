@@ -17,7 +17,9 @@ import {
     Sun,
     Languages,
     User as UserIcon,
-    HardHat
+    HardHat,
+    Settings,
+    UserCog
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -72,14 +74,29 @@ export default function Layout({ children }) {
         { path: '/reports', icon: FileText, label: t('nav.reports') }
     ];
 
+    if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
+        navItems.push({ path: '/team', icon: UserCog, label: 'Team Management' });
+    }
+
+
+
+
     return (
         <div className="layout">
             {/* Sidebar */}
             <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        <Building2 size={28} />
-                        <span>{t('app.name')}</span>
+                        {user?.companyLogo ? (
+                            <img
+                                src={getImageUrl(user.companyLogo)}
+                                alt="Logo"
+                                style={{ height: '56px', width: '56px', borderRadius: '50%', marginRight: '10px', objectFit: 'cover' }}
+                            />
+                        ) : (
+                            <Building2 size={28} />
+                        )}
+                        <span>{user?.company || t('app.name')}</span>
                     </div>
                     <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>
                         <X size={24} />

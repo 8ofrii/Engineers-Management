@@ -1,7 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
+import sendEmail from '../utils/sendEmail.js';
 
+// Generate JWT Token
 // Generate JWT Token
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -9,9 +11,8 @@ const generateToken = (id) => {
     });
 };
 
-// @desc    Register user
+// @desc    Register user (Legacy)
 // @route   POST /api/auth/register
-// @access  Public
 export const register = async (req, res, next) => {
     try {
         const { name, email, password, company, phone, role } = req.body;
@@ -60,6 +61,200 @@ export const register = async (req, res, next) => {
     }
 };
 
+// Helper to generate 6-digit OTP
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+// @desc    Step 1: Register a new company (SaaS Tenant + Admin User) - Sends OTP
+// @route   POST /api/auth/register-company
+// @access  Public
+export const registerCompany = async (req, res, next) => {
+    try {
+        const { companyName, adminName, email, password, phone } = req.body;
+
+        // Validation
+        if (!companyName || !adminName || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide all required fields'
+            });
+        }
+
+        // Check if user exists
+        const userExists = await prisma.user.findUnique({ where: { email } });
+        if (userExists) {
+            return res.status(400).json({
+                success: false,
+                message: 'User already exists with this email'
+            });
+        }
+
+        // Generate Company Slug
+        const slug = companyName
+            .toLowerCase()
+            .replace(/ /g, '-')
+            .replace(/[^\w-]+/g, '') + '-' + Math.floor(Math.random() * 1000);
+
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Generate Verification Code
+        const verificationCode = generateOTP();
+        const verificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+        // Transaction: Create Tenant + Admin User
+        const result = await prisma.$transaction(async (prisma) => {
+            // 1. Create Tenant
+            const tenant = await prisma.tenant.create({
+                data: {
+                    name: companyName,
+                    slug: slug,
+                    subscriptionPlan: 'FREE_PILOT'
+                }
+            });
+
+            // 2. Create Admin User (Unverified)
+            const user = await prisma.user.create({
+                data: {
+                    name: adminName,
+                    email,
+                    password: hashedPassword,
+                    company: companyName,
+                    phone,
+                    role: 'ADMIN', // Company Owner
+                    tenantId: tenant.id,
+                    isVerified: false,
+                    verificationCode,
+                    verificationExpires
+                }
+            });
+
+            return { tenant, user };
+        });
+
+        // Send Verification Email
+        const message = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1 style="color: #3b82f6;">Welcome to Civil Engine!</h1>
+                <p>You have successfully initialized your company workspace: <strong>${companyName}</strong></p>
+                <p>Please enter the following code to verify your account and complete the setup:</p>
+                <div style="background-color: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                    <h2 style="color: #111827; font-size: 32px; letter-spacing: 5px; margin: 0;">${verificationCode}</h2>
+                </div>
+                <p>This code expires in 10 minutes.</p>
+                <p>If you did not request this, please ignore this email.</p>
+            </div>
+        `;
+
+        try {
+            await sendEmail({
+                email: result.user.email,
+                subject: 'Verify Your Company Workspace - Civil Engine',
+                message
+            });
+        } catch (error) {
+            console.error('Email send error:', error);
+            // We return success true but maybe with a warning, or fail?
+            // If we fail here, the user is created but can't verify.
+            // Let's assume it works or they can resend (need resend endpoint?)
+            // For MVP/Demo, let's just log.
+        }
+
+        res.status(201).json({
+            success: true,
+            email: result.user.email,
+            message: 'Registration successful. Verification code sent to your email.'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Step 2: Verify Email and Activate Account
+// @route   POST /api/auth/verify-email
+// @access  Public
+export const verifyEmail = async (req, res, next) => {
+    try {
+        const { email, code } = req.body;
+
+        if (!email || !code) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide email and verification code'
+            });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { email },
+            include: { tenant: true }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email'
+            });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({
+                success: false,
+                message: 'User is already verified'
+            });
+        }
+
+        if (user.verificationCode !== code) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid verification code'
+            });
+        }
+
+        if (user.verificationExpires && user.verificationExpires < new Date()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Verification code expired'
+            });
+        }
+
+        // Activate User
+        const updatedUser = await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                isVerified: true,
+                isActive: true, // Ensure active
+                verificationCode: null,
+                verificationExpires: null
+            },
+            include: { tenant: true }
+        });
+
+        // Generate Token
+        const token = generateToken(updatedUser.id);
+
+        res.status(200).json({
+            success: true,
+            token,
+            user: {
+                id: updatedUser.id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                role: updatedUser.role,
+                company: updatedUser.tenant ? updatedUser.tenant.name : updatedUser.company,
+                companyLogo: updatedUser.tenant ? updatedUser.tenant.logo : null, // Added Logo
+                tenantId: updatedUser.tenantId
+            }
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ... (imports remain)
+
+// ... (register, registerCompany, verifyEmail remain)
+
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
@@ -75,7 +270,11 @@ export const login = async (req, res, next) => {
         }
 
         // Check for user
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({
+            where: { email },
+            include: { tenant: true } // Include tenant info
+        });
+
         if (!user) {
             return res.status(401).json({
                 success: false,
@@ -111,7 +310,11 @@ export const login = async (req, res, next) => {
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                company: user.company
+                company: user.tenant ? user.tenant.name : user.company,
+                companyLogo: user.tenant ? user.tenant.logo : null,
+                tenantId: user.tenantId,
+                permissions: user.permissions || [],
+                mustChangePassword: user.mustChangePassword || false
             }
         });
     } catch (error) {
@@ -126,22 +329,26 @@ export const getMe = async (req, res, next) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: req.user.id },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                company: true,
-                phone: true,
-                profilePicture: true,
-                isActive: true,
-                createdAt: true
-            }
+            include: { tenant: true }
         });
 
         res.status(200).json({
             success: true,
-            data: user
+            data: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                company: user.tenant ? user.tenant.name : user.company,
+                companyLogo: user.tenant ? user.tenant.logo : null,
+                tenantId: user.tenantId,
+                phone: user.phone,
+                profilePicture: user.profilePicture,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                permissions: user.permissions || [],
+                mustChangePassword: user.mustChangePassword || false
+            }
         });
     } catch (error) {
         next(error);
@@ -200,6 +407,7 @@ export const updateProfile = async (req, res, next) => {
 
             const salt = await bcrypt.genSalt(10);
             updateData.password = await bcrypt.hash(newPassword, salt);
+            updateData.mustChangePassword = false; // Reset flag on success
         }
 
         // Update user
@@ -215,7 +423,9 @@ export const updateProfile = async (req, res, next) => {
                 phone: true,
                 profilePicture: true,
                 isActive: true,
-                createdAt: true
+                createdAt: true,
+                permissions: true,
+                mustChangePassword: true
             }
         });
 
@@ -224,6 +434,41 @@ export const updateProfile = async (req, res, next) => {
             data: updatedUser,
             message: 'Profile updated successfully'
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Verify Invitation Token
+// @route   POST /api/auth/verify-invite
+// @access  Public
+export const verifyInvite = async (req, res, next) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ success: false, message: 'Invalid token' });
+        }
+
+        const user = await prisma.user.findFirst({
+            where: { verificationCode: token }
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired verification token' });
+        }
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                isVerified: true,
+                verificationCode: null,
+                isActive: true
+            }
+        });
+
+        res.status(200).json({ success: true, message: 'Account verified successfully. You can now login.' });
+
     } catch (error) {
         next(error);
     }

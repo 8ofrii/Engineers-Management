@@ -6,6 +6,9 @@ import prisma from '../lib/prisma.js';
 export const getClients = async (req, res, next) => {
     try {
         const clients = await prisma.client.findMany({
+            where: {
+                tenantId: req.user.tenantId // Tenant Isolation
+            },
             orderBy: {
                 createdAt: 'desc'
             }
@@ -26,8 +29,11 @@ export const getClients = async (req, res, next) => {
 // @access  Private
 export const getClient = async (req, res, next) => {
     try {
-        const client = await prisma.client.findUnique({
-            where: { id: req.params.id },
+        const client = await prisma.client.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 projects: true
             }
@@ -55,7 +61,10 @@ export const getClient = async (req, res, next) => {
 export const createClient = async (req, res, next) => {
     try {
         const client = await prisma.client.create({
-            data: req.body
+            data: {
+                ...req.body,
+                tenantId: req.user.tenantId // Critical: Assign to Tenant
+            }
         });
 
         res.status(201).json({
@@ -72,14 +81,29 @@ export const createClient = async (req, res, next) => {
 // @access  Private
 export const updateClient = async (req, res, next) => {
     try {
-        const client = await prisma.client.update({
-            where: { id: req.params.id },
+        const client = await prisma.client.updateMany({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId // Ensure ownership
+            },
             data: req.body
+        });
+
+        if (client.count === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Client not found or authorized'
+            });
+        }
+
+        // Fetch updated
+        const updatedClient = await prisma.client.findFirst({
+            where: { id: req.params.id }
         });
 
         res.status(200).json({
             success: true,
-            data: client
+            data: updatedClient
         });
     } catch (error) {
         next(error);
@@ -91,9 +115,19 @@ export const updateClient = async (req, res, next) => {
 // @access  Private
 export const deleteClient = async (req, res, next) => {
     try {
-        await prisma.client.delete({
-            where: { id: req.params.id }
+        const result = await prisma.client.deleteMany({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            }
         });
+
+        if (result.count === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Client not found or authorized'
+            });
+        }
 
         res.status(200).json({
             success: true,

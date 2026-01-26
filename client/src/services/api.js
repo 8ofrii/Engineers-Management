@@ -37,8 +37,21 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
     register: (data) => api.post('/auth/register', data),
+    registerCompany: (data) => api.post('/auth/register-company', data), // SaaS Sign-up Step 1
+    verifyEmail: (data) => api.post('/auth/verify-email', data), // SaaS Sign-up Step 2
+    verifyInvite: (token) => api.post('/auth/verify-invite', { token }),
     login: (data) => api.post('/auth/login', data),
-    getMe: () => api.get('/auth/me')
+    getMe: () => api.get('/auth/me'),
+    updateProfile: (formData) => api.put('/auth/profile', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
+};
+
+export const userAPI = {
+    getAll: () => api.get('/users'),
+    invite: (data) => api.post('/users', data),
+    update: (id, data) => api.put(`/users/${id}`, data),
+    delete: (id) => api.delete(`/users/${id}`)
 };
 
 // Projects API
@@ -93,6 +106,14 @@ export const chatAPI = {
     getMessages: () => api.get('/chat'),
     sendText: (data) => api.post('/chat/text', data),
     sendAudio: (formData) => api.post('/chat/audio', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
+};
+
+// Tenant API
+export const tenantAPI = {
+    getSettings: () => api.get('/tenant'),
+    updateSettings: (formData) => api.put('/tenant', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     })
 };

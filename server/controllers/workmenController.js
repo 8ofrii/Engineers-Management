@@ -6,6 +6,9 @@ import prisma from '../lib/prisma.js';
 export const getAll = async (req, res, next) => {
     try {
         const workmen = await prisma.workman.findMany({
+            where: {
+                tenantId: req.user.tenantId // Tenant Isolation
+            },
             orderBy: { createdAt: 'desc' }
         });
 
@@ -23,8 +26,11 @@ export const getAll = async (req, res, next) => {
 // @access  Private
 export const getOne = async (req, res, next) => {
     try {
-        const workman = await prisma.workman.findUnique({
-            where: { id: req.params.id },
+        const workman = await prisma.workman.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 workmanships: true,
                 transactions: {
@@ -64,7 +70,8 @@ export const create = async (req, res, next) => {
                 trade,
                 dailyRate,
                 phone,
-                nationalId
+                nationalId,
+                tenantId: req.user.tenantId // Critical: Assign to Tenant
             }
         });
 
@@ -84,8 +91,11 @@ export const update = async (req, res, next) => {
     try {
         const { name, nameAr, trade, dailyRate, phone, nationalId, isActive } = req.body;
 
-        const workman = await prisma.workman.update({
-            where: { id: req.params.id },
+        const workman = await prisma.workman.updateMany({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            },
             data: {
                 name,
                 nameAr,
@@ -97,9 +107,20 @@ export const update = async (req, res, next) => {
             }
         });
 
+        if (workman.count === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Workman not found or authorized'
+            });
+        }
+
+        const updatedWorkman = await prisma.workman.findFirst({
+            where: { id: req.params.id }
+        });
+
         res.status(200).json({
             success: true,
-            data: workman
+            data: updatedWorkman
         });
     } catch (error) {
         next(error);
@@ -111,9 +132,19 @@ export const update = async (req, res, next) => {
 // @access  Private
 export const deleteWorkman = async (req, res, next) => {
     try {
-        await prisma.workman.delete({
-            where: { id: req.params.id }
+        const result = await prisma.workman.deleteMany({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            }
         });
+
+        if (result.count === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Workman not found or authorized'
+            });
+        }
 
         res.status(200).json({
             success: true,

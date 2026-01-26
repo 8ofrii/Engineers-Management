@@ -60,6 +60,18 @@ export const AuthProvider = ({ children }) => {
         return response.data;
     };
 
+    const registerCompany = async (companyData) => {
+        const response = await authAPI.registerCompany(companyData);
+        const { token, user } = response.data;
+
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setToken(token);
+        setUser(user);
+
+        return response.data;
+    };
+
     const logout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -78,6 +90,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!user,
         login,
         register,
+        registerCompany,
         logout,
         updateUser
     };

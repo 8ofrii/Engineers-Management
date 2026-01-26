@@ -18,6 +18,8 @@ import custodyRoutes from './routes/custody.js';
 import notificationRoutes from './routes/notifications.js';
 import materialBatchRoutes from './routes/materialBatches.js';
 import chatRoutes from './routes/chat.js';
+import tenantRoutes from './routes/tenant.js';
+import userRoutes from './routes/users.js';
 
 // Load env vars
 dotenv.config();
@@ -57,6 +59,8 @@ app.use('/api/custody', custodyRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/material-batches', materialBatchRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/tenant', tenantRoutes);
+app.use('/api/users', userRoutes); // NEW: User Management
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

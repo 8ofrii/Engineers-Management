@@ -4,14 +4,17 @@ import { PrivateRoute } from './components/PrivateRoute';
 
 // Pages
 import Login from './pages/Login';
-import SignUp from './pages/SignUp';
+import RegisterCompany from './pages/RegisterCompany'; // New SaaS Sign-up
+import VerifyInvite from './pages/VerifyInvite';
 import Dashboard from './pages/Dashboard';
+import CompanySettings from './pages/CompanySettings';
 import Projects from './pages/Projects';
 import Clients from './pages/Clients';
 import Suppliers from './pages/Suppliers';
 import Workforce from './pages/Workforce';
 import ChatAssistant from './pages/ChatAssistant';
 import Reports from './pages/Reports';
+import TeamManagement from './pages/TeamManagement';
 
 function App() {
     return (
@@ -20,7 +23,8 @@ function App() {
                 <Routes>
                     {/* Public Routes */}
                     <Route path="/login" element={<Login />} />
-                    <Route path="/signup" element={<SignUp />} />
+                    <Route path="/signup" element={<RegisterCompany />} />
+                    <Route path="/verify-invite" element={<VerifyInvite />} />
 
                     {/* Protected Routes */}
                     <Route
@@ -72,10 +76,26 @@ function App() {
                         }
                     />
                     <Route
+                        path="/team"
+                        element={
+                            <PrivateRoute>
+                                <TeamManagement />
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
                         path="/reports"
                         element={
                             <PrivateRoute>
                                 <Reports />
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
+                        path="/settings"
+                        element={
+                            <PrivateRoute>
+                                <CompanySettings />
                             </PrivateRoute>
                         }
                     />

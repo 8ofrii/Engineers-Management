@@ -12,13 +12,56 @@ datasource db {
 }
 
 // ============================================
-// USER & AUTHENTICATION (Enhanced for Custody)
+// MULTI-TENANT SAAS ARCHITECTURE
+// ============================================
+
+model Tenant {
+  id               String   @id @default(uuid())
+  name             String   // e.g., "Al-Futtaim Construction"
+  slug             String   @unique // e.g., "al-futtaim"
+  subscriptionPlan String   @default("FREE_PILOT") // BASIC, PRO, ENTERPRISE
+  isActive         Boolean  @default(true)
+  
+  // Company Profile
+  logo             String?
+  address          String?
+  phone            String?
+  email            String?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations - All data belongs to a tenant
+  users            User[]
+  projects         Project[]
+  clients          Client[]
+  suppliers        Supplier[]
+  workmen          Workman[]
+  transactions     Transaction[]
+  materialBatches  MaterialBatch[]
+  materials        Material[]
+  chatMessages     ChatMessage[]
+  notifications    Notification[]
+  custodyTransfers CustodyTransfer[]
+  
+  // Implicit/New Relations
+  materialUsage    MaterialUsage[]
+  workmanships     Workmanship[]
+  documents        Document[]
+  notes            Note[]
+
+  @@map("tenants")
+}
+
+// ============================================
+// USER & AUTHENTICATION (Multi-Tenant Enhanced)
 // ============================================
 
 enum UserRole {
-  ADMIN
-  PROJECT_MANAGER // New: Approver role
-  ENGINEER // Site Engineer - Wallet Holder
+  SUPER_ADMIN      // SaaS Owner - Can manage all tenants
+  ADMIN            // Company Owner - Full access within tenant
+  PROJECT_MANAGER  // Approver role
+  ENGINEER         // Site Engineer - Wallet Holder
   ACCOUNTANT
 }
 
@@ -32,10 +75,25 @@ model User {
   phone    String?
   profilePicture String? // URL to profile picture
   isActive Boolean  @default(true)
+  
+  // Verification
+  isVerified         Boolean   @default(false)
+  verificationCode   String?
+  verificationExpires DateTime?
+
+  // Multi-Tenant: Every user belongs to a tenant (except SUPER_ADMIN)
+  // Note: tenantId is optional (String?) only to allow SUPER_ADMIN to exist outside a company.
+  // For all other users (Engineers, Managers), tenantId must be enforced by API/App logic.
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // NEW: Financial Custody Tracking (Al-Ohda)
   currentCustodyBalance Decimal @default(0) @db.Decimal(15, 2) // Money currently in engineer's hand
   pendingClearance      Decimal @default(0) @db.Decimal(15, 2) // Receipts uploaded but not approved yet
+
+  // Access Control
+  permissions        String[]  @default([])
+  mustChangePassword Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -72,6 +130,10 @@ model Client {
   company      String?
   taxId        String?
   status       ClientStatus @default(ACTIVE)
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Address
   street  String?
@@ -121,6 +183,10 @@ model Supplier {
   paymentTerms String           @default("Net 30")
   rating       Int              @default(3)
   status       SupplierStatus   @default(ACTIVE)
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Address
   street  String?
@@ -199,6 +265,10 @@ model Project {
   engineerId String
   engineer   User   @relation(fields: [engineerId], references: [id])
 
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -242,11 +312,16 @@ model Material {
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
 
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   usage MaterialUsage[]
+  batches MaterialBatch[] // Added relation to batches
 
   @@map("materials")
 }
@@ -268,6 +343,10 @@ model MaterialUsage {
   user       User   @relation(fields: [recordedBy], references: [id])
 
   createdAt DateTime @default(now())
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("material_usage")
 }
@@ -306,6 +385,14 @@ model MaterialBatch {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Multi-Tenant
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Optional: Link to material definition if needed
+  materialId String?
+  material   Material? @relation(fields: [materialId], references: [id])
+
   @@index([projectId, status])
   @@map("material_batches")
 }
@@ -340,6 +427,10 @@ model Workman {
   phone      String?
   nationalId String?
   isActive   Boolean      @default(true)
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Financial Tracking
   totalPaid Decimal @default(0) @db.Decimal(15, 2) // Total cash given to this workman
@@ -387,6 +478,10 @@ model Workmanship {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("workmanships")
 }
@@ -482,6 +577,10 @@ model Transaction {
   approver   User?     @relation("ApprovedBy", fields: [approvedBy], references: [id])
   approvedAt DateTime?
 
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -517,6 +616,10 @@ model CustodyTransfer {
 
   // Optional link to related transaction (for clearance)
   relatedTransactionId String?
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -560,6 +663,10 @@ model ChatMessage {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Multi-Tenant (Redundant via User, but good for direct filtering)
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -580,6 +687,10 @@ model Notification {
   id     String @id @default(uuid())
   userId String // Who receives this notification
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   type         NotificationType
   title        String
@@ -610,6 +721,10 @@ model Document {
 
   uploadedAt DateTime @default(now())
 
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   @@map("documents")
 }
 
@@ -621,6 +736,10 @@ model Note {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+  // Multi-Tenant
+  tenantId String?
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("notes")
 }
