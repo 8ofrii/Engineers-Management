@@ -380,7 +380,7 @@ export default function TeamManagement() {
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                     <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ marginBottom: '6px', display: 'block', fontWeight: '500', fontSize: '14px' }}>Phone Number</label>
+                                        <label style={{ marginBottom: '6px', display: 'block', fontWeight: '500', fontSize: '14px' }}>Phone Number <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                                         <input
                                             type="text"
                                             className="input"
@@ -388,6 +388,7 @@ export default function TeamManagement() {
                                             value={formData.phone}
                                             onChange={e => setFormData({ ...formData, phone: e.target.value })}
                                             placeholder="+1 234 567 890"
+                                            required
                                         />
                                     </div>
                                     {modalMode === 'add' && (

@@ -67,7 +67,7 @@ enum UserRole {
 
 model User {
   id       String   @id @default(uuid())
-  email    String   @unique
+  email    String
   password String
   name     String
   role     UserRole @default(ENGINEER)
@@ -94,6 +94,10 @@ model User {
   // Access Control
   permissions        String[]  @default([])
   mustChangePassword Boolean   @default(false)
+  
+  // Password Reset
+  resetPasswordToken   String?
+  resetPasswordExpire  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -110,6 +114,8 @@ model User {
   notifications        Notification[]
 
   @@map("users")
+  @@unique([email, tenantId])
+  @@unique([phone, tenantId])
 }
 
 // ============================================

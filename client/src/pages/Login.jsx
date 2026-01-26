@@ -76,10 +76,15 @@ export default function Login() {
                         </div>
 
                         <div className="input-group">
-                            <label className="input-label">
-                                <Lock size={16} />
-                                {t('auth.password')}
-                            </label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <label className="input-label">
+                                    <Lock size={16} />
+                                    {t('auth.password')}
+                                </label>
+                                <Link to="/forgot-password" style={{ fontSize: '12px', color: 'var(--color-primary)', textDecoration: 'none' }}>
+                                    {t('auth.forgotPassword') || 'Forgot Password?'}
+                                </Link>
+                            </div>
                             <div style={{ position: 'relative' }}>
                                 <input
                                     type={showPassword ? "text" : "password"}

@@ -81,6 +81,13 @@ export default function Layout({ children }) {
 
 
 
+    // Force Password Change Logic
+    useEffect(() => {
+        if (user?.mustChangePassword) {
+            setProfileModalOpen(true);
+        }
+    }, [user]);
+
     return (
         <div className="layout">
             {/* Sidebar */}
@@ -199,6 +206,7 @@ export default function Layout({ children }) {
             <ProfileModal
                 isOpen={profileModalOpen}
                 onClose={() => setProfileModalOpen(false)}
+                forceChangePassword={user?.mustChangePassword}
             />
         </div>
     );

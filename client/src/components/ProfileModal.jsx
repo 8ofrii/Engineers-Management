@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Upload, User, Building2, UserCircle } from 'lucide-react';
+import { X, Upload, User, Building2, UserCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api, { tenantAPI } from '../services/api';
 import './Modal.css';
 import './Modal.css';
 
-export default function ProfileModal({ isOpen, onClose }) {
+export default function ProfileModal({ isOpen, onClose, forceChangePassword = false }) {
     const { t } = useTranslation();
     const { user, updateUser } = useAuth();
     const fileInputRef = useRef(null);
@@ -130,14 +130,21 @@ export default function ProfileModal({ isOpen, onClose }) {
             newErrors.email = t('profile.errors.emailInvalid');
         }
 
-        // Password validation (only if user wants to change password)
-        if (formData.newPassword || formData.confirmPassword) {
+        // Password validation
+        // If forceChangePassword is true, newPassword is MANDATORY
+        if (forceChangePassword || formData.newPassword || formData.confirmPassword) {
             if (!formData.currentPassword) {
                 newErrors.currentPassword = t('profile.errors.currentPasswordRequired');
             }
-            if (formData.newPassword.length < 6) {
-                newErrors.newPassword = t('profile.errors.passwordTooShort');
+
+            // Strict Complexity Check
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+            if (!formData.newPassword) {
+                newErrors.newPassword = t('profile.errors.passwordRequired');
+            } else if (!passwordRegex.test(formData.newPassword)) {
+                newErrors.newPassword = 'Password must be at least 8 chars, with Uppercase, Lowercase, Number, and Symbol.';
             }
+
             if (formData.newPassword !== formData.confirmPassword) {
                 newErrors.confirmPassword = t('profile.errors.passwordMismatch');
             }
@@ -247,23 +254,32 @@ export default function ProfileModal({ isOpen, onClose }) {
         onClose();
     };
 
+    // Prevent closing if forced
+    const handleOverlayClick = (e) => {
+        if (!forceChangePassword) {
+            handleClose();
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
-        <div className="modal-overlay" onClick={handleClose}>
+        <div className="modal-overlay" onClick={handleOverlayClick}>
             <div className="modal-container" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header" style={{ flexDirection: 'column', gap: '20px', paddingBottom: '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                         <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                            {activeTab === 'profile' ? t('profile.title') : 'Company Settings'}
+                            {forceChangePassword ? 'Action Required: Change Password' : (activeTab === 'profile' ? t('profile.title') : 'Company Settings')}
                         </h2>
-                        <button className="modal-close" onClick={handleClose} style={{ background: 'var(--bg-tertiary)', padding: '8px', borderRadius: '50%' }}>
-                            <X size={20} />
-                        </button>
+                        {!forceChangePassword && (
+                            <button className="modal-close" onClick={handleClose} style={{ background: 'var(--bg-tertiary)', padding: '8px', borderRadius: '50%' }}>
+                                <X size={20} />
+                            </button>
+                        )}
                     </div>
 
-                    {/* Tabs (Pill Style) */}
-                    {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
+                    {/* Tabs (Pill Style) - Hide if forced */}
+                    {!forceChangePassword && (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
                         <div style={{
                             display: 'flex',
                             background: 'var(--bg-tertiary)',
@@ -431,9 +447,15 @@ export default function ProfileModal({ isOpen, onClose }) {
 
                             {/* Change Password */}
                             <div className="form-section">
-                                <h3 className="section-title">{t('profile.sections.password')}</h3>
+                                <h3 className="section-title">{forceChangePassword ? 'Create New Password' : t('profile.sections.password')}</h3>
+                                {forceChangePassword && (
+                                    <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
+                                        <AlertCircle size={16} />
+                                        <span>For your security, you must change your password on first login.</span>
+                                    </div>
+                                )}
                                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                                    {t('profile.passwordHint')}
+                                    Password must include: 8+ chars, Uppercase, Lowercase, Number, Symbol.
                                 </p>
                                 <div className="form-grid">
                                     <div className="form-group full-width">
@@ -560,9 +582,11 @@ export default function ProfileModal({ isOpen, onClose }) {
                     )}
 
                     <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={handleClose}>
-                            {t('common.cancel')}
-                        </button>
+                        {!forceChangePassword && (
+                            <button type="button" className="btn btn-secondary" onClick={handleClose}>
+                                {t('common.cancel')}
+                            </button>
+                        )}
                         <button type="submit" className="btn btn-primary" disabled={loading}>
                             {loading ? t('common.loading') : (activeTab === 'profile' ? t('profile.saveChanges') : 'Save Company Settings')}
                         </button>

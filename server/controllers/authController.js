@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import sendEmail from '../utils/sendEmail.js';
+import crypto from 'crypto';
 
 // Generate JWT Token
 // Generate JWT Token
@@ -18,7 +19,7 @@ export const register = async (req, res, next) => {
         const { name, email, password, company, phone, role } = req.body;
 
         // Check if user exists
-        const userExists = await prisma.user.findUnique({ where: { email } });
+        const userExists = await prisma.user.findFirst({ where: { email } });
         if (userExists) {
             return res.status(400).json({
                 success: false,
@@ -79,14 +80,16 @@ export const registerCompany = async (req, res, next) => {
             });
         }
 
-        // Check if user exists
-        const userExists = await prisma.user.findUnique({ where: { email } });
+        // Check if user exists - Removed for Multi-Tenant Support (allow duplicate emails)
+        /*
+        const userExists = await prisma.user.findFirst({ where: { email } });
         if (userExists) {
             return res.status(400).json({
                 success: false,
                 message: 'User already exists with this email'
             });
         }
+        */
 
         // Generate Company Slug
         const slug = companyName
@@ -184,8 +187,9 @@ export const verifyEmail = async (req, res, next) => {
             });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email },
+        // Find user by email AND code (since email might be duplicate)
+        const user = await prisma.user.findFirst({
+            where: { email, verificationCode: code },
             include: { tenant: true }
         });
 
@@ -269,22 +273,30 @@ export const login = async (req, res, next) => {
             });
         }
 
-        // Check for user
-        const user = await prisma.user.findUnique({
+        // Check for user(s)
+        const users = await prisma.user.findMany({
             where: { email },
-            include: { tenant: true } // Include tenant info
+            include: { tenant: true }
         });
 
-        if (!user) {
+        if (!users || users.length === 0) {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid credentials'
             });
         }
 
-        // Check if password matches
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
+        // Find the user with the matching password
+        let user = null;
+        for (const u of users) {
+            const isMatch = await bcrypt.compare(password, u.password);
+            if (isMatch) {
+                user = u;
+                break;
+            }
+        }
+
+        if (!user) {
             return res.status(401).json({
                 success: false,
                 message: 'Invalid credentials'
@@ -377,12 +389,14 @@ export const updateProfile = async (req, res, next) => {
 
         if (name) updateData.name = name;
         if (email && email !== user.email) {
-            // Check if email is already taken
-            const emailExists = await prisma.user.findUnique({ where: { email } });
+            // Check if email is already taken in THIS tenant
+            // If user is trying to change email to one that exists in another tenant, it's fine!
+            // But within this tenant, it must be unique.
+            const emailExists = await prisma.user.findFirst({ where: { email, tenantId: user.tenantId } });
             if (emailExists) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Email already in use'
+                    message: 'Email already in use in this company'
                 });
             }
             updateData.email = email;
@@ -402,6 +416,15 @@ export const updateProfile = async (req, res, next) => {
                 return res.status(401).json({
                     success: false,
                     message: 'Current password is incorrect'
+                });
+            }
+
+            // Password Complexity Check
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+            if (!passwordRegex.test(newPassword)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character.'
                 });
             }
 
@@ -471,6 +494,141 @@ export const verifyInvite = async (req, res, next) => {
 
     } catch (error) {
         next(error);
+    }
+};
+
+// @desc    Forgot Password
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        // There might be multiple users, but for forgot password we just need one valid one?
+        // Ideally we should send emails to all of them, or ask for tenant context.
+        // For simplicity, we findFirst. If user has multiple accounts, this might be tricky.
+        const user = await prisma.user.findFirst({ where: { email } });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Get reset token
+        const resetToken = crypto.randomBytes(20).toString('hex');
+
+        // Hash token and set to resetPasswordToken field
+        const resetPasswordToken = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+
+        // Set expire
+        const resetPasswordExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                resetPasswordToken,
+                resetPasswordExpire
+            }
+        });
+
+        // Create reset url
+        const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
+
+        const message = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                <h2 style="color: #2563eb;">Password Reset Request</h2>
+                <p>You have requested a password reset. Please click the button below to set a new password:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Password</a>
+                </div>
+                <p>If you did not request this, please ignore this email.</p>
+            </div>
+        `;
+
+        try {
+            await sendEmail({
+                email: user.email,
+                subject: 'Password Reset Token',
+                message
+            });
+
+            res.status(200).json({ success: true, message: 'Email sent' });
+        } catch (err) {
+            console.error(err);
+            await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    resetPasswordToken: null,
+                    resetPasswordExpire: null
+                }
+            });
+
+            return res.status(500).json({ success: false, message: 'Email could not be sent' });
+        }
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Reset Password
+// @route   PUT /api/auth/reset-password/:resettoken
+// @access  Public
+export const resetPassword = async (req, res, next) => {
+    try {
+        // Get hashed token
+        const resetPasswordToken = crypto
+            .createHash('sha256')
+            .update(req.params.resettoken)
+            .digest('hex');
+
+        const user = await prisma.user.findFirst({
+            where: {
+                resetPasswordToken,
+                resetPasswordExpire: { gt: new Date() }
+            },
+            include: { tenant: true }
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid token' });
+        }
+
+        // Set new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(req.body.password, salt);
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashedPassword,
+                resetPasswordToken: null,
+                resetPasswordExpire: null,
+                mustChangePassword: false
+            }
+        });
+
+        // Generate token
+        const token = generateToken(user.id);
+
+        res.status(200).json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                company: user.tenant ? user.tenant.name : user.company,
+                permissions: user.permissions || [],
+                mustChangePassword: false,
+                companyLogo: user.tenant ? user.tenant.logo : null,
+                tenantId: user.tenantId
+            }
+        });
+
+    } catch (err) {
+        next(err);
     }
 };
 

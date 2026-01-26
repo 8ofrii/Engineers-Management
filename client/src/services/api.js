@@ -41,6 +41,8 @@ export const authAPI = {
     verifyEmail: (data) => api.post('/auth/verify-email', data), // SaaS Sign-up Step 2
     verifyInvite: (token) => api.post('/auth/verify-invite', { token }),
     login: (data) => api.post('/auth/login', data),
+    forgotPassword: (data) => api.post('/auth/forgot-password', data),
+    resetPassword: (token, data) => api.put(`/auth/reset-password/${token}`, data),
     getMe: () => api.get('/auth/me'),
     updateProfile: (formData) => api.put('/auth/profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }

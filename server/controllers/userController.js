@@ -31,16 +31,32 @@ export const getUsers = async (req, res) => {
 export const inviteUser = async (req, res) => {
     const { name, email, role, password, phone, permissions } = req.body;
 
-    // Validate Input
-    if (!name || !email || !password) {
-        return res.status(400).json({ success: false, message: 'Please provide all required fields' });
+    // Validate Input: Email and Phone are mandatory
+    if (!name || !email || !password || !phone) {
+        return res.status(400).json({ success: false, message: 'Please provide all required fields (Name, Email, Password, Phone)' });
     }
 
     try {
-        // Check if user exists globally (email unique)
-        const exists = await prisma.user.findUnique({ where: { email } });
-        if (exists) {
-            return res.status(400).json({ success: false, message: 'User with this email already exists' });
+        // Check if user exists in THIS tenant (email unique per tenant)
+        const emailExists = await prisma.user.findFirst({
+            where: {
+                email,
+                tenantId: req.user.tenantId
+            }
+        });
+        if (emailExists) {
+            return res.status(400).json({ success: false, message: 'User with this email already exists in this company' });
+        }
+
+        // Check if user exists in THIS tenant with same phone
+        const phoneExists = await prisma.user.findFirst({
+            where: {
+                phone,
+                tenantId: req.user.tenantId
+            }
+        });
+        if (phoneExists) {
+            return res.status(400).json({ success: false, message: 'User with this phone number already exists in this company' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -52,7 +68,7 @@ export const inviteUser = async (req, res) => {
                 email,
                 password: hashedPassword,
                 role: role || 'ENGINEER',
-                phone: phone || '',
+                phone: phone, // Mandatory now
                 tenantId: req.user.tenantId,
                 isActive: true,
                 isVerified: false, // User must verify via email
@@ -108,6 +124,20 @@ export const inviteUser = async (req, res) => {
 export const updateUser = async (req, res) => {
     const { id } = req.params;
     const { role, name, phone, permissions } = req.body;
+
+    // Verify new phone isn't taken by another user
+    if (phone) {
+        const phoneExists = await prisma.user.findFirst({
+            where: {
+                phone,
+                tenantId: req.user.tenantId,
+                NOT: { id }
+            }
+        });
+        if (phoneExists) {
+            return res.status(400).json({ success: false, message: 'Phone number already in use by another member' });
+        }
+    }
 
     try {
         const user = await prisma.user.update({
