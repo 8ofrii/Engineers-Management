@@ -59,6 +59,8 @@
         "createFirst": "Create your first project to get started",
         "budget": "Budget",
         "spent": "Spent",
+        "remaining": "Remaining",
+        "viewTransactions": "View Transactions",
         "status": {
             "planning": "Planning",
             "inProgress": "In Progress",
@@ -231,6 +233,7 @@
     "finance": {
         "title": "Accounting",
         "subtitle": "Financial management and ledger",
+        "filteringBy": "Filtering by Project",
         "newTransaction": "New Transaction",
         "recordExpense": "Record Expense",
         "recordIncome": "Record Client Payment",
@@ -344,6 +347,7 @@
         "add": "Add",
         "search": "Search",
         "filter": "Filter",
+        "clear": "Clear",
         "export": "Export",
         "import": "Import",
         "yes": "Yes",

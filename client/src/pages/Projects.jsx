@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '../services/api';
-import { FolderKanban, Plus, Pencil, Trash2 } from 'lucide-react';
+import { FolderKanban, Plus, Pencil, Trash2, Receipt } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import Layout from '../components/Layout';
 import AddProjectModal from '../components/AddProjectModal';
@@ -9,6 +10,7 @@ import AddProjectModal from '../components/AddProjectModal';
 export default function Projects() {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const navigate = useNavigate();
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,6 +33,10 @@ export default function Projects() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const viewProjectTransactions = (projectId, projectName) => {
+        navigate(`/finance?projectId=${projectId}&projectName=${encodeURIComponent(projectName)}`);
     };
 
     const getStatusColor = (status) => {
@@ -211,6 +217,23 @@ export default function Projects() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* View Transactions Button */}
+                                <button
+                                    className="btn btn-secondary"
+                                    style={{
+                                        marginTop: 'var(--spacing-md)',
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 'var(--spacing-sm)'
+                                    }}
+                                    onClick={() => viewProjectTransactions(project.id, project.name)}
+                                >
+                                    <Receipt size={16} />
+                                    {t('projects.viewTransactions')}
+                                </button>
                             </div>
                         ))}
                     </div>

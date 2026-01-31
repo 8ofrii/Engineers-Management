@@ -60,6 +60,7 @@
         "budget": "الميزانية",
         "spent": "المصروف",
         "remaining": "المتبقي",
+        "viewTransactions": "عرض المعاملات",
         "status": {
             "planning": "تخطيط",
             "inProgress": "قيد التنفيذ",
@@ -232,6 +233,7 @@
     "finance": {
         "title": "المحاسبة",
         "subtitle": "الإدارة المالية ودفتر الأستاذ",
+        "filteringBy": "تصفية حسب المشروع",
         "newTransaction": "معاملة جديدة",
         "recordExpense": "تسجيل مصروف",
         "recordIncome": "تحصيل دفعة عميل",
@@ -345,6 +347,7 @@
         "add": "إضافة",
         "search": "بحث",
         "filter": "تصفية",
+        "clear": "مسح",
         "export": "تصدير",
         "import": "استيراد",
         "yes": "نعم",

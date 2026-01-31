@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X } from 'lucide-react';
 import Layout from '../components/Layout';
 import AddTransactionModal from '../components/AddTransactionModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 
 export default function Finance() {
     const { t } = useTranslation();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,14 +17,26 @@ export default function Finance() {
 
     // Filter states (basic implementation, can be expanded)
     const [filterType, setFilterType] = useState('ALL'); // ALL, INCOME, EXPENSE
+    const [filterProjectId, setFilterProjectId] = useState(null);
+    const [filterProjectName, setFilterProjectName] = useState(null);
 
     // Delete state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [transactionToDelete, setTransactionToDelete] = useState(null);
 
+    // Handle URL params for project filtering
+    useEffect(() => {
+        const projectId = searchParams.get('projectId');
+        const projectName = searchParams.get('projectName');
+        if (projectId) {
+            setFilterProjectId(projectId);
+            setFilterProjectName(projectName);
+        }
+    }, [searchParams]);
+
     useEffect(() => {
         loadTransactions();
-    }, [filterType]);
+    }, [filterType, filterProjectId]);
 
     const loadTransactions = async () => {
         try {
@@ -30,19 +44,31 @@ export default function Finance() {
             const params = {};
             if (filterType !== 'ALL') params.type = filterType;
 
-            const response = await transactionsAPI.getAll(params); // Note: make sure getAll handles params properly or filter client side
-            // If API doesn't support params yet, filter client side:
-            const allTx = response?.data?.data || [];
+            const response = await transactionsAPI.getAll(params);
+            let allTx = response?.data?.data || [];
+
+            // Filter by type
             if (filterType !== 'ALL') {
-                setTransactions(allTx.filter(tx => tx.type === filterType));
-            } else {
-                setTransactions(allTx);
+                allTx = allTx.filter(tx => tx.type === filterType);
             }
+
+            // Filter by project
+            if (filterProjectId) {
+                allTx = allTx.filter(tx => tx.projectId === filterProjectId);
+            }
+
+            setTransactions(allTx);
         } catch (error) {
             console.error('Failed to load transactions:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const clearProjectFilter = () => {
+        setFilterProjectId(null);
+        setFilterProjectName(null);
+        setSearchParams({});
     };
 
     // handleSaveTransaction removed as AddTransactionModal handles API calls directly layer
@@ -95,6 +121,39 @@ export default function Finance() {
                             {t('finance.title')}
                         </h1>
                         <p className="text-secondary">{t('finance.subtitle')}</p>
+
+                        {/* Project Filter Badge */}
+                        {filterProjectId && filterProjectName && (
+                            <div style={{
+                                marginTop: 'var(--spacing-sm)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 'var(--spacing-xs)',
+                                padding: '6px 12px',
+                                background: 'var(--color-primary)',
+                                color: 'white',
+                                borderRadius: 'var(--radius-md)',
+                                fontSize: 'var(--font-size-sm)'
+                            }}>
+                                <Filter size={14} />
+                                <span>{t('finance.filteringBy')}: {filterProjectName}</span>
+                                <button
+                                    onClick={clearProjectFilter}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        padding: '2px',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                    }}
+                                    title={t('common.clear')}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                     <button className="btn btn-primary" onClick={openCreateModal}>
                         <Plus size={20} />
