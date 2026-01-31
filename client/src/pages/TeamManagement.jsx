@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
-
 import { useTranslation } from 'react-i18next';
-import { Users, UserPlus, Shield, Trash2, Edit2, Search, MoreVertical, X, Check, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
-import { userAPI } from '../services/api';
+import { Users, UserPlus, Trash2, Edit2, Search, X, Eye, EyeOff, Mail, Phone } from 'lucide-react';
+import { userAPI, rolesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import CustomAlert from '../components/CustomAlert';
+import '../components/Modal.css';
 
 export default function TeamManagement() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { user: currentUser } = useAuth();
+    const isRTL = i18n.language === 'ar';
 
     const [users, setUsers] = useState([]);
+    const [roles, setRoles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -20,9 +22,9 @@ export default function TeamManagement() {
     const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
     const [selectedUser, setSelectedUser] = useState(null);
     const [formData, setFormData] = useState({
-        name: '', email: '', role: 'ENGINEER', password: '', phone: ''
+        name: '', email: '', roleId: '', role: 'ENGINEER', password: '', phone: '', permissions: {}
     });
-    const [showPassword, setShowPassword] = useState(false); // Toggle state
+    const [showPassword, setShowPassword] = useState(false);
 
     // Alert State
     const [alertConfig, setAlertConfig] = useState({
@@ -30,14 +32,14 @@ export default function TeamManagement() {
     });
 
     useEffect(() => {
-        loadUsers();
+        loadData();
     }, []);
 
     const showAlert = (config) => {
         setAlertConfig({
             isOpen: true,
-            confirmText: 'OK',
-            cancelText: 'Cancel',
+            confirmText: t('common.confirm'),
+            cancelText: t('common.cancel'),
             onConfirm: () => setAlertConfig(prev => ({ ...prev, isOpen: false })),
             ...config
         });
@@ -47,10 +49,14 @@ export default function TeamManagement() {
         setAlertConfig(prev => ({ ...prev, isOpen: false }));
     };
 
-    const loadUsers = async () => {
+    const loadData = async () => {
         try {
-            const res = await userAPI.getAll();
-            setUsers(res.data.data);
+            const [usersRes, rolesRes] = await Promise.all([
+                userAPI.getAll(),
+                rolesAPI.getAll().catch(() => ({ data: { data: [] } })) // Fallback if roles not seeded
+            ]);
+            setUsers(usersRes.data.data);
+            setRoles(rolesRes.data.data || []);
         } catch (err) {
             console.error(err);
         } finally {
@@ -65,65 +71,118 @@ export default function TeamManagement() {
         u.email.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Permissions Configuration
-    const PERMISSIONS_LIST = [
-        { id: 'view_dashboard', label: 'View Dashboard' },
-        { id: 'manage_projects', label: 'Manage Projects' },
-        { id: 'manage_clients', label: 'Manage Clients/Suppliers' },
-        { id: 'manage_workforce', label: 'Manage Workforce' },
-        { id: 'view_financials', label: 'View Financials' },
-        { id: 'manage_team', label: 'Manage Team' },
-        { id: 'view_reports', label: 'View Reports' },
-        { id: 'manage_settings', label: 'Company Settings' }
-    ];
+    // Detailed RBAC Permission Structure (matching backend)
+    const PERMISSION_CATEGORIES = {
+        financials: {
+            label: t('roles.permissions.financials.title'),
+            permissions: [
+                { key: 'view_operational_fund', label: t('roles.permissions.financials.view_operational_fund') },
+                { key: 'view_office_profit', label: t('roles.permissions.financials.view_office_profit'), sensitive: true },
+                { key: 'view_all_wallets', label: t('roles.permissions.financials.view_all_wallets') },
+                { key: 'view_company_stats', label: t('roles.permissions.financials.view_company_stats') }
+            ]
+        },
+        custody: {
+            label: t('roles.permissions.custody.title'),
+            permissions: [
+                { key: 'request_funds', label: t('roles.permissions.custody.request_funds') },
+                { key: 'authorize_transfers', label: t('roles.permissions.custody.authorize_transfers') },
+                { key: 'approve_receipts', label: t('roles.permissions.custody.approve_receipts') }
+            ]
+        },
+        transactions: {
+            label: t('roles.permissions.transactions.title'),
+            permissions: [
+                { key: 'create', label: t('roles.permissions.transactions.create') },
+                { key: 'approve', label: t('roles.permissions.transactions.approve') },
+                { key: 'record_income', label: t('roles.permissions.transactions.record_income') }
+            ]
+        },
+        projects: {
+            label: t('roles.permissions.projects.title'),
+            permissions: [
+                { key: 'create', label: t('roles.permissions.projects.create') },
+                { key: 'edit', label: t('roles.permissions.projects.edit') },
+                { key: 'delete', label: t('roles.permissions.projects.delete') },
+                { key: 'view', label: t('roles.permissions.projects.view') },
+                { key: 'edit_budget', label: t('roles.permissions.projects.edit_budget') }
+            ]
+        },
+        inventory: {
+            label: t('roles.permissions.inventory.title'),
+            permissions: [
+                { key: 'create_batch', label: t('roles.permissions.inventory.create_batch') },
+                { key: 'consume_material', label: t('roles.permissions.inventory.consume_material') },
+                { key: 'view', label: t('roles.permissions.inventory.view') }
+            ]
+        },
+        admin: {
+            label: t('roles.permissions.admin.title'),
+            permissions: [
+                { key: 'manage_users', label: t('roles.permissions.admin.manage_users') },
+                { key: 'manage_roles', label: t('roles.permissions.admin.manage_roles') },
+                { key: 'invite_users', label: t('roles.permissions.admin.invite_users') },
+                { key: 'change_user_roles', label: t('roles.permissions.admin.change_user_roles') }
+            ]
+        }
+    };
 
+    // Default permissions for legacy roles (structured format)
     const ROLE_DEFAULTS = {
-        'SUPER_ADMIN': PERMISSIONS_LIST.map(p => p.id),
-        'ADMIN': PERMISSIONS_LIST.map(p => p.id),
-        'PROJECT_MANAGER': ['view_dashboard', 'manage_projects', 'manage_clients', 'manage_workforce', 'view_financials', 'view_reports'],
-        'ENGINEER': ['view_dashboard', 'manage_projects', 'manage_workforce'],
-        'ACCOUNTANT': ['view_dashboard', 'view_financials', 'view_reports', 'manage_clients']
+        'ADMIN': {
+            financials: { view_operational_fund: true, view_office_profit: true, view_all_wallets: true, view_company_stats: true },
+            custody: { request_funds: true, authorize_transfers: true, approve_receipts: true },
+            transactions: { create: true, approve: true, record_income: true },
+            projects: { create: true, edit: true, delete: true, view: true, edit_budget: true },
+            inventory: { create_batch: true, consume_material: true, view: true },
+            admin: { manage_users: true, manage_roles: true, invite_users: true, change_user_roles: true }
+        },
+        'PROJECT_MANAGER': {
+            financials: { view_operational_fund: true, view_office_profit: false, view_all_wallets: true, view_company_stats: true },
+            custody: { request_funds: false, authorize_transfers: false, approve_receipts: true },
+            transactions: { create: true, approve: true, record_income: false },
+            projects: { create: false, edit: true, delete: false, view: true, edit_budget: false },
+            inventory: { create_batch: true, consume_material: true, view: true },
+            admin: { manage_users: false, manage_roles: false, invite_users: false, change_user_roles: false }
+        },
+        'ENGINEER': {
+            financials: { view_operational_fund: true, view_office_profit: false, view_all_wallets: false, view_company_stats: false },
+            custody: { request_funds: true, authorize_transfers: false, approve_receipts: false },
+            transactions: { create: true, approve: false, record_income: false },
+            projects: { create: false, edit: false, delete: false, view: true, edit_budget: false },
+            inventory: { create_batch: true, consume_material: true, view: true },
+            admin: { manage_users: false, manage_roles: false, invite_users: false, change_user_roles: false }
+        },
+        'ACCOUNTANT': {
+            financials: { view_operational_fund: true, view_office_profit: true, view_all_wallets: true, view_company_stats: true },
+            custody: { request_funds: false, authorize_transfers: true, approve_receipts: false },
+            transactions: { create: true, approve: false, record_income: true },
+            projects: { create: false, edit: false, delete: false, view: true, edit_budget: false },
+            inventory: { create_batch: false, consume_material: false, view: true },
+            admin: { manage_users: false, manage_roles: false, invite_users: false, change_user_roles: false }
+        }
     };
 
-    const handleRoleChange = (newRole) => {
-        setFormData(prev => ({
-            ...prev,
-            role: newRole,
-            permissions: ROLE_DEFAULTS[newRole] || []
-        }));
-    };
-
-    const togglePermission = (permId) => {
-        setFormData(prev => {
-            const current = prev.permissions || [];
-            if (current.includes(permId)) {
-                return { ...prev, permissions: current.filter(p => p !== permId) };
-            } else {
-                return { ...prev, permissions: [...current, permId] };
-            }
-        });
-    };
-
-    // Reset password show state when modal opens
     const handleOpenModal = (mode, user = null) => {
         setShowPassword(false);
         setModalMode(mode);
         setSelectedUser(user);
         if (mode === 'edit' && user) {
-            // If user has saved permissions use them, else fallback to role defaults
             setFormData({
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                roleId: user.roleId || '',
                 phone: user.phone || '',
                 password: '',
-                permissions: user.permissions || ROLE_DEFAULTS[user.role] || []
+                permissions: user.permissions || ROLE_DEFAULTS[user.role] || ROLE_DEFAULTS['ENGINEER']
             });
         } else {
             setFormData({
                 name: '',
                 email: '',
                 role: 'ENGINEER',
+                roleId: '',
                 password: '',
                 phone: '',
                 permissions: ROLE_DEFAULTS['ENGINEER']
@@ -132,41 +191,94 @@ export default function TeamManagement() {
         setShowModal(true);
     };
 
+    const handleRoleChange = (value) => {
+        // Check if it's a custom role (UUID) or legacy role
+        if (value.includes('-')) {
+            // Custom role - find and load its permissions
+            const customRole = roles.find(r => r.id === value);
+            const rolePermissions = customRole?.permissions || ROLE_DEFAULTS['ENGINEER'];
+
+            setFormData({ ...formData, roleId: value, role: 'ENGINEER', permissions: rolePermissions });
+        } else {
+            // Legacy role - load default permissions
+            setFormData({ ...formData, role: value, roleId: '', permissions: ROLE_DEFAULTS[value] || ROLE_DEFAULTS['ENGINEER'] });
+        }
+    };
+
+    const togglePermission = (category, permKey) => {
+        setFormData(prev => {
+            const current = prev.permissions || {};
+            const categoryPerms = current[category] || {};
+
+            return {
+                ...prev,
+                permissions: {
+                    ...current,
+                    [category]: {
+                        ...categoryPerms,
+                        [permKey]: !categoryPerms[permKey]
+                    }
+                }
+            };
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            // Prepare data for submission
+            const submitData = { ...formData };
+
+            // If roleId is empty, remove it (use legacy role)
+            if (!submitData.roleId) {
+                delete submitData.roleId;
+            }
+
             if (modalMode === 'add') {
-                await userAPI.invite(formData);
-                showAlert({ type: 'success', title: 'Invite Sent', message: 'User has been invited successfully via email.' });
+                await userAPI.invite(submitData);
+                showAlert({
+                    type: 'success',
+                    title: t('teamManagement.messages.addSuccess'),
+                    message: t('teamManagement.messages.addSuccess')
+                });
             } else {
-                await userAPI.update(selectedUser.id, formData);
-                showAlert({ type: 'success', title: 'Updated', message: 'User details updated successfully.' });
+                // Don't send password if empty on edit
+                if (!submitData.password) {
+                    delete submitData.password;
+                }
+                await userAPI.update(selectedUser.id, submitData);
+                showAlert({
+                    type: 'success',
+                    title: t('teamManagement.messages.updateSuccess'),
+                    message: t('teamManagement.messages.updateSuccess')
+                });
             }
             setShowModal(false);
-            loadUsers();
+            loadData();
         } catch (err) {
-            showAlert({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Operation failed' });
+            showAlert({
+                type: 'error',
+                title: t('common.error'),
+                message: err.response?.data?.message || t('teamManagement.messages.error')
+            });
         }
     };
 
     const handleDelete = (id) => {
         showAlert({
             type: 'danger',
-            title: 'Remove User',
-            message: 'Are you sure you want to remove this user? This action cannot be undone.',
+            title: t('teamManagement.confirmDelete.title'),
+            message: t('teamManagement.confirmDelete.message'),
             showCancel: true,
-            confirmText: 'Remove',
+            confirmText: t('teamManagement.confirmDelete.confirm'),
             onConfirm: async () => {
                 closeAlert();
                 try {
                     await userAPI.delete(id);
-                    loadUsers();
-                    // Optional: Show success
-                    // showAlert({ type: 'success', title: 'Removed', message: 'User removed successfully.' });
+                    loadData();
                 } catch (err) {
-                    // Need to wait for modal to close or use timeout, but simplistic replaces state works usually
                     setTimeout(() => {
-                        showAlert({ type: 'error', title: 'Error', message: 'Failed to delete user' });
+                        showAlert({ type: 'error', title: t('common.error'), message: t('teamManagement.messages.error') });
                     }, 100);
                 }
             }
@@ -184,7 +296,6 @@ export default function TeamManagement() {
         return colors[role] || colors['ENGINEER'];
     };
 
-    // Helper to extract initials
     const getInitials = (name) => {
         return name
             ?.split(' ')
@@ -192,6 +303,15 @@ export default function TeamManagement() {
             .join('')
             .toUpperCase()
             .substring(0, 2) || 'U';
+    };
+
+    const getRoleDisplayName = (user) => {
+        // If user has custom role, show custom role name
+        if (user.roleId && user.customRole) {
+            return user.customRole.name;
+        }
+        // Otherwise show translated legacy role
+        return t(`teamManagement.roles.${user.role}`);
     };
 
     return (
@@ -202,12 +322,12 @@ export default function TeamManagement() {
                     <div>
                         <h1 className="flex gap-md" style={{ alignItems: 'center' }}>
                             <Users size={32} />
-                            Team Management
+                            {t('teamManagement.title')}
                         </h1>
-                        <p className="text-secondary">Manage your team members and their roles</p>
+                        <p className="text-secondary">{t('teamManagement.subtitle')}</p>
                     </div>
                     <button className="btn btn-primary" onClick={() => handleOpenModal('add')}>
-                        <UserPlus size={20} /> Add New Member
+                        <UserPlus size={20} /> {t('teamManagement.addMember')}
                     </button>
                 </div>
 
@@ -217,285 +337,331 @@ export default function TeamManagement() {
                     <div className="flex-between mb-lg" style={{ padding: 'var(--spacing-lg)', borderBottom: '1px solid var(--border-color)' }}>
                         <div className="input-group" style={{ maxWidth: '400px', margin: 0 }}>
                             <div style={{ position: 'relative', width: '100%' }}>
-                                <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+                                <Search size={18} style={{
+                                    position: 'absolute',
+                                    [isRTL ? 'right' : 'left']: '12px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    color: 'var(--text-tertiary)'
+                                }} />
                                 <input
                                     type="text"
-                                    placeholder="Search members by name or email..."
+                                    placeholder={t('teamManagement.searchPlaceholder')}
                                     className="input"
-                                    style={{ paddingLeft: '40px', width: '100%' }}
+                                    style={{
+                                        [isRTL ? 'paddingRight' : 'paddingLeft']: '40px',
+                                        width: '100%'
+                                    }}
                                     value={searchTerm}
                                     onChange={handleSearch}
                                 />
                             </div>
                         </div>
                         <div className="text-secondary" style={{ fontSize: '14px' }}>
-                            Total Members: <strong style={{ color: 'var(--text-primary)' }}>{filteredUsers.length}</strong>
+                            {t('teamManagement.totalMembers')}: <strong style={{ color: 'var(--text-primary)' }}>{filteredUsers.length}</strong>
                         </div>
                     </div>
 
                     {/* Table */}
                     <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', direction: isRTL ? 'rtl' : 'ltr' }}>
                             <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', background: 'var(--bg-tertiary)' }}>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)' }}>User</th>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)' }}>Role</th>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)' }}>Contact</th>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'right' }}>Actions</th>
+                                <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
+                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'start' }}>{t('teamManagement.table.user')}</th>
+                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'start' }}>{t('teamManagement.table.role')}</th>
+                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'start' }}>{t('teamManagement.table.contact')}</th>
+                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'end' }}>{t('teamManagement.table.actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center' }}>Loading...</td></tr>
+                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center' }}>{t('teamManagement.loading')}</td></tr>
                                 ) : filteredUsers.length > 0 ? (
-                                    filteredUsers.map(user => (
-                                        <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
-                                            <td style={{ padding: '16px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                    <div style={{
-                                                        width: '40px', height: '40px', borderRadius: '50%',
-                                                        background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center',
-                                                        justifyContent: 'center', fontWeight: '600', color: 'var(--color-primary)',
-                                                        overflow: 'hidden'
+                                    filteredUsers.map(user => {
+                                        const roleColor = getRoleBadgeColor(user.role);
+                                        return (
+                                            <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                {/* User */}
+                                                <td style={{ padding: '16px', textAlign: 'start' }}>
+                                                    <div className="flex gap-md" style={{ alignItems: 'center' }}>
+                                                        <div style={{
+                                                            width: '40px',
+                                                            height: '40px',
+                                                            borderRadius: '50%',
+                                                            background: 'linear-gradient(135deg, var(--primary-color), var(--accent-color))',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: 'white',
+                                                            fontWeight: '600',
+                                                            fontSize: '14px'
+                                                        }}>
+                                                            {getInitials(user.name)}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{user.name}</div>
+                                                            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{user.company || t('app.name')}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* Role */}
+                                                <td style={{ padding: '16px', textAlign: 'start' }}>
+                                                    <span style={{
+                                                        padding: '6px 12px',
+                                                        borderRadius: '6px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500',
+                                                        background: roleColor.bg,
+                                                        color: roleColor.text,
+                                                        display: 'inline-block'
                                                     }}>
-                                                        {user.profilePicture ? (
-                                                            <img
-                                                                src={user.profilePicture.startsWith('http') ? user.profilePicture : `${import.meta.env.VITE_API_URL}${user.profilePicture}`}
-                                                                alt={user.name}
-                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                            />
-                                                        ) : getInitials(user.name)}
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{user.name}</div>
-                                                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{user.company || 'N/A'}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td style={{ padding: '16px' }}>
-                                                <span className="badge" style={{
-                                                    backgroundColor: getRoleBadgeColor(user.role).bg,
-                                                    color: getRoleBadgeColor(user.role).text
-                                                }}>
-                                                    {user.role}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: '16px' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
-                                                        <Mail size={14} /> {user.email}
+                                                        {getRoleDisplayName(user)}
                                                     </span>
-                                                    {user.phone && (
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-                                                            <Phone size={14} /> {user.phone}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td style={{ padding: '16px', textAlign: 'right' }}>
-                                                {currentUser.id !== user.id && (
-                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                                </td>
+
+                                                {/* Contact */}
+                                                <td style={{ padding: '16px', textAlign: 'start' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                        <div className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px' }}>
+                                                            <Mail size={14} style={{ color: 'var(--text-tertiary)' }} />
+                                                            <span>{user.email}</span>
+                                                        </div>
+                                                        {user.phone && (
+                                                            <div className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px' }}>
+                                                                <Phone size={14} style={{ color: 'var(--text-tertiary)' }} />
+                                                                <span>{user.phone}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
+
+                                                {/* Actions */}
+                                                <td style={{ padding: '16px', textAlign: 'end' }}>
+                                                    <div className="flex gap-sm" style={{ justifyContent: 'flex-end' }}>
                                                         <button
+                                                            className="btn btn-sm"
                                                             onClick={() => handleOpenModal('edit', user)}
-                                                            className="btn btn-secondary"
-                                                            style={{ padding: '6px', minWidth: 'auto' }}
-                                                            title="Edit Role"
+                                                            style={{ padding: '8px' }}
                                                         >
                                                             <Edit2 size={16} />
                                                         </button>
                                                         <button
+                                                            className="btn btn-sm btn-danger"
                                                             onClick={() => handleDelete(user.id)}
-                                                            className="btn"
-                                                            style={{ padding: '6px', minWidth: 'auto', color: 'var(--color-danger)', background: '#fee2e2' }}
-                                                            title="Remove User"
+                                                            style={{ padding: '8px' }}
+                                                            disabled={user.id === currentUser?.id}
                                                         >
                                                             <Trash2 size={16} />
                                                         </button>
                                                     </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
-                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No members found matching your search.</td></tr>
+                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>{t('teamManagement.noMembers')}</td></tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* Modal */}
+                {/* Add/Edit Modal */}
                 {showModal && (
                     <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                        <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '850px', width: '95%', padding: '32px' }}>
-                            <div className="modal-header" style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
-                                <h2 style={{ fontSize: '22px', fontWeight: 'bold', margin: 0 }}>{modalMode === 'add' ? 'Add New Member' : 'Edit Member'}</h2>
-                                <button className="modal-close" onClick={() => setShowModal(false)}><X size={24} /></button>
+                        <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+                            <div className="modal-header">
+                                <h2>{modalMode === 'add' ? t('teamManagement.addMember') : t('teamManagement.editMember')}</h2>
+                                <button className="modal-close" onClick={() => setShowModal(false)}>
+                                    <X size={24} />
+                                </button>
                             </div>
-                            <form onSubmit={handleSubmit} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ marginBottom: '6px', display: 'block', fontWeight: '500', fontSize: '14px' }}>Full Name <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-                                        <input
-                                            type="text"
-                                            className="input"
-                                            style={{ height: '42px' }}
-                                            value={formData.name}
-                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            required
-                                            placeholder="John Doe"
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ marginBottom: '6px', display: 'block', fontWeight: '500', fontSize: '14px' }}>Email Address <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-                                        <input
-                                            type="email"
-                                            className="input"
-                                            style={{ height: '42px' }}
-                                            value={formData.email}
-                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                            required
-                                            // disabled={modalMode === 'edit'} // Allow editing email
-                                            placeholder="john@company.com"
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ marginBottom: '6px', display: 'block', fontWeight: '500', fontSize: '14px' }}>Role <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-                                        <div style={{ position: 'relative' }}>
+                            <form onSubmit={handleSubmit} className="modal-body">
+                                {/* Basic Personnel Information */}
+                                <div className="form-section">
+                                    <h3 className="section-title">{t('projects.modal.sections.basic')}</h3>
+                                    <div className="form-grid">
+                                        {/* Name */}
+                                        <div className="form-group">
+                                            <label>{t('teamManagement.form.name')} <span className="required">*</span></label>
+                                            <input
+                                                type="text"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                required
+                                                placeholder={t('teamManagement.form.name')}
+                                            />
+                                        </div>
+
+                                        {/* Email */}
+                                        <div className="form-group">
+                                            <label>{t('teamManagement.form.email')} <span className="required">*</span></label>
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                required
+                                                placeholder={t('teamManagement.form.email')}
+                                            />
+                                        </div>
+
+                                        {/* Phone */}
+                                        <div className="form-group">
+                                            <label>{t('teamManagement.form.phone')}</label>
+                                            <input
+                                                type="text"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                placeholder={t('teamManagement.form.phone')}
+                                            />
+                                        </div>
+
+                                        {/* Role Selection */}
+                                        <div className="form-group">
+                                            <label>{t('teamManagement.form.role')} <span className="required">*</span></label>
                                             <select
-                                                className="input"
-                                                style={{ height: '42px', width: '100%' }}
-                                                value={formData.role}
-                                                onChange={e => handleRoleChange(e.target.value)}
+                                                value={formData.roleId || formData.role}
+                                                onChange={(e) => handleRoleChange(e.target.value)}
+                                                required
                                             >
-                                                <option value="ADMIN">Admin</option>
-                                                <option value="PROJECT_MANAGER">Project Manager</option>
-                                                <option value="ENGINEER">Site Engineer</option>
-                                                <option value="ACCOUNTANT">Accountant</option>
+                                                <option value="" disabled>{t('teamManagement.form.selectRole')}</option>
+
+                                                {/* System Roles */}
+                                                <option value="ADMIN">{t('teamManagement.roles.ADMIN')}</option>
+                                                <option value="PROJECT_MANAGER">{t('teamManagement.roles.PROJECT_MANAGER')}</option>
+                                                <option value="ENGINEER">{t('teamManagement.roles.ENGINEER')}</option>
+                                                <option value="ACCOUNTANT">{t('teamManagement.roles.ACCOUNTANT')}</option>
+
+                                                {/* Custom Roles */}
+                                                {roles.length > 0 && roles.map(role => (
+                                                    <option key={role.id} value={role.id}>
+                                                        {role.name} ({t('roles.customRole')})
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
-                                    </div>
-                                </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ marginBottom: '6px', display: 'block', fontWeight: '500', fontSize: '14px' }}>Phone Number <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-                                        <input
-                                            type="text"
-                                            className="input"
-                                            style={{ height: '42px' }}
-                                            value={formData.phone}
-                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                            placeholder="+1 234 567 890"
-                                            required
-                                        />
-                                    </div>
-                                    {modalMode === 'add' && (
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <label style={{ marginBottom: '6px', display: 'block', fontWeight: '500', fontSize: '14px' }}>Initial Password <span style={{ color: 'var(--color-danger)' }}>*</span></label>
-                                            <div style={{ position: 'relative' }}>
-                                                <input
-                                                    type={showPassword ? "text" : "password"}
-                                                    className="input"
-                                                    style={{ height: '42px', paddingRight: '40px' }}
-                                                    value={formData.password}
-                                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                                    required
-                                                    placeholder="Create a password"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        right: '10px',
-                                                        top: '50%',
-                                                        transform: 'translateY(-50%)',
-                                                        background: 'none',
-                                                        border: 'none',
-                                                        color: 'var(--text-tertiary)',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center'
-                                                    }}
-                                                >
-                                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Permissions Checkboxes */}
-                                <div className="form-section" style={{ padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px', border: '1px solid var(--border-color)', flex: 1 }}>
-                                    <label style={{ display: 'block', marginBottom: '12px', fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)' }}>Permissions</label>
-                                    <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(3, 1fr)',
-                                        gap: '12px'
-                                    }}>
-                                        {PERMISSIONS_LIST.map(perm => {
-                                            const isChecked = (formData.permissions || []).includes(perm.id);
-                                            return (
-                                                <label key={perm.id} style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '10px',
-                                                    fontSize: '13px',
-                                                    cursor: 'pointer',
-                                                    userSelect: 'none',
-                                                    color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)'
-                                                }}>
-                                                    <div style={{
-                                                        minWidth: '18px',
-                                                        height: '18px',
-                                                        borderRadius: '4px',
-                                                        border: isChecked ? 'none' : '2px solid var(--text-tertiary)',
-                                                        background: isChecked ? 'var(--color-primary)' : 'transparent',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        transition: 'all 0.2s',
-                                                        flexShrink: 0
-                                                    }}>
-                                                        {isChecked && <Check size={12} color="white" strokeWidth={3} />}
-                                                    </div>
+                                        {/* Password Field */}
+                                        {(modalMode === 'add' || modalMode === 'edit') && (
+                                            <div className="form-group full-width" style={{ position: 'relative' }}>
+                                                <label>{t('teamManagement.form.password')} {modalMode === 'add' ? <span className="required">*</span> : `(${t('common.leaveBlank')})`}</label>
+                                                <div style={{ position: 'relative' }}>
                                                     <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={() => togglePermission(perm.id)}
-                                                        style={{ display: 'none' }}
+                                                        type={showPassword ? 'text' : 'password'}
+                                                        style={{ width: '100%', paddingLeft: isRTL ? '12px' : '40px', paddingRight: isRTL ? '40px' : '12px' }}
+                                                        value={formData.password}
+                                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                                        required={modalMode === 'add'}
+                                                        placeholder={modalMode === 'add' ? t('teamManagement.form.password') : '••••••••'}
                                                     />
-                                                    {perm.label}
-                                                </label>
-                                            );
-                                        })}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPassword(!showPassword)}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            [isRTL ? 'left' : 'right']: '12px',
+                                                            top: '50%',
+                                                            transform: 'translateY(-50%)',
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            padding: 0,
+                                                            color: 'var(--text-tertiary)'
+                                                        }}
+                                                    >
+                                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="modal-footer" style={{ marginTop: '0', paddingTop: '16px', borderTop: '1px solid var(--border-color)', gap: '12px' }}>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={() => setShowModal(false)}
-                                        style={{ height: '40px', padding: '0 20px', fontSize: '14px' }}
-                                    >
-                                        Cancel
+                                {/* Permissions Matrix */}
+                                <div className="form-section">
+                                    <div className="flex-between mb-md">
+                                        <h3 className="section-title" style={{ border: 'none', margin: 0 }}>{t('teamManagement.form.permissions')}</h3>
+                                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
+                                            {t('teamManagement.form.basedOnRole')}
+                                        </span>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
+                                        {Object.entries(PERMISSION_CATEGORIES).map(([categoryKey, category]) => (
+                                            <div key={categoryKey} style={{
+                                                background: 'var(--bg-secondary)',
+                                                border: '1px solid var(--border-color)',
+                                                borderRadius: 'var(--radius-md)',
+                                                padding: 'var(--spacing-md)'
+                                            }}>
+                                                <h4 style={{
+                                                    fontSize: 'var(--font-size-xs)',
+                                                    color: 'var(--color-primary)',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.05em',
+                                                    marginBottom: 'var(--spacing-sm)',
+                                                    fontWeight: 600
+                                                }}>
+                                                    {category.label}
+                                                </h4>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+                                                    {category.permissions.map(perm => {
+                                                        const isChecked = formData.permissions?.[categoryKey]?.[perm.key] || false;
+                                                        return (
+                                                            <label key={perm.key} style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 'var(--spacing-sm)',
+                                                                cursor: 'pointer',
+                                                                fontSize: 'var(--font-size-sm)',
+                                                                color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                                                transition: 'color 0.2s'
+                                                            }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isChecked}
+                                                                    onChange={() => togglePermission(categoryKey, perm.key)}
+                                                                    style={{ accentColor: 'var(--color-primary)' }}
+                                                                />
+                                                                <span>
+                                                                    {perm.label}
+                                                                    {perm.sensitive && (
+                                                                        <span style={{
+                                                                            marginLeft: 'var(--spacing-xs)',
+                                                                            color: 'var(--color-danger)',
+                                                                            fontSize: '10px',
+                                                                            fontWeight: 700
+                                                                        }}>
+                                                                            {t('common.sensitive')}
+                                                                        </span>
+                                                                    )}
+                                                                </span>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="modal-footer">
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                                        {t('common.cancel')}
                                     </button>
-                                    <button
-                                        type="submit"
-                                        className="btn btn-primary"
-                                        style={{ height: '40px', padding: '0 20px', fontSize: '14px' }}
-                                    >
-                                        {modalMode === 'add' ? 'Send Invite' : 'Save Changes'}
+                                    <button type="submit" className="btn btn-primary">
+                                        {modalMode === 'add' ? t('common.add') : t('common.update')}
                                     </button>
                                 </div>
                             </form>
                         </div>
                     </div>
                 )}
-                <CustomAlert {...alertConfig} onCancel={closeAlert} />
+
+                {/* Alert */}
+                <CustomAlert {...alertConfig} onClose={closeAlert} />
             </div>
         </Layout>
     );

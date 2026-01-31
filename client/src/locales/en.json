@@ -46,6 +46,8 @@
         "loss": "Loss",
         "revenue": "Revenue",
         "costs": "Costs",
+        "income": "Income",
+        "expense": "Expense",
         "viewAll": "View All",
         "recentProjects": "Recent Projects",
         "expensesByCategory": "Expenses by Category",
@@ -345,6 +347,7 @@
         "delete": "Delete",
         "edit": "Edit",
         "add": "Add",
+        "sensitive": "SENSITIVE",
         "search": "Search",
         "filter": "Filter",
         "clear": "Clear",
@@ -397,7 +400,8 @@
             "password": "Password",
             "selectRole": "Select Role",
             "permissions": "Permissions",
-            "customPermissions": "Custom Permissions"
+            "customPermissions": "Custom Permission Overrides",
+            "basedOnRole": "Based on selected role"
         },
         "roles": {
             "SUPER_ADMIN": "Super Admin",

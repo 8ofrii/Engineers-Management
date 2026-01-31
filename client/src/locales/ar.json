@@ -13,7 +13,7 @@
         "name": "الاسم الكامل",
         "company": "اسم الشركة",
         "phone": "رقم الهاتف",
-        "welcomeBack": "مرحباً بعودتك",
+        "welcomeBack": "أهلاً بيك من تاني",
         "createAccount": "إنشاء حساب",
         "alreadyHaveAccount": "هل لديك حساب بالفعل؟",
         "dontHaveAccount": "ليس لديك حساب؟",
@@ -21,35 +21,38 @@
         "creatingAccount": "جاري إنشاء الحساب..."
     },
     "nav": {
-        "dashboard": "لوحة التحكم",
+        "dashboard": "الرئيسية",
         "projects": "المشاريع",
         "clients": "العملاء",
         "suppliers": "الموردين",
-        "inventory": "المواد الخام",
+        "inventory": "الخامات والمخزن",
         "labor": "الصنايعية",
-        "workmanship": "المصنعية",
-        "finance": "المحاسبة",
-        "chat": "المساعد الذكي",
-        "reports": "التقارير"
+        "workmanship": "المصنعيات",
+        "finance": "الحسابات والمصاريف",
+        "chat": "المساعد الذكي (AI)",
+        "reports": "التقارير",
+        "team": "إدارة الفريق"
     },
     "dashboard": {
-        "title": "لوحة التحكم",
-        "welcome": "مرحباً بعودتك، {{name}}! إليك نظرة عامة على مشاريعك.",
+        "title": "لوحة التحكم الرئيسية",
+        "welcome": "أهلاً بيك يا {{name}}! دي نظرة سريعة على مشاريعك وشغلك.",
         "totalProjects": "إجمالي المشاريع",
-        "activeProjects": "نشط",
+        "activeProjects": "شغالين",
         "totalIncome": "إجمالي الإيرادات",
-        "totalExpenses": "إجمالي المصروفات",
-        "netBalance": "صافي الرصيد",
-        "activeClients": "العملاء النشطون",
+        "totalExpenses": "إجمالي المصاريف",
+        "netBalance": "الرصيد الصافي",
+        "activeClients": "العملاء الشغالين",
         "suppliers": "الموردين",
-        "profit": "ربح",
+        "profit": "مكسب",
         "loss": "خسارة",
-        "revenue": "إيرادات",
+        "revenue": "إيراد",
         "costs": "تكاليف",
-        "viewAll": "عرض الكل",
-        "recentProjects": "المشاريع الأخيرة",
-        "expensesByCategory": "المصروفات حسب الفئة",
-        "incomeVsExpenses": "الإيرادات مقابل المصروفات"
+        "income": "إيرادات",
+        "expense": "مصاريف",
+        "viewAll": "الكل",
+        "recentProjects": "أحدث المشاريع",
+        "expensesByCategory": "المصاريف حسب البند",
+        "incomeVsExpenses": "الإيرادات والمصاريف"
     },
     "projects": {
         "title": "المشاريع",
@@ -63,10 +66,12 @@
         "viewTransactions": "عرض المعاملات",
         "status": {
             "planning": "تخطيط",
-            "inProgress": "قيد التنفيذ",
-            "onHold": "معلق",
-            "completed": "مكتمل",
-            "cancelled": "ملغي"
+            "inProgress": "شغال",
+            "onHold": "واقف",
+            "completed": "خلصان",
+            "cancelled": "ملغي",
+            "in-progress": "شغال",
+            "on-hold": "واقف"
         },
         "modal": {
             "title": "إضافة مشروع جديد",
@@ -224,25 +229,25 @@
         }
     },
     "workmanship": {
-        "title": "المصنعية",
-        "subtitle": "تتبع الأعمال المتعاقد عليها والمدفوعات",
+        "title": "المصنعيات",
+        "subtitle": "تتبع مخلصات الأعمال والمدفوعات",
         "agreedAmount": "المبلغ المتفق عليه",
-        "paidAmount": "المبلغ المدفوع",
+        "paidAmount": "المدفوع",
         "outstanding": "المتبقي"
     },
     "finance": {
-        "title": "المحاسبة",
-        "subtitle": "الإدارة المالية ودفتر الأستاذ",
+        "title": "الحسابات والمصاريف",
+        "subtitle": "متابعة المصاريف والعهد والدفعات",
         "filteringBy": "تصفية حسب المشروع",
-        "newTransaction": "معاملة جديدة",
+        "newTransaction": "حركة جديدة",
         "recordExpense": "تسجيل مصروف",
-        "recordIncome": "تحصيل دفعة عميل",
-        "consumeMaterial": "صرف خامات",
-        "expense": "مصروفات",
+        "recordIncome": "استلام دفعة عميل",
+        "consumeMaterial": "سحب من المخزن",
+        "expense": "مصاريف",
         "income": "إيرادات",
         "usage": "استهلاك",
-        "addToInventory": "إضافة للمخزون (مشتريات)",
-        "itemName": "اسم الصنف",
+        "addToInventory": "شراء خامات للمخزن",
+        "itemName": "اسم البند / الصنف",
         "itemNamePlaceholder": "مثال: أسمنت، حديد",
         "category": "بند التكلفة",
         "selectCategory": "اختر البند",
@@ -340,19 +345,20 @@
     },
     "common": {
         "loading": "جاري التحميل...",
-        "save": "حفظ",
         "cancel": "إلغاء",
+        "save": "حفظ",
         "delete": "حذف",
         "edit": "تعديل",
-        "add": "إضافة",
+        "sensitive": "حساس",
+        "confirm": "تأكيد",
         "search": "بحث",
         "filter": "تصفية",
         "clear": "مسح",
         "export": "تصدير",
         "import": "استيراد",
+        "add": "إضافة",
         "yes": "نعم",
         "no": "لا",
-        "confirm": "تأكيد",
         "close": "إغلاق",
         "back": "رجوع",
         "next": "التالي",
@@ -374,7 +380,7 @@
         "actions": "الإجراءات",
         "status": "الحالة",
         "type": "النوع",
-        "noData": "لا توجد بيانات"
+        "noData": "مفيش بيانات"
     },
     "teamManagement": {
         "title": "إدارة الفريق",
@@ -396,9 +402,10 @@
             "phone": "رقم الهاتف",
             "role": "الدور",
             "password": "كلمة المرور",
-            "selectRole": "اختر الدور",
-            "permissions": "الصلاحيات",
-            "customPermissions": "صلاحيات مخصصة"
+            "selectRole": "اختر نوع الحساب من القائمة",
+            "permissions": "صلاحيات الوصول",
+            "customPermissions": "تعديل صلاحيات مخصصة",
+            "basedOnRole": "بناءً على الدور المختار"
         },
         "roles": {
             "SUPER_ADMIN": "مدير النظام",
@@ -440,45 +447,45 @@
             "title": "مصفوفة الصلاحيات",
             "financials": {
                 "title": "الرؤية المالية",
-                "view_operational_fund": "عرض \"الصندوق التشغيلي\" للمشروع (ميزانية الموقع)",
-                "view_office_profit": "عرض \"إيرادات المكتب\" (ربح الشركة) ⚠️ حساس",
-                "view_all_wallets": "عرض أرصدة جميع المهندسين",
-                "view_company_stats": "عرض إحصائيات الشركة العامة"
+                "view_operational_fund": "عرض الصندوق التشغيلي (ميزانية الموقع)",
+                "view_office_profit": "مشاهدة إيرادات المكتب (أرباح الشركة) ⚠️ حساس",
+                "view_all_wallets": "الاطلاع على جميع أرصدة العُهد",
+                "view_company_stats": "مشاهدة إحصائيات الشركة العامة"
             },
             "custody": {
-                "title": "العهدة والمصروفات",
-                "request_funds": "طلب تمويل (تمويل)",
-                "authorize_transfers": "تفويض تحويل الأموال (إعطاء المال للآخرين)",
-                "approve_receipts": "الموافقة على إيصالات الموقع",
-                "max_approval_limit": "حد الموافقة الأقصى (جنيه)"
+                "title": "العُهد والمصروفات",
+                "request_funds": "طلب تمويل عُهدة (تمويل)",
+                "authorize_transfers": "اعتماد تحويل العُهد (صرف للآخرين)",
+                "approve_receipts": "عرض واعتماد مستندات الموقع",
+                "max_approval_limit": "الحد الأقصى للاعتماد (جنيه)"
             },
             "transactions": {
-                "title": "المعاملات",
-                "create": "إنشاء معاملات مسودة",
-                "approve": "الموافقة على المعاملات",
-                "record_income": "تسجيل الإيرادات (دفعات العملاء)",
-                "max_approval_limit": "حد الموافقة الأقصى (جنيه)"
+                "title": "الحسابات والقيود",
+                "create": "إنشاء مسودة قيود (معاملات)",
+                "approve": "اعتماد القيود المحاسبية",
+                "record_income": "تسجيل تحصيل (دفعات العملاء)",
+                "max_approval_limit": "حد الاعتماد المالي (جنيه)"
             },
             "projects": {
-                "title": "عمليات المشروع",
-                "create": "إنشاء مشاريع",
-                "edit": "تعديل المشاريع",
-                "delete": "أرشفة/حذف المشاريع",
-                "view": "عرض المشاريع",
-                "edit_budget": "تعديل ميزانيات المشروع"
+                "title": "إدارة العمليات والمشاريع",
+                "create": "إضافة مشروع جديد",
+                "edit": "تعديل بيانات المشاريع",
+                "delete": "أرشفة أو حذف المشاريع",
+                "view": "الاطلاع على قائمة المشاريع",
+                "edit_budget": "تعديل الميزانية التقديرية للمشروع"
             },
             "inventory": {
-                "title": "إدارة المخزون",
-                "create_batch": "إنشاء دفعات مواد",
-                "consume_material": "استهلاك المواد (تسجيل الاستخدام)",
-                "view": "عرض المخزون"
+                "title": "المخزون والتوريدات",
+                "create_batch": "تسجيل توريدات مواد",
+                "consume_material": "تسجيل صرف مواد للموقع",
+                "view": "متابعة أرصدة المخازن"
             },
             "admin": {
-                "title": "إدارة الفريق",
-                "manage_users": "إدارة المستخدمين",
-                "manage_roles": "إدارة الأدوار والصلاحيات",
-                "invite_users": "دعوة مستخدمين جدد",
-                "change_user_roles": "تغيير أدوار المستخدمين"
+                "title": "إدارة النظام والفريق",
+                "manage_users": "التحكم في حسابات المستخدمين",
+                "manage_roles": "إدارة الأدوار وصلاحيات الوصول",
+                "invite_users": "إرسال دعوات انضمام للفريق",
+                "change_user_roles": "تعديل وتغيير أدوار الأعضاء"
             }
         },
         "messages": {

@@ -576,29 +576,42 @@ export const createDraft = async (req, res, next) => {
 // Keep existing functions
 export const getStats = async (req, res, next) => {
     try {
+        let whereClause = { status: 'APPROVED' };
+
+        // Role-based filtering
+        if (req.user.role === 'ENGINEER') {
+            whereClause.createdBy = req.user.id;
+        } else if (req.user.role === 'PROJECT_MANAGER') {
+            const projects = await prisma.project.findMany({
+                where: { engineerId: req.user.id },
+                select: { id: true }
+            });
+            whereClause.projectId = { in: projects.map(p => p.id) };
+        }
+        // Admin and Accountant see all
+
         const transactions = await prisma.transaction.findMany({
-            where: {
-                createdBy: req.user.id,
-                status: 'APPROVED'
-            }
+            where: whereClause
         });
 
         const byType = transactions.reduce((acc, t) => {
-            const existing = acc.find(item => item._id === t.type);
+            const typeKey = t.type.toUpperCase();
+            const existing = acc.find(item => item._id === typeKey);
             if (existing) {
                 existing.total += Number(t.amount);
             } else {
-                acc.push({ _id: t.type, total: Number(t.amount) });
+                acc.push({ _id: typeKey, total: Number(t.amount) });
             }
             return acc;
         }, []);
 
         const byCategory = transactions.reduce((acc, t) => {
-            const existing = acc.find(item => item._id === t.category);
+            const catKey = t.category.toUpperCase();
+            const existing = acc.find(item => item._id === catKey);
             if (existing) {
                 existing.total += Number(t.amount);
             } else {
-                acc.push({ _id: t.category, total: Number(t.amount) });
+                acc.push({ _id: catKey, total: Number(t.amount) });
             }
             return acc;
         }, []);

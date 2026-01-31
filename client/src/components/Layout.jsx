@@ -77,7 +77,7 @@ export default function Layout({ children }) {
     ];
 
     if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
-        navItems.push({ path: '/team', icon: UserCog, label: 'Team Management' });
+        navItems.push({ path: '/team', icon: UserCog, label: t('teamManagement.title') });
     }
 
 
@@ -174,24 +174,19 @@ export default function Layout({ children }) {
                     </button>
 
                     <div className="topbar-actions">
-                        {/* Show language and theme toggles only on dashboard */}
-                        {location.pathname === '/dashboard' && (
-                            <>
-                                <button
-                                    className="theme-toggle"
-                                    onClick={toggleLanguage}
-                                    title="Switch Language"
-                                >
-                                    <Languages size={20} />
-                                    <span style={{ fontSize: '11px', marginLeft: '4px', fontWeight: '600' }}>
-                                        {i18n.language === 'en' ? 'AR' : 'EN'}
-                                    </span>
-                                </button>
-                                <button className="theme-toggle" onClick={toggleTheme}>
-                                    {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                                </button>
-                            </>
-                        )}
+                        <button
+                            className="theme-toggle"
+                            onClick={toggleLanguage}
+                            title="Switch Language"
+                        >
+                            <Languages size={20} />
+                            <span style={{ fontSize: '11px', marginLeft: '4px', fontWeight: '600' }}>
+                                {i18n.language === 'en' ? 'AR' : 'EN'}
+                            </span>
+                        </button>
+                        <button className="theme-toggle" onClick={toggleTheme} title="Toggle Dark/Light Mode">
+                            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                        </button>
                         {/* Notification bell always visible on all pages - ALWAYS LAST */}
                         <NotificationBell />
                     </div>

@@ -209,21 +209,33 @@ export default function Dashboard() {
                                 <ResponsiveContainer width="100%" height={300}>
                                     <PieChart>
                                         <Pie
-                                            data={transactionStats.byCategory}
+                                            data={transactionStats.byCategory.map(item => ({
+                                                ...item,
+                                                displayName: t(`finance.categories.${item._id.toLowerCase()}`) || item._id
+                                            }))}
                                             cx="50%"
                                             cy="50%"
                                             labelLine={false}
-                                            label={({ _id, percent }) => `${_id}: ${(percent * 100).toFixed(0)}%`}
+                                            label={({ displayName, percent }) => `${displayName}: ${(percent * 100).toFixed(0)}%`}
                                             outerRadius={100}
                                             fill="#8884d8"
                                             dataKey="total"
-                                            nameKey="_id"
+                                            nameKey="displayName"
                                         >
                                             {transactionStats.byCategory.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                                        <Tooltip
+                                            formatter={(value) => formatCurrency(value)}
+                                            contentStyle={{
+                                                background: 'var(--bg-elevated)',
+                                                border: '1px solid var(--border-color)',
+                                                borderRadius: 'var(--radius-md)',
+                                                color: 'var(--text-primary)'
+                                            }}
+                                        />
+                                        <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -235,10 +247,13 @@ export default function Dashboard() {
                             </div>
                             <div className="card-body">
                                 <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={transactionStats.byType}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
-                                        <XAxis dataKey="_id" stroke="var(--text-secondary)" />
-                                        <YAxis stroke="var(--text-secondary)" />
+                                    <BarChart data={transactionStats.byType.map(item => ({
+                                        ...item,
+                                        displayName: t(`dashboard.${item._id.toLowerCase()}`) || item._id
+                                    }))}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
+                                        <XAxis dataKey="displayName" stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} />
+                                        <YAxis stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000}k`} />
                                         <Tooltip
                                             formatter={(value) => formatCurrency(value)}
                                             contentStyle={{
@@ -246,8 +261,15 @@ export default function Dashboard() {
                                                 border: '1px solid var(--border-color)',
                                                 borderRadius: 'var(--radius-md)'
                                             }}
+                                            cursor={{ fill: 'var(--bg-secondary)', opacity: 0.4 }}
                                         />
-                                        <Bar dataKey="total" fill="var(--color-primary)" radius={[8, 8, 0, 0]} />
+                                        <Bar dataKey="total" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
+                                        <defs>
+                                            <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={1} />
+                                                <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0.6} />
+                                            </linearGradient>
+                                        </defs>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -269,18 +291,18 @@ export default function Dashboard() {
                         ) : (
                             <div className="projects-list">
                                 {recentProjects.map((project) => (
-                                    <div key={project._id} className="project-item">
+                                    <Link key={project.id} to={`/projects/${project.id}`} className="project-item">
                                         <div className="project-info">
                                             <h4>{project.name}</h4>
-                                            <p>{project.client?.name || 'No client'}</p>
+                                            <p>{project.client?.name || t('common.noData')}</p>
                                         </div>
                                         <div className="project-meta">
-                                            <span className={`badge badge-${getStatusColor(project.status)}`}>
-                                                {project.status}
+                                            <span className={`badge badge-${getStatusColor(project.status.toLowerCase())}`}>
+                                                {t(`projects.status.${project.status.toLowerCase()}`)}
                                             </span>
                                             <span className="project-budget">{formatCurrency(project.budget)}</span>
                                         </div>
-                                    </div>
+                                    </Link>
                                 ))}
                             </div>
                         )}
