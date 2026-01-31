@@ -118,8 +118,8 @@ export default function Clients() {
                                 <div className="flex-between mb-md">
                                     <h3>{client.name}</h3>
                                     <div className="flex gap-sm">
-                                        <span className={`badge badge-${client.status === 'active' ? 'success' : 'warning'}`}>
-                                            {t(`clients.status.${client.status}`)}
+                                        <span className={`badge badge-${client.status?.toLowerCase() === 'active' ? 'success' : 'warning'}`}>
+                                            {t(`clients.status.${client.status?.toLowerCase()}`)}
                                         </span>
                                         <button
                                             className="btn btn-secondary btn-sm"

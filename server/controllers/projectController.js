@@ -97,7 +97,19 @@ export const createProject = async (req, res, next) => {
     try {
         const project = await prisma.project.create({
             data: {
-                ...req.body,
+                name: req.body.name,
+                description: req.body.description,
+                status: req.body.status,
+                projectType: req.body.projectType,
+                location: req.body.location,
+                startDate: new Date(req.body.startDate),
+                endDate: req.body.endDate ? new Date(req.body.endDate) : null,
+                budget: req.body.budget ? parseFloat(req.body.budget) : 0,
+                revenueModel: req.body.revenueModel,
+                managementFeePercent: req.body.managementFeePercent ? parseFloat(req.body.managementFeePercent) : 0,
+                totalContractValue: req.body.totalContractValue ? parseFloat(req.body.totalContractValue) : 0,
+                paymentTerms: req.body.paymentTerms,
+                clientId: req.body.clientId,
                 engineerId: req.user.id,
                 tenantId: req.user.tenantId // Critical: Assign to Tenant
             },
@@ -142,9 +154,50 @@ export const updateProject = async (req, res, next) => {
             });
         }
 
+        const updateData = { ...req.body };
+
+        // Remove nested objects (like client) if they are passed solely for UI display
+        delete updateData.client;
+        delete updateData.engineer;
+        delete updateData.id;
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+
+        // Ensure proper types
+        if (updateData.startDate) {
+            updateData.startDate = new Date(updateData.startDate);
+        } else {
+            delete updateData.startDate; // Don't try to validat empty string
+        }
+
+        if (updateData.endDate) {
+            updateData.endDate = new Date(updateData.endDate);
+        } else {
+            // If explicit empty string is passed, it might mean "clear date", but for now safer to ignore or set null if schema allows
+            if (updateData.endDate === '') updateData.endDate = null;
+            else delete updateData.endDate;
+        }
+        if (updateData.budget !== undefined && updateData.budget !== '') {
+            updateData.budget = parseFloat(updateData.budget);
+        } else if (updateData.budget === '') {
+            updateData.budget = 0;
+        }
+
+        if (updateData.managementFeePercent !== undefined && updateData.managementFeePercent !== '') {
+            updateData.managementFeePercent = parseFloat(updateData.managementFeePercent);
+        } else if (updateData.managementFeePercent === '') {
+            updateData.managementFeePercent = 0;
+        }
+
+        if (updateData.totalContractValue !== undefined && updateData.totalContractValue !== '') {
+            updateData.totalContractValue = parseFloat(updateData.totalContractValue);
+        } else if (updateData.totalContractValue === '') {
+            updateData.totalContractValue = 0;
+        }
+
         const updatedProject = await prisma.project.update({
             where: { id: req.params.id },
-            data: req.body,
+            data: updateData,
             include: {
                 client: true
             }

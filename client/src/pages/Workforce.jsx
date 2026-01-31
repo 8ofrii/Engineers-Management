@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HardHat, Plus, Phone, CreditCard, DollarSign } from 'lucide-react';
+import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon } from 'lucide-react';
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI } from '../services/api';
@@ -10,6 +10,7 @@ export default function Workforce() {
     const [workmen, setWorkmen] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
+    const [selectedWorkman, setSelectedWorkman] = useState(null);
     const [selectedTrades, setSelectedTrades] = useState([]); // Changed to array for multiple selection
 
     useEffect(() => {
@@ -29,9 +30,14 @@ export default function Workforce() {
 
     const handleSaveWorkman = async (workmanData) => {
         try {
-            await workmenAPI.create(workmanData);
+            if (selectedWorkman) {
+                await workmenAPI.update(selectedWorkman.id, workmanData);
+            } else {
+                await workmenAPI.create(workmanData);
+            }
             await loadWorkmen();
             setModalOpen(false);
+            setSelectedWorkman(null);
         } catch (error) {
             console.error('Failed to save workman:', error);
             throw error;
@@ -169,17 +175,42 @@ export default function Workforce() {
                 ) : (
                     <div className="grid grid-3">
                         {filteredWorkmen.map((workman) => (
-                            <div key={workman.id} className="card">
-                                <div className="flex-between mb-md">
+                            <div key={workman.id} className="card" style={{ position: 'relative' }}>
+                                <div className="flex-between mb-md" style={{ alignItems: 'flex-start' }}>
                                     <div>
-                                        <h3 style={{ marginBottom: '4px' }}>{workman.name}</h3>
+                                        <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{workman.name}</h3>
                                         {workman.nameAr && (
                                             <p className="text-secondary" style={{ fontSize: '13px' }}>{workman.nameAr}</p>
                                         )}
                                     </div>
-                                    <span className={`badge ${workman.isActive ? 'badge-success' : 'badge-secondary'}`}>
-                                        {workman.isActive ? t('common.active') : t('common.inactive')}
-                                    </span>
+                                    <div className="flex gap-sm">
+                                        <span className={`badge ${workman.isActive ? 'badge-success' : 'badge-secondary'}`}>
+                                            {workman.isActive ? t('common.active') : t('common.inactive')}
+                                        </span>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedWorkman(workman);
+                                                setModalOpen(true);
+                                            }}
+                                            className="btn-icon"
+                                            style={{
+                                                width: '32px',
+                                                height: '32px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: 'var(--text-secondary)',
+                                                background: 'var(--bg-tertiary)',
+                                                border: '1px solid var(--border-color)',
+                                                borderRadius: 'var(--radius-md)',
+                                                marginLeft: '8px',
+                                                cursor: 'pointer'
+                                            }}
+                                            title={t('common.edit')}
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex gap-sm mb-md" style={{ flexWrap: 'wrap' }}>
@@ -215,6 +246,16 @@ export default function Workforce() {
                                             <span>{workman.nationalId}</span>
                                         </div>
                                     )}
+                                    {workman.nationalIdImage && (
+                                        <div className="flex gap-sm" style={{ color: 'var(--color-primary)', cursor: 'pointer' }} onClick={() => {
+                                            // Open image in new tab or modal
+                                            const win = window.open();
+                                            win.document.write('<iframe src="' + workman.nationalIdImage + '" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>');
+                                        }}>
+                                            <ImageIcon size={16} />
+                                            <span>{t('View ID')}</span>
+                                        </div>
+                                    )}
                                     <div className="flex gap-sm" style={{ color: 'var(--color-success)', fontWeight: '600' }}>
                                         <DollarSign size={16} />
                                         <span>{t('labor.totalPaid')}: {formatCurrency(workman.totalPaid)}</span>
@@ -227,8 +268,12 @@ export default function Workforce() {
 
                 <AddWorkmanModal
                     isOpen={modalOpen}
-                    onClose={() => setModalOpen(false)}
+                    onClose={() => {
+                        setModalOpen(false);
+                        setSelectedWorkman(null);
+                    }}
                     onSave={handleSaveWorkman}
+                    initialData={selectedWorkman}
                 />
             </div>
         </Layout>

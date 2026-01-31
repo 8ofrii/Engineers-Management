@@ -2,20 +2,20 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '../services/api';
 import { FolderKanban, Plus, Pencil, Trash2 } from 'lucide-react';
+import { useAlert } from '../context/AlertContext';
 import Layout from '../components/Layout';
 import AddProjectModal from '../components/AddProjectModal';
-import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 
 export default function Projects() {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
 
-    // Delete state
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [projectToDelete, setProjectToDelete] = useState(null);
+    // Delete state managed via Alert now, but keeping local var for reference if needed
+    // However, the CustomAlert handles the confirmation internally via callbacks.
 
     useEffect(() => {
         loadProjects();
@@ -27,6 +27,7 @@ export default function Projects() {
             setProjects(response.data.data);
         } catch (error) {
             console.error('Failed to load projects:', error);
+            // Optional: Show alert on load failure or just log it
         } finally {
             setLoading(false);
         }
@@ -54,32 +55,49 @@ export default function Projects() {
         try {
             if (editingProject) {
                 await projectsAPI.update(editingProject.id, projectData);
+                showAlert({
+                    type: 'success',
+                    title: t('common.success'),
+                    message: 'Project updated successfully'
+                });
             } else {
                 await projectsAPI.create(projectData);
+                showAlert({
+                    type: 'success',
+                    title: t('common.success'),
+                    message: 'Project created successfully'
+                });
             }
-            loadProjects(); // Reload the list
+            loadProjects();
         } catch (error) {
             console.error('Failed to save project:', error);
-            alert('Failed to save project. Please try again.');
+            const errorMsg = error.response?.data?.message || error.message || 'Unknown error occurred';
+            showAlert({
+                type: 'error',
+                title: t('common.error'),
+                message: `Failed to save project: ${errorMsg}`
+            });
         }
     };
 
     const handleDeleteClick = (project) => {
-        setProjectToDelete(project);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!projectToDelete) return;
-        try {
-            await projectsAPI.delete(projectToDelete.id);
-            loadProjects();
-        } catch (error) {
-            console.error('Failed to delete project:', error);
-            alert('Failed to delete project. Please try again.');
-        } finally {
-            setProjectToDelete(null);
-        }
+        showAlert({
+            type: 'warning',
+            title: t('common.deleteConfirmTitle'),
+            message: `${t('common.deleteConfirmMessage')} "${project.name}"?`,
+            showCancel: true,
+            confirmText: t('common.delete'),
+            onConfirm: async () => {
+                try {
+                    await projectsAPI.delete(project.id);
+                    showAlert({ type: 'success', title: 'Deleted', message: 'Project deleted successfully' });
+                    loadProjects();
+                } catch (error) {
+                    console.error('Failed to delete project:', error);
+                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete project' });
+                }
+            }
+        });
     };
 
     const openCreateModal = () => {
@@ -132,12 +150,17 @@ export default function Projects() {
                 ) : (
                     <div className="grid grid-2">
                         {projects.map((project) => (
-                            <div key={project.id} className="card">
+                            <div key={project.id} className="card" style={{
+                                padding: 'var(--spacing-lg)',
+                                background: 'var(--bg-secondary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: 'var(--radius-lg)'
+                            }}>
                                 <div className="flex-between mb-md">
                                     <h3>{project.name}</h3>
                                     <div className="flex gap-sm">
-                                        <span className={`badge badge-${getStatusColor(project.status)}`}>
-                                            {t(`projects.status.${project.status}`)}
+                                        <span className={`badge badge-${getStatusColor(project.status.toLowerCase())}`}>
+                                            {t(`projects.status.${project.status.toLowerCase()}`)}
                                         </span>
                                         <button
                                             className="btn btn-secondary btn-sm"
@@ -175,6 +198,18 @@ export default function Projects() {
                                             {formatCurrency(project.actualCost)}
                                         </div>
                                     </div>
+                                    <div>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                            {t('projects.remaining')}
+                                        </div>
+                                        <div style={{
+                                            fontSize: 'var(--font-size-lg)',
+                                            fontWeight: 600,
+                                            color: (project.budget - project.actualCost) < 0 ? 'var(--color-danger)' : 'var(--color-success)'
+                                        }}>
+                                            {formatCurrency(project.budget - project.actualCost)}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -187,15 +222,6 @@ export default function Projects() {
                 initialData={editingProject}
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleSaveProject}
-            />
-
-            <DeleteConfirmationModal
-                isOpen={isDeleteModalOpen}
-                onClose={() => setIsDeleteModalOpen(false)}
-                onConfirm={handleConfirmDelete}
-                itemName={projectToDelete?.name}
-                title={t('common.deleteConfirmTitle')}
-                message={t('common.deleteConfirmMessage')}
             />
         </Layout>
     );

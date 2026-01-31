@@ -109,11 +109,14 @@ export const inviteUser = async (req, res) => {
                 subject: 'Verify Your Account - Engineers Management',
                 message
             });
+
+            res.status(201).json({ success: true, data: newUser, message: 'User invited. Verification email sent.' });
+
         } catch (emailError) {
             console.error('Failed to send invitation email:', emailError);
+            // Return success even if email fails, but warn
+            res.status(201).json({ success: true, data: newUser, message: 'User created, but failed to send verification email. Please contact admin.' });
         }
-
-        res.status(201).json({ success: true, data: newUser, message: 'User invited. Verification email sent.' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Failed to create user' });

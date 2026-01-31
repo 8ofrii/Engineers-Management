@@ -67,7 +67,7 @@ enum UserRole {
 
 model User {
   id       String   @id @default(uuid())
-  email    String
+  email    String   @unique
   password String
   name     String
   role     UserRole @default(ENGINEER)
@@ -114,8 +114,6 @@ model User {
   notifications        Notification[]
 
   @@map("users")
-  @@unique([email, tenantId])
-  @@unique([phone, tenantId])
 }
 
 // ============================================

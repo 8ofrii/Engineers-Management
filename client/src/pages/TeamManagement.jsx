@@ -356,7 +356,7 @@ export default function TeamManagement() {
                                             value={formData.email}
                                             onChange={e => setFormData({ ...formData, email: e.target.value })}
                                             required
-                                            disabled={modalMode === 'edit'}
+                                            // disabled={modalMode === 'edit'} // Allow editing email
                                             placeholder="john@company.com"
                                         />
                                     </div>

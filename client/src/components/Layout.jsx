@@ -19,7 +19,8 @@ import {
     User as UserIcon,
     HardHat,
     Settings,
-    UserCog
+    UserCog,
+    Wallet
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -70,6 +71,7 @@ export default function Layout({ children }) {
         { path: '/clients', icon: Users, label: t('nav.clients') },
         { path: '/suppliers', icon: Package, label: t('nav.suppliers') },
         { path: '/workforce', icon: HardHat, label: t('nav.labor') },
+        { path: '/finance', icon: Wallet, label: t('finance.title') }, // or 'Accounting'
         { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
         { path: '/reports', icon: FileText, label: t('nav.reports') }
     ];

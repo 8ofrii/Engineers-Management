@@ -73,7 +73,8 @@ export const transactionsAPI = {
     create: (data) => api.post('/transactions', data),
     update: (id, data) => api.put(`/transactions/${id}`, data),
     delete: (id) => api.delete(`/transactions/${id}`),
-    getStats: (params) => api.get('/transactions/stats', { params })
+    getStats: (params) => api.get('/transactions/stats', { params }),
+    recordIncome: (data) => api.post('/transactions/income', data)
 };
 
 // Clients API
@@ -101,6 +102,32 @@ export const workmenAPI = {
     create: (data) => api.post('/workmen', data),
     update: (id, data) => api.put(`/workmen/${id}`, data),
     delete: (id) => api.delete(`/workmen/${id}`)
+};
+
+// Materials API
+export const materialsAPI = {
+    getAll: (params) => api.get('/materials', { params }),
+    getOne: (id) => api.get(`/materials/${id}`),
+    create: (data) => api.post('/materials', data),
+    update: (id, data) => api.put(`/materials/${id}`, data),
+    delete: (id) => api.delete(`/materials/${id}`)
+};
+
+// Material Usage API (and Batches)
+export const materialUsageAPI = {
+    getAll: (params) => api.get('/material-usage', { params }),
+    create: (data) => api.post('/material-usage', data),
+    getBatches: (params) => api.get('/material-batches', { params }),
+    consumeBatch: (id, data) => api.post(`/material-batches/${id}/consume`, data)
+};
+
+// Workmanship API
+export const workmanshipAPI = {
+    getAll: (params) => api.get('/workmanships', { params }),
+    getOne: (id) => api.get(`/workmanships/${id}`),
+    create: (data) => api.post('/workmanships', data),
+    update: (id, data) => api.put(`/workmanships/${id}`, data),
+    delete: (id) => api.delete(`/workmanships/${id}`)
 };
 
 // Chat API

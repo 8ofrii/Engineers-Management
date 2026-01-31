@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { CheckCircle, XCircle, Loader, Building2 } from 'lucide-react';
@@ -12,12 +12,17 @@ export default function VerifyInvite() {
     const [status, setStatus] = useState('verifying'); // verifying, success, error
     const [message, setMessage] = useState('Verifying your account...');
 
+    const attemptRef = useRef(false);
+
     useEffect(() => {
         if (!token) {
             setStatus('error');
             setMessage('Invalid verification link.');
             return;
         }
+
+        if (attemptRef.current) return;
+        attemptRef.current = true;
 
         const verify = async () => {
             try {

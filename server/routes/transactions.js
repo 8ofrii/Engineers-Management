@@ -21,7 +21,7 @@ router.get(
 // Record income (Admins & Accountants only)
 router.post(
     '/income',
-    verifyRole(['ADMIN', 'ACCOUNTANT']),
+    verifyRole(['ADMIN', 'ACCOUNTANT', 'PROJECT_MANAGER']),
     transactionController.recordIncome
 );
 
@@ -61,11 +61,17 @@ router.put(
     transactionController.rejectTransaction
 );
 
+// Create generic transaction
+router.post('/', transactionController.createTransaction);
+
 // Get all transactions (role-based filtering)
 router.get('/', transactionController.getTransactions);
 
 // Get single transaction
 router.get('/:id', transactionController.getTransaction);
+
+// Update transaction
+router.put('/:id', transactionController.updateTransaction);
 
 // Delete transaction
 router.delete('/:id', transactionController.deleteTransaction);

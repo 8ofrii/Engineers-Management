@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Upload, User, Building2, UserCircle, AlertCircle } from 'lucide-react';
+import { X, Upload, User, Building2, UserCircle, AlertCircle, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api, { tenantAPI } from '../services/api';
 import './Modal.css';
@@ -31,6 +31,17 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
     const [companyData, setCompanyData] = useState({ name: '', address: '', phone: '', email: '' });
     const [companyLogo, setCompanyLogo] = useState(null);
     const [companyLogoPreview, setCompanyLogoPreview] = useState(null);
+
+    // Password Visibility State
+    const [showPasswords, setShowPasswords] = useState({
+        current: false,
+        new: false,
+        confirm: false
+    });
+
+    const togglePassword = (field) => {
+        setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
+    };
 
     // Helper function to get full image URL
     const getImageUrl = (path) => {
@@ -162,6 +173,8 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
         }
     };
 
+    const [successMessage, setSuccessMessage] = useState(null);
+
     const handleCompanySubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -179,7 +192,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
             const me = await api.get('/auth/me');
             updateUser(me.data.data);
 
-            alert('Company settings updated successfully');
+            setSuccessMessage('Company settings updated successfully');
         } catch (err) {
             console.error(err);
             alert(err.response?.data?.message || 'Failed to update company');
@@ -224,8 +237,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
             });
 
             updateUser(response.data.data);
-            alert(t('profile.updateSuccess'));
-            handleClose();
+            setSuccessMessage(t('profile.updateSuccess'));
         } catch (error) {
             console.error('Failed to update profile:', error);
             if (error.response?.data?.message) {
@@ -251,6 +263,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
         setProfilePicture(null);
         setPreviewUrl(null);
         setErrors({});
+        setSuccessMessage(null);
         onClose();
     };
 
@@ -337,261 +350,359 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                     )}
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
-
-                    {/* --- PROFILE TAB --- */}
-                    {activeTab === 'profile' && (
-                        <>
-                            {/* Profile Picture Section */}
-                            <div className="form-section">
-                                <h3 className="section-title">{t('profile.sections.picture')}</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                                    <div
-                                        style={{
-                                            width: '120px',
-                                            height: '120px',
-                                            borderRadius: '50%',
-                                            overflow: 'hidden',
-                                            border: '3px solid var(--color-primary)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: 'var(--bg-secondary)',
-                                            fontSize: '48px',
-                                            fontWeight: '600',
-                                            color: 'var(--color-primary)'
-                                        }}
-                                    >
-                                        {previewUrl ? (
-                                            <img
-                                                src={previewUrl}
-                                                alt="Profile"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
-                                        ) : (
-                                            <User size={60} />
-                                        )}
-                                    </div>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleFileChange}
-                                        style={{ display: 'none' }}
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={() => fileInputRef.current?.click()}
-                                    >
-                                        <Upload size={16} />
-                                        {t('profile.uploadPicture')}
-                                    </button>
-                                    {errors.profilePicture && <span className="error-message">{errors.profilePicture}</span>}
-                                </div>
+                <div className="modal-body">
+                    {successMessage ? (
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '40px 20px',
+                            textAlign: 'center',
+                            height: '100%'
+                        }}>
+                            <div style={{
+                                width: '80px',
+                                height: '80px',
+                                borderRadius: '50%',
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginBottom: '24px'
+                            }}>
+                                <CheckCircle size={48} color="#22c55e" />
                             </div>
-
-                            {/* Basic Information */}
-                            <div className="form-section">
-                                <h3 className="section-title">{t('profile.sections.basic')}</h3>
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label htmlFor="name">{t('profile.fields.name')} <span className="required">*</span></label>
-                                        <input
-                                            type="text"
-                                            id="name"
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleChange}
-                                            className={errors.name ? 'error' : ''}
-                                        />
-                                        {errors.name && <span className="error-message">{errors.name}</span>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label htmlFor="email">{t('profile.fields.email')} <span className="required">*</span></label>
-                                        <input
-                                            type="email"
-                                            id="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleChange}
-                                            className={errors.email ? 'error' : ''}
-                                        />
-                                        {errors.email && <span className="error-message">{errors.email}</span>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label htmlFor="phone">{t('profile.fields.phone')}</label>
-                                        <input
-                                            type="tel"
-                                            id="phone"
-                                            name="phone"
-                                            value={formData.phone}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label htmlFor="company">{t('profile.fields.company')}</label>
-                                        <input
-                                            type="text"
-                                            id="company"
-                                            name="company"
-                                            value={formData.company}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Change Password */}
-                            <div className="form-section">
-                                <h3 className="section-title">{forceChangePassword ? 'Create New Password' : t('profile.sections.password')}</h3>
-                                {forceChangePassword && (
-                                    <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
-                                        <AlertCircle size={16} />
-                                        <span>For your security, you must change your password on first login.</span>
-                                    </div>
-                                )}
-                                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                                    Password must include: 8+ chars, Uppercase, Lowercase, Number, Symbol.
-                                </p>
-                                <div className="form-grid">
-                                    <div className="form-group full-width">
-                                        <label htmlFor="currentPassword">{t('profile.fields.currentPassword')}</label>
-                                        <input
-                                            type="password"
-                                            id="currentPassword"
-                                            name="currentPassword"
-                                            value={formData.currentPassword}
-                                            onChange={handleChange}
-                                            className={errors.currentPassword ? 'error' : ''}
-                                        />
-                                        {errors.currentPassword && <span className="error-message">{errors.currentPassword}</span>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label htmlFor="newPassword">{t('profile.fields.newPassword')}</label>
-                                        <input
-                                            type="password"
-                                            id="newPassword"
-                                            name="newPassword"
-                                            value={formData.newPassword}
-                                            onChange={handleChange}
-                                            className={errors.newPassword ? 'error' : ''}
-                                        />
-                                        {errors.newPassword && <span className="error-message">{errors.newPassword}</span>}
-                                    </div>
-
-                                    <div className="form-group">
-                                        <label htmlFor="confirmPassword">{t('profile.fields.confirmPassword')}</label>
-                                        <input
-                                            type="password"
-                                            id="confirmPassword"
-                                            name="confirmPassword"
-                                            value={formData.confirmPassword}
-                                            onChange={handleChange}
-                                            className={errors.confirmPassword ? 'error' : ''}
-                                        />
-                                        {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {/* --- COMPANY TAB --- */}
-                    {activeTab === 'company' && (
-                        <>
-                            {/* Logo Section */}
-                            <div className="form-section">
-                                <h3 className="section-title">Company Logo</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                                    <div
-                                        style={{
-                                            width: '120px',
-                                            height: '120px',
-                                            borderRadius: '50%', // Circle for consistency, or square for logo? Let's use circle
-                                            overflow: 'hidden',
-                                            border: '1px solid #eee',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            backgroundColor: '#f9fafb',
-                                        }}
-                                    >
-                                        {companyLogoPreview ? (
-                                            <img
-                                                src={companyLogoPreview}
-                                                alt="Logo"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                            />
-                                        ) : (
-                                            <Building2 size={40} color="#9ca3af" />
-                                        )}
-                                    </div>
-                                    <label className="btn btn-secondary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Upload size={16} /> Upload Logo
-                                        <input type="file" accept="image/*" onChange={handleCompanyLogoChange} style={{ display: 'none' }} />
-                                    </label>
-                                    <p style={{ fontSize: '12px', color: '#6b7280' }}>Recommended: Square PNG, max 2MB</p>
-                                </div>
-                            </div>
-
-                            {/* Company Details */}
-                            <div className="form-section">
-                                <h3 className="section-title">Company Details</h3>
-                                <div className="form-grid">
-                                    <div className="form-group">
-                                        <label>Company Name <span className="required">*</span></label>
-                                        <input
-                                            type="text"
-                                            value={companyData.name}
-                                            onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Support Email</label>
-                                        <input
-                                            type="email"
-                                            value={companyData.email}
-                                            onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Phone</label>
-                                        <input
-                                            type="text"
-                                            value={companyData.phone}
-                                            onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Address</label>
-                                        <input
-                                            type="text"
-                                            value={companyData.address}
-                                            onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    <div className="modal-footer">
-                        {!forceChangePassword && (
-                            <button type="button" className="btn btn-secondary" onClick={handleClose}>
-                                {t('common.cancel')}
+                            <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--text-primary)' }}>Success!</h3>
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '16px' }}>{successMessage}</p>
+                            <button className="btn btn-primary" onClick={handleClose} style={{ minWidth: '150px' }}>
+                                {t('common.close')}
                             </button>
-                        )}
-                        <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? t('common.loading') : (activeTab === 'profile' ? t('profile.saveChanges') : 'Save Company Settings')}
-                        </button>
-                    </div>
-                </form>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleSubmit}>
+
+                            {/* --- PROFILE TAB --- */}
+                            {activeTab === 'profile' && (
+                                <>
+                                    {/* Profile Picture Section */}
+                                    <div className="form-section">
+                                        <h3 className="section-title">{t('profile.sections.picture')}</h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                                            <div
+                                                style={{
+                                                    width: '120px',
+                                                    height: '120px',
+                                                    borderRadius: '50%',
+                                                    overflow: 'hidden',
+                                                    border: '3px solid var(--color-primary)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: 'var(--bg-secondary)',
+                                                    fontSize: '48px',
+                                                    fontWeight: '600',
+                                                    color: 'var(--color-primary)'
+                                                }}
+                                            >
+                                                {previewUrl ? (
+                                                    <img
+                                                        src={previewUrl}
+                                                        alt="Profile"
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    />
+                                                ) : (
+                                                    <User size={60} />
+                                                )}
+                                            </div>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleFileChange}
+                                                style={{ display: 'none' }}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => fileInputRef.current?.click()}
+                                            >
+                                                <Upload size={16} />
+                                                {t('profile.uploadPicture')}
+                                            </button>
+                                            {errors.profilePicture && <span className="error-message">{errors.profilePicture}</span>}
+                                        </div>
+                                    </div>
+
+                                    {/* Basic Information */}
+                                    <div className="form-section">
+                                        <h3 className="section-title">{t('profile.sections.basic')}</h3>
+                                        <div className="form-grid">
+                                            <div className="form-group">
+                                                <label htmlFor="name">{t('profile.fields.name')} <span className="required">*</span></label>
+                                                <input
+                                                    type="text"
+                                                    id="name"
+                                                    name="name"
+                                                    value={formData.name}
+                                                    onChange={handleChange}
+                                                    className={errors.name ? 'error' : ''}
+                                                />
+                                                {errors.name && <span className="error-message">{errors.name}</span>}
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="email">{t('profile.fields.email')} <span className="required">*</span></label>
+                                                <input
+                                                    type="email"
+                                                    id="email"
+                                                    name="email"
+                                                    value={formData.email}
+                                                    onChange={handleChange}
+                                                    className={errors.email ? 'error' : ''}
+                                                />
+                                                {errors.email && <span className="error-message">{errors.email}</span>}
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="phone">{t('profile.fields.phone')}</label>
+                                                <input
+                                                    type="tel"
+                                                    id="phone"
+                                                    name="phone"
+                                                    value={formData.phone}
+                                                    onChange={handleChange}
+                                                />
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="company">{t('profile.fields.company')}</label>
+                                                <input
+                                                    type="text"
+                                                    id="company"
+                                                    name="company"
+                                                    value={formData.company}
+                                                    onChange={handleChange}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Change Password */}
+                                    <div className="form-section">
+                                        <h3 className="section-title">{forceChangePassword ? 'Create New Password' : t('profile.sections.password')}</h3>
+                                        {forceChangePassword && (
+                                            <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
+                                                <AlertCircle size={16} />
+                                                <span>For your security, you must change your password on first login.</span>
+                                            </div>
+                                        )}
+                                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                                            Password must include: 8+ chars, Uppercase, Lowercase, Number, Symbol.
+                                        </p>
+                                        <div className="form-grid">
+                                            <div className="form-group full-width">
+                                                <label htmlFor="currentPassword">{t('profile.fields.currentPassword')}</label>
+                                                <div style={{ position: 'relative', width: '100%' }}>
+                                                    <input
+                                                        type={showPasswords.current ? 'text' : 'password'}
+                                                        id="currentPassword"
+                                                        name="currentPassword"
+                                                        value={formData.currentPassword}
+                                                        onChange={handleChange}
+                                                        className={errors.currentPassword ? 'error' : ''}
+                                                        style={{ paddingRight: '40px', width: '100%' }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => togglePassword('current')}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            right: '10px',
+                                                            top: '50%',
+                                                            transform: 'translateY(-50%)',
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: 'var(--text-secondary)',
+                                                            cursor: 'pointer',
+                                                            padding: '4px',
+                                                            display: 'flex',
+                                                            alignItems: 'center'
+                                                        }}
+                                                    >
+                                                        {showPasswords.current ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                    </button>
+                                                </div>
+                                                {errors.currentPassword && <span className="error-message">{errors.currentPassword}</span>}
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="newPassword">{t('profile.fields.newPassword')}</label>
+                                                <div style={{ position: 'relative', width: '100%' }}>
+                                                    <input
+                                                        type={showPasswords.new ? 'text' : 'password'}
+                                                        id="newPassword"
+                                                        name="newPassword"
+                                                        value={formData.newPassword}
+                                                        onChange={handleChange}
+                                                        className={errors.newPassword ? 'error' : ''}
+                                                        style={{ paddingRight: '40px', width: '100%' }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => togglePassword('new')}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            right: '10px',
+                                                            top: '50%',
+                                                            transform: 'translateY(-50%)',
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: 'var(--text-secondary)',
+                                                            cursor: 'pointer',
+                                                            padding: '4px',
+                                                            display: 'flex',
+                                                            alignItems: 'center'
+                                                        }}
+                                                    >
+                                                        {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                    </button>
+                                                </div>
+                                                {errors.newPassword && <span className="error-message">{errors.newPassword}</span>}
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="confirmPassword">{t('profile.fields.confirmPassword')}</label>
+                                                <div style={{ position: 'relative', width: '100%' }}>
+                                                    <input
+                                                        type={showPasswords.confirm ? 'text' : 'password'}
+                                                        id="confirmPassword"
+                                                        name="confirmPassword"
+                                                        value={formData.confirmPassword}
+                                                        onChange={handleChange}
+                                                        className={errors.confirmPassword ? 'error' : ''}
+                                                        style={{ paddingRight: '40px', width: '100%' }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => togglePassword('confirm')}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            right: '10px',
+                                                            top: '50%',
+                                                            transform: 'translateY(-50%)',
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: 'var(--text-secondary)',
+                                                            cursor: 'pointer',
+                                                            padding: '4px',
+                                                            display: 'flex',
+                                                            alignItems: 'center'
+                                                        }}
+                                                    >
+                                                        {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                                                    </button>
+                                                </div>
+                                                {errors.confirmPassword && <span className="error-message">{errors.confirmPassword}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* --- COMPANY TAB --- */}
+                            {activeTab === 'company' && (
+                                <>
+                                    {/* Logo Section */}
+                                    <div className="form-section">
+                                        <h3 className="section-title">Company Logo</h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                                            <div
+                                                style={{
+                                                    width: '120px',
+                                                    height: '120px',
+                                                    borderRadius: '50%', // Circle for consistency, or square for logo? Let's use circle
+                                                    overflow: 'hidden',
+                                                    border: '1px solid #eee',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    backgroundColor: '#f9fafb',
+                                                }}
+                                            >
+                                                {companyLogoPreview ? (
+                                                    <img
+                                                        src={companyLogoPreview}
+                                                        alt="Logo"
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    />
+                                                ) : (
+                                                    <Building2 size={40} color="#9ca3af" />
+                                                )}
+                                            </div>
+                                            <label className="btn btn-secondary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Upload size={16} /> Upload Logo
+                                                <input type="file" accept="image/*" onChange={handleCompanyLogoChange} style={{ display: 'none' }} />
+                                            </label>
+                                            <p style={{ fontSize: '12px', color: '#6b7280' }}>Recommended: Square PNG, max 2MB</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Company Details */}
+                                    <div className="form-section">
+                                        <h3 className="section-title">Company Details</h3>
+                                        <div className="form-grid">
+                                            <div className="form-group">
+                                                <label>Company Name <span className="required">*</span></label>
+                                                <input
+                                                    type="text"
+                                                    value={companyData.name}
+                                                    onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Support Email</label>
+                                                <input
+                                                    type="email"
+                                                    value={companyData.email}
+                                                    onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Phone</label>
+                                                <input
+                                                    type="text"
+                                                    value={companyData.phone}
+                                                    onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label>Address</label>
+                                                <input
+                                                    type="text"
+                                                    value={companyData.address}
+                                                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="modal-footer">
+                                {!forceChangePassword && (
+                                    <button type="button" className="btn btn-secondary" onClick={handleClose}>
+                                        {t('common.cancel')}
+                                    </button>
+                                )}
+                                <button type="submit" className="btn btn-primary" disabled={loading}>
+                                    {loading ? t('common.loading') : (activeTab === 'profile' ? t('profile.saveChanges') : 'Save Company Settings')}
+                                </button>
+                            </div>
+                        </form>
+                    )}
+                </div>
             </div>
         </div>
     );
