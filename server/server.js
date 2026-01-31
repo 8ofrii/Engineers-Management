@@ -20,6 +20,7 @@ import materialBatchRoutes from './routes/materialBatches.js';
 import chatRoutes from './routes/chat.js';
 import tenantRoutes from './routes/tenant.js';
 import userRoutes from './routes/users.js';
+import roleRoutes from './routes/roles.js';
 
 // Load env vars
 dotenv.config();
@@ -60,7 +61,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/material-batches', materialBatchRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/tenant', tenantRoutes);
-app.use('/api/users', userRoutes); // NEW: User Management
+app.use('/api/users', userRoutes);
+app.use('/api/roles', roleRoutes); // NEW: Role Management
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

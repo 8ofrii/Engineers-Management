@@ -1,7 +1,3 @@
-// Prisma Schema for Construction ERP - AI-First Cash-to-Cost System
-// PostgreSQL Database
-// Updated: V1 with Custody Management, Income Splitting, and AI Voice Workflow
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,155 +7,435 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// MULTI-TENANT SAAS ARCHITECTURE
-// ============================================
-
 model Tenant {
-  id               String   @id @default(uuid())
-  name             String   // e.g., "Al-Futtaim Construction"
-  slug             String   @unique // e.g., "al-futtaim"
-  subscriptionPlan String   @default("FREE_PILOT") // BASIC, PRO, ENTERPRISE
-  isActive         Boolean  @default(true)
-  
-  // Company Profile
+  id               String            @id @default(uuid())
+  name             String
+  slug             String            @unique
+  subscriptionPlan String            @default("FREE_PILOT")
+  isActive         Boolean           @default(true)
   logo             String?
   address          String?
   phone            String?
   email            String?
-  
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations - All data belongs to a tenant
-  users            User[]
-  projects         Project[]
-  clients          Client[]
-  suppliers        Supplier[]
-  workmen          Workman[]
-  transactions     Transaction[]
-  materialBatches  MaterialBatch[]
-  materials        Material[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   chatMessages     ChatMessage[]
-  notifications    Notification[]
+  clients          Client[]
   custodyTransfers CustodyTransfer[]
-  
-  // Implicit/New Relations
-  materialUsage    MaterialUsage[]
-  workmanships     Workmanship[]
   documents        Document[]
+  materialBatches  MaterialBatch[]
+  materialUsage    MaterialUsage[]
+  materials        Material[]
   notes            Note[]
+  notifications    Notification[]
+  projects         Project[]
+  roles            Role[]
+  suppliers        Supplier[]
+  transactions     Transaction[]
+  users            User[]
+  workmanships     Workmanship[]
+  workmen          Workman[]
 
   @@map("tenants")
 }
 
-// ============================================
-// USER & AUTHENTICATION (Multi-Tenant Enhanced)
-// ============================================
-
-enum UserRole {
-  SUPER_ADMIN      // SaaS Owner - Can manage all tenants
-  ADMIN            // Company Owner - Full access within tenant
-  PROJECT_MANAGER  // Approver role
-  ENGINEER         // Site Engineer - Wallet Holder
-  ACCOUNTANT
-}
-
 model User {
-  id       String   @id @default(uuid())
-  email    String   @unique
-  password String
-  name     String
-  role     UserRole @default(ENGINEER)
-  company  String?
-  phone    String?
-  profilePicture String? // URL to profile picture
-  isActive Boolean  @default(true)
-  
-  // Verification
-  isVerified         Boolean   @default(false)
-  verificationCode   String?
-  verificationExpires DateTime?
+  id                    String            @id @default(uuid())
+  email                 String
+  password              String
+  name                  String
+  role                  UserRole          @default(ENGINEER)
+  company               String?
+  phone                 String?
+  isActive              Boolean           @default(true)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  currentCustodyBalance Decimal           @default(0) @db.Decimal(15, 2)
+  pendingClearance      Decimal           @default(0) @db.Decimal(15, 2)
+  profilePicture        String?
+  tenantId              String?
+  isVerified            Boolean           @default(false)
+  verificationCode      String?
+  verificationExpires   DateTime?
+  mustChangePassword    Boolean           @default(false)
+  permissions           String[]          @default([])
+  resetPasswordExpire   DateTime?
+  resetPasswordToken    String?
+  roleId                String?
+  chatMessages          ChatMessage[]
+  custodyTransfers      CustodyTransfer[]
+  materialBatches       MaterialBatch[]
+  materialUsage         MaterialUsage[]
+  notifications         Notification[]
+  projects              Project[]
+  approvedTransactions  Transaction[]     @relation("ApprovedBy")
+  transactions          Transaction[]
+  customRole            Role?             @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  tenant                Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workmanships          Workmanship[]
 
-  // Multi-Tenant: Every user belongs to a tenant (except SUPER_ADMIN)
-  // Note: tenantId is optional (String?) only to allow SUPER_ADMIN to exist outside a company.
-  // For all other users (Engineers, Managers), tenantId must be enforced by API/App logic.
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // NEW: Financial Custody Tracking (Al-Ohda)
-  currentCustodyBalance Decimal @default(0) @db.Decimal(15, 2) // Money currently in engineer's hand
-  pendingClearance      Decimal @default(0) @db.Decimal(15, 2) // Receipts uploaded but not approved yet
-
-  // Access Control
-  permissions        String[]  @default([])
-  mustChangePassword Boolean   @default(false)
-  
-  // Password Reset
-  resetPasswordToken   String?
-  resetPasswordExpire  DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  projects             Project[]
-  transactions         Transaction[]
-  approvedTransactions Transaction[]     @relation("ApprovedBy")
-  chatMessages         ChatMessage[]
-  workmanships         Workmanship[]
-  materialUsage        MaterialUsage[]
-  materialBatches      MaterialBatch[]
-  custodyTransfers     CustodyTransfer[]
-  notifications        Notification[]
-
+  @@unique([email, tenantId])
+  @@unique([phone, tenantId])
   @@map("users")
 }
 
-// ============================================
-// CLIENTS & SUPPLIERS
-// ============================================
+/// Dynamic Role-Based Access Control (RBAC) Model
+model Role {
+  id          String   @id @default(uuid())
+  name        String   // e.g., "Senior Engineer", "Site Clerk", "Junior Accountant"
+  description String?
+  isSystem    Boolean  @default(false) // If true, cannot be deleted (e.g., Admin, Engineer)
+  
+  /// The Permission Matrix: Stored as JSON for flexibility
+  /// Example: { "financials": { "view_operational_fund": true, "view_office_profit": false }, ... }
+  permissions Json     
+  
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  users       User[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name]) // Role names must be unique per company
+  @@map("roles")
+}
+
+model Client {
+  id              String        @id @default(uuid())
+  name            String
+  email           String
+  phone           String
+  company         String?
+  taxId           String?
+  status          ClientStatus  @default(ACTIVE)
+  street          String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?
+  contactName     String?
+  contactPosition String?
+  contactPhone    String?
+  contactEmail    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tenantId        String?
+  tenant          Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects        Project[]
+  transactions    Transaction[]
+
+  @@map("clients")
+}
+
+model Supplier {
+  id           String           @id @default(uuid())
+  name         String
+  email        String
+  phone        String
+  company      String?
+  category     SupplierCategory @default(OTHER)
+  taxId        String?
+  paymentTerms String           @default("Net 30")
+  rating       Int              @default(3)
+  status       SupplierStatus   @default(ACTIVE)
+  street       String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  tenantId     String?
+  materials    Material[]
+  tenant       Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("suppliers")
+}
+
+model Project {
+  id                   String          @id @default(uuid())
+  name                 String
+  description          String?
+  status               ProjectStatus   @default(PLANNING)
+  projectType          ProjectType     @default(OTHER)
+  location             String?
+  startDate            DateTime
+  endDate              DateTime?
+  budget               Decimal         @db.Decimal(15, 2)
+  actualCost           Decimal         @default(0) @db.Decimal(15, 2)
+  clientId             String
+  engineerId           String
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  managementFeePercent Decimal?        @db.Decimal(5, 2)
+  officeRevenue        Decimal         @default(0) @db.Decimal(15, 2)
+  operationalFund      Decimal         @default(0) @db.Decimal(15, 2)
+  paymentTerms         String          @default("Net 30")
+  revenueModel         RevenueModel    @default(EXECUTION_COST_PLUS)
+  tenantId             String?
+  totalContractValue   Decimal?        @db.Decimal(15, 2)
+  documents            Document[]
+  materialBatches      MaterialBatch[]
+  materialUsage        MaterialUsage[]
+  notes                Note[]
+  client               Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  engineer             User            @relation(fields: [engineerId], references: [id])
+  tenant               Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions         Transaction[]
+  workmanships         Workmanship[]
+
+  @@map("projects")
+}
+
+model Material {
+  id           String          @id @default(uuid())
+  name         String
+  nameAr       String?
+  description  String?
+  unit         MaterialUnit
+  stockLevel   Decimal         @default(0) @db.Decimal(10, 2)
+  unitPrice    Decimal         @db.Decimal(10, 2)
+  reorderLevel Decimal?        @db.Decimal(10, 2)
+  supplierId   String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  tenantId     String?
+  batches      MaterialBatch[]
+  usage        MaterialUsage[]
+  supplier     Supplier?       @relation(fields: [supplierId], references: [id])
+  tenant       Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("materials")
+}
+
+model MaterialUsage {
+  id         String   @id @default(uuid())
+  quantity   Decimal  @db.Decimal(10, 2)
+  notes      String?
+  usageDate  DateTime @default(now())
+  materialId String
+  projectId  String
+  recordedBy String
+  createdAt  DateTime @default(now())
+  tenantId   String?
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [recordedBy], references: [id])
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("material_usage")
+}
+
+model MaterialBatch {
+  id                String      @id @default(uuid())
+  description       String
+  descriptionAr     String?
+  initialValue      Decimal     @db.Decimal(15, 2)
+  remainingValue    Decimal     @db.Decimal(15, 2)
+  status            BatchStatus @default(AVAILABLE)
+  projectId         String
+  originalReceiptId String?
+  recordedBy        String
+  purchaseDate      DateTime    @default(now())
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  tenantId          String
+  materialId        String?
+  material          Material?   @relation(fields: [materialId], references: [id])
+  project           Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [recordedBy], references: [id])
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("material_batches")
+}
+
+model Workman {
+  id           String        @id @default(uuid())
+  name         String
+  nameAr       String?
+  trade        WorkmanTrade
+  dailyRate    Decimal       @db.Decimal(10, 2)
+  phone        String?
+  nationalId   String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  tenantId     String?
+  totalPaid    Decimal       @default(0) @db.Decimal(15, 2)
+  transactions Transaction[]
+  workmanships Workmanship[]
+  tenant       Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("workmen")
+}
+
+model Workmanship {
+  id                String            @id @default(uuid())
+  description       String
+  descriptionAr     String?
+  agreedAmount      Decimal           @db.Decimal(10, 2)
+  paidAmount        Decimal           @default(0) @db.Decimal(10, 2)
+  outstandingAmount Decimal           @default(0) @db.Decimal(10, 2)
+  status            WorkmanshipStatus @default(PENDING)
+  startDate         DateTime?
+  completionDate    DateTime?
+  workmanId         String
+  projectId         String
+  managedBy         String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenantId          String?
+  manager           User              @relation(fields: [managedBy], references: [id])
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workman           Workman           @relation(fields: [workmanId], references: [id], onDelete: Cascade)
+
+  @@map("workmanships")
+}
+
+model Transaction {
+  id              String              @id @default(uuid())
+  type            TransactionType
+  category        TransactionCategory
+  amount          Decimal             @db.Decimal(15, 2)
+  description     String
+  descriptionAr   String?
+  debit           Decimal?            @db.Decimal(15, 2)
+  credit          Decimal?            @db.Decimal(15, 2)
+  transactionDate DateTime            @default(now())
+  paymentMethod   PaymentMethod       @default(BANK_TRANSFER)
+  invoiceNumber   String?
+  status          TransactionStatus   @default(DRAFT)
+  notes           String?
+  projectId       String?
+  supplierId      String?
+  clientId        String?
+  createdBy       String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  aiExtractedData Json?
+  aiRawText       String?
+  approvedAt      DateTime?
+  approvedBy      String?
+  custodyWalletId String?
+  receiptPhotoUrl String?
+  rejectionReason String?
+  tenantId        String?
+  voiceNoteUrl    String?
+  workmanId       String?
+  approver        User?               @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  client          Client?             @relation(fields: [clientId], references: [id])
+  user            User                @relation(fields: [createdBy], references: [id])
+  project         Project?            @relation(fields: [projectId], references: [id])
+  supplier        Supplier?           @relation(fields: [supplierId], references: [id])
+  tenant          Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workman         Workman?            @relation(fields: [workmanId], references: [id])
+
+  @@index([projectId, transactionDate])
+  @@index([type, category])
+  @@index([status])
+  @@map("transactions")
+}
+
+model CustodyTransfer {
+  id                   String              @id @default(uuid())
+  type                 CustodyTransferType
+  amount               Decimal             @db.Decimal(15, 2)
+  description          String
+  engineerId           String
+  balanceBefore        Decimal             @db.Decimal(15, 2)
+  balanceAfter         Decimal             @db.Decimal(15, 2)
+  relatedTransactionId String?
+  tenantId             String?
+  createdAt            DateTime            @default(now())
+  engineer             User                @relation(fields: [engineerId], references: [id])
+  tenant               Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([engineerId, createdAt])
+  @@map("custody_transfers")
+}
+
+model ChatMessage {
+  id            String        @id @default(uuid())
+  messageType   MessageType   @default(TEXT)
+  content       String
+  audioUrl      String?
+  transcript    String?
+  intent        MessageIntent @default(GENERAL)
+  extractedData Json?
+  processed     Boolean       @default(false)
+  response      String?
+  userId        String
+  createdAt     DateTime      @default(now())
+  tenantId      String?
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  userId       String
+  tenantId     String?
+  type         NotificationType
+  title        String
+  message      String
+  resourceId   String?
+  resourceType String?
+  isRead       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  tenant       Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model Document {
+  id         String   @id @default(uuid())
+  name       String
+  url        String
+  fileType   String?
+  fileSize   Int?
+  projectId  String
+  uploadedAt DateTime @default(now())
+  tenantId   String?
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String
+  projectId String
+  createdAt DateTime @default(now())
+  tenantId  String?
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+enum UserRole {
+  ADMIN
+  ENGINEER
+  ACCOUNTANT
+  SUPER_ADMIN
+  PROJECT_MANAGER
+}
 
 enum ClientStatus {
   ACTIVE
   INACTIVE
   PENDING
-}
-
-model Client {
-  id           String       @id @default(uuid())
-  name         String
-  email        String
-  phone        String
-  company      String?
-  taxId        String?
-  status       ClientStatus @default(ACTIVE)
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // Address
-  street  String?
-  city    String?
-  state   String?
-  zipCode String?
-  country String?
-
-  // Contact Person
-  contactName     String?
-  contactPosition String?
-  contactPhone    String?
-  contactEmail    String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  projects     Project[]
-  transactions Transaction[]
-
-  @@map("clients")
 }
 
 enum SupplierCategory {
@@ -175,43 +451,6 @@ enum SupplierStatus {
   INACTIVE
   BLACKLISTED
 }
-
-model Supplier {
-  id           String           @id @default(uuid())
-  name         String
-  email        String
-  phone        String
-  company      String?
-  category     SupplierCategory @default(OTHER)
-  taxId        String?
-  paymentTerms String           @default("Net 30")
-  rating       Int              @default(3)
-  status       SupplierStatus   @default(ACTIVE)
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // Address
-  street  String?
-  city    String?
-  state   String?
-  zipCode String?
-  country String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  transactions Transaction[]
-  materials    Material[]
-
-  @@map("suppliers")
-}
-
-// ============================================
-// PROJECTS (Enhanced for Revenue Models & Income Splitting)
-// ============================================
 
 enum ProjectStatus {
   PLANNING
@@ -229,224 +468,44 @@ enum ProjectType {
   OTHER
 }
 
-// NEW: Revenue Model Types
 enum RevenueModel {
-  DESIGN_ONLY_AREA // Area * Rate (Design fees)
-  EXECUTION_COST_PLUS // Expenses + Management Fee %
-  EXECUTION_LUMP_SUM // Fixed Contract Price
+  DESIGN_ONLY_AREA
+  EXECUTION_COST_PLUS
+  EXECUTION_LUMP_SUM
 }
-
-model Project {
-  id          String        @id @default(uuid())
-  name        String
-  description String?
-  status      ProjectStatus @default(PLANNING)
-  projectType ProjectType   @default(OTHER)
-  location    String?
-
-  // Dates
-  startDate DateTime
-  endDate   DateTime?
-
-  // Financial (Original)
-  budget     Decimal @db.Decimal(15, 2)
-  actualCost Decimal @default(0) @db.Decimal(15, 2)
-
-  // NEW: Revenue Logic
-  revenueModel         RevenueModel @default(EXECUTION_COST_PLUS)
-  managementFeePercent Decimal?     @db.Decimal(5, 2) // e.g., 20.00% for Cost-Plus
-
-  // NEW: Fund Splitting (The "Income Splitter" Engine)
-  totalContractValue Decimal? @db.Decimal(15, 2) // Total contract amount
-  paymentTerms       String   @default("Net 30") // Moved from Client to Project
-  operationalFund    Decimal  @default(0) @db.Decimal(15, 2) // Cash for site work (80%)
-  officeRevenue      Decimal  @default(0) @db.Decimal(15, 2) // Company profit (20%)
-
-  // Relations
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  engineerId String
-  engineer   User   @relation(fields: [engineerId], references: [id])
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  transactions    Transaction[]
-  workmanships    Workmanship[]
-  materialUsage   MaterialUsage[]
-  materialBatches MaterialBatch[]
-  documents       Document[]
-  notes           Note[]
-
-  @@map("projects")
-}
-
-// ============================================
-// MATERIALS (RAW MATERIALS INVENTORY)
-// ============================================
 
 enum MaterialUnit {
-  M3 // Cubic Meter
-  TON // Ton
-  KG // Kilogram
-  M2 // Square Meter
-  M // Meter
-  PIECE // Piece/Unit
-  LITER // Liter
-  BAG // Bag
+  M3
+  TON
+  KG
+  M2
+  M
+  PIECE
+  LITER
+  BAG
 }
-
-model Material {
-  id           String       @id @default(uuid())
-  name         String
-  nameAr       String? // Arabic name
-  description  String?
-  unit         MaterialUnit
-  stockLevel   Decimal      @default(0) @db.Decimal(10, 2)
-  unitPrice    Decimal      @db.Decimal(10, 2)
-  reorderLevel Decimal?     @db.Decimal(10, 2)
-
-  // Supplier
-  supplierId String?
-  supplier   Supplier? @relation(fields: [supplierId], references: [id])
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  usage MaterialUsage[]
-  batches MaterialBatch[] // Added relation to batches
-
-  @@map("materials")
-}
-
-model MaterialUsage {
-  id        String   @id @default(uuid())
-  quantity  Decimal  @db.Decimal(10, 2)
-  notes     String?
-  usageDate DateTime @default(now())
-
-  // Relations
-  materialId String
-  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  recordedBy String
-  user       User   @relation(fields: [recordedBy], references: [id])
-
-  createdAt DateTime @default(now())
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("material_usage")
-}
-
-// ============================================
-// MATERIAL BATCH - The "Landing Zone" Inventory (V1)
-// ============================================
 
 enum BatchStatus {
-  AVAILABLE // Full value remaining
-  PARTIALLY_USED // Some value consumed
-  CONSUMED // Fully used
+  AVAILABLE
+  PARTIALLY_USED
+  CONSUMED
 }
-
-model MaterialBatch {
-  id            String  @id @default(uuid())
-  description   String // e.g., "10 Tons Steel Rebar"
-  descriptionAr String? // Arabic description
-
-  // Value Tracking (Not Quantity - We track VALUE)
-  initialValue   Decimal @db.Decimal(15, 2) // Original purchase amount
-  remainingValue Decimal @db.Decimal(15, 2) // What's left in stock
-
-  status BatchStatus @default(AVAILABLE)
-
-  // Relations
-  projectId String // Materials belong to a specific project site
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  originalReceiptId String? // Link to the purchase transaction
-
-  recordedBy String
-  user       User   @relation(fields: [recordedBy], references: [id])
-
-  purchaseDate DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Multi-Tenant
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // Optional: Link to material definition if needed
-  materialId String?
-  material   Material? @relation(fields: [materialId], references: [id])
-
-  @@index([projectId, status])
-  @@map("material_batches")
-}
-
-// ============================================
-// WORKMEN & WORKMANSHIP (MUSANAIYAH)
-// ============================================
 
 enum WorkmanTrade {
-  CARPENTER   // Naggar (نجار)
-  MASON       // Banna (مباني)
-  ELECTRICIAN // Kahraba'i (كهربائي)
-  PLUMBER     // Sabbak (سباك)
-  PAINTER     // Naqqash (نقاش)
-  WELDER      // Laham (لحام)
-  LABORER     // 3amel (عامل)
-  FOREMAN     // Rayes (رئيس)
-  CONCRETE    // Musalaha - Formwork/Steel (مسلح)
-  PLASTERER   // Mbayad (مبيض)
-  FLOORING    // Mbalat - Ceramic/Marble (مبلط)
-  GYPSUM      // Jebs (جبس)
-  ALUMINUM    // Alumetal (ألوميتال)
-  OTHER       // أخرى
-}
-
-model Workman {
-  id         String       @id @default(uuid())
-  name       String
-  nameAr     String? // Arabic name
-  trade      WorkmanTrade
-  dailyRate  Decimal      @db.Decimal(10, 2)
-  phone      String?
-  nationalId String?
-  isActive   Boolean      @default(true)
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  // Financial Tracking
-  totalPaid Decimal @default(0) @db.Decimal(15, 2) // Total cash given to this workman
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  workmanships Workmanship[]
-  transactions Transaction[] // Link to their payments
-
-  @@map("workmen")
+  CARPENTER
+  MASON
+  ELECTRICIAN
+  PLUMBER
+  PAINTER
+  WELDER
+  LABORER
+  FOREMAN
+  OTHER
+  CONCRETE
+  PLASTERER
+  FLOORING
+  GYPSUM
+  ALUMINUM
 }
 
 enum WorkmanshipStatus {
@@ -455,44 +514,6 @@ enum WorkmanshipStatus {
   COMPLETED
   PAID
 }
-
-model Workmanship {
-  id            String  @id @default(uuid())
-  description   String
-  descriptionAr String? // Arabic description
-
-  // Contract
-  agreedAmount      Decimal @db.Decimal(10, 2)
-  paidAmount        Decimal @default(0) @db.Decimal(10, 2)
-  outstandingAmount Decimal @default(0) @db.Decimal(10, 2)
-
-  status         WorkmanshipStatus @default(PENDING)
-  startDate      DateTime?
-  completionDate DateTime?
-
-  // Relations
-  workmanId String
-  workman   Workman @relation(fields: [workmanId], references: [id], onDelete: Cascade)
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  managedBy String
-  manager   User   @relation(fields: [managedBy], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("workmanships")
-}
-
-// ============================================
-// TRANSACTIONS (The 3-Step AI Workflow)
-// ============================================
 
 enum TransactionType {
   INCOME
@@ -505,8 +526,8 @@ enum TransactionCategory {
   EQUIPMENT
   SERVICES
   PAYMENT
-  CUSTODY_TRANSFER // NEW: For Tamweel (funding engineer wallet)
   OTHER
+  CUSTODY_TRANSFER
 }
 
 enum PaymentMethod {
@@ -514,126 +535,23 @@ enum PaymentMethod {
   CHECK
   BANK_TRANSFER
   CREDIT_CARD
-  CUSTODY_WALLET // NEW: Paid from engineer's custody
   OTHER
+  CUSTODY_WALLET
 }
 
-// NEW: The Workflow State Machine
 enum TransactionStatus {
-  DRAFT // AI created, waiting for engineer to verify
-  PENDING_APPROVAL // Engineer submitted, waiting for Manager
-  APPROVED // Manager approved, deducted from wallet
-  REJECTED // Manager rejected, returned to engineer
-  CANCELLED // Cancelled by user
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
 }
-
-model Transaction {
-  id            String              @id @default(uuid())
-  type          TransactionType
-  category      TransactionCategory
-  amount        Decimal             @db.Decimal(15, 2)
-  description   String
-  descriptionAr String? // Arabic description
-
-  // Accounting
-  debit  Decimal? @db.Decimal(15, 2)
-  credit Decimal? @db.Decimal(15, 2)
-
-  transactionDate DateTime      @default(now())
-  paymentMethod   PaymentMethod @default(BANK_TRANSFER)
-  invoiceNumber   String?
-
-  // NEW: The Workflow State
-  status          TransactionStatus @default(DRAFT)
-  rejectionReason String? // Why manager rejected it
-
-  // NEW: Source Logic (Custody Tracking)
-  custodyWalletId String? // Which engineer's wallet paid this?
-
-  // NEW: AI Voice Input Data
-  voiceNoteUrl    String? // URL to the recorded voice note
-  aiRawText       String? // Whisper API transcription
-  aiExtractedData Json? // LLM structured output { vendor, amount, category }
-
-  // NEW: Receipt Photo
-  receiptPhotoUrl String? // Engineer uploads receipt photo
-
-  notes String?
-
-  // Relations
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id])
-
-  supplierId String?
-  supplier   Supplier? @relation(fields: [supplierId], references: [id])
-
-  clientId String?
-  client   Client? @relation(fields: [clientId], references: [id])
-
-  workmanId String?
-  workman   Workman? @relation(fields: [workmanId], references: [id])
-
-  createdBy String
-  user      User   @relation(fields: [createdBy], references: [id])
-
-  // NEW: Approver Tracking
-  approvedBy String?
-  approver   User?     @relation("ApprovedBy", fields: [approvedBy], references: [id])
-  approvedAt DateTime?
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([projectId, transactionDate])
-  @@index([type, category])
-  @@index([status]) // NEW: For filtering pending approvals
-  @@map("transactions")
-}
-
-// ============================================
-// CUSTODY TRANSFER (Al-Ohda / Tamweel & Tasweya)
-// ============================================
 
 enum CustodyTransferType {
-  FUNDING // Tamweel: Office → Engineer Wallet
-  CLEARANCE // Tasweya: Expense Approved, deduct from wallet
-  RETURN // Engineer returns unused cash
+  FUNDING
+  CLEARANCE
+  RETURN
 }
-
-model CustodyTransfer {
-  id          String              @id @default(uuid())
-  type        CustodyTransferType
-  amount      Decimal             @db.Decimal(15, 2)
-  description String
-
-  // Relations
-  engineerId String
-  engineer   User   @relation(fields: [engineerId], references: [id])
-
-  // Balances (Snapshot at time of transfer)
-  balanceBefore Decimal @db.Decimal(15, 2)
-  balanceAfter  Decimal @db.Decimal(15, 2)
-
-  // Optional link to related transaction (for clearance)
-  relatedTransactionId String?
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([engineerId, createdAt])
-  @@map("custody_transfers")
-}
-
-// ============================================
-// CHAT & COMMUNICATION
-// ============================================
 
 enum MessageType {
   TEXT
@@ -652,98 +570,8 @@ enum MessageIntent {
   GENERAL
 }
 
-model ChatMessage {
-  id            String        @id @default(uuid())
-  messageType   MessageType   @default(TEXT)
-  content       String
-  audioUrl      String?
-  transcript    String?
-  intent        MessageIntent @default(GENERAL)
-  extractedData Json?
-  processed     Boolean       @default(false)
-  response      String?
-
-  // Relations
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Multi-Tenant (Redundant via User, but good for direct filtering)
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId, createdAt])
-  @@map("chat_messages")
-}
-
-// ============================================
-// NOTIFICATIONS (In-App Alert System)
-// ============================================
-
 enum NotificationType {
-  ACTION_REQUIRED // e.g., "New Expense Needs Approval"
-  INFO // e.g., "Your Receipt was Approved"
-  ALERT // e.g., "Low Custody Balance"
-}
-
-model Notification {
-  id     String @id @default(uuid())
-  userId String // Who receives this notification
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  type         NotificationType
-  title        String
-  message      String
-  resourceId   String? // Link to Transaction ID, Project ID, etc.
-  resourceType String? // 'transaction', 'project', 'custody', etc.
-  isRead       Boolean          @default(false)
-
-  createdAt DateTime @default(now())
-
-  @@index([userId, isRead, createdAt])
-  @@map("notifications")
-}
-
-// ============================================
-// DOCUMENTS & NOTES
-// ============================================
-
-model Document {
-  id       String  @id @default(uuid())
-  name     String
-  url      String
-  fileType String?
-  fileSize Int?
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  uploadedAt DateTime @default(now())
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("documents")
-}
-
-model Note {
-  id      String @id @default(uuid())
-  content String
-
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  // Multi-Tenant
-  tenantId String?
-  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("notes")
+  ACTION_REQUIRED
+  INFO
+  ALERT
 }
