@@ -376,6 +376,126 @@
         "type": "النوع",
         "noData": "لا توجد بيانات"
     },
+    "teamManagement": {
+        "title": "إدارة الفريق",
+        "subtitle": "إدارة أعضاء الفريق وأدوارهم",
+        "addMember": "إضافة عضو جديد",
+        "editMember": "تعديل العضو",
+        "removeMember": "إزالة العضو",
+        "totalMembers": "إجمالي الأعضاء",
+        "searchPlaceholder": "البحث عن الأعضاء بالاسم أو البريد الإلكتروني...",
+        "table": {
+            "user": "المستخدم",
+            "role": "الدور",
+            "contact": "التواصل",
+            "actions": "الإجراءات"
+        },
+        "form": {
+            "name": "الاسم الكامل",
+            "email": "البريد الإلكتروني",
+            "phone": "رقم الهاتف",
+            "role": "الدور",
+            "password": "كلمة المرور",
+            "selectRole": "اختر الدور",
+            "permissions": "الصلاحيات",
+            "customPermissions": "صلاحيات مخصصة"
+        },
+        "roles": {
+            "SUPER_ADMIN": "مدير النظام",
+            "ADMIN": "مدير الشركة",
+            "PROJECT_MANAGER": "مدير مشروع",
+            "ENGINEER": "مهندس موقع",
+            "ACCOUNTANT": "محاسب"
+        },
+        "confirmDelete": {
+            "title": "إزالة المستخدم",
+            "message": "هل أنت متأكد أنك تريد إزالة هذا المستخدم؟ لا يمكن التراجع عن هذا الإجراء.",
+            "confirm": "إزالة",
+            "cancel": "إلغاء"
+        },
+        "messages": {
+            "addSuccess": "تمت إضافة العضو بنجاح",
+            "updateSuccess": "تم تحديث العضو بنجاح",
+            "deleteSuccess": "تمت إزالة العضو بنجاح",
+            "error": "حدث خطأ. يرجى المحاولة مرة أخرى"
+        },
+        "noMembers": "لا يوجد أعضاء",
+        "loading": "جاري التحميل..."
+    },
+    "roles": {
+        "title": "الأدوار والصلاحيات",
+        "subtitle": "إدارة الأدوار وصلاحياتها",
+        "createRole": "إنشاء دور جديد",
+        "editRole": "تعديل الدور",
+        "deleteRole": "حذف الدور",
+        "systemRole": "دور النظام",
+        "customRole": "دور مخصص",
+        "form": {
+            "name": "اسم الدور",
+            "description": "الوصف",
+            "namePlaceholder": "مثال: مهندس أول، محاسب مبتدئ",
+            "descriptionPlaceholder": "وصف مختصر لهذا الدور"
+        },
+        "permissions": {
+            "title": "مصفوفة الصلاحيات",
+            "financials": {
+                "title": "الرؤية المالية",
+                "view_operational_fund": "عرض \"الصندوق التشغيلي\" للمشروع (ميزانية الموقع)",
+                "view_office_profit": "عرض \"إيرادات المكتب\" (ربح الشركة) ⚠️ حساس",
+                "view_all_wallets": "عرض أرصدة جميع المهندسين",
+                "view_company_stats": "عرض إحصائيات الشركة العامة"
+            },
+            "custody": {
+                "title": "العهدة والمصروفات",
+                "request_funds": "طلب تمويل (تمويل)",
+                "authorize_transfers": "تفويض تحويل الأموال (إعطاء المال للآخرين)",
+                "approve_receipts": "الموافقة على إيصالات الموقع",
+                "max_approval_limit": "حد الموافقة الأقصى (جنيه)"
+            },
+            "transactions": {
+                "title": "المعاملات",
+                "create": "إنشاء معاملات مسودة",
+                "approve": "الموافقة على المعاملات",
+                "record_income": "تسجيل الإيرادات (دفعات العملاء)",
+                "max_approval_limit": "حد الموافقة الأقصى (جنيه)"
+            },
+            "projects": {
+                "title": "عمليات المشروع",
+                "create": "إنشاء مشاريع",
+                "edit": "تعديل المشاريع",
+                "delete": "أرشفة/حذف المشاريع",
+                "view": "عرض المشاريع",
+                "edit_budget": "تعديل ميزانيات المشروع"
+            },
+            "inventory": {
+                "title": "إدارة المخزون",
+                "create_batch": "إنشاء دفعات مواد",
+                "consume_material": "استهلاك المواد (تسجيل الاستخدام)",
+                "view": "عرض المخزون"
+            },
+            "admin": {
+                "title": "إدارة الفريق",
+                "manage_users": "إدارة المستخدمين",
+                "manage_roles": "إدارة الأدوار والصلاحيات",
+                "invite_users": "دعوة مستخدمين جدد",
+                "change_user_roles": "تغيير أدوار المستخدمين"
+            }
+        },
+        "messages": {
+            "createSuccess": "تم إنشاء الدور بنجاح",
+            "updateSuccess": "تم تحديث الدور بنجاح",
+            "deleteSuccess": "تم حذف الدور بنجاح",
+            "deleteError": "لا يمكن حذف هذا الدور",
+            "systemRoleWarning": "لا يمكن تعديل أو حذف أدوار النظام",
+            "usersAssignedWarning": "لا يمكن حذف دور له مستخدمون معينون"
+        },
+        "confirmDelete": {
+            "title": "حذف الدور",
+            "message": "هل أنت متأكد أنك تريد حذف هذا الدور؟",
+            "confirm": "حذف",
+            "cancel": "إلغاء"
+        }
+    },
     "profile": {
         "title": "تعديل الملف الشخصي",
         "sections": {

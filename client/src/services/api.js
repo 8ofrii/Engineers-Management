@@ -147,4 +147,15 @@ export const tenantAPI = {
     })
 };
 
+// Roles API (RBAC)
+export const rolesAPI = {
+    getAll: () => api.get('/roles'),
+    getOne: (id) => api.get(`/roles/${id}`),
+    create: (data) => api.post('/roles', data),
+    update: (id, data) => api.put(`/roles/${id}`, data),
+    delete: (id) => api.delete(`/roles/${id}`),
+    getTemplates: () => api.get('/roles/templates'),
+    seedDefaults: () => api.post('/roles/seed-defaults')
+};
+
 export default api;

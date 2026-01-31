@@ -375,6 +375,126 @@
         "status": "Status",
         "type": "Type"
     },
+    "teamManagement": {
+        "title": "Team Management",
+        "subtitle": "Manage your team members and their roles",
+        "addMember": "Add New Member",
+        "editMember": "Edit Member",
+        "removeMember": "Remove Member",
+        "totalMembers": "Total Members",
+        "searchPlaceholder": "Search members by name or email...",
+        "table": {
+            "user": "User",
+            "role": "Role",
+            "contact": "Contact",
+            "actions": "Actions"
+        },
+        "form": {
+            "name": "Full Name",
+            "email": "Email Address",
+            "phone": "Phone Number",
+            "role": "Role",
+            "password": "Password",
+            "selectRole": "Select Role",
+            "permissions": "Permissions",
+            "customPermissions": "Custom Permissions"
+        },
+        "roles": {
+            "SUPER_ADMIN": "Super Admin",
+            "ADMIN": "Company Owner",
+            "PROJECT_MANAGER": "Project Manager",
+            "ENGINEER": "Site Engineer",
+            "ACCOUNTANT": "Accountant"
+        },
+        "confirmDelete": {
+            "title": "Remove User",
+            "message": "Are you sure you want to remove this user? This action cannot be undone.",
+            "confirm": "Remove",
+            "cancel": "Cancel"
+        },
+        "messages": {
+            "addSuccess": "Member added successfully",
+            "updateSuccess": "Member updated successfully",
+            "deleteSuccess": "Member removed successfully",
+            "error": "An error occurred. Please try again"
+        },
+        "noMembers": "No members found",
+        "loading": "Loading..."
+    },
+    "roles": {
+        "title": "Roles & Permissions",
+        "subtitle": "Manage roles and their permissions",
+        "createRole": "Create New Role",
+        "editRole": "Edit Role",
+        "deleteRole": "Delete Role",
+        "systemRole": "System Role",
+        "customRole": "Custom Role",
+        "form": {
+            "name": "Role Name",
+            "description": "Description",
+            "namePlaceholder": "e.g., Senior Engineer, Junior Accountant",
+            "descriptionPlaceholder": "Brief description of this role"
+        },
+        "permissions": {
+            "title": "Permission Matrix",
+            "financials": {
+                "title": "Financial Visibility",
+                "view_operational_fund": "Can view Project \"Operational Fund\" (Site Budget)",
+                "view_office_profit": "Can view Project \"Office Revenue\" (Company Profit) ⚠️ Sensitive",
+                "view_all_wallets": "Can view all engineers' custody balances",
+                "view_company_stats": "Can view general company statistics"
+            },
+            "custody": {
+                "title": "Custody & Expenses",
+                "request_funds": "Can request funds (Tamweel)",
+                "authorize_transfers": "Can authorize fund transfers (Give money to others)",
+                "approve_receipts": "Can approve site receipts",
+                "max_approval_limit": "Maximum approval limit (EGP)"
+            },
+            "transactions": {
+                "title": "Transactions",
+                "create": "Can create draft transactions",
+                "approve": "Can approve transactions",
+                "record_income": "Can record income (Client payments)",
+                "max_approval_limit": "Maximum approval limit (EGP)"
+            },
+            "projects": {
+                "title": "Project Operations",
+                "create": "Can create projects",
+                "edit": "Can edit projects",
+                "delete": "Can archive/delete projects",
+                "view": "Can view projects",
+                "edit_budget": "Can edit project budgets"
+            },
+            "inventory": {
+                "title": "Inventory Management",
+                "create_batch": "Can create material batches",
+                "consume_material": "Can consume material (Log usage)",
+                "view": "Can view inventory"
+            },
+            "admin": {
+                "title": "Team Management",
+                "manage_users": "Can manage users",
+                "manage_roles": "Can manage roles & permissions",
+                "invite_users": "Can invite new users",
+                "change_user_roles": "Can change user roles"
+            }
+        },
+        "messages": {
+            "createSuccess": "Role created successfully",
+            "updateSuccess": "Role updated successfully",
+            "deleteSuccess": "Role deleted successfully",
+            "deleteError": "Cannot delete this role",
+            "systemRoleWarning": "Cannot modify or delete system roles",
+            "usersAssignedWarning": "Cannot delete role with assigned users"
+        },
+        "confirmDelete": {
+            "title": "Delete Role",
+            "message": "Are you sure you want to delete this role?",
+            "confirm": "Delete",
+            "cancel": "Cancel"
+        }
+    },
     "profile": {
         "title": "Edit Profile",
         "sections": {
