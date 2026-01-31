@@ -1,7 +1,6 @@
 import express from 'express';
 import * as roleController from '../controllers/roleController.js';
 import { protect } from '../middleware/auth.js';
-import { verifyRole } from '../middleware/roleCheck.js';
 import { checkPermission } from '../middleware/permissions.js';
 
 const router = express.Router();
@@ -26,7 +25,7 @@ router.get(
 // Seed default roles (usually called during tenant setup)
 router.post(
     '/seed-defaults',
-    verifyRole(['ADMIN']),
+    checkPermission('admin.manage_roles'),
     roleController.seedDefaultRoles
 );
 
