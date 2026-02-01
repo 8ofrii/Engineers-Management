@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import OpenAI from 'openai';
 import fs from 'fs';
+import * as aiService from '../services/aiService.js';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -12,114 +13,197 @@ const openai = new OpenAI({
 // @access  Private
 export const sendMessage = async (req, res, next) => {
     try {
-        const { message, audioFile } = req.body;
+        const { message } = req.body;
         const userId = req.user.id;
-
         let userMessage = message;
+        let isAudio = !!req.file;
+        let aiParsedData = null;
 
-        // If audio file is provided, transcribe it first
-        if (req.file) {
+        // Step 1: Handle Audio via specialized AI Service
+        if (isAudio) {
             try {
-                const transcription = await openai.audio.transcriptions.create({
-                    file: fs.createReadStream(req.file.path),
-                    model: "whisper-1",
-                    language: "ar" // Arabic, or use auto-detect
-                });
-
-                userMessage = transcription.text;
-
-                // Delete the audio file after transcription
-                fs.unlinkSync(req.file.path);
-
+                const result = await aiService.processVoiceNote(req.file.path);
+                userMessage = result.raw_text;
+                aiParsedData = result.parsed_data;
             } catch (error) {
-                console.error('Whisper transcription error:', error);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Failed to transcribe audio',
-                    error: error.message
-                });
+                console.error('AI Service processing failed:', error);
+                return res.status(500).json({ success: false, message: 'Voice processing failed' });
+            } finally {
+                if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             }
         }
 
-        if (!userMessage) {
-            return res.status(400).json({
-                success: false,
-                message: 'Message or audio file is required'
-            });
-        }
+        if (!userMessage && !isAudio) return res.status(400).json({ success: false, message: 'No content' });
 
-        // Save user message to database
-        const userChatMessage = await prisma.chatMessage.create({
+        // Save User Message
+        await prisma.chatMessage.create({
             data: {
-                userId: userId,
-                content: userMessage,
-                type: 'TEXT',
-                intent: 'GENERAL'
+                userId,
+                content: userMessage || "Voice Note",
+                type: isAudio ? 'AUDIO' : 'TEXT'
             }
         });
 
-        // Get AI response using GPT-4o-mini
-        try {
-            const completion = await openai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [{
-                    role: "system",
-                    content: `You are a helpful assistant for a construction management system. You can help with:
-- Adding transactions (expenses, income)
-- Checking project status
-- Viewing financial reports
-- Managing suppliers and clients
-- Answering questions about the system
+        let aiResponse = "";
+        let toolData = null;
 
-Respond in the same language as the user (Arabic or English).
-Be concise and helpful.`
-                }, {
-                    role: "user",
-                    content: userMessage
-                }],
-                temperature: 0.7,
-                max_tokens: 500
-            });
+        // Step 2: If it was audio, we already have structured data from aiService
+        if (isAudio && aiParsedData) {
+            aiResponse = `تمام، فهمت من كلامك: "${aiParsedData.summary}". 
+            المبلغ: ${aiParsedData.amount} ج.م، البند: ${aiParsedData.category}. 
+            تحب أسجلها كموسودة؟`;
 
-            const aiResponse = completion.choices[0].message.content;
-
-            // Save AI response to database
-            const aiChatMessage = await prisma.chatMessage.create({
-                data: {
-                    userId: userId,
-                    content: aiResponse,
-                    type: 'TEXT',
-                    intent: 'GENERAL'
-                }
-            });
-
-            res.status(200).json({
-                success: true,
-                data: {
-                    userMessage: {
-                        id: userChatMessage.id,
-                        content: userMessage,
-                        createdAt: userChatMessage.createdAt,
-                        transcribed: !!req.file // Was this from voice?
-                    },
-                    aiResponse: {
-                        id: aiChatMessage.id,
-                        content: aiResponse,
-                        createdAt: aiChatMessage.createdAt
+            toolData = {
+                action: 'CREATE_TRANSACTION',
+                params: {
+                    type: 'EXPENSE',
+                    amount: aiParsedData.amount,
+                    category: aiParsedData.category,
+                    description: aiParsedData.summary,
+                    vendor: aiParsedData.vendor,
+                    isStockPurchase: aiParsedData.is_stock_purchase,
+                    itemName: aiParsedData.items?.[0]?.name,
+                    quantity: aiParsedData.items?.[0]?.quantity,
+                    unit: aiParsedData.items?.[0]?.unit,
+                    items: aiParsedData.items
+                },
+                confidence: 1.0
+            };
+        } else {
+            // Step 3: Regular Chat with Tools for Text Input
+            const tools = [
+                {
+                    type: "function",
+                    function: {
+                        name: "record_transaction",
+                        description: "Record a financial transaction (expense or income) for a project.",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                type: { type: "string", enum: ["EXPENSE", "INCOME"] },
+                                amount: { type: "number" },
+                                category: { type: "string", enum: ["MATERIALS", "LABOR", "EQUIPMENT", "SERVICES", "OTHER"] },
+                                description: { type: "string" },
+                                projectName: { type: "string", description: "Name of the project" }
+                            },
+                            required: ["type", "amount", "category", "description"]
+                        }
+                    }
+                },
+                {
+                    type: "function",
+                    function: {
+                        name: "get_financial_summary",
+                        description: "Get a summary of projects, income, or expenses.",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                scope: { type: "string", enum: ["ALL", "PROJECT"], default: "ALL" },
+                                projectName: { type: "string" }
+                            }
+                        }
                     }
                 }
+            ];
+
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a professional construction assistant in Egypt. 
+                        You help engineers manage sites. You can process transactions and answer project questions.
+                        Respond in Egyptian Arabic unless English is used.`
+                    },
+                    { role: "user", content: userMessage }
+                ],
+                tools,
+                tool_choice: "auto"
             });
 
-        } catch (error) {
-            console.error('OpenAI chat error:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to get AI response',
-                error: error.message
-            });
+            const responseMessage = completion.choices[0].message;
+            aiResponse = responseMessage.content;
+
+            if (responseMessage.tool_calls) {
+                for (const toolCall of responseMessage.tool_calls) {
+                    const args = JSON.parse(toolCall.function.arguments);
+
+                    if (toolCall.function.name === 'record_transaction') {
+                        let projectId = null;
+                        if (args.projectName) {
+                            const project = await prisma.project.findFirst({
+                                where: { name: { contains: args.projectName, mode: 'insensitive' } }
+                            });
+                            projectId = project?.id;
+                        }
+
+                        toolData = {
+                            action: 'CREATE_TRANSACTION',
+                            params: { ...args, projectId },
+                            confidence: 0.95
+                        };
+                        aiResponse = `تمام، أنا جهزت تفاصيل المصروف: ${args.amount} ج.م لبند ${args.category}. دوس تأكيد عشان نسجلها.`;
+                    }
+
+                    if (toolCall.function.name === 'get_financial_summary') {
+                        let summaryText = "";
+                        if (args.projectName) {
+                            const project = await prisma.project.findFirst({
+                                where: { name: { contains: args.projectName, mode: 'insensitive' } },
+                                include: { transactions: { where: { status: 'APPROVED' } } }
+                            });
+
+                            if (project) {
+                                const totalSpent = project.transactions.filter(t => t.type === 'EXPENSE').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                                const totalRevenue = project.transactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                                summaryText = `بخصوص مشروع ${project.name}:\n- الميزانية: ${project.budget} ج.م\n- إجمالي المصاريف: ${totalSpent} ج.م\n- الدفعات المستلمة: ${totalRevenue} ج.م\n- المتبقي في الميزانية: ${Number(project.budget) - totalSpent} ج.م`;
+                            } else {
+                                summaryText = "ملقتش مشروع بالاسم ده، ممكن تتأكد من الاسم؟";
+                            }
+                        } else {
+                            const stats = await prisma.transaction.groupBy({
+                                by: ['type'],
+                                where: { status: 'APPROVED' },
+                                _sum: { amount: true }
+                            });
+                            const income = stats.find(s => s.type === 'INCOME')?._sum.amount || 0;
+                            const expense = stats.find(s => s.type === 'EXPENSE')?._sum.amount || 0;
+                            summaryText = `إجمالي الشغل عندك حالياً:\n- إجمالي الإيرادات: ${income} ج.م\n- إجمالي المصاريف: ${expense} ج.م\n- الرصيد الصافي: ${Number(income) - Number(expense)} ج.م`;
+                        }
+                        aiResponse = summaryText;
+                        toolData = { action: 'FETCH_SUMMARY', params: args, data: summaryText };
+                    }
+                }
+            }
         }
 
+        if (!aiResponse) aiResponse = "أنا معاك، أقدر أساعدك في إيه؟";
+
+        // Save AI Message with Extracted Data
+        const aiChatMessage = await prisma.chatMessage.create({
+            data: {
+                userId,
+                content: aiResponse,
+                type: toolData ? 'COMMAND' : 'TEXT',
+                intent: toolData ? toolData.action : 'GENERAL',
+                extractedData: toolData ? toolData : undefined,
+                processed: false
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: aiChatMessage.id,
+                content: aiResponse,
+                createdAt: aiChatMessage.createdAt,
+                transcript: userMessage,
+                extractedData: toolData
+            }
+        });
+
     } catch (error) {
+        console.error('Chat Assistant Error:', error);
         next(error);
     }
 };

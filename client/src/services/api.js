@@ -74,7 +74,10 @@ export const transactionsAPI = {
     update: (id, data) => api.put(`/transactions/${id}`, data),
     delete: (id) => api.delete(`/transactions/${id}`),
     getStats: (params) => api.get('/transactions/stats', { params }),
-    recordIncome: (data) => api.post('/transactions/income', data)
+    recordIncome: (data) => api.post('/transactions/income', data),
+    analyze: (formData) => api.post('/transactions/analyze', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    })
 };
 
 // Clients API
@@ -132,11 +135,16 @@ export const workmanshipAPI = {
 
 // Chat API
 export const chatAPI = {
-    getMessages: () => api.get('/chat'),
-    sendText: (data) => api.post('/chat/text', data),
-    sendAudio: (formData) => api.post('/chat/audio', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    getMessages: () => api.get('/chat/history'),
+    sendMessage: (contentOrFormData, isAudio = false) => {
+        if (isAudio) {
+            return api.post('/chat/message', contentOrFormData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+        }
+        return api.post('/chat/message', { message: contentOrFormData });
+    },
+    clearHistory: () => api.delete('/chat/history')
 };
 
 // Tenant API

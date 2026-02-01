@@ -6,47 +6,74 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
+import fs from 'fs';
+import * as aiService from '../services/aiService.js';
+
+// @desc    Analyze voice note with AI (Returns JSON, no DB save)
+// @route   POST /api/transactions/analyze
+// @access  Private (Engineer, Manager, Admin)
+export const analyzeTransaction = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No audio file provided'
+            });
+        }
+
+        const result = await aiService.processVoiceNote(req.file.path);
+
+        // Cleanup: Delete file after processing
+        if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+
+        res.status(200).json({
+            success: true,
+            data: result
+        });
+
+    } catch (error) {
+        // Cleanup file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        next(error);
+    }
+};
+
 // @desc    Parse voice note with AI (Staging - No DB save)
 // @route   POST /api/transactions/ai-parse
 // @access  Private (Engineer, Manager, Admin)
 export const parseVoiceNote = async (req, res, next) => {
     try {
-        const { audioFile, textInput, projectId } = req.body;
+        const { textInput, projectId } = req.body;
+        const audioFile = req.file;
 
         // Check if OpenAI API key is configured
         if (!process.env.OPENAI_API_KEY) {
             return res.status(500).json({
                 success: false,
-                message: 'OpenAI API key not configured. Please add OPENAI_API_KEY to .env file'
+                message: 'OpenAI API key not configured.'
             });
         }
 
         let rawText = textInput;
 
         // Step 1: If audio file provided, transcribe with Whisper
-        if (audioFile && !textInput) {
+        if (audioFile) {
             try {
-                // Note: This is a placeholder for actual Whisper API integration
-                // You'll need to implement file upload handling first
-                // For now, we'll return an error message
-                return res.status(400).json({
-                    success: false,
-                    message: 'Audio file upload not yet implemented. Please use textInput for testing.',
-                    hint: 'Add file upload middleware (multer) to handle audio files'
-                });
-
-                /* Future implementation:
-                const OpenAI = require('openai');
-                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-                
                 const transcription = await openai.audio.transcriptions.create({
-                    file: audioFile,
+                    file: fs.createReadStream(audioFile.path),
                     model: "whisper-1",
-                    language: "ar" // or auto-detect
+                    language: "ar" // Target Egyptian Arabic
                 });
                 rawText = transcription.text;
-                */
+
+                // Cleanup uploaded file
+                fs.unlinkSync(audioFile.path);
             } catch (error) {
+                console.error('Whisper transcription failed:', error);
                 return res.status(500).json({
                     success: false,
                     message: 'Whisper transcription failed',
@@ -58,66 +85,57 @@ export const parseVoiceNote = async (req, res, next) => {
         if (!rawText) {
             return res.status(400).json({
                 success: false,
-                message: 'Either audioFile or textInput is required'
+                message: 'Either audio file or textInput is required'
             });
         }
 
         // Step 2: Extract structured data with GPT-4o-mini
         try {
-            // Note: This is a placeholder for actual OpenAI API integration
-            // For testing, we'll use a simple parser
-
-            /* Future implementation:
-            const OpenAI = require('openai');
-            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-            
             const completion = await openai.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages: [{
                     role: "system",
-                    content: `You are a financial assistant for a construction company. Extract transaction details from Arabic/English text.
+                    content: `You are a financial assistant for a construction company in Egypt. 
+                    Extract transaction details from the provided text (can be Arabic, English, or mixed).
                     
-Available categories: MATERIALS, LABOR, EQUIPMENT, TRANSPORTATION, SERVICES, UTILITIES, PERMITS, OTHER
-
-Return JSON with:
-{
-  "vendor": "vendor name or Unknown",
-  "amount": number (extract from text, if not found return 0),
-  "category": "one of the available categories",
-  "description": "clean description in original language"
-}`
+                    Available categories: MATERIALS, LABOR, EQUIPMENT, TRANSPORTATION, SERVICES, UTILITIES, PERMITS, OTHER
+                    
+                    Identify if it's an EXPENSE or INCOME. Default to EXPENSE if buying/paying for things.
+                    
+                    Return ONLY a JSON object:
+                    {
+                      "type": "EXPENSE" | "INCOME",
+                      "amount": number,
+                      "category": "one of the available categories",
+                      "description": "Short clean description in Arabic",
+                      "vendor": "Vendor name if mentioned, otherwise null"
+                    }`
                 }, {
                     role: "user",
                     content: rawText
                 }],
                 response_format: { type: "json_object" }
             });
-            
+
             const extracted = JSON.parse(completion.choices[0].message.content);
-            */
 
-
-
-            // Return structured data WITHOUT saving to database
             res.status(200).json({
                 success: true,
-                message: 'Voice note parsed successfully. Please verify and submit.',
+                message: 'AI parsed successfully',
                 data: {
                     rawText: rawText,
                     extracted: extracted,
                     projectId: projectId,
-                    status: 'DRAFT',
-                    nextStep: 'Review the extracted data and call POST /api/transactions/draft to create the transaction'
+                    status: 'DRAFT'
                 }
             });
 
         } catch (error) {
-            console.error('OpenAI API Error:', error);
+            console.error('GPT Extraction Error:', error);
             return res.status(500).json({
                 success: false,
                 message: 'AI extraction failed',
-                error: error.message,
-                details: error.response?.data || 'No additional details'
+                error: error.message
             });
         }
 

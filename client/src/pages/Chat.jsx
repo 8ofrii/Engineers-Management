@@ -42,30 +42,93 @@ export default function Chat() {
 
         const userMessage = {
             content: inputText,
-            messageType: 'text',
+            messageType: 'TEXT',
             createdAt: new Date().toISOString(),
             isUser: true
         };
 
-        setMessages([...messages, userMessage]);
+        setMessages(prev => [...prev, userMessage]);
+        const textToSend = inputText;
         setInputText('');
         setLoading(true);
 
         try {
-            const response = await chatAPI.sendText({ content: inputText });
-            const botMessage = response.data.data;
-            setMessages(prev => [...prev, { ...botMessage, isUser: false }]);
+            const response = await chatAPI.sendMessage(textToSend);
+            const aiData = response.data.data;
+            setMessages(prev => [...prev, { ...aiData, isUser: false }]);
         } catch (error) {
             console.error('Failed to send message:', error);
             setMessages(prev => [
                 ...prev,
                 {
-                    content: 'Sorry, I encountered an error. Please try again.',
-                    messageType: 'text',
+                    content: 'عذراً، حصل مشكلة فنية. جرب تاني كمان شوية.',
+                    messageType: 'TEXT',
                     createdAt: new Date().toISOString(),
                     isUser: false
                 }
             ]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const sendAudioMessage = async (audioBlob) => {
+        setLoading(true);
+
+        // Placeholder for user message while processing
+        const userPlaceholder = {
+            content: 'جاري معالجة الصوت...',
+            messageType: 'TEXT',
+            createdAt: new Date().toISOString(),
+            isUser: true
+        };
+        setMessages(prev => [...prev, userPlaceholder]);
+
+        try {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+
+            const response = await chatAPI.sendMessage(formData, true);
+            const aiData = response.data.data;
+
+            // Remove placeholder and add real transcribed message + AI response
+            setMessages(prev => {
+                const filtered = prev.filter(m => m !== userPlaceholder);
+                return [
+                    ...filtered,
+                    { content: aiData.transcript, messageType: 'TEXT', isUser: true, createdAt: new Date().toISOString() },
+                    { ...aiData, isUser: false }
+                ];
+            });
+        } catch (error) {
+            console.error('Failed to send audio:', error);
+            setMessages(prev => [
+                ...prev,
+                {
+                    content: 'مقدرتش أفهم الصوت، ممكن يكون فيه دوشة كتير. جرب تسجل تاني.',
+                    messageType: 'TEXT',
+                    createdAt: new Date().toISOString(),
+                    isUser: false
+                }
+            ]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleConfirmAction = async (msgId, actionData) => {
+        try {
+            setLoading(true);
+            if (actionData.action === 'CREATE_TRANSACTION') {
+                await transactionsAPI.create(actionData.params);
+                // Update message internally to show completed
+                setMessages(prev => prev.map(m =>
+                    m.id === msgId ? { ...m, isActionCompleted: true, content: '✅ تمام، سجلت المصروف بنجاح!' } : m
+                ));
+            }
+        } catch (error) {
+            console.error('Action confirmation failed:', error);
+            alert('فشل في تنفيذ العملية. تأكد من البيانات.');
         } finally {
             setLoading(false);
         }
@@ -105,40 +168,6 @@ export default function Chat() {
         }
     };
 
-    const sendAudioMessage = async (audioBlob) => {
-        setLoading(true);
-
-        const userMessage = {
-            content: 'Audio message',
-            messageType: 'audio',
-            createdAt: new Date().toISOString(),
-            isUser: true
-        };
-        setMessages(prev => [...prev, userMessage]);
-
-        try {
-            const formData = new FormData();
-            formData.append('audio', audioBlob, 'recording.webm');
-
-            const response = await chatAPI.sendAudio(formData);
-            const botMessage = response.data.data;
-            setMessages(prev => [...prev, { ...botMessage, isUser: false }]);
-        } catch (error) {
-            console.error('Failed to send audio:', error);
-            setMessages(prev => [
-                ...prev,
-                {
-                    content: 'Sorry, I could not process the audio. Please try again.',
-                    messageType: 'text',
-                    createdAt: new Date().toISOString(),
-                    isUser: false
-                }
-            ]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
         <Layout>
             <div className="chat-page">
@@ -166,20 +195,68 @@ export default function Chat() {
                                         className={`message ${message.isUser ? 'message-user' : 'message-bot'}`}
                                     >
                                         <div className="message-content">
-                                            {message.messageType === 'audio' && message.audioUrl && (
-                                                <audio controls src={message.audioUrl} className="message-audio" />
-                                            )}
-                                            {message.transcript && message.messageType === 'audio' && (
-                                                <div className="message-transcript">
-                                                    <small>Transcript:</small>
-                                                    <p>{message.transcript}</p>
+                                            <p>{message.content}</p>
+
+                                            {/* Action Card for AI Commands */}
+                                            {message.extractedData && !message.isActionCompleted && (
+                                                <div className="action-card">
+                                                    <div className="action-header">
+                                                        {message.extractedData.action === 'CREATE_TRANSACTION' ? 'تأكيد تسجيل مصروف' : 'إجراء مقترح'}
+                                                    </div>
+                                                    <div className="action-details">
+                                                        {message.extractedData.params.itemName && (
+                                                            <>
+                                                                <span className="action-label">الصنف:</span>
+                                                                <span className="action-value">
+                                                                    {message.extractedData.params.itemName}
+                                                                    {message.extractedData.params.isStockPurchase &&
+                                                                        <span className="badge badge-info ml-xs" style={{ fontSize: '10px' }}>مخزن</span>
+                                                                    }
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                        {message.extractedData.params.quantity && (
+                                                            <>
+                                                                <span className="action-label">الكمية:</span>
+                                                                <span className="action-value">{message.extractedData.params.quantity} {message.extractedData.params.unit}</span>
+                                                            </>
+                                                        )}
+                                                        {message.extractedData.params.amount && (
+                                                            <>
+                                                                <span className="action-label">المبلغ:</span>
+                                                                <span className="action-value">{message.extractedData.params.amount} ج.م</span>
+                                                            </>
+                                                        )}
+                                                        {message.extractedData.params.category && (
+                                                            <>
+                                                                <span className="action-label">البند:</span>
+                                                                <span className="action-value">{message.extractedData.params.category}</span>
+                                                            </>
+                                                        )}
+                                                        {message.extractedData.params.projectName && (
+                                                            <>
+                                                                <span className="action-label">المشروع:</span>
+                                                                <span className="action-value">{message.extractedData.params.projectName}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    <div className="action-buttons">
+                                                        <button
+                                                            className="btn-confirm"
+                                                            onClick={() => handleConfirmAction(message.id, message.extractedData)}
+                                                            disabled={loading}
+                                                        >
+                                                            تأكيد التسجيل
+                                                        </button>
+                                                        <button
+                                                            className="btn-cancel"
+                                                            onClick={() => setMessages(prev => prev.map(m => m.id === message.id ? { ...m, isActionCompleted: true, content: 'تم إلغاء العملية.' } : m))}
+                                                            disabled={loading}
+                                                        >
+                                                            إلغاء
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            )}
-                                            {message.content && message.messageType === 'text' && (
-                                                <p>{message.content}</p>
-                                            )}
-                                            {message.response && !message.isUser && (
-                                                <p className="message-response">{message.response}</p>
                                             )}
                                         </div>
                                         <div className="message-time">

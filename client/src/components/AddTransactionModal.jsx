@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Mic, MicOff, Wallet } from 'lucide-react';
 import { projectsAPI, materialUsageAPI, transactionsAPI } from '../services/api';
@@ -210,13 +210,92 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         }
     }, [selectedProjectId, projects]);
 
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = recorder;
+            audioChunksRef.current = [];
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            recorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                await analyzeAudio(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            recorder.start();
+            setIsRecording(true);
+        } catch (error) {
+            console.error("Recording failed", error);
+            alert("Could not start recording. Please check microphone permissions.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const analyzeAudio = async (blob) => {
+        setIsAnalyzing(true);
+        try {
+            const formData = new FormData();
+            formData.append('audio', blob, 'transaction.webm');
+
+            const res = await transactionsAPI.analyze(formData);
+            const data = res.data.data;
+            const parsed = data.parsed_data;
+
+            // Map AI response to form fields
+            setFormData(prev => ({
+                ...prev,
+                amount: parsed.amount ? parsed.amount.toString() : prev.amount,
+                description: parsed.summary || prev.description,
+                category: parsed.category || prev.category,
+                transactionTo: parsed.vendor || prev.transactionTo,
+            }));
+
+            // Handle Stock Purchase mapping
+            if (parsed.is_stock_purchase || parsed.category === 'MATERIALS') {
+                setIsStockPurchase(true);
+                if (parsed.items && parsed.items.length > 0) {
+                    const item = parsed.items[0];
+                    setFormData(prev => ({
+                        ...prev,
+                        itemName: item.name || prev.itemName,
+                        quantity: item.quantity ? item.quantity.toString() : prev.quantity,
+                        unit: item.unit ? item.unit.toUpperCase() : prev.unit
+                    }));
+                }
+            }
+
+            // Map to mode (AI returns type INCOME or EXPENSE)
+            if (parsed.type === 'INCOME') setMode('INCOME');
+            else if (parsed.type === 'EXPENSE') setMode('EXPENSE');
+
+        } catch (error) {
+            console.error("Analysis failed:", error);
+            alert("Failed to analyze voice note. Please enter details manually.");
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const handleVoiceInput = () => {
-        setIsRecording(!isRecording);
-        if (!isRecording) {
-            setTimeout(() => {
-                alert("Voice input simulation");
-                setIsRecording(false);
-            }, 1000);
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
         }
     };
 
@@ -573,6 +652,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         >
                                             {isRecording ? <MicOff size={14} /> : <Mic size={14} />}
                                         </button>
+                                        {isAnalyzing && (
+                                            <div className="absolute top-10 right-0 bg-brand-orange text-white text-xs px-2 py-1 rounded-md animate-pulse z-10">
+                                                {t('finance.ai_analyzing') || 'Analyzing...'}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

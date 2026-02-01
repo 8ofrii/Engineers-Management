@@ -2,6 +2,7 @@ import express from 'express';
 import * as transactionController from '../controllers/transactionController.js';
 import { protect } from '../middleware/auth.js';
 import { verifyRole, verifyOwnership } from '../middleware/rbac.js';
+import { audioUpload } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -36,7 +37,16 @@ router.post(
 router.post(
     '/ai-parse',
     verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN']),
+    audioUpload.single('audio'),
     transactionController.parseVoiceNote
+);
+
+// AI Voice Analysis (New Service Pattern)
+router.post(
+    '/analyze',
+    verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN']),
+    audioUpload.single('audio'),
+    transactionController.analyzeTransaction
 );
 
 // Submit transaction for approval
