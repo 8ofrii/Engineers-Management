@@ -159,11 +159,19 @@ export default function Projects() {
                             <div key={project.id} className="card" style={{
                                 padding: 'var(--spacing-lg)',
                                 background: 'var(--bg-secondary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-lg)'
+                                border: project.projectSafeBalance < 0 ? '2px solid #ef4444' : '1px solid var(--border-color)',
+                                borderRadius: 'var(--radius-lg)',
+                                boxShadow: project.projectSafeBalance < 0 ? '0 0 15px rgba(239, 68, 68, 0.2)' : 'none'
                             }}>
                                 <div className="flex-between mb-md">
-                                    <h3>{project.name}</h3>
+                                    <div className="flex flex-col">
+                                        <h3>{project.name}</h3>
+                                        {project.projectSafeBalance < 0 && (
+                                            <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                                ⚠️ {t('projects.negativeBalanceAlert') || 'عجز في خزينة المشروع'}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex gap-sm">
                                         <span className={`badge badge-${getStatusColor(project.status.toLowerCase())}`}>
                                             {t(`projects.status.${project.status.toLowerCase()}`)}
@@ -187,12 +195,34 @@ export default function Projects() {
                                     </div>
                                 </div>
                                 <p className="text-secondary mb-md">{project.description || t('common.noData')}</p>
+                                <div className="grid grid-2 gap-md mb-md">
+                                    <div className="p-sm bg-tertiary rounded">
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                            {t('projects.safeBalance') || 'خزينة المشروع'}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '1rem',
+                                            fontWeight: 700,
+                                            color: project.projectSafeBalance < 0 ? '#ef4444' : 'var(--color-success)'
+                                        }}>
+                                            {formatCurrency(project.projectSafeBalance)}
+                                        </div>
+                                    </div>
+                                    <div className="p-sm bg-tertiary rounded">
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                            {t('projects.officeProfit') || 'أرباح المكتب'}
+                                        </div>
+                                        <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-secondary)' }}>
+                                            {formatCurrency(project.officeRevenue)}
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="flex-between">
                                     <div>
                                         <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                             {t('projects.budget')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>
+                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
                                             {formatCurrency(project.budget)}
                                         </div>
                                     </div>
@@ -200,7 +230,7 @@ export default function Projects() {
                                         <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                             {t('projects.spent')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>
+                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
                                             {formatCurrency(project.actualCost)}
                                         </div>
                                     </div>
@@ -209,7 +239,7 @@ export default function Projects() {
                                             {t('projects.remaining')}
                                         </div>
                                         <div style={{
-                                            fontSize: 'var(--font-size-lg)',
+                                            fontSize: 'var(--font-size-md)',
                                             fontWeight: 600,
                                             color: (project.budget - project.actualCost) < 0 ? 'var(--color-danger)' : 'var(--color-success)'
                                         }}>
@@ -246,6 +276,6 @@ export default function Projects() {
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleSaveProject}
             />
-        </Layout>
+        </Layout >
     );
 }

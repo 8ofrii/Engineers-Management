@@ -8,6 +8,7 @@ const openai = new OpenAI({
 
 import fs from 'fs';
 import * as aiService from '../services/aiService.js';
+import * as transactionV2 from './transactionControllerV2.js';
 
 // @desc    Analyze voice note with AI (Returns JSON, no DB save)
 // @route   POST /api/transactions/analyze
@@ -239,17 +240,10 @@ export const recordIncome = async (req, res, next) => {
             });
         }
 
-        // Calculate split based on revenue model
-        let officeShare = 0;
-        let opsShare = amount;
+        // V1.2: Income is no longer split upon receipt.
+        // It goes 100% to the Project Safe (Operational Fund).
 
-        if (project.revenueModel === 'EXECUTION_COST_PLUS') {
-            const feePercent = project.managementFeePercent || 20;
-            officeShare = amount * (feePercent / 100);
-            opsShare = amount - officeShare;
-        }
-
-        // Append extended details to description since schema doesn't have them
+        // Append extended details to description
         let finalDescription = description;
         const extras = [];
         if (transactionFrom) extras.push(`From: ${transactionFrom}`);
@@ -273,16 +267,18 @@ export const recordIncome = async (req, res, next) => {
                     createdBy: req.user.id,
                     transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                     paymentMethod: paymentMethod || 'BANK_TRANSFER',
-                    invoiceNumber: invoiceNumber
+                    invoiceNumber: invoiceNumber,
+                    tenantId: req.user.tenantId
                 }
             }),
 
-            // Update project funds
+            // Update project safe balance (Full Amount)
             prisma.project.update({
                 where: { id: projectId },
                 data: {
-                    officeRevenue: { increment: officeShare },
-                    operationalFund: { increment: opsShare }
+                    projectSafeBalance: { increment: amount },
+                    // officeRevenue and operationalFund are kept for legacy but safeBalance is the master now
+                    operationalFund: { increment: amount }
                 }
             })
         ]);
@@ -863,7 +859,9 @@ export const updateTransaction = async (req, res, next) => {
                     transactionDate: transactionDate ? new Date(transactionDate) : undefined,
                     paymentMethod,
                     projectId,
-                    invoiceNumber
+                    invoiceNumber,
+                    payerUserId,
+                    projectCostItemId
                 }
             });
 
@@ -915,164 +913,261 @@ export const updateTransaction = async (req, res, next) => {
         next(error);
     }
 };
-// @desc    Create generic transaction (Expense or Income)
-// @route   POST /api/transactions
-// @access  Private
-// @desc    Create generic transaction (Expense or Income)
-// @route   POST /api/transactions
-// @access  Private
+
+/**
+ * @desc    Create transaction with V1.2 "Profit on Expense" Logic
+ * @route   POST /api/transactions
+ * @access  Private
+ */
 export const createTransaction = async (req, res, next) => {
     try {
         const {
-            type, category, amount, projectId, description,
-            paymentMethod, transactionDate,
-            // Extended fields
-            itemName, unit, quantity, unitPrice,
-            transactionFrom, transactionTo, costCenter,
-            invoiceNumber, physicalAccount,
-            createBatch, custodyWalletId
+            type,
+            category,
+            amount,
+            projectId,
+            projectCostItemId,
+            description,
+            paymentMethod,
+            transactionDate,
+            payerUserId, // V1.2: For managers to assign payer
+            invoiceNumber,
+            clientId,
+            supplierId,
+            workmanId,
+            createBatch, // Flag for inventory purchase
+            itemName,   // For creating new ProjectCostItem
+            unit,
+            quantity,
+            unitPrice
         } = req.body;
 
-        // 1. Handle INCOME
-        if (type === 'INCOME') {
-            // Re-use recordIncome logic or call it directly? 
-            // Better to keep clean logic here since recordIncome expects slightly different body structure in the standalone function
-            // We'll implement income logic here for consistency
+        // Validate required fields
+        if (!type || !amount || !projectId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Type, amount, and projectId are required'
+            });
+        }
 
-            const project = await prisma.project.findUnique({ where: { id: projectId } });
-            if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
+        // Fetch project
+        const project = await prisma.project.findUnique({
+            where: { id: projectId }
+        });
 
-            // Calculate Split
-            let officeShare = 0;
-            let opsShare = Number(amount);
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: 'Project not found'
+            });
+        }
 
-            if (project.revenueModel === 'EXECUTION_COST_PLUS') {
-                const feePercent = Number(project.managementFeePercent) || 20;
-                officeShare = Number(amount) * (feePercent / 100);
-                opsShare = Number(amount) - officeShare;
-            }
+        // V1.2: Determine payer (Manager can assign, Engineer defaults to self)
+        let actualPayer = req.user.id;
+        if (payerUserId && (req.user.role === 'PROJECT_MANAGER' || req.user.role === 'ADMIN')) {
+            actualPayer = payerUserId;
+        }
 
-            const result = await prisma.$transaction([
-                prisma.transaction.create({
+        const result = await prisma.$transaction(async (tx) => {
+            let profitInfo = null;
+
+            // ========== V1.2 INCOME LOGIC ==========
+            if (type === 'INCOME') {
+                // NEW: Add full amount to Project Safe (no split)
+                const transaction = await tx.transaction.create({
                     data: {
                         type: 'INCOME',
                         category: category || 'PAYMENT',
                         amount: Number(amount),
-                        description: description || 'Income Record',
+                        description: description || 'Client Payment',
                         status: 'APPROVED',
                         projectId,
-                        clientId: project.clientId, // Assume from project's client
-                        createdBy: req.user.id,
+                        projectCostItemId,
+                        clientId: clientId || project.clientId,
+                        createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'BANK_TRANSFER',
-                        transactionFrom,
-                        transactionTo,
-                        invoiceNumber
+                        invoiceNumber,
+                        tenantId: req.user.tenantId
                     }
-                }),
-                prisma.project.update({
-                    where: { id: projectId },
-                    data: {
-                        officeRevenue: { increment: officeShare },
-                        operationalFund: { increment: opsShare }
-                    }
-                })
-            ]);
+                });
 
-            return res.status(201).json({ success: true, data: result[0] });
-        }
-
-        // 2. Handle EXPENSE
-        // Status logic: 
-        // - If CUSTODY_WALLET -> PENDING_APPROVAL (needs manager to confirm deduction)
-        // - If OTHERS (Cash/check) -> APPROVED (assuming user has authority or it's just reporting)
-        // For now, let's play safe: Engineers always creates PENDING_APPROVAL or DRAFT. 
-        // The modal implies "Submit", so let's go with PENDING_APPROVAL.
-
-        const status = paymentMethod === 'CUSTODY_WALLET' ? 'PENDING_APPROVAL' : 'APPROVED';
-
-        const transactionData = {
-            type: 'EXPENSE',
-            category,
-            amount: Number(amount),
-            description,
-            status,
-            projectId,
-            createdBy: req.user.id,
-            transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-            paymentMethod,
-            custodyWalletId: custodyWalletId || (paymentMethod === 'CUSTODY_WALLET' ? req.user.id : null),
-
-            // Store extra details in notes or description if schema doesn't have strict columns?
-            // Schema has: invoiceNumber. 
-            // It does NOT have: itemName, unit, quantity, unitPrice, costCenter, transactionFrom, transactionTo directly on Transaction table.
-            // BUT, looking at the schema Transaction table...
-            // It indeed DOES NOT have these fields. 
-            // We should store them in 'notes' or a JSON field if available.
-            // Schema checks: 
-            // - notes: String?
-            // - aiExtractedData: Json? (We could abuse this or add a new 'metaData' Json field)
-            // Let's pack them into 'notes' for now to identify them, or better, update Schema?
-            // User asked to "revise APIs", not schema. But to store them we need a place.
-            // 'aiExtractedData' is JSON, maybe use that? Or just append to description?
-
-            // Let's append formatted details to description for visibility
-            description: `${description} | ${quantity || 0} ${unit || ''} @ ${unitPrice || 0}`,
-            invoiceNumber
-        };
-
-        const result = await prisma.$transaction(async (tx) => {
-            const txRecord = await tx.transaction.create({
-                data: transactionData
-            });
-
-            // If APPROVED (Non-custody), we should update project Actual Cost immediately
-            if (status === 'APPROVED') {
+                // V1.2: Update Project Safe Balance (full amount)
                 await tx.project.update({
                     where: { id: projectId },
-                    data: { actualCost: { increment: Number(amount) } }
-                });
-            }
-
-            // If it's a Stock Purchase (createBatch = true), handle inventory
-            // Only if APPROVED? Or created as Pending Batch?
-            // If PENDING, batch shouldn't exist yet.
-            // If APPROVED, create batch.
-            if (createBatch && status === 'APPROVED') {
-                await tx.materialBatch.create({
                     data: {
-                        projectId,
-                        originalReceiptId: txRecord.id,
-                        description: itemName || description,
-                        initialValue: Number(amount),
-                        remainingValue: Number(amount),
-                        status: 'AVAILABLE',
-                        recordedBy: req.user.id,
-                        // materialId? if we had one
+                        projectSafeBalance: { increment: Number(amount) }
                     }
                 });
+
+                profitInfo = {
+                    type: 'INCOME',
+                    amountToSafe: Number(amount),
+                    profitRecognized: 0,
+                    message: 'Full amount added to Project Safe. Profit will be recognized on expenses.'
+                };
+
+                return { transaction, profitInfo };
             }
 
-            // If CUSTODY_WALLET, we must increment user's "pendingClearance" (Frozen funds)
-            if (status === 'PENDING_APPROVAL') {
-                await tx.user.update({
-                    where: { id: req.user.id },
-                    data: { pendingClearance: { increment: Number(amount) } }
+            // ========== V1.2 EXPENSE LOGIC ==========
+            if (type === 'EXPENSE') {
+                // V1.2: If projectCostItemId is missing but itemName is provided, create a new ProjectCostItem (Work Order/Band)
+                let finalCostItemId = projectCostItemId;
+                if (!finalCostItemId && itemName && type === 'EXPENSE') {
+                    const newItem = await tx.projectCostItem.create({
+                        data: {
+                            projectId,
+                            name: itemName,
+                            category,
+                            totalQuantity: quantity ? Number(quantity) : null,
+                            unitOfMeasure: unit,
+                            unitPrice: unitPrice ? Number(unitPrice) : null,
+                            estimatedTotal: (quantity && unitPrice) ? (Number(quantity) * Number(unitPrice)) : null,
+                            tenantId: req.user.tenantId,
+                            totalPaid: 0 // Will be incremented below
+                        }
+                    });
+                    finalCostItemId = newItem.id;
+                }
+
+                const transaction = await tx.transaction.create({
+                    data: {
+                        type: 'EXPENSE',
+                        category,
+                        amount: Number(amount),
+                        description,
+                        status: 'APPROVED',
+                        projectId,
+                        projectCostItemId: finalCostItemId,
+                        supplierId,
+                        workmanId,
+                        createdBy: actualPayer,
+                        transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+                        paymentMethod: paymentMethod || 'CASH',
+                        invoiceNumber,
+                        tenantId: req.user.tenantId
+                    }
                 });
 
-                // Notify Manager
-                // await tx.notification.create(...) // Skip for brevity/speed
+                // Deduct from Project Safe
+                await tx.project.update({
+                    where: { id: projectId },
+                    data: {
+                        projectSafeBalance: { decrement: Number(amount) },
+                        actualCost: { increment: Number(amount) }
+                    }
+                });
+
+                // Update Cost Item if linked
+                if (finalCostItemId) {
+                    await tx.projectCostItem.update({
+                        where: { id: finalCostItemId },
+                        data: {
+                            totalPaid: { increment: Number(amount) }
+                        }
+                    });
+                }
+
+                // V1.2: Update Workman balance if linked
+                if (workmanId) {
+                    await tx.workman.update({
+                        where: { id: workmanId },
+                        data: {
+                            totalPaid: { increment: Number(amount) }
+                        }
+                    });
+                }
+
+                // V1.2 PROFIT CALCULATION
+                // If it's NOT an inventory purchase, recognize profit immediately
+                if (!createBatch) {
+                    const feePercent = Number(project.managementFeePercent) || 0;
+                    const profit = Number(amount) * (feePercent / 100);
+
+                    if (profit > 0 && project.revenueModel === 'EXECUTION_COST_PLUS') {
+                        // Transfer profit from Project Safe to Office Revenue
+                        await tx.project.update({
+                            where: { id: projectId },
+                            data: {
+                                projectSafeBalance: { decrement: profit },
+                                officeRevenue: { increment: profit }
+                            }
+                        });
+
+                        profitInfo = {
+                            profit,
+                            projectSafeAfter: Number(project.projectSafeBalance) - Number(amount) - profit,
+                            officeRevenueAfter: Number(project.officeRevenue) + profit,
+                            message: `Profit of ${profit} EGP recognized and transferred to office revenue.`
+                        };
+                    } else {
+                        profitInfo = {
+                            profit: 0,
+                            message: 'No profit recognized (not a COST_PLUS project or 0% fee).'
+                        };
+                    }
+                } else {
+                    // Inventory Purchase: Create batch, defer profit
+                    await tx.materialBatch.create({
+                        data: {
+                            projectId,
+                            originalReceiptId: transaction.id,
+                            description: description || 'Material Purchase',
+                            initialValue: Number(amount),
+                            remainingValue: Number(amount),
+                            status: 'AVAILABLE',
+                            recordedBy: actualPayer,
+                            tenantId: req.user.tenantId
+                        }
+                    });
+
+                    profitInfo = {
+                        profit: 0,
+                        message: 'Inventory batch created. Profit deferred until usage.'
+                    };
+                }
+
+                // Check if Project Safe is negative and send notification
+                const updatedProject = await tx.project.findUnique({
+                    where: { id: projectId },
+                    include: { engineer: true }
+                });
+
+                if (Number(updatedProject.projectSafeBalance) < 0) {
+                    // Send notification to project manager and admin
+                    await tx.notification.create({
+                        data: {
+                            userId: updatedProject.engineerId,
+                            tenantId: req.user.tenantId,
+                            type: 'ALERT',
+                            title: '⚠️ Project Safe Balance Negative',
+                            message: `Project "${updatedProject.name}" has a negative safe balance: ${updatedProject.projectSafeBalance} EGP`,
+                            resourceId: projectId,
+                            resourceType: 'project'
+                        }
+                    });
+                }
+
+                return { transaction, profitInfo };
             }
 
-            return txRecord;
+            throw new Error('Invalid transaction type');
         });
 
         res.status(201).json({
             success: true,
-            data: result
+            data: result.transaction,
+            profitInfo: result.profitInfo
         });
 
     } catch (error) {
         next(error);
     }
 };
+
+// ========== V1.2 EXPORTS ==========
+// New "Profit on Expense" Logic
+export const createTransactionV2 = transactionV2.createTransactionV2;
+export const recordInventoryUsage = transactionV2.recordInventoryUsage;
+export const getProjectInventory = transactionV2.getProjectInventory;

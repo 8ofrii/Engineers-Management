@@ -21,6 +21,8 @@ import chatRoutes from './routes/chat.js';
 import tenantRoutes from './routes/tenant.js';
 import userRoutes from './routes/users.js';
 import roleRoutes from './routes/roles.js';
+import projectCostItemRoutes from './routes/projectCostItems.js';
+import categoryRoutes from './routes/categories.js';
 
 // Load env vars
 dotenv.config();
@@ -62,7 +64,9 @@ app.use('/api/material-batches', materialBatchRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/tenant', tenantRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/roles', roleRoutes); // NEW: Role Management
+app.use('/api/roles', roleRoutes);
+app.use('/api/project-cost-items', projectCostItemRoutes); // V1.2: Work Orders
+app.use('/api/categories', categoryRoutes); // V1.2: Arabic Categories
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

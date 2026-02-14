@@ -75,6 +75,8 @@ export const transactionsAPI = {
     delete: (id) => api.delete(`/transactions/${id}`),
     getStats: (params) => api.get('/transactions/stats', { params }),
     recordIncome: (data) => api.post('/transactions/income', data),
+    createV2: (data) => api.post('/transactions/v2', data),
+    getProjectInventory: (projectId) => api.get(`/transactions/projects/${projectId}/inventory`),
     analyze: (formData) => api.post('/transactions/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -121,7 +123,8 @@ export const materialUsageAPI = {
     getAll: (params) => api.get('/material-usage', { params }),
     create: (data) => api.post('/material-usage', data),
     getBatches: (params) => api.get('/material-batches', { params }),
-    consumeBatch: (id, data) => api.post(`/material-batches/${id}/consume`, data)
+    consumeBatch: (id, data) => api.post(`/material-batches/${id}/consume`, data),
+    recordUsageV2: (data) => api.post('/transactions/inventory-usage', data)
 };
 
 // Workmanship API
@@ -164,6 +167,16 @@ export const rolesAPI = {
     delete: (id) => api.delete(`/roles/${id}`),
     getTemplates: () => api.get('/roles/templates'),
     seedDefaults: () => api.post('/roles/seed-defaults')
+};
+
+// Project Cost Items API (Work Orders)
+export const projectCostItemsAPI = {
+    getAll: (params) => api.get('/project-cost-items', { params }),
+    getByProject: (projectId) => api.get(`/project-cost-items/project/${projectId}`),
+    getOne: (id) => api.get(`/project-cost-items/${id}`),
+    create: (data) => api.post('/project-cost-items', data),
+    update: (id, data) => api.put(`/project-cost-items/${id}`, data),
+    delete: (id) => api.delete(`/project-cost-items/${id}`)
 };
 
 export default api;

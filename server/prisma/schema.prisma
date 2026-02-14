@@ -28,6 +28,7 @@ model Tenant {
   materials        Material[]
   notes            Note[]
   notifications    Notification[]
+  projectCostItems ProjectCostItem[]
   projects         Project[]
   roles            Role[]
   suppliers        Supplier[]
@@ -70,6 +71,7 @@ model User {
   projects              Project[]
   approvedTransactions  Transaction[]     @relation("ApprovedBy")
   transactions          Transaction[]
+  payerTransactions     Transaction[]     @relation("PayerOfTransaction")
   customRole            Role?             @relation(fields: [roleId], references: [id], onDelete: SetNull)
   tenant                Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workmanships          Workmanship[]
@@ -156,38 +158,61 @@ model Supplier {
 }
 
 model Project {
-  id                   String          @id @default(uuid())
+  id                   String            @id @default(uuid())
   name                 String
   description          String?
-  status               ProjectStatus   @default(PLANNING)
-  projectType          ProjectType     @default(OTHER)
+  status               ProjectStatus     @default(PLANNING)
+  projectType          ProjectType       @default(OTHER)
   location             String?
   startDate            DateTime
   endDate              DateTime?
-  budget               Decimal         @db.Decimal(15, 2)
-  actualCost           Decimal         @default(0) @db.Decimal(15, 2)
+  budget               Decimal           @db.Decimal(15, 2)
+  actualCost           Decimal           @default(0) @db.Decimal(15, 2)
   clientId             String
   engineerId           String
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  managementFeePercent Decimal?        @db.Decimal(5, 2)
-  officeRevenue        Decimal         @default(0) @db.Decimal(15, 2)
-  operationalFund      Decimal         @default(0) @db.Decimal(15, 2)
-  paymentTerms         String          @default("Net 30")
-  revenueModel         RevenueModel    @default(EXECUTION_COST_PLUS)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  managementFeePercent Decimal?          @db.Decimal(5, 2)
+  officeRevenue        Decimal           @default(0) @db.Decimal(15, 2)
+  operationalFund      Decimal           @default(0) @db.Decimal(15, 2)
+  projectSafeBalance   Decimal           @default(0) @db.Decimal(15, 2)
+  paymentTerms         String            @default("Net 30")
+  revenueModel         RevenueModel      @default(EXECUTION_COST_PLUS)
   tenantId             String?
-  totalContractValue   Decimal?        @db.Decimal(15, 2)
+  totalContractValue   Decimal?          @db.Decimal(15, 2)
   documents            Document[]
   materialBatches      MaterialBatch[]
   materialUsage        MaterialUsage[]
   notes                Note[]
-  client               Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  engineer             User            @relation(fields: [engineerId], references: [id])
-  tenant               Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectCostItems     ProjectCostItem[]
+  client               Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  engineer             User              @relation(fields: [engineerId], references: [id])
+  tenant               Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions         Transaction[]
   workmanships         Workmanship[]
 
   @@map("projects")
+}
+
+model ProjectCostItem {
+  id             String        @id @default(uuid())
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name           String
+  totalQuantity  Decimal?      @db.Decimal(15, 2)
+  unitOfMeasure  String?
+  unitPrice      Decimal?      @db.Decimal(15, 2)
+  estimatedTotal Decimal?      @db.Decimal(15, 2)
+  totalPaid      Decimal       @default(0) @db.Decimal(15, 2)
+  status         String        @default("OPEN")
+  category       String?
+  transactions   Transaction[]
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("project_cost_items")
 }
 
 model Material {
@@ -298,42 +323,46 @@ model Workmanship {
 }
 
 model Transaction {
-  id              String              @id @default(uuid())
-  type            TransactionType
-  category        TransactionCategory
-  amount          Decimal             @db.Decimal(15, 2)
-  description     String
-  descriptionAr   String?
-  debit           Decimal?            @db.Decimal(15, 2)
-  credit          Decimal?            @db.Decimal(15, 2)
-  transactionDate DateTime            @default(now())
-  paymentMethod   PaymentMethod       @default(BANK_TRANSFER)
-  invoiceNumber   String?
-  status          TransactionStatus   @default(DRAFT)
-  notes           String?
-  projectId       String?
-  supplierId      String?
-  clientId        String?
-  createdBy       String
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  aiExtractedData Json?
-  aiRawText       String?
-  approvedAt      DateTime?
-  approvedBy      String?
-  custodyWalletId String?
-  receiptPhotoUrl String?
-  rejectionReason String?
-  tenantId        String?
-  voiceNoteUrl    String?
-  workmanId       String?
-  approver        User?               @relation("ApprovedBy", fields: [approvedBy], references: [id])
-  client          Client?             @relation(fields: [clientId], references: [id])
-  user            User                @relation(fields: [createdBy], references: [id])
-  project         Project?            @relation(fields: [projectId], references: [id])
-  supplier        Supplier?           @relation(fields: [supplierId], references: [id])
-  tenant          Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  workman         Workman?            @relation(fields: [workmanId], references: [id])
+  id                String              @id @default(uuid())
+  type              TransactionType
+  category          TransactionCategory
+  amount            Decimal             @db.Decimal(15, 2)
+  description       String
+  descriptionAr     String?
+  debit             Decimal?            @db.Decimal(15, 2)
+  credit            Decimal?            @db.Decimal(15, 2)
+  transactionDate   DateTime            @default(now())
+  paymentMethod     PaymentMethod       @default(BANK_TRANSFER)
+  invoiceNumber     String?
+  status            TransactionStatus   @default(DRAFT)
+  notes             String?
+  projectId         String?
+  projectCostItemId String?
+  supplierId        String?
+  clientId          String?
+  createdBy         String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  aiExtractedData   Json?
+  aiRawText         String?
+  approvedAt        DateTime?
+  approvedBy        String?
+  custodyWalletId   String?
+  receiptPhotoUrl   String?
+  rejectionReason   String?
+  payerUserId       String?
+  payer             User?               @relation("PayerOfTransaction", fields: [payerUserId], references: [id])
+  tenantId          String?
+  voiceNoteUrl      String?
+  workmanId         String?
+  approver          User?               @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  client            Client?             @relation(fields: [clientId], references: [id])
+  user              User                @relation(fields: [createdBy], references: [id])
+  project           Project?            @relation(fields: [projectId], references: [id])
+  projectCostItem   ProjectCostItem?    @relation(fields: [projectCostItemId], references: [id])
+  supplier          Supplier?           @relation(fields: [supplierId], references: [id])
+  tenant            Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workman           Workman?            @relation(fields: [workmanId], references: [id])
 
   @@index([projectId, transactionDate])
   @@index([type, category])
@@ -521,6 +550,7 @@ enum TransactionType {
 }
 
 enum TransactionCategory {
+  // Existing generic categories
   MATERIALS
   LABOR
   EQUIPMENT
@@ -528,6 +558,37 @@ enum TransactionCategory {
   PAYMENT
   OTHER
   CUSTODY_TRANSFER
+  
+  // V1.2 Specific Arabic Categories
+  CONCRETE
+  SITE_CLEANING
+  STOCKING
+  CEMENT
+  SAND
+  BRICKS
+  GENERAL_LABOR
+  MASONRY_LABOR
+  PLASTERING_MATERIALS
+  PLASTERING_LABOR
+  PLUMBING_MATERIALS
+  PLUMBING_LABOR
+  ELECTRICAL_MATERIALS
+  ELECTRICAL_LABOR
+  CERAMIC_MATERIALS
+  CERAMIC_LABOR
+  PAINTING_MATERIALS
+  PAINTING_LABOR
+  GYPSUM_MATERIALS
+  GYPSUM_LABOR
+  CARPENTRY_MATERIALS
+  CARPENTRY_LABOR
+  DECOR
+  DRAWINGS
+  TIPS
+  TRANSPORT
+  INSULATION_LABOR
+  HVAC_PREP
+  ALUMETAL
 }
 
 enum PaymentMethod {

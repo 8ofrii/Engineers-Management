@@ -17,6 +17,7 @@ import ChatAssistant from './pages/ChatAssistant';
 import Reports from './pages/Reports';
 import TeamManagement from './pages/TeamManagement';
 import Finance from './pages/Finance';
+import Inventory from './pages/Inventory';
 
 function App() {
     return (
@@ -107,6 +108,14 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <CompanySettings />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/inventory"
+                            element={
+                                <PrivateRoute>
+                                    <Inventory />
                                 </PrivateRoute>
                             }
                         />

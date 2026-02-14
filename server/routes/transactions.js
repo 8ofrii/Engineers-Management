@@ -86,4 +86,16 @@ router.put('/:id', transactionController.updateTransaction);
 // Delete transaction
 router.delete('/:id', transactionController.deleteTransaction);
 
+// ========== V1.2 ROUTES ==========
+// New "Profit on Expense" Logic
+
+// Create transaction with V1.2 logic
+router.post('/v2', transactionController.createTransactionV2);
+
+// Record inventory usage with profit recognition
+router.post('/inventory-usage', transactionController.recordInventoryUsage);
+
+// Get project inventory (aggregated material batches)
+router.get('/projects/:id/inventory', transactionController.getProjectInventory);
+
 export default router;

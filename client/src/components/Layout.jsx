@@ -70,6 +70,7 @@ export default function Layout({ children }) {
         { path: '/projects', icon: FolderKanban, label: t('nav.projects') },
         { path: '/clients', icon: Users, label: t('nav.clients') },
         { path: '/suppliers', icon: Package, label: t('nav.suppliers') },
+        { path: '/inventory', icon: Package, label: t('nav.inventory') || 'Inventory' },
         { path: '/workforce', icon: HardHat, label: t('nav.labor') },
         { path: '/finance', icon: Wallet, label: t('finance.title') }, // or 'Accounting'
         { path: '/chat', icon: MessageSquare, label: t('nav.chat') },

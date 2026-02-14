@@ -23,6 +23,8 @@ export default function Finance() {
     // Delete state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [transactionToDelete, setTransactionToDelete] = useState(null);
+    const [workmen, setWorkmen] = useState([]);
+    const [filterWorkmanId, setFilterWorkmanId] = useState('ALL');
 
     // Handle URL params for project filtering
     useEffect(() => {
@@ -36,7 +38,8 @@ export default function Finance() {
 
     useEffect(() => {
         loadTransactions();
-    }, [filterType, filterProjectId]);
+        loadWorkmen();
+    }, [filterType, filterProjectId, filterWorkmanId]);
 
     const loadTransactions = async () => {
         try {
@@ -57,11 +60,25 @@ export default function Finance() {
                 allTx = allTx.filter(tx => tx.projectId === filterProjectId);
             }
 
+            // Filter by workman
+            if (filterWorkmanId !== 'ALL') {
+                allTx = allTx.filter(tx => tx.workmanId === filterWorkmanId);
+            }
+
             setTransactions(allTx);
         } catch (error) {
             console.error('Failed to load transactions:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadWorkmen = async () => {
+        try {
+            const res = await workmenAPI.getAll();
+            setWorkmen(res.data.data || []);
+        } catch (error) {
+            console.error('Failed to load workmen:', error);
         }
     };
 
@@ -162,7 +179,7 @@ export default function Finance() {
                 </div>
 
                 {/* Filters */}
-                <div className="card mb-lg" style={{ padding: '16px' }}>
+                <div className="flex gap-md items-center flex-wrap">
                     <div className="flex gap-md items-center">
                         <Filter size={20} className="text-secondary" />
                         <span className="text-secondary font-medium">{t('common.filter')}:</span>
@@ -187,6 +204,20 @@ export default function Finance() {
                             </button>
                         </div>
                     </div>
+
+                    <div className="flex gap-md items-center ml-auto">
+                        <span className="text-secondary font-medium">{t('labor.title')}:</span>
+                        <select
+                            value={filterWorkmanId}
+                            onChange={(e) => setFilterWorkmanId(e.target.value)}
+                            style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem' }}
+                        >
+                            <option value="ALL">{t('common.all')}</option>
+                            {workmen.map(w => (
+                                <option key={w.id} value={w.id}>{w.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -204,102 +235,145 @@ export default function Finance() {
                         </button>
                     </div>
                 ) : (
-                    <div className="card overflow-hidden" style={{ padding: '0' }}>
+                    <div className="finance-content">
                         <style>
                             {`
+                                .project-group {
+                                    margin-bottom: var(--spacing-xl);
+                                }
+                                .project-header {
+                                    background: var(--bg-tertiary);
+                                    padding: 12px 20px;
+                                    border-radius: var(--radius-md) var(--radius-md) 0 0;
+                                    border-bottom: 2px solid var(--color-primary);
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                }
+                                .project-title {
+                                    margin: 0;
+                                    font-size: 1.1rem;
+                                    font-weight: 700;
+                                    color: var(--text-primary);
+                                }
                                 .transaction-table {
                                     width: 100%;
                                     border-collapse: collapse;
+                                    background: var(--bg-secondary);
+                                    border-radius: 0 0 var(--radius-md) var(--radius-md);
+                                    overflow: hidden;
                                 }
                                 .transaction-table th {
-                                    padding: 16px;
+                                    padding: 14px;
                                     text-align: center;
-                                    font-size: 0.875rem;
+                                    font-size: 0.85rem;
                                     color: var(--text-secondary);
-                                    background: var(--bg-tertiary);
+                                    background: rgba(0,0,0,0.05);
                                     border-bottom: 1px solid var(--border-color);
                                     font-weight: 600;
                                 }
                                 .transaction-table td {
-                                    padding: 16px;
+                                    padding: 14px;
                                     text-align: center;
                                     font-size: 0.9rem;
                                     border-bottom: 1px solid var(--border-color);
                                     color: var(--text-primary);
                                 }
-                                .transaction-table tr:last-child td {
-                                    border-bottom: none;
-                                }
                                 .transaction-table tr:hover td {
                                     background: var(--bg-elevated);
                                 }
-                                /* Remove RTL specific overrides that force left/right, keep center */
-                                [dir="rtl"] .transaction-table th, 
-                                [dir="rtl"] .transaction-table td,
-                                [dir="ltr"] .transaction-table th, 
-                                [dir="ltr"] .transaction-table td {
-                                    text-align: center;
+                                .project-summary {
+                                    font-size: 0.85rem;
+                                    color: var(--text-secondary);
                                 }
                             `}
                         </style>
-                        <table className="transaction-table">
-                            <thead>
-                                <tr>
-                                    <th>{t('common.date')}</th>
-                                    <th>{t('common.type')}</th>
-                                    <th>{t('finance.category')}</th>
-                                    <th>{t('finance.description')}</th>
-                                    <th>{t('nav.projects')}</th>
-                                    <th>{t('finance.amount')}</th>
-                                    <th>{t('common.status')}</th>
-                                    <th style={{ width: '120px' }}>{t('common.actions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {transactions.map((tx) => (
-                                    <tr key={tx.id}>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{formatDate(tx.transactionDate)}</td>
-                                        <td>
-                                            <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.75rem' }}>
-                                                {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
-                                            </span>
-                                        </td>
-                                        <td>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                        <td style={{ maxWidth: '300px' }} className="truncate" title={tx.description}>
-                                            {tx.description}
-                                        </td>
-                                        <td>{tx.project?.name || '-'}</td>
-                                        <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                            {Number(tx.amount).toLocaleString()} EGP
-                                        </td>
-                                        <td>
-                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.75rem' }}>
-                                                {t(`finance.status.${tx.status}`) || tx.status?.replace('_', ' ')}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="flex gap-sm justify-center">
-                                                <button
-                                                    className="btn btn-sm btn-ghost icon-only"
-                                                    onClick={() => openEditModal(tx)}
-                                                    title={t('common.edit')}
-                                                >
-                                                    <Pencil size={16} />
-                                                </button>
-                                                <button
-                                                    className="btn btn-sm btn-ghost icon-only"
-                                                    style={{ color: '#ef4444' }}
-                                                    onClick={() => handleDeleteClick(tx)}
-                                                    title={t('common.delete')}
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+
+                        {/* Grouping Logic */}
+                        {(() => {
+                            // If filterProjectId is set, we don't need to group (or we group by Category/Band)
+                            // If NOT set, group by Project
+                            const groups = transactions.reduce((acc, tx) => {
+                                const key = tx.project?.name || t('common.unassigned') || 'Unassigned';
+                                if (!acc[key]) acc[key] = [];
+                                acc[key].push(tx);
+                                return acc;
+                            }, {});
+
+                            return Object.entries(groups).map(([projectName, txs]) => {
+                                const totalAmount = txs.reduce((sum, tx) => sum + (tx.type === 'INCOME' ? Number(tx.amount) : -Number(tx.amount)), 0);
+
+                                return (
+                                    <div key={projectName} className="project-group card" style={{ padding: 0, overflow: 'hidden' }}>
+                                        <div className="project-header">
+                                            <h3 className="project-title">{projectName}</h3>
+                                            <div className="project-summary">
+                                                {t('finance.projectNet') || 'صافي المشروع'}:
+                                                <span style={{
+                                                    marginLeft: '8px',
+                                                    fontWeight: 'bold',
+                                                    color: totalAmount >= 0 ? 'var(--color-success)' : 'var(--color-danger)'
+                                                }}>
+                                                    {totalAmount.toLocaleString()} EGP
+                                                </span>
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                        </div>
+                                        <table className="transaction-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>{t('common.date')}</th>
+                                                    <th>{t('common.type')}</th>
+                                                    <th>{t('finance.category')}</th>
+                                                    <th>{t('finance.description')}</th>
+                                                    <th>{t('finance.amount')}</th>
+                                                    <th>{t('common.status')}</th>
+                                                    <th style={{ width: '100px' }}>{t('common.actions')}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {txs.map((tx) => (
+                                                    <tr key={tx.id}>
+                                                        <td>{formatDate(tx.transactionDate)}</td>
+                                                        <td>
+                                                            <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
+                                                                {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
+                                                            </span>
+                                                        </td>
+                                                        <td>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                        <td style={{ maxWidth: '250px' }} className="truncate" title={tx.description}>
+                                                            {tx.description}
+                                                            {tx.projectCostItem && (
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '2px' }}>
+                                                                    #{tx.projectCostItem.name}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td style={{ fontWeight: 700 }}>
+                                                            {Number(tx.amount).toLocaleString()} EGP
+                                                        </td>
+                                                        <td>
+                                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem' }}>
+                                                                {t(`finance.status.${tx.status}`) || tx.status?.replace('_', ' ')}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <div className="flex gap-sm justify-center">
+                                                                <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
+                                                                    <Pencil size={14} />
+                                                                </button>
+                                                                <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.delete')}>
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                );
+                            });
+                        })()}
                     </div>
                 )}
             </div>
