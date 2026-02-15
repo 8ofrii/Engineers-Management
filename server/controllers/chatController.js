@@ -3,10 +3,14 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import * as aiService from '../services/aiService.js';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-});
+// Lazy initialization to ensure env vars are loaded
+let openai = null;
+const getOpenAI = () => {
+    if (!openai) {
+        openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+    return openai;
+};
 
 // @desc    Chat with AI assistant (with voice support)
 // @route   POST /api/chat/message
@@ -106,7 +110,8 @@ export const sendMessage = async (req, res, next) => {
                 }
             ];
 
-            const completion = await openai.chat.completions.create({
+            const client = getOpenAI();
+            const completion = await client.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages: [
                     {

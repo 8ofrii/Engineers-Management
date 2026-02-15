@@ -1,7 +1,14 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy initialization to ensure env vars are loaded
+let openai = null;
+const getOpenAI = () => {
+    if (!openai) {
+        openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+    return openai;
+};
 
 const SYSTEM_PROMPT = `
 You are an AI Assistant for an Egyptian Construction Company (SaaS).
@@ -37,8 +44,10 @@ Your role is to parse voice notes from Site Engineers into structured financial 
  */
 export const processVoiceNote = async (filePath) => {
     try {
+        const client = getOpenAI();
+
         // Step 1: Transcribe
-        const transcription = await openai.audio.transcriptions.create({
+        const transcription = await client.audio.transcriptions.create({
             file: fs.createReadStream(filePath),
             model: "whisper-1",
             language: "ar", // Force Arabic bias
@@ -46,7 +55,7 @@ export const processVoiceNote = async (filePath) => {
         });
 
         // Step 2: Extract Intelligence
-        const completion = await openai.chat.completions.create({
+        const completion = await client.chat.completions.create({
             model: "gpt-4o-mini", // Efficient & Smart
             messages: [
                 { role: "system", content: SYSTEM_PROMPT },

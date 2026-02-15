@@ -1,23 +1,27 @@
 import prisma from '../lib/prisma.js';
 
-// @desc    Consume material batch
+// @desc    Consume material batch (with office fee calculation)
 // @route   POST /api/material-batches/:id/consume
 // @access  Private (Engineer, Manager, Admin)
 export const consumeBatch = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { amountConsumed, description } = req.body;
+        const { amountConsumed, quantityConsumed, description } = req.body;
 
-        if (!amountConsumed || amountConsumed <= 0) {
+        // Must provide either amount or quantity
+        if ((!amountConsumed || amountConsumed <= 0) && (!quantityConsumed || quantityConsumed <= 0)) {
             return res.status(400).json({
                 success: false,
-                message: 'Amount consumed must be greater than 0'
+                message: 'Either amountConsumed or quantityConsumed must be provided and greater than 0'
             });
         }
 
         // Fetch the batch
         const batch = await prisma.materialBatch.findUnique({
-            where: { id }
+            where: { id },
+            include: {
+                project: true
+            }
         });
 
         if (!batch) {
@@ -27,8 +31,16 @@ export const consumeBatch = async (req, res, next) => {
             });
         }
 
+        // Calculate actual consumed value
+        let actualConsumedValue = amountConsumed;
+        if (!actualConsumedValue && quantityConsumed) {
+            // Calculate based on quantity (proportional to initial value)
+            const totalQuantity = Number(batch.quantityUsed) || Number(batch.initialValue);
+            actualConsumedValue = (Number(quantityConsumed) / totalQuantity) * Number(batch.initialValue);
+        }
+
         // Check if enough material is available
-        if (batch.remainingValue < amountConsumed) {
+        if (Number(batch.remainingValue) < actualConsumedValue) {
             return res.status(400).json({
                 success: false,
                 message: `Insufficient material value. Available: ${batch.remainingValue} EGP`,
@@ -36,29 +48,73 @@ export const consumeBatch = async (req, res, next) => {
             });
         }
 
+        // Import office fee service
+        const officeFeeService = await import('../services/officeFeeService.js');
+
+        // Calculate office fee on consumed portion
+        const officeFee = await officeFeeService.calculateOfficeFee(
+            batch.projectId,
+            'MATERIALS', // Generic materials category
+            actualConsumedValue
+        );
+
         // Calculate new values
-        const newRemainingValue = Number(batch.remainingValue) - Number(amountConsumed);
+        const newRemainingValue = Number(batch.remainingValue) - actualConsumedValue;
+        const newQuantityUsed = Number(batch.quantityUsed || 0) + (quantityConsumed || 0);
+        const newOfficeFeeApplied = Number(batch.officeFeeApplied) + officeFee;
         const newStatus = newRemainingValue <= 0 ? 'CONSUMED' :
             newRemainingValue < batch.initialValue ? 'PARTIALLY_USED' :
                 'AVAILABLE';
 
-        // Update batch (NO project cost change - already counted at purchase)
-        const updated = await prisma.materialBatch.update({
-            where: { id },
-            data: {
-                remainingValue: newRemainingValue,
-                status: newStatus
+        // Atomic transaction: Update batch + Apply office fee to project
+        const result = await prisma.$transaction(async (tx) => {
+            // Update batch
+            const updatedBatch = await tx.materialBatch.update({
+                where: { id },
+                data: {
+                    remainingValue: newRemainingValue,
+                    quantityUsed: newQuantityUsed,
+                    officeFeeApplied: newOfficeFeeApplied,
+                    status: newStatus
+                }
+            });
+
+            // Apply office fee to project
+            await tx.project.update({
+                where: { id: batch.projectId },
+                data: {
+                    officeRevenue: { increment: officeFee },
+                    projectSafeBalance: { decrement: officeFee }
+                }
+            });
+
+            // Create material usage record
+            if (batch.materialId) {
+                await tx.materialUsage.create({
+                    data: {
+                        materialId: batch.materialId,
+                        projectId: batch.projectId,
+                        quantity: quantityConsumed || 0,
+                        notes: description || `Consumed from batch: ${batch.description}`,
+                        recordedBy: req.user.id,
+                        tenantId: req.user.tenantId
+                    }
+                });
             }
+
+            return updatedBatch;
         });
 
         res.status(200).json({
             success: true,
-            message: `Consumed ${amountConsumed} EGP worth of materials`,
+            message: `Consumed ${actualConsumedValue.toFixed(2)} EGP worth of materials`,
             data: {
-                ...updated,
-                remainingValue: Number(updated.remainingValue),
-                initialValue: Number(updated.initialValue),
-                consumed: Number(amountConsumed)
+                ...result,
+                remainingValue: Number(result.remainingValue),
+                initialValue: Number(result.initialValue),
+                consumed: actualConsumedValue,
+                officeFeeApplied: officeFee,
+                totalOfficeFee: Number(result.officeFeeApplied)
             }
         });
 

@@ -12,9 +12,9 @@
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(circle at 20% 50%, hsla(210, 100%, 60%, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 80% 80%, hsla(280, 70%, 60%, 0.15) 0%, transparent 50%),
-        radial-gradient(circle at 40% 20%, hsla(160, 80%, 50%, 0.1) 0%, transparent 50%);
+        radial-gradient(circle at 20% 50%, hsla(220, 80%, 45%, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, hsla(210, 15%, 50%, 0.12) 0%, transparent 50%),
+        radial-gradient(circle at 40% 20%, hsla(220, 70%, 50%, 0.08) 0%, transparent 50%);
     animation: backgroundShift 20s ease-in-out infinite;
 }
 

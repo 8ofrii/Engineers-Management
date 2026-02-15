@@ -130,7 +130,8 @@ export default function Finance() {
 
     return (
         <Layout>
-            <div>
+            <div className="container">
+                {/* Header Section */}
                 <div className="flex-between mb-xl">
                     <div>
                         <h1 className="flex gap-md">
@@ -142,29 +143,35 @@ export default function Finance() {
                         {/* Project Filter Badge */}
                         {filterProjectId && filterProjectName && (
                             <div style={{
-                                marginTop: 'var(--spacing-sm)',
+                                marginTop: 'var(--spacing-md)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: 'var(--spacing-xs)',
-                                padding: '6px 12px',
-                                background: 'var(--color-primary)',
-                                color: 'white',
-                                borderRadius: 'var(--radius-md)',
-                                fontSize: 'var(--font-size-sm)'
+                                gap: 'var(--spacing-sm)',
+                                padding: '8px 16px',
+                                background: 'hsla(220, 80%, 45%, 0.1)',
+                                color: 'var(--color-primary)',
+                                borderRadius: 'var(--radius-full)',
+                                fontSize: 'var(--font-size-sm)',
+                                fontWeight: '600',
+                                border: '1px solid hsla(220, 80%, 45%, 0.2)'
                             }}>
-                                <Filter size={14} />
+                                <Filter size={16} />
                                 <span>{t('finance.filteringBy')}: {filterProjectName}</span>
                                 <button
                                     onClick={clearProjectFilter}
                                     style={{
                                         background: 'transparent',
                                         border: 'none',
-                                        color: 'white',
+                                        color: 'var(--color-primary)',
                                         cursor: 'pointer',
                                         padding: '2px',
                                         display: 'flex',
-                                        alignItems: 'center'
+                                        alignItems: 'center',
+                                        borderRadius: 'var(--radius-sm)',
+                                        transition: 'all var(--transition-fast)'
                                     }}
+                                    onMouseEnter={(e) => e.target.style.background = 'hsla(220, 80%, 45%, 0.1)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
                                     title={t('common.clear')}
                                 >
                                     <X size={16} />
@@ -178,45 +185,90 @@ export default function Finance() {
                     </button>
                 </div>
 
-                {/* Filters */}
-                <div className="flex gap-md items-center flex-wrap">
-                    <div className="flex gap-md items-center">
-                        <Filter size={20} className="text-secondary" />
-                        <span className="text-secondary font-medium">{t('common.filter')}:</span>
-                        <div className="flex gap-sm">
-                            <button
-                                className={`btn btn-sm ${filterType === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setFilterType('ALL')}
-                            >
-                                {t('common.all')}
-                            </button>
-                            <button
-                                className={`btn btn-sm ${filterType === 'INCOME' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setFilterType('INCOME')}
-                            >
-                                {t('finance.income')}
-                            </button>
-                            <button
-                                className={`btn btn-sm ${filterType === 'EXPENSE' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setFilterType('EXPENSE')}
-                            >
-                                {t('finance.expense')}
-                            </button>
+                {/* Filters Section - Enhanced Design */}
+                <div className="card" style={{
+                    padding: 'var(--spacing-lg)',
+                    marginBottom: 'var(--spacing-xl)',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <div className="flex gap-lg items-center flex-wrap">
+                        {/* Type Filter */}
+                        <div className="flex gap-md items-center">
+                            <div className="flex gap-xs items-center">
+                                <Filter size={18} className="text-secondary" />
+                                <span className="text-secondary font-medium" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                    {t('common.filter')}:
+                                </span>
+                            </div>
+                            <div className="flex gap-xs">
+                                <button
+                                    className={`btn btn-sm ${filterType === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setFilterType('ALL')}
+                                    style={{
+                                        borderRadius: 'var(--radius-full)',
+                                        padding: '6px 16px',
+                                        fontSize: 'var(--font-size-sm)',
+                                        fontWeight: '600',
+                                        transition: 'all var(--transition-base)'
+                                    }}
+                                >
+                                    {t('common.all')}
+                                </button>
+                                <button
+                                    className={`btn btn-sm ${filterType === 'INCOME' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setFilterType('INCOME')}
+                                    style={{
+                                        borderRadius: 'var(--radius-full)',
+                                        padding: '6px 16px',
+                                        fontSize: 'var(--font-size-sm)',
+                                        fontWeight: '600',
+                                        transition: 'all var(--transition-base)'
+                                    }}
+                                >
+                                    {t('finance.income')}
+                                </button>
+                                <button
+                                    className={`btn btn-sm ${filterType === 'EXPENSE' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setFilterType('EXPENSE')}
+                                    style={{
+                                        borderRadius: 'var(--radius-full)',
+                                        padding: '6px 16px',
+                                        fontSize: 'var(--font-size-sm)',
+                                        fontWeight: '600',
+                                        transition: 'all var(--transition-base)'
+                                    }}
+                                >
+                                    {t('finance.expense')}
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="flex gap-md items-center ml-auto">
-                        <span className="text-secondary font-medium">{t('labor.title')}:</span>
-                        <select
-                            value={filterWorkmanId}
-                            onChange={(e) => setFilterWorkmanId(e.target.value)}
-                            style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.85rem' }}
-                        >
-                            <option value="ALL">{t('common.all')}</option>
-                            {workmen.map(w => (
-                                <option key={w.id} value={w.id}>{w.name}</option>
-                            ))}
-                        </select>
+                        {/* Workman Filter */}
+                        <div className="flex gap-md items-center" style={{ marginLeft: 'auto' }}>
+                            <span className="text-secondary font-medium" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                {t('labor.title')}:
+                            </span>
+                            <select
+                                value={filterWorkmanId}
+                                onChange={(e) => setFilterWorkmanId(e.target.value)}
+                                className="select"
+                                style={{
+                                    padding: '8px 12px',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: 'var(--font-size-sm)',
+                                    minWidth: '150px',
+                                    background: 'var(--bg-tertiary)',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'var(--text-primary)'
+                                }}
+                            >
+                                <option value="ALL">{t('common.all')}</option>
+                                {workmen.map(w => (
+                                    <option key={w.id} value={w.id}>{w.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -239,52 +291,94 @@ export default function Finance() {
                         <style>
                             {`
                                 .project-group {
-                                    margin-bottom: var(--spacing-xl);
+                                    margin-bottom: var(--spacing-2xl);
                                 }
                                 .project-header {
-                                    background: var(--bg-tertiary);
-                                    padding: 12px 20px;
-                                    border-radius: var(--radius-md) var(--radius-md) 0 0;
-                                    border-bottom: 2px solid var(--color-primary);
+                                    background: linear-gradient(135deg, var(--color-primary) 0%, hsl(220, 70%, 50%) 100%);
+                                    padding: 16px 24px;
+                                    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
                                     display: flex;
                                     justify-content: space-between;
                                     align-items: center;
+                                    box-shadow: 0 2px 8px hsla(220, 80%, 45%, 0.2);
                                 }
                                 .project-title {
                                     margin: 0;
-                                    font-size: 1.1rem;
+                                    font-size: 1.125rem;
                                     font-weight: 700;
-                                    color: var(--text-primary);
-                                }
-                                .transaction-table {
-                                    width: 100%;
-                                    border-collapse: collapse;
-                                    background: var(--bg-secondary);
-                                    border-radius: 0 0 var(--radius-md) var(--radius-md);
-                                    overflow: hidden;
-                                }
-                                .transaction-table th {
-                                    padding: 14px;
-                                    text-align: center;
-                                    font-size: 0.85rem;
-                                    color: var(--text-secondary);
-                                    background: rgba(0,0,0,0.05);
-                                    border-bottom: 1px solid var(--border-color);
-                                    font-weight: 600;
-                                }
-                                .transaction-table td {
-                                    padding: 14px;
-                                    text-align: center;
-                                    font-size: 0.9rem;
-                                    border-bottom: 1px solid var(--border-color);
-                                    color: var(--text-primary);
-                                }
-                                .transaction-table tr:hover td {
-                                    background: var(--bg-elevated);
+                                    color: white;
                                 }
                                 .project-summary {
-                                    font-size: 0.85rem;
+                                    font-size: 0.875rem;
+                                    color: rgba(255, 255, 255, 0.95);
+                                    font-weight: 600;
+                                }
+                                .transaction-table {
+                                    width: 100%;\r
+                                    border-collapse: collapse;
+                                    background: var(--bg-secondary);
+                                    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+                                    overflow: hidden;
+                                    box-shadow: var(--shadow-sm);
+                                }
+                                .transaction-table th {
+                                    padding: 16px 14px;
+                                    text-align: center;
+                                    font-size: 0.8125rem;
                                     color: var(--text-secondary);
+                                    background: var(--bg-tertiary);
+                                    border-bottom: 2px solid var(--border-color);
+                                    font-weight: 700;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.5px;
+                                }
+                                .transaction-table td {
+                                    padding: 16px 14px;
+                                    text-align: center;
+                                    font-size: 0.875rem;
+                                    border-bottom: 1px solid var(--border-color);
+                                    color: var(--text-primary);
+                                    transition: all var(--transition-fast);
+                                }
+                                .transaction-table tbody tr {
+                                    transition: all var(--transition-fast);
+                                }
+                                .transaction-table tbody tr:hover {
+                                    background: var(--bg-elevated);
+                                    transform: scale(1.005);
+                                    box-shadow: 0 2px 8px hsla(220, 80%, 45%, 0.08);
+                                }
+                                .transaction-table tbody tr:last-child td {
+                                    border-bottom: none;
+                                }
+                                .btn-icon-sm {
+                                    background: var(--bg-tertiary);
+                                    border: 1px solid var(--border-color);
+                                    color: var(--text-primary);
+                                    padding: 8px;
+                                    border-radius: var(--radius-md);
+                                    cursor: pointer;
+                                    display: inline-flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    transition: all var(--transition-base);
+                                }
+                                .btn-icon-sm:hover {
+                                    background: var(--color-primary);
+                                    color: white;
+                                    border-color: var(--color-primary);
+                                    transform: translateY(-2px);
+                                    box-shadow: 0 4px 8px hsla(220, 80%, 45%, 0.3);
+                                }
+                                .btn-icon-sm.text-danger:hover {
+                                    background: var(--color-danger);
+                                    border-color: var(--color-danger);
+                                    box-shadow: 0 4px 8px hsla(0, 85%, 60%, 0.3);
+                                }
+                                .truncate {
+                                    white-space: nowrap;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
                                 }
                             `}
                         </style>
@@ -304,7 +398,7 @@ export default function Finance() {
                                 const totalAmount = txs.reduce((sum, tx) => sum + (tx.type === 'INCOME' ? Number(tx.amount) : -Number(tx.amount)), 0);
 
                                 return (
-                                    <div key={projectName} className="project-group card" style={{ padding: 0, overflow: 'hidden' }}>
+                                    <div key={projectName} className="project-group" style={{ overflow: 'hidden' }}>
                                         <div className="project-header">
                                             <h3 className="project-title">{projectName}</h3>
                                             <div className="project-summary">
@@ -312,7 +406,7 @@ export default function Finance() {
                                                 <span style={{
                                                     marginLeft: '8px',
                                                     fontWeight: 'bold',
-                                                    color: totalAmount >= 0 ? 'var(--color-success)' : 'var(--color-danger)'
+                                                    color: totalAmount >= 0 ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 200, 200, 1)'
                                                 }}>
                                                     {totalAmount.toLocaleString()} EGP
                                                 </span>
@@ -327,42 +421,42 @@ export default function Finance() {
                                                     <th>{t('finance.description')}</th>
                                                     <th>{t('finance.amount')}</th>
                                                     <th>{t('common.status')}</th>
-                                                    <th style={{ width: '100px' }}>{t('common.actions')}</th>
+                                                    <th style={{ width: '120px' }}>{t('common.actions')}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {txs.map((tx) => (
                                                     <tr key={tx.id}>
-                                                        <td>{formatDate(tx.transactionDate)}</td>
+                                                        <td style={{ fontWeight: '500' }}>{formatDate(tx.transactionDate)}</td>
                                                         <td>
-                                                            <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
+                                                            <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
                                                                 {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
                                                             </span>
                                                         </td>
-                                                        <td>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                        <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
                                                         <td style={{ maxWidth: '250px' }} className="truncate" title={tx.description}>
                                                             {tx.description}
                                                             {tx.projectCostItem && (
-                                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '2px' }}>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
                                                                     #{tx.projectCostItem.name}
                                                                 </div>
                                                             )}
                                                         </td>
-                                                        <td style={{ fontWeight: 700 }}>
+                                                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
                                                             {Number(tx.amount).toLocaleString()} EGP
                                                         </td>
                                                         <td>
-                                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem' }}>
+                                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
                                                                 {t(`finance.status.${tx.status}`) || tx.status?.replace('_', ' ')}
                                                             </span>
                                                         </td>
                                                         <td>
                                                             <div className="flex gap-sm justify-center">
                                                                 <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
-                                                                    <Pencil size={14} />
+                                                                    <Pencil size={16} />
                                                                 </button>
                                                                 <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.delete')}>
-                                                                    <Trash2 size={14} />
+                                                                    <Trash2 size={16} />
                                                                 </button>
                                                             </div>
                                                         </td>

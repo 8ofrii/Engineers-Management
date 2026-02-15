@@ -8,34 +8,36 @@ datasource db {
 }
 
 model Tenant {
-  id               String            @id @default(uuid())
-  name             String
-  slug             String            @unique
-  subscriptionPlan String            @default("FREE_PILOT")
-  isActive         Boolean           @default(true)
-  logo             String?
-  address          String?
-  phone            String?
-  email            String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  chatMessages     ChatMessage[]
-  clients          Client[]
-  custodyTransfers CustodyTransfer[]
-  documents        Document[]
-  materialBatches  MaterialBatch[]
-  materialUsage    MaterialUsage[]
-  materials        Material[]
-  notes            Note[]
-  notifications    Notification[]
-  projectCostItems ProjectCostItem[]
-  projects         Project[]
-  roles            Role[]
-  suppliers        Supplier[]
-  transactions     Transaction[]
-  users            User[]
-  workmanships     Workmanship[]
-  workmen          Workman[]
+  id                  String                @id @default(uuid())
+  name                String
+  slug                String                @unique
+  subscriptionPlan    String                @default("FREE_PILOT")
+  isActive            Boolean               @default(true)
+  logo                String?
+  address             String?
+  phone               String?
+  email               String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  chatMessages        ChatMessage[]
+  clients             Client[]
+  custodyTransfers    CustodyTransfer[]
+  documents           Document[]
+  materialBatches     MaterialBatch[]
+  materialUsage       MaterialUsage[]
+  materials           Material[]
+  notes               Note[]
+  notifications       Notification[]
+  projectCostItems    ProjectCostItem[]
+  projects            Project[]
+  roles               Role[]
+  suppliers           Supplier[]
+  transactions        Transaction[]
+  users               User[]
+  workmanships        Workmanship[]
+  workmen             Workman[]
+  globalCategoryFees  GlobalCategoryFee[]
+  projectCategoryFees ProjectCategoryFee[]
 
   @@map("tenants")
 }
@@ -185,6 +187,7 @@ model Project {
   materialUsage        MaterialUsage[]
   notes                Note[]
   projectCostItems     ProjectCostItem[]
+  categoryFees         ProjectCategoryFee[]
   client               Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   engineer             User              @relation(fields: [engineerId], references: [id])
   tenant               Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -260,6 +263,8 @@ model MaterialBatch {
   descriptionAr     String?
   initialValue      Decimal     @db.Decimal(15, 2)
   remainingValue    Decimal     @db.Decimal(15, 2)
+  quantityUsed      Decimal?    @db.Decimal(15, 2)
+  officeFeeApplied  Decimal     @default(0) @db.Decimal(15, 2)
   status            BatchStatus @default(AVAILABLE)
   projectId         String
   originalReceiptId String?
@@ -635,4 +640,33 @@ enum NotificationType {
   ACTION_REQUIRED
   INFO
   ALERT
+}
+
+// Global default office fee percentages per category
+model GlobalCategoryFee {
+  id                String              @id @default(uuid())
+  category          TransactionCategory @unique
+  defaultFeePercent Decimal             @db.Decimal(5, 2)
+  tenantId          String
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@map("global_category_fees")
+}
+
+// Project-specific category fee overrides
+model ProjectCategoryFee {
+  id         String              @id @default(uuid())
+  projectId  String
+  category   TransactionCategory
+  feePercent Decimal             @db.Decimal(5, 2)
+  project    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([projectId, category])
+  @@map("project_category_fees")
 }

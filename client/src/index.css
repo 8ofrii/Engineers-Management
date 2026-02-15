@@ -1,35 +1,35 @@
 :root {
-  /* Color Palette - Construction/Engineering Theme */
-  --color-primary: hsl(25, 95%, 53%);
-  /* Construction Orange */
-  --color-primary-dark: hsl(25, 95%, 45%);
-  --color-primary-light: hsl(25, 95%, 63%);
+  /* Color Palette - Professional Navy Blue, White & Grey Theme */
+  --color-primary: hsl(220, 80%, 45%);
+  /* Navy Blue */
+  --color-primary-dark: hsl(220, 85%, 35%);
+  --color-primary-light: hsl(220, 75%, 55%);
 
-  --color-secondary: hsl(200, 18%, 46%);
-  /* Steel Blue */
-  --color-accent: hsl(142, 71%, 45%);
-  /* Safety Green */
+  --color-secondary: hsl(210, 15%, 50%);
+  /* Professional Grey */
+  --color-accent: hsl(220, 70%, 50%);
+  /* Accent Blue */
   --color-warning: hsl(45, 100%, 51%);
-  /* Caution Yellow */
+  /* Warning Yellow */
   --color-danger: hsl(0, 85%, 60%);
   --color-success: hsl(142, 71%, 45%);
 
-  /* Backgrounds */
-  --bg-primary: hsl(220, 20%, 8%);
-  --bg-secondary: hsl(220, 18%, 12%);
-  --bg-tertiary: hsl(220, 16%, 16%);
-  --bg-elevated: hsl(220, 18%, 14%);
-  --bg-overlay: hsla(220, 20%, 8%, 0.95);
+  /* Backgrounds - Dark Mode */
+  --bg-primary: hsl(220, 25%, 10%);
+  --bg-secondary: hsl(220, 22%, 14%);
+  --bg-tertiary: hsl(220, 20%, 18%);
+  --bg-elevated: hsl(220, 22%, 16%);
+  --bg-overlay: hsla(220, 25%, 10%, 0.95);
 
   /* Text Colors */
   --text-primary: hsl(0, 0%, 98%);
-  --text-secondary: hsl(0, 0%, 75%);
-  --text-tertiary: hsl(0, 0%, 55%);
-  --text-disabled: hsl(0, 0%, 40%);
+  --text-secondary: hsl(210, 10%, 75%);
+  --text-tertiary: hsl(210, 8%, 55%);
+  --text-disabled: hsl(210, 5%, 40%);
 
   /* Borders */
-  --border-color: hsl(220, 16%, 20%);
-  --border-color-light: hsl(220, 16%, 25%);
+  --border-color: hsl(220, 18%, 22%);
+  --border-color-light: hsl(220, 16%, 28%);
 
   /* Shadows */
   --shadow-sm: 0 2px 8px hsla(0, 0%, 0%, 0.2);
@@ -38,7 +38,7 @@
   --shadow-xl: 0 16px 48px hsla(0, 0%, 0%, 0.5);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  --gradient-primary: linear-gradient(135deg, hsl(220, 80%, 45%) 0%, hsl(220, 70%, 50%) 100%);
   --gradient-success: linear-gradient(135deg, hsl(140, 70%, 55%) 0%, hsl(160, 80%, 50%) 100%);
   --gradient-danger: linear-gradient(135deg, hsl(0, 85%, 60%) 0%, hsl(15, 85%, 55%) 100%);
 
@@ -83,24 +83,24 @@
 
 /* Light Mode */
 .light-mode {
-  --bg-primary: hsl(0, 0%, 98%);
-  --bg-secondary: hsl(0, 0%, 95%);
-  --bg-tertiary: hsl(0, 0%, 92%);
+  --bg-primary: hsl(0, 0%, 100%);
+  --bg-secondary: hsl(210, 20%, 98%);
+  --bg-tertiary: hsl(210, 18%, 95%);
   --bg-elevated: hsl(0, 0%, 100%);
-  --bg-overlay: hsla(0, 0%, 98%, 0.95);
+  --bg-overlay: hsla(0, 0%, 100%, 0.95);
 
-  --text-primary: hsl(220, 20%, 10%);
-  --text-secondary: hsl(220, 15%, 30%);
+  --text-primary: hsl(220, 25%, 15%);
+  --text-secondary: hsl(220, 15%, 35%);
   --text-tertiary: hsl(220, 10%, 50%);
   --text-disabled: hsl(220, 5%, 65%);
 
-  --border-color: hsl(220, 16%, 85%);
-  --border-color-light: hsl(220, 16%, 90%);
+  --border-color: hsl(220, 16%, 88%);
+  --border-color-light: hsl(220, 16%, 92%);
 
-  --shadow-sm: 0 2px 8px hsla(220, 20%, 20%, 0.08);
-  --shadow-md: 0 4px 16px hsla(220, 20%, 20%, 0.12);
-  --shadow-lg: 0 8px 32px hsla(220, 20%, 20%, 0.16);
-  --shadow-xl: 0 16px 48px hsla(220, 20%, 20%, 0.2);
+  --shadow-sm: 0 2px 8px hsla(220, 25%, 20%, 0.08);
+  --shadow-md: 0 4px 16px hsla(220, 25%, 20%, 0.12);
+  --shadow-lg: 0 8px 32px hsla(220, 25%, 20%, 0.16);
+  --shadow-xl: 0 16px 48px hsla(220, 25%, 20%, 0.2);
 }
 
 /* Reset & Base Styles */
@@ -235,10 +235,10 @@ a:hover {
 
 /* Glass Effect */
 .glass {
-  background: hsla(220, 18%, 14%, 0.7);
+  background: hsla(220, 22%, 16%, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid hsla(0, 0%, 100%, 0.1);
+  border: 1px solid hsla(220, 80%, 45%, 0.1);
 }
 
 /* Button Styles */
@@ -267,12 +267,12 @@ a:hover {
 .btn-primary {
   background: var(--gradient-primary);
   color: white;
-  box-shadow: 0 4px 12px hsla(210, 100%, 60%, 0.3);
+  box-shadow: 0 4px 12px hsla(220, 80%, 45%, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px hsla(210, 100%, 60%, 0.4);
+  box-shadow: 0 6px 20px hsla(220, 80%, 45%, 0.4);
 }
 
 .btn-secondary {
@@ -340,7 +340,7 @@ a:hover {
 .select:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px hsla(210, 100%, 60%, 0.1);
+  box-shadow: 0 0 0 3px hsla(220, 80%, 45%, 0.1);
 }
 
 .textarea {
@@ -361,7 +361,7 @@ a:hover {
 }
 
 .badge-primary {
-  background: hsla(210, 100%, 60%, 0.15);
+  background: hsla(220, 80%, 45%, 0.15);
   color: var(--color-primary);
 }
 

@@ -1,10 +1,14 @@
 import prisma from '../lib/prisma.js';
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
-});
+// Lazy initialization to ensure env vars are loaded
+let openai = null;
+const getOpenAI = () => {
+    if (!openai) {
+        openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+    return openai;
+};
 
 import fs from 'fs';
 import * as aiService from '../services/aiService.js';
@@ -64,7 +68,8 @@ export const parseVoiceNote = async (req, res, next) => {
         // Step 1: If audio file provided, transcribe with Whisper
         if (audioFile) {
             try {
-                const transcription = await openai.audio.transcriptions.create({
+                const client = getOpenAI();
+                const transcription = await client.audio.transcriptions.create({
                     file: fs.createReadStream(audioFile.path),
                     model: "whisper-1",
                     language: "ar" // Target Egyptian Arabic
@@ -92,7 +97,8 @@ export const parseVoiceNote = async (req, res, next) => {
 
         // Step 2: Extract structured data with GPT-4o-mini
         try {
-            const completion = await openai.chat.completions.create({
+            const client = getOpenAI();
+            const completion = await client.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages: [{
                     role: "system",
@@ -225,7 +231,7 @@ export const recordIncome = async (req, res, next) => {
         const {
             projectId, amount, category, clientId, description,
             paymentMethod, transactionDate, invoiceNumber,
-            transactionFrom, physicalAccount
+            transactionFrom, physicalAccount, payerUserId
         } = req.body;
 
         // Fetch project configuration
@@ -268,16 +274,16 @@ export const recordIncome = async (req, res, next) => {
                     transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                     paymentMethod: paymentMethod || 'BANK_TRANSFER',
                     invoiceNumber: invoiceNumber,
+                    payerUserId: payerUserId,
                     tenantId: req.user.tenantId
                 }
             }),
 
-            // Update project safe balance (Full Amount)
+            // Update project safe balance (Full Amount - 100%)
             prisma.project.update({
                 where: { id: projectId },
                 data: {
                     projectSafeBalance: { increment: amount },
-                    // officeRevenue and operationalFund are kept for legacy but safeBalance is the master now
                     operationalFund: { increment: amount }
                 }
             })
@@ -288,9 +294,9 @@ export const recordIncome = async (req, res, next) => {
             transaction: result[0],
             split: {
                 total: amount,
-                officeRevenue: officeShare,
-                operationalFund: opsShare,
-                splitRatio: `${100 - (project.managementFeePercent || 0)}/${project.managementFeePercent || 0}`
+                toProjectSafe: amount,
+                officeRevenue: 0,
+                note: 'Income goes 100% to project safe. Office revenue calculated on expenses.'
             }
         });
 
@@ -378,7 +384,8 @@ export const approveTransaction = async (req, res, next) => {
             where: { id },
             include: {
                 user: true,
-                project: true
+                project: true,
+                projectCostItem: true
             }
         });
 
@@ -396,6 +403,9 @@ export const approveTransaction = async (req, res, next) => {
             });
         }
 
+        // Import office fee service
+        const officeFeeService = await import('../services/officeFeeService.js');
+
         // THE CRITICAL LINKS - All happen atomically
         const updates = await prisma.$transaction(async (tx) => {
             // LINK 1: Update transaction status
@@ -408,59 +418,146 @@ export const approveTransaction = async (req, res, next) => {
                 }
             });
 
-            // LINK 2: Decrement engineer's custody balance
-            await tx.user.update({
-                where: { id: transaction.createdBy },
-                data: {
-                    currentCustodyBalance: { decrement: transaction.amount },
-                    pendingClearance: { decrement: transaction.amount }
-                }
-            });
+            // LINK 2: Handle EXPENSE transactions with new office fee logic
+            if (transaction.type === 'EXPENSE') {
+                const isInventory = officeFeeService.isInventoryCategory(transaction.category);
+                let officeFee = 0;
 
-            // LINK 3: Update project funds
-            await tx.project.update({
-                where: { id: transaction.projectId },
-                data: {
-                    operationalFund: { decrement: transaction.amount },
-                    actualCost: { increment: transaction.amount }
-                }
-            });
+                if (isInventory) {
+                    // Inventory: Deduct from safe, NO office fee yet (calculated on usage)
+                    await tx.project.update({
+                        where: { id: transaction.projectId },
+                        data: {
+                            projectSafeBalance: { decrement: transaction.amount },
+                            operationalFund: { decrement: transaction.amount },
+                            actualCost: { increment: transaction.amount }
+                        }
+                    });
+                } else {
+                    // Regular expense: Calculate and apply office fee
+                    officeFee = await officeFeeService.calculateOfficeFee(
+                        transaction.projectId,
+                        transaction.category,
+                        transaction.amount
+                    );
 
-            // LINK 4: Create custody transfer record
-            await tx.custodyTransfer.create({
-                data: {
-                    type: 'CLEARANCE',
-                    amount: transaction.amount,
-                    description: `Cleared: ${transaction.description}`,
-                    engineerId: transaction.createdBy,
-                    balanceBefore: transaction.user.currentCustodyBalance,
-                    balanceAfter: transaction.user.currentCustodyBalance - transaction.amount,
-                    relatedTransactionId: id
-                }
-            });
+                    const totalDeduction = Number(transaction.amount) + officeFee;
 
-            // LINK 5: Create material batch if it's a material purchase
-            if (transaction.category === 'MATERIALS') {
-                await tx.materialBatch.create({
-                    data: {
-                        projectId: transaction.projectId,
-                        originalReceiptId: id,
-                        description: transaction.description,
-                        initialValue: transaction.amount,
-                        remainingValue: transaction.amount,
-                        status: 'AVAILABLE',
-                        recordedBy: transaction.createdBy
+                    await tx.project.update({
+                        where: { id: transaction.projectId },
+                        data: {
+                            projectSafeBalance: { decrement: totalDeduction },
+                            operationalFund: { decrement: transaction.amount },
+                            officeRevenue: { increment: officeFee },
+                            actualCost: { increment: transaction.amount }
+                        }
+                    });
+                }
+
+                // LINK 3: Update work order if linked
+                if (transaction.projectCostItemId) {
+                    const workOrder = await tx.projectCostItem.findUnique({
+                        where: { id: transaction.projectCostItemId }
+                    });
+
+                    if (workOrder) {
+                        const newTotalPaid = Number(workOrder.totalPaid) + Number(transaction.amount);
+                        const isCompleted = workOrder.estimatedTotal && newTotalPaid >= Number(workOrder.estimatedTotal);
+
+                        await tx.projectCostItem.update({
+                            where: { id: transaction.projectCostItemId },
+                            data: {
+                                totalPaid: newTotalPaid,
+                                status: isCompleted ? 'COMPLETED' : 'OPEN'
+                            }
+                        });
                     }
+                }
+
+                // LINK 4: Handle custody wallet payment
+                if (transaction.paymentMethod === 'CUSTODY_WALLET') {
+                    await tx.user.update({
+                        where: { id: transaction.createdBy },
+                        data: {
+                            currentCustodyBalance: { decrement: transaction.amount },
+                            pendingClearance: { decrement: transaction.amount }
+                        }
+                    });
+
+                    await tx.custodyTransfer.create({
+                        data: {
+                            type: 'CLEARANCE',
+                            amount: transaction.amount,
+                            description: `Cleared: ${transaction.description}`,
+                            engineerId: transaction.createdBy,
+                            balanceBefore: transaction.user.currentCustodyBalance,
+                            balanceAfter: Number(transaction.user.currentCustodyBalance) - Number(transaction.amount),
+                            relatedTransactionId: id,
+                            tenantId: req.user.tenantId
+                        }
+                    });
+                }
+
+                // LINK 5: Create material batch if it's a material purchase (inventory)
+                if (isInventory) {
+                    await tx.materialBatch.create({
+                        data: {
+                            projectId: transaction.projectId,
+                            originalReceiptId: id,
+                            description: transaction.description,
+                            initialValue: transaction.amount,
+                            remainingValue: transaction.amount,
+                            status: 'AVAILABLE',
+                            recordedBy: transaction.createdBy,
+                            tenantId: req.user.tenantId
+                        }
+                    });
+                }
+
+                // LINK 6: Check for negative project safe and send alerts
+                const updatedProject = await tx.project.findUnique({
+                    where: { id: transaction.projectId }
                 });
+
+                if (Number(updatedProject.projectSafeBalance) < 0) {
+                    // Get recipients: Project Manager + All ADMINs + All PROJECT_MANAGERs
+                    const recipients = await tx.user.findMany({
+                        where: {
+                            OR: [
+                                { id: updatedProject.engineerId },
+                                { role: 'ADMIN' },
+                                { role: 'PROJECT_MANAGER' }
+                            ],
+                            tenantId: req.user.tenantId,
+                            isActive: true
+                        }
+                    });
+
+                    // Send alert notifications
+                    for (const user of recipients) {
+                        await tx.notification.create({
+                            data: {
+                                userId: user.id,
+                                tenantId: req.user.tenantId,
+                                type: 'ALERT',
+                                title: 'تحذير: رصيد المشروع سالب',
+                                message: `مشروع "${updatedProject.name}" رصيده أصبح سالب: ${Number(updatedProject.projectSafeBalance).toLocaleString()} جنيه`,
+                                resourceId: updatedProject.id,
+                                resourceType: 'project'
+                            }
+                        });
+                    }
+                }
             }
 
-            // LINK 6: Notify the engineer
+            // LINK 7: Notify the engineer
             await tx.notification.create({
                 data: {
                     userId: transaction.createdBy,
+                    tenantId: req.user.tenantId,
                     type: 'INFO',
-                    title: 'Expense Approved',
-                    message: `Your expense of ${transaction.amount} EGP was approved. Custody updated.`,
+                    title: transaction.type === 'EXPENSE' ? 'تم الموافقة على المصروف' : 'تم الموافقة على المعاملة',
+                    message: `تم الموافقة على ${transaction.type === 'EXPENSE' ? 'مصروف' : 'معاملة'} بقيمة ${Number(transaction.amount).toLocaleString()} جنيه`,
                     resourceId: id,
                     resourceType: 'transaction'
                 }

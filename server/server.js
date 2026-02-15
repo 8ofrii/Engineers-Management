@@ -23,6 +23,8 @@ import userRoutes from './routes/users.js';
 import roleRoutes from './routes/roles.js';
 import projectCostItemRoutes from './routes/projectCostItems.js';
 import categoryRoutes from './routes/categories.js';
+import workOrderRoutes from './routes/workOrders.js';
+import officeFeeRoutes from './routes/officeFees.js';
 
 // Load env vars
 dotenv.config();
@@ -65,7 +67,9 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/tenant', tenantRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/roles', roleRoutes);
-app.use('/api/project-cost-items', projectCostItemRoutes); // V1.2: Work Orders
+app.use('/api/project-cost-items', projectCostItemRoutes); // V1.2: Work Orders (Legacy)
+app.use('/api/work-orders', workOrderRoutes); // V2: Work Orders (New)
+app.use('/api/office-fees', officeFeeRoutes); // V2: Office Fee Configuration
 app.use('/api/categories', categoryRoutes); // V1.2: Arabic Categories
 
 // Health check endpoint
