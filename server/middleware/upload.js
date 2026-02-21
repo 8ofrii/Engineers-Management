@@ -3,13 +3,27 @@ import multerS3 from 'multer-s3';
 import { S3Client } from '@aws-sdk/client-s3';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
-// --- Local Storage for Audio Notes (Temporary before sending to OpenAI) ---
-const audioDir = './uploads/audio';
-if (!fs.existsSync(audioDir)) {
-    fs.mkdirSync(audioDir, { recursive: true });
-}
+// Ensure environment variables are loaded
+dotenv.config();
 
+// Get absolute paths for local storage
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.join(__dirname, '..');
+const audioDir = path.join(rootDir, 'uploads', 'audio');
+const imageDir = path.join(rootDir, 'uploads', 'images');
+
+// Ensure directories exist
+[audioDir, imageDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
+
+// Configure local storage for audio (temporary)
 const localAudioStorage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, audioDir);
@@ -20,7 +34,6 @@ const localAudioStorage = multer.diskStorage({
     }
 });
 
-// Configure multer for temporary local audio uploads
 const audioUpload = multer({
     storage: localAudioStorage,
     fileFilter: (req, file, cb) => {
@@ -31,38 +44,55 @@ const audioUpload = multer({
     limits: { fileSize: 25 * 1024 * 1024 }
 });
 
-// --- S3 Storage for Persistent Images (Logos, Profiles) ---
+// --- S3 Storage for Persistent Images ---
 const s3 = new S3Client({
-    region: process.env.AWS_REGION || 'eu-central-1',
+    region: process.env.AWS_REGION || 'eu-north-1',
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     }
 });
 
-const getBucketName = () => process.env.AWS_BUCKET_NAME || 'my-app-buckets';
+const BUCKET_NAME = process.env.AWS_BUCKET_NAME || 'engineers-app-images-2026';
 
+// Storage configuration with S3
 const s3ImageStorage = multerS3({
     s3: s3,
-    bucket: getBucketName,
+    bucket: BUCKET_NAME, // Fixed: Must be a string or a callback-based function
     contentType: multerS3.AUTO_CONTENT_TYPE,
+    metadata: function (req, file, cb) {
+        cb(null, { fieldName: file.fieldname });
+    },
     key: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, 'images/profile-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
-// Configure multer for S3 image uploads
+// Fallback Local Storage
+const localImageStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, imageDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+// Decide whether to use S3 or Local
+const useS3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_BUCKET_NAME);
+
 const upload = multer({
-    storage: s3ImageStorage,
+    storage: useS3 ? s3ImageStorage : localImageStorage,
     fileFilter: (req, file, cb) => {
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
         if (allowedTypes.includes(file.mimetype)) cb(null, true);
-        else cb(new Error('Invalid file type. Only image files are allowed'), false);
+        else cb(new Error('Invalid file type. Only images are allowed'), false);
     },
     limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 export { upload, audioUpload };
-export default audioUpload; // Keep default export for backward compatibility
+export default audioUpload;
 

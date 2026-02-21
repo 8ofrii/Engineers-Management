@@ -1,5 +1,9 @@
 import express from 'express';
 import dotenv from 'dotenv';
+
+// Load env vars at the very top before any other imports
+dotenv.config();
+
 import cors from 'cors';
 import morgan from 'morgan';
 import path from 'path';
@@ -25,9 +29,6 @@ import projectCostItemRoutes from './routes/projectCostItems.js';
 import categoryRoutes from './routes/categories.js';
 import workOrderRoutes from './routes/workOrders.js';
 import officeFeeRoutes from './routes/officeFees.js';
-
-// Load env vars
-dotenv.config();
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);

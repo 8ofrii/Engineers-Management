@@ -27,6 +27,14 @@ export default function CompanySettings() {
     const [profileImg, setProfileImg] = useState(null);
     const [profilePreview, setProfilePreview] = useState(null);
 
+    const getImageUrl = (path) => {
+        if (!path) return null;
+        if (path.startsWith('http')) return path;
+        if (path.startsWith('blob:')) return path; // For local preview
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        return `${apiUrl}${path}`;
+    };
+
     useEffect(() => {
         loadData();
     }, []);
@@ -47,7 +55,7 @@ export default function CompanySettings() {
                 email: cData.email || ''
             });
             if (cData.logo) {
-                setLogoPreview(import.meta.env.VITE_API_URL + cData.logo);
+                setLogoPreview(getImageUrl(cData.logo));
             }
 
             // Load User
@@ -59,7 +67,7 @@ export default function CompanySettings() {
                 company: uData.company || ''
             });
             if (uData.profilePicture) {
-                setProfilePreview(import.meta.env.VITE_API_URL + uData.profilePicture);
+                setProfilePreview(getImageUrl(uData.profilePicture));
             }
 
         } catch (err) {
