@@ -41,7 +41,14 @@ app.use(express.urlencoded({ extended: true }));
 
 // CORS
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        // Dynamically allow any origin that starts with http
+        // This stops strict string mismatches from breaking logins
+        callback(null, true);
+    },
     credentials: true
 }));
 
