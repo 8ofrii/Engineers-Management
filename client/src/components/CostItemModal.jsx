@@ -72,9 +72,10 @@ const CostItemModal = ({
         setLoading(true);
 
         try {
+            const API_URL = import.meta.env.VITE_API_URL || '';
             const url = isEdit
-                ? `/api/project-cost-items/${editItem.id}`
-                : '/api/project-cost-items';
+                ? `${API_URL}/api/project-cost-items/${editItem.id}`
+                : `${API_URL}/api/project-cost-items`;
 
             const method = isEdit ? 'PUT' : 'POST';
 

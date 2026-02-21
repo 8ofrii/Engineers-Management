@@ -60,7 +60,8 @@ const TransactionModal = ({
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const response = await fetch('/api/categories?grouped=true', {
+                const API_URL = import.meta.env.VITE_API_URL || '/api';
+                const response = await fetch(`${API_URL}/categories?grouped=true`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
@@ -85,7 +86,8 @@ const TransactionModal = ({
             if (!projectId) return;
 
             try {
-                const response = await fetch(`/api/project-cost-items/project/${projectId}`, {
+                const API_URL = import.meta.env.VITE_API_URL || '/api';
+                const response = await fetch(`${API_URL}/project-cost-items/project/${projectId}`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
@@ -110,7 +112,8 @@ const TransactionModal = ({
             if (!isManager) return;
 
             try {
-                const response = await fetch('/api/users', {
+                const API_URL = import.meta.env.VITE_API_URL || '/api';
+                const response = await fetch(`${API_URL}/users`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }

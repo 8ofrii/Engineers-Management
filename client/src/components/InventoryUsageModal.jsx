@@ -49,7 +49,8 @@ const InventoryUsageModal = ({
             if (!projectId || !open) return;
 
             try {
-                const response = await fetch(`/api/transactions/projects/${projectId}/inventory`, {
+                const API_URL = import.meta.env.VITE_API_URL || '/api';
+                const response = await fetch(`${API_URL}/transactions/projects/${projectId}/inventory`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
@@ -111,7 +112,8 @@ const InventoryUsageModal = ({
 
         try {
             // Fetch project to get management fee
-            const response = await fetch(`/api/projects/${projectId}`, {
+            const API_URL = import.meta.env.VITE_API_URL || '/api';
+            const response = await fetch(`${API_URL}/projects/${projectId}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -165,7 +167,8 @@ const InventoryUsageModal = ({
         setLoading(true);
 
         try {
-            const response = await fetch('/api/transactions/inventory-usage', {
+            const API_URL = import.meta.env.VITE_API_URL || '/api';
+            const response = await fetch(`${API_URL}/transactions/inventory-usage`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

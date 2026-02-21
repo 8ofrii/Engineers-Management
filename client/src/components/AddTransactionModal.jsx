@@ -209,7 +209,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const loadCategories = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('/api/categories?grouped=true', {
+            const API_URL = import.meta.env.VITE_API_URL || '/api';
+            const res = await fetch(`${API_URL}/categories?grouped=true`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -226,7 +227,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const loadUsers = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('/api/users', {
+            const API_URL = import.meta.env.VITE_API_URL || '/api';
+            const res = await fetch(`${API_URL}/users`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
