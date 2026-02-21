@@ -33,8 +33,15 @@ export default function Layout({ children }) {
     const { user, logout } = useAuth();
     const { t, i18n } = useTranslation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [darkMode, setDarkMode] = useState(true);
+    const [darkMode, setDarkMode] = useState(false);
     const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+    // Initial load - ensure light mode class is applied if it's default
+    useEffect(() => {
+        if (!darkMode) {
+            document.body.classList.add('light-mode');
+        }
+    }, []);
 
     // Helper function to get full image URL
     const getImageUrl = (path) => {

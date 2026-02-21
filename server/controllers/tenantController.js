@@ -48,7 +48,7 @@ export const updateTenant = async (req, res, next) => {
 
         // Handle Logo Upload
         if (req.file) {
-            updateData.logo = `/uploads/images/${req.file.filename}`;
+            updateData.logo = req.file.location || `/uploads/images/${req.file.filename}`;
         }
 
         const tenant = await prisma.tenant.update({

@@ -406,7 +406,7 @@ export const updateProfile = async (req, res, next) => {
 
         // Handle profile picture upload
         if (req.file) {
-            updateData.profilePicture = `/uploads/images/${req.file.filename}`;
+            updateData.profilePicture = req.file.location || `/uploads/images/${req.file.filename}`;
         }
 
         // Handle password change
