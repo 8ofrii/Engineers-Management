@@ -424,34 +424,56 @@ export const approveTransaction = async (req, res, next) => {
                 let officeFee = 0;
 
                 if (isInventory) {
-                    // Inventory: Deduct from safe, NO office fee yet (calculated on usage)
-                    await tx.project.update({
-                        where: { id: transaction.projectId },
-                        data: {
-                            projectSafeBalance: { decrement: transaction.amount },
-                            operationalFund: { decrement: transaction.amount },
-                            actualCost: { increment: transaction.amount }
-                        }
-                    });
+                    if (transaction.isOfficeExpense) {
+                        // Office-borne expense for inventory (rare, but possible)
+                        await tx.project.update({
+                            where: { id: transaction.projectId },
+                            data: {
+                                officeExpenses: { increment: transaction.amount },
+                                actualCost: { increment: transaction.amount }
+                            }
+                        });
+                    } else {
+                        // Inventory: Deduct from safe, NO office fee yet (calculated on usage)
+                        await tx.project.update({
+                            where: { id: transaction.projectId },
+                            data: {
+                                projectSafeBalance: { decrement: transaction.amount },
+                                operationalFund: { decrement: transaction.amount },
+                                actualCost: { increment: transaction.amount }
+                            }
+                        });
+                    }
                 } else {
-                    // Regular expense: Calculate and apply office fee
-                    officeFee = await officeFeeService.calculateOfficeFee(
-                        transaction.projectId,
-                        transaction.category,
-                        transaction.amount
-                    );
+                    if (transaction.isOfficeExpense) {
+                        // Office-borne expense: Doesn't hit project safe, no office fee generated
+                        await tx.project.update({
+                            where: { id: transaction.projectId },
+                            data: {
+                                officeExpenses: { increment: transaction.amount },
+                                actualCost: { increment: transaction.amount }
+                            }
+                        });
+                    } else {
+                        // Regular expense: Calculate and apply office fee
+                        officeFee = await officeFeeService.calculateOfficeFee(
+                            transaction.projectId,
+                            transaction.category,
+                            transaction.amount
+                        );
 
-                    const totalDeduction = Number(transaction.amount) + officeFee;
+                        const totalDeduction = Number(transaction.amount) + officeFee;
 
-                    await tx.project.update({
-                        where: { id: transaction.projectId },
-                        data: {
-                            projectSafeBalance: { decrement: totalDeduction },
-                            operationalFund: { decrement: transaction.amount },
-                            officeRevenue: { increment: officeFee },
-                            actualCost: { increment: transaction.amount }
-                        }
-                    });
+                        await tx.project.update({
+                            where: { id: transaction.projectId },
+                            data: {
+                                projectSafeBalance: { decrement: totalDeduction },
+                                operationalFund: { decrement: transaction.amount },
+                                officeRevenue: { increment: officeFee },
+                                actualCost: { increment: transaction.amount }
+                            }
+                        });
+                    }
                 }
 
                 // LINK 3: Update work order if linked
@@ -502,6 +524,7 @@ export const approveTransaction = async (req, res, next) => {
                 if (isInventory) {
                     await tx.materialBatch.create({
                         data: {
+                            category: transaction.category,
                             projectId: transaction.projectId,
                             originalReceiptId: id,
                             description: transaction.description,
@@ -650,7 +673,7 @@ export const rejectTransaction = async (req, res, next) => {
 // @access  Private
 export const createDraft = async (req, res, next) => {
     try {
-        const { projectId, amount, category, description } = req.body;
+        const { projectId, amount, category, description, isOfficeExpense } = req.body;
 
         const draft = await prisma.transaction.create({
             data: {
@@ -661,7 +684,8 @@ export const createDraft = async (req, res, next) => {
                 status: 'DRAFT',
                 projectId: projectId,
                 createdBy: req.user.id,
-                paymentMethod: 'CUSTODY_WALLET'
+                paymentMethod: 'CUSTODY_WALLET',
+                isOfficeExpense: isOfficeExpense || false
             }
         });
 
@@ -1036,7 +1060,8 @@ export const createTransaction = async (req, res, next) => {
             itemName,   // For creating new ProjectCostItem
             unit,
             quantity,
-            unitPrice
+            unitPrice,
+            isOfficeExpense
         } = req.body;
 
         // Validate required fields
@@ -1143,18 +1168,29 @@ export const createTransaction = async (req, res, next) => {
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'CASH',
                         invoiceNumber,
+                        isOfficeExpense: isOfficeExpense || false,
                         tenantId: req.user.tenantId
                     }
                 });
 
-                // Deduct from Project Safe
-                await tx.project.update({
-                    where: { id: projectId },
-                    data: {
-                        projectSafeBalance: { decrement: Number(amount) },
-                        actualCost: { increment: Number(amount) }
-                    }
-                });
+                // Deduct from Project Safe or Office Expenses
+                if (isOfficeExpense) {
+                    await tx.project.update({
+                        where: { id: projectId },
+                        data: {
+                            officeExpenses: { increment: Number(amount) },
+                            actualCost: { increment: Number(amount) }
+                        }
+                    });
+                } else {
+                    await tx.project.update({
+                        where: { id: projectId },
+                        data: {
+                            projectSafeBalance: { decrement: Number(amount) },
+                            actualCost: { increment: Number(amount) }
+                        }
+                    });
+                }
 
                 // Update Cost Item if linked
                 if (finalCostItemId) {
@@ -1177,8 +1213,8 @@ export const createTransaction = async (req, res, next) => {
                 }
 
                 // V1.2 PROFIT CALCULATION
-                // If it's NOT an inventory purchase, recognize profit immediately
-                if (!createBatch) {
+                // If it's NOT an inventory purchase and NOT an office expense, recognize profit immediately
+                if (!createBatch && !isOfficeExpense) {
                     const feePercent = Number(project.managementFeePercent) || 0;
                     const profit = Number(amount) * (feePercent / 100);
 

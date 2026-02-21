@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
+import { useAlert } from '../context/AlertContext';
 
 export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData = null }) {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [formData, setFormData] = useState({
         name: '',
         nameAr: '',
@@ -115,7 +117,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
             handleClose();
         } catch (error) {
             console.error('Failed to save workman:', error);
-            alert(t('common.error'));
+            showAlert({ type: 'error', title: t('common.error'), message: error.response?.data?.message || t('common.error') });
         } finally {
             setLoading(false);
         }
@@ -220,39 +222,14 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                             <label htmlFor="dailyRate">
                                 {t('labor.dailyRate')} <span className="required">*</span>
                             </label>
-                            <div className="number-input-wrapper">
-                                <CurrencyInput
-                                    id="dailyRate"
-                                    name="dailyRate"
-                                    value={formData.dailyRate}
-                                    onChange={handleChange}
-                                    className={errors.dailyRate ? 'error' : ''}
-                                    placeholder="500"
-                                />
-                                <div className="number-spinners">
-                                    <button
-                                        type="button"
-                                        className="spinner-btn"
-                                        onClick={() => {
-                                            const newValue = (parseFloat(formData.dailyRate) || 0) + 50;
-                                            handleChange({ target: { name: 'dailyRate', value: newValue.toString() } });
-                                        }}
-                                    >
-                                        ▲
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="spinner-btn"
-                                        onClick={() => {
-                                            const newValue = Math.max(0, (parseFloat(formData.dailyRate) || 0) - 50);
-                                            handleChange({ target: { name: 'dailyRate', value: newValue.toString() } });
-                                        }}
-                                        disabled={!formData.dailyRate || parseFloat(formData.dailyRate) <= 0}
-                                    >
-                                        ▼
-                                    </button>
-                                </div>
-                            </div>
+                            <CurrencyInput
+                                id="dailyRate"
+                                name="dailyRate"
+                                value={formData.dailyRate}
+                                onChange={handleChange}
+                                className={errors.dailyRate ? 'error' : ''}
+                                placeholder="500"
+                            />
                             {errors.dailyRate && <span className="error-message">{errors.dailyRate}</span>}
                         </div>
 
@@ -297,9 +274,9 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                                 />
                                 {!formData.nationalIdImage ? (
                                     <div className="flex-column flex-center gap-sm">
-                                        <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Click to upload image</span>
+                                        <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{t('labor.clickToUpload') || 'انقر هنا لرفع الصورة'}</span>
                                         <button type="button" className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>
-                                            Choose File
+                                            {t('labor.chooseFile') || 'اختر ملف'}
                                         </button>
                                     </div>
                                 ) : (
@@ -318,7 +295,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                                             className="btn btn-danger btn-sm"
                                             style={{ display: 'block', margin: '10px auto 0' }}
                                         >
-                                            Remove Image
+                                            {t('labor.removeImage') || 'حذف الصورة'}
                                         </button>
                                     </div>
                                 )}

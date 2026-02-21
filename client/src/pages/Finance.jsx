@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { transactionsAPI } from '../services/api';
+import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
 import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X } from 'lucide-react';
 import Layout from '../components/Layout';
+import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 
 export default function Finance() {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [searchParams, setSearchParams] = useSearchParams();
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -24,6 +26,7 @@ export default function Finance() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [transactionToDelete, setTransactionToDelete] = useState(null);
     const [workmen, setWorkmen] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [filterWorkmanId, setFilterWorkmanId] = useState('ALL');
 
     // Handle URL params for project filtering
@@ -39,6 +42,7 @@ export default function Finance() {
     useEffect(() => {
         loadTransactions();
         loadWorkmen();
+        loadProjects();
     }, [filterType, filterProjectId, filterWorkmanId]);
 
     const loadTransactions = async () => {
@@ -82,6 +86,15 @@ export default function Finance() {
         }
     };
 
+    const loadProjects = async () => {
+        try {
+            const res = await projectsAPI.getAll();
+            setProjects(res.data.data || []);
+        } catch (error) {
+            console.error('Failed to load projects:', error);
+        }
+    };
+
     const clearProjectFilter = () => {
         setFilterProjectId(null);
         setFilterProjectName(null);
@@ -106,7 +119,7 @@ export default function Finance() {
             setTransactionToDelete(null);
         } catch (error) {
             console.error('Failed to delete transaction:', error);
-            alert(t('common.deleteFailed') || 'Failed to delete');
+            showAlert({ type: 'error', title: t('common.error'), message: t('common.deleteFailed') || 'Failed to delete' });
             // Keep modal open on error? Or close?
             // Usually keep open to retry, but for now we close to avoid stuck state
             setIsDeleteModalOpen(false);
@@ -187,27 +200,68 @@ export default function Finance() {
 
                 {/* Filters Section - Enhanced Design */}
                 <div className="card" style={{
-                    padding: 'var(--spacing-lg)',
+                    padding: 'var(--spacing-sm) var(--spacing-lg)',
                     marginBottom: 'var(--spacing-xl)',
                     background: 'var(--bg-secondary)',
                     border: '1px solid var(--border-color)'
                 }}>
-                    <div className="flex gap-lg items-center flex-wrap">
+                    <div className="flex gap-lg items-center flex-wrap" style={{ justifyContent: 'flex-end', width: '100%' }}>
+
+                        {/* Dropdowns Filter */}
+                        <div className="flex gap-md items-center" style={{ flexGrow: 1 }}>
+                            <select
+                                value={filterProjectId || 'ALL'}
+                                onChange={(e) => {
+                                    setFilterProjectId(e.target.value === 'ALL' ? null : e.target.value);
+                                    setFilterProjectName(e.target.options[e.target.selectedIndex].text);
+                                }}
+                                className="select"
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: 'var(--font-size-sm)',
+                                    width: '180px',
+                                    background: 'var(--bg-tertiary)',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'var(--text-primary)'
+                                }}
+                            >
+                                <option value="ALL">{t('common.allProjects') || 'المشاريع (الكل)'}</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={filterWorkmanId}
+                                onChange={(e) => setFilterWorkmanId(e.target.value)}
+                                className="select"
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: 'var(--font-size-sm)',
+                                    width: '180px',
+                                    background: 'var(--bg-tertiary)',
+                                    border: '1px solid var(--border-color)',
+                                    color: 'var(--text-primary)'
+                                }}
+                            >
+                                <option value="ALL">{t('labor.title') || 'العمال والصنايعية'}</option>
+                                {workmen.map(w => (
+                                    <option key={w.id} value={w.id}>{w.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         {/* Type Filter */}
                         <div className="flex gap-md items-center">
-                            <div className="flex gap-xs items-center">
-                                <Filter size={18} className="text-secondary" />
-                                <span className="text-secondary font-medium" style={{ fontSize: 'var(--font-size-sm)' }}>
-                                    {t('common.filter')}:
-                                </span>
-                            </div>
-                            <div className="flex gap-xs">
+                            <div className="flex gap-md">
                                 <button
                                     className={`btn btn-sm ${filterType === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={() => setFilterType('ALL')}
                                     style={{
                                         borderRadius: 'var(--radius-full)',
-                                        padding: '6px 16px',
+                                        padding: '4px 16px',
                                         fontSize: 'var(--font-size-sm)',
                                         fontWeight: '600',
                                         transition: 'all var(--transition-base)'
@@ -220,7 +274,7 @@ export default function Finance() {
                                     onClick={() => setFilterType('INCOME')}
                                     style={{
                                         borderRadius: 'var(--radius-full)',
-                                        padding: '6px 16px',
+                                        padding: '4px 16px',
                                         fontSize: 'var(--font-size-sm)',
                                         fontWeight: '600',
                                         transition: 'all var(--transition-base)'
@@ -233,7 +287,7 @@ export default function Finance() {
                                     onClick={() => setFilterType('EXPENSE')}
                                     style={{
                                         borderRadius: 'var(--radius-full)',
-                                        padding: '6px 16px',
+                                        padding: '4px 16px',
                                         fontSize: 'var(--font-size-sm)',
                                         fontWeight: '600',
                                         transition: 'all var(--transition-base)'
@@ -242,32 +296,6 @@ export default function Finance() {
                                     {t('finance.expense')}
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Workman Filter */}
-                        <div className="flex gap-md items-center" style={{ marginLeft: 'auto' }}>
-                            <span className="text-secondary font-medium" style={{ fontSize: 'var(--font-size-sm)' }}>
-                                {t('labor.title')}:
-                            </span>
-                            <select
-                                value={filterWorkmanId}
-                                onChange={(e) => setFilterWorkmanId(e.target.value)}
-                                className="select"
-                                style={{
-                                    padding: '8px 12px',
-                                    borderRadius: 'var(--radius-md)',
-                                    fontSize: 'var(--font-size-sm)',
-                                    minWidth: '150px',
-                                    background: 'var(--bg-tertiary)',
-                                    border: '1px solid var(--border-color)',
-                                    color: 'var(--text-primary)'
-                                }}
-                            >
-                                <option value="ALL">{t('common.all')}</option>
-                                {workmen.map(w => (
-                                    <option key={w.id} value={w.id}>{w.name}</option>
-                                ))}
-                            </select>
                         </div>
                     </div>
                 </div>

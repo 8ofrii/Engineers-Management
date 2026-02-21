@@ -176,6 +176,7 @@ model Project {
   updatedAt            DateTime          @updatedAt
   managementFeePercent Decimal?          @db.Decimal(5, 2)
   officeRevenue        Decimal           @default(0) @db.Decimal(15, 2)
+  officeExpenses       Decimal           @default(0) @db.Decimal(15, 2)
   operationalFund      Decimal           @default(0) @db.Decimal(15, 2)
   projectSafeBalance   Decimal           @default(0) @db.Decimal(15, 2)
   paymentTerms         String            @default("Net 30")
@@ -209,6 +210,8 @@ model ProjectCostItem {
   totalPaid      Decimal       @default(0) @db.Decimal(15, 2)
   status         String        @default("OPEN")
   category       String?
+  workmanId      String?
+  workman        Workman?      @relation(fields: [workmanId], references: [id], onDelete: SetNull)
   transactions   Transaction[]
   tenantId       String
   tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -266,6 +269,7 @@ model MaterialBatch {
   quantityUsed      Decimal?    @db.Decimal(15, 2)
   officeFeeApplied  Decimal     @default(0) @db.Decimal(15, 2)
   status            BatchStatus @default(AVAILABLE)
+  category          TransactionCategory?
   projectId         String
   originalReceiptId String?
   recordedBy        String
@@ -295,9 +299,10 @@ model Workman {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   tenantId     String?
-  totalPaid    Decimal       @default(0) @db.Decimal(15, 2)
-  transactions Transaction[]
-  workmanships Workmanship[]
+  totalPaid        Decimal           @default(0) @db.Decimal(15, 2)
+  transactions     Transaction[]
+  workmanships     Workmanship[]
+  projectCostItems ProjectCostItem[]
   tenant       Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("workmen")
@@ -340,6 +345,7 @@ model Transaction {
   paymentMethod     PaymentMethod       @default(BANK_TRANSFER)
   invoiceNumber     String?
   status            TransactionStatus   @default(DRAFT)
+  isOfficeExpense   Boolean             @default(false)
   notes             String?
   projectId         String?
   projectCostItemId String?

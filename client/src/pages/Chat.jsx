@@ -61,7 +61,7 @@ export default function Chat() {
             setMessages(prev => [
                 ...prev,
                 {
-                    content: 'عذراً، حصل مشكلة فنية. جرب تاني كمان شوية.',
+                    content: t('chat.generalError') || 'عذراً، حصل مشكلة فنية. جرب تاني كمان شوية.',
                     messageType: 'TEXT',
                     createdAt: new Date().toISOString(),
                     isUser: false
@@ -77,7 +77,7 @@ export default function Chat() {
 
         // Placeholder for user message while processing
         const userPlaceholder = {
-            content: 'جاري معالجة الصوت...',
+            content: t('chat.processingAudio') || 'جاري معالجة الصوت...',
             messageType: 'TEXT',
             createdAt: new Date().toISOString(),
             isUser: true
@@ -105,7 +105,7 @@ export default function Chat() {
             setMessages(prev => [
                 ...prev,
                 {
-                    content: 'مقدرتش أفهم الصوت، ممكن يكون فيه دوشة كتير. جرب تسجل تاني.',
+                    content: t('chat.audioError') || 'مقدرتش أفهم الصوت، ممكن يكون فيه دوشة كتير. جرب تسجل تاني.',
                     messageType: 'TEXT',
                     createdAt: new Date().toISOString(),
                     isUser: false
@@ -123,12 +123,12 @@ export default function Chat() {
                 await transactionsAPI.create(actionData.params);
                 // Update message internally to show completed
                 setMessages(prev => prev.map(m =>
-                    m.id === msgId ? { ...m, isActionCompleted: true, content: '✅ تمام، سجلت المصروف بنجاح!' } : m
+                    m.id === msgId ? { ...m, isActionCompleted: true, content: t('chat.successExpense') || '✅ تمام، سجلت المصروف بنجاح!' } : m
                 ));
             }
         } catch (error) {
             console.error('Action confirmation failed:', error);
-            alert('فشل في تنفيذ العملية. تأكد من البيانات.');
+            alert(t('chat.failAction') || 'فشل في تنفيذ العملية. تأكد من البيانات.');
         } finally {
             setLoading(false);
         }
@@ -201,41 +201,41 @@ export default function Chat() {
                                             {message.extractedData && !message.isActionCompleted && (
                                                 <div className="action-card">
                                                     <div className="action-header">
-                                                        {message.extractedData.action === 'CREATE_TRANSACTION' ? 'تأكيد تسجيل مصروف' : 'إجراء مقترح'}
+                                                        {message.extractedData.action === 'CREATE_TRANSACTION' ? (t('chat.confirmExpense') || 'تأكيد تسجيل مصروف') : (t('chat.proposedAction') || 'إجراء مقترح')}
                                                     </div>
                                                     <div className="action-details">
                                                         {message.extractedData.params.itemName && (
                                                             <>
-                                                                <span className="action-label">الصنف:</span>
+                                                                <span className="action-label">{t('chat.itemLabel') || 'الصنف:'}</span>
                                                                 <span className="action-value">
                                                                     {message.extractedData.params.itemName}
                                                                     {message.extractedData.params.isStockPurchase &&
-                                                                        <span className="badge badge-info ml-xs" style={{ fontSize: '10px' }}>مخزن</span>
+                                                                        <span className="badge badge-info ml-xs" style={{ fontSize: '10px' }}>{t('chat.stock') || 'مخزن'}</span>
                                                                     }
                                                                 </span>
                                                             </>
                                                         )}
                                                         {message.extractedData.params.quantity && (
                                                             <>
-                                                                <span className="action-label">الكمية:</span>
+                                                                <span className="action-label">{t('chat.qtyLabel') || 'الكمية:'}</span>
                                                                 <span className="action-value">{message.extractedData.params.quantity} {message.extractedData.params.unit}</span>
                                                             </>
                                                         )}
                                                         {message.extractedData.params.amount && (
                                                             <>
-                                                                <span className="action-label">المبلغ:</span>
-                                                                <span className="action-value">{message.extractedData.params.amount} ج.م</span>
+                                                                <span className="action-label">{t('chat.amountLabel') || 'المبلغ:'}</span>
+                                                                <span className="action-value">{message.extractedData.params.amount} {t('chat.currency') || 'ج.م'}</span>
                                                             </>
                                                         )}
                                                         {message.extractedData.params.category && (
                                                             <>
-                                                                <span className="action-label">البند:</span>
+                                                                <span className="action-label">{t('chat.bandLabel') || 'البند:'}</span>
                                                                 <span className="action-value">{message.extractedData.params.category}</span>
                                                             </>
                                                         )}
                                                         {message.extractedData.params.projectName && (
                                                             <>
-                                                                <span className="action-label">المشروع:</span>
+                                                                <span className="action-label">{t('chat.projectLabel') || 'المشروع:'}</span>
                                                                 <span className="action-value">{message.extractedData.params.projectName}</span>
                                                             </>
                                                         )}
@@ -246,14 +246,14 @@ export default function Chat() {
                                                             onClick={() => handleConfirmAction(message.id, message.extractedData)}
                                                             disabled={loading}
                                                         >
-                                                            تأكيد التسجيل
+                                                            {t('chat.confirmRecord') || 'تأكيد التسجيل'}
                                                         </button>
                                                         <button
                                                             className="btn-cancel"
-                                                            onClick={() => setMessages(prev => prev.map(m => m.id === message.id ? { ...m, isActionCompleted: true, content: 'تم إلغاء العملية.' } : m))}
+                                                            onClick={() => setMessages(prev => prev.map(m => m.id === message.id ? { ...m, isActionCompleted: true, content: t('chat.actionCancelled') || 'تم إلغاء العملية.' } : m))}
                                                             disabled={loading}
                                                         >
-                                                            إلغاء
+                                                            {t('chat.cancelLabel') || 'إلغاء'}
                                                         </button>
                                                     </div>
                                                 </div>

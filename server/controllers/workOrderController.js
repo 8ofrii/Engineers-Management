@@ -148,6 +148,7 @@ export const createWorkOrder = async (req, res, next) => {
             unitPrice,
             estimatedTotal,
             description,
+            workmanId,
             // Optional: Create first payment
             createFirstPayment,
             firstPaymentAmount,
@@ -184,6 +185,7 @@ export const createWorkOrder = async (req, res, next) => {
                     estimatedTotal: calculatedEstimatedTotal ? Number(calculatedEstimatedTotal) : null,
                     totalPaid: 0,
                     status: 'OPEN',
+                    workmanId: workmanId || null,
                     tenantId: req.user.tenantId
                 }
             });
@@ -240,7 +242,8 @@ export const updateWorkOrder = async (req, res, next) => {
             unitOfMeasure,
             unitPrice,
             estimatedTotal,
-            status
+            status,
+            workmanId
         } = req.body;
 
         const workOrder = await prisma.projectCostItem.findUnique({
@@ -269,7 +272,8 @@ export const updateWorkOrder = async (req, res, next) => {
                 unitOfMeasure: unitOfMeasure || workOrder.unitOfMeasure,
                 unitPrice: unitPrice ? Number(unitPrice) : workOrder.unitPrice,
                 estimatedTotal: newEstimatedTotal ? Number(newEstimatedTotal) : workOrder.estimatedTotal,
-                status: status || workOrder.status
+                status: status || workOrder.status,
+                workmanId: workmanId !== undefined ? workmanId : workOrder.workmanId
             }
         });
 

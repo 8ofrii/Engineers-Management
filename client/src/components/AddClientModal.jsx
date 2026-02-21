@@ -84,8 +84,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
         const newErrors = {};
 
         if (!formData.name.trim()) newErrors.name = t('clients.modal.fields.name') + ' is required'; // Ideally move validation messages to i18n too
-        if (!formData.email.trim()) newErrors.email = t('clients.modal.fields.email') + ' is required';
-        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('clients.modal.fields.email') + ' is invalid';
+        if (formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('clients.modal.fields.email') + ' is invalid';
         if (!formData.phone.trim()) newErrors.phone = t('clients.modal.fields.phone') + ' is required';
 
         setErrors(newErrors);
@@ -166,7 +165,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                             </div>
 
                             <div className="form-group">
-                                <label htmlFor="email">{t('clients.modal.fields.email')} <span className="required">*</span></label>
+                                <label htmlFor="email">{t('clients.modal.fields.email')}</label>
                                 <input
                                     type="email"
                                     id="email"

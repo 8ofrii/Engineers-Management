@@ -100,9 +100,9 @@ export default function Workforce() {
     return (
         <Layout>
             <div>
-                <div className="flex-between mb-xl">
+                <div className="flex-between mb-xl flex-wrap gap-md">
                     <div>
-                        <h1 className="flex gap-md">
+                        <h1 className="flex gap-md items-center">
                             <HardHat size={32} />
                             {t('labor.title')}
                         </h1>
@@ -264,9 +264,7 @@ export default function Workforce() {
                             </div>
                         ))}
                     </div>
-                )}
-
-                <AddWorkmanModal
+                )}                <AddWorkmanModal
                     isOpen={modalOpen}
                     onClose={() => {
                         setModalOpen(false);

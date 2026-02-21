@@ -20,7 +20,8 @@ import {
     HardHat,
     Settings,
     UserCog,
-    Wallet
+    Wallet,
+    ClipboardList
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';

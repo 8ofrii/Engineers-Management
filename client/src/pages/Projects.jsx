@@ -43,7 +43,9 @@ export default function Projects() {
         const colors = {
             'planning': 'warning',
             'in-progress': 'primary',
+            'in_progress': 'primary',
             'on-hold': 'warning',
+            'on_hold': 'warning',
             'completed': 'success',
             'cancelled': 'danger'
         };

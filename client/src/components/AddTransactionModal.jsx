@@ -662,7 +662,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                     onChange={handleChange}
                                     style={{ fontSize: '1rem', padding: '10px', width: '100%' }}
                                 >
-                                    <option value="">-- {t('finance.selectPayer') || 'نقي اللي دفع'} --</option>
+                                    <option value="">-- {t('finance.selectPayer')} --</option>
                                     {users.map(u => (
                                         <option key={u.id} value={u.id}>
                                             {u.name} ({t(`teamManagement.roles.${u.role}`) || u.role})
@@ -729,7 +729,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         onChange={handleChange}
                                                         className={errors.projectCostItemId ? 'error' : ''}
                                                     >
-                                                        <option value="">-- {t('finance.selectBand') || 'نقي البند المفتوح'} --</option>
+                                                        <option value="">-- {t('finance.selectBand')} --</option>
                                                         {costItems.map(item => (
                                                             <option key={item.id} value={item.id}>
                                                                 {item.name}
@@ -745,7 +745,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         onChange={handleChange}
                                                         disabled // Auto-filled from Band
                                                     >
-                                                        <option value="">-- {t('finance.autoFilled') || 'بيتحدد من البند'} --</option>
+                                                        <option value="">-- {t('finance.autoFilled')} --</option>
                                                         {categories.flatMap(g => g.items).map(item => (
                                                             <option key={item.key} value={item.key}>{item.ar}</option>
                                                         ))}
@@ -778,7 +778,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         name="itemName"
                                                         value={formData.itemName}
                                                         onChange={handleChange}
-                                                        placeholder={t('finance.itemNamePlaceholder') || "مثال: تركيب سيراميك الدور الأرضي"}
+                                                        placeholder={t('finance.itemNamePlaceholder')}
                                                         className={errors.itemName ? 'error' : ''}
                                                     />
                                                 </div>

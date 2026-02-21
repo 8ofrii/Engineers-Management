@@ -61,7 +61,7 @@ export default function Dashboard() {
             setStats({
                 projects: {
                     total: projects.length,
-                    active: projects.filter(p => p.status === 'in-progress').length
+                    active: projects.filter(p => p.status === 'in-progress' || p.status === 'IN_PROGRESS').length
                 },
                 clients: { total: clientsRes.data.count },
                 suppliers: { total: suppliersRes.data.count },
@@ -88,7 +88,7 @@ export default function Dashboard() {
         }).format(amount);
     };
 
-    const COLORS = ['hsl(210, 100%, 60%)', 'hsl(280, 70%, 60%)', 'hsl(160, 80%, 50%)', 'hsl(35, 100%, 60%)', 'hsl(0, 85%, 60%)'];
+    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
 
     if (loading) {
         return (
@@ -215,10 +215,11 @@ export default function Dashboard() {
                                             }))}
                                             cx="50%"
                                             cy="50%"
-                                            labelLine={false}
-                                            label={({ displayName, percent }) => `${displayName}: ${(percent * 100).toFixed(0)}%`}
+                                            innerRadius={65}
                                             outerRadius={100}
-                                            fill="#8884d8"
+                                            paddingAngle={4}
+                                            stroke="transparent"
+                                            label={false}
                                             dataKey="total"
                                             nameKey="displayName"
                                         >
@@ -232,10 +233,14 @@ export default function Dashboard() {
                                                 background: 'var(--bg-elevated)',
                                                 border: '1px solid var(--border-color)',
                                                 borderRadius: 'var(--radius-md)',
-                                                color: 'var(--text-primary)'
                                             }}
+                                            itemStyle={{ color: 'var(--text-primary)' }}
                                         />
-                                        <Legend />
+                                        <Legend
+                                            verticalAlign="bottom"
+                                            iconType="circle"
+                                            wrapperStyle={{ paddingTop: '20px', fontSize: '13px', color: 'var(--text-primary)' }}
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -261,6 +266,7 @@ export default function Dashboard() {
                                                 border: '1px solid var(--border-color)',
                                                 borderRadius: 'var(--radius-md)'
                                             }}
+                                            itemStyle={{ color: 'var(--text-primary)' }}
                                             cursor={{ fill: 'var(--bg-secondary)', opacity: 0.4 }}
                                         />
                                         <Bar dataKey="total" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
@@ -317,7 +323,9 @@ function getStatusColor(status) {
     const colors = {
         'planning': 'warning',
         'in-progress': 'primary',
+        'in_progress': 'primary',
         'on-hold': 'warning',
+        'on_hold': 'warning',
         'completed': 'success',
         'cancelled': 'danger'
     };
