@@ -61,16 +61,18 @@ export const getOne = async (req, res, next) => {
 // @access  Private
 export const create = async (req, res, next) => {
     try {
-        const { name, nameAr, trade, dailyRate, phone, nationalId } = req.body;
+        const { name, nameAr, trade, customTrade, dailyRate, phone, nationalId, nationalIdImage } = req.body;
 
         const workman = await prisma.workman.create({
             data: {
                 name,
                 nameAr,
                 trade,
+                customTrade,
                 dailyRate,
                 phone,
                 nationalId,
+                nationalIdImage,
                 tenantId: req.user.tenantId // Critical: Assign to Tenant
             }
         });
@@ -89,7 +91,7 @@ export const create = async (req, res, next) => {
 // @access  Private
 export const update = async (req, res, next) => {
     try {
-        const { name, nameAr, trade, dailyRate, phone, nationalId, isActive } = req.body;
+        const { name, nameAr, trade, customTrade, dailyRate, phone, nationalId, nationalIdImage, isActive } = req.body;
 
         const workman = await prisma.workman.updateMany({
             where: {
@@ -100,9 +102,11 @@ export const update = async (req, res, next) => {
                 name,
                 nameAr,
                 trade,
+                customTrade,
                 dailyRate,
                 phone,
                 nationalId,
+                nationalIdImage,
                 isActive
             }
         });

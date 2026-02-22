@@ -149,6 +149,8 @@ model Supplier {
   state        String?
   zipCode      String?
   country      String?
+  contactName  String?
+  notes        String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   tenantId     String?
@@ -288,22 +290,24 @@ model MaterialBatch {
 }
 
 model Workman {
-  id           String        @id @default(uuid())
-  name         String
-  nameAr       String?
-  trade        WorkmanTrade
-  dailyRate    Decimal       @db.Decimal(10, 2)
-  phone        String?
-  nationalId   String?
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  tenantId     String?
+  id               String            @id @default(uuid())
+  name             String
+  nameAr           String?
+  trade            WorkmanTrade
+  customTrade      String?
+  dailyRate        Decimal           @db.Decimal(10, 2)
+  phone            String?
+  nationalId       String?
+  nationalIdImage  String?           @db.Text
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  tenantId         String?
   totalPaid        Decimal           @default(0) @db.Decimal(15, 2)
   transactions     Transaction[]
   workmanships     Workmanship[]
   projectCostItems ProjectCostItem[]
-  tenant       Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant           Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("workmen")
 }
@@ -484,6 +488,15 @@ enum SupplierCategory {
   SERVICES
   LABOR
   OTHER
+  CONCRETE
+  STEEL
+  CEMENT
+  BRICKS
+  ELECTRICAL
+  PLUMBING
+  PAINT
+  WOOD
+  TOOLS
 }
 
 enum SupplierStatus {

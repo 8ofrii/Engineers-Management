@@ -16,9 +16,12 @@ export const consumeBatch = async (req, res, next) => {
             });
         }
 
-        // Fetch the batch
-        const batch = await prisma.materialBatch.findUnique({
-            where: { id },
+        // Fetch the batch - Enforce Tenant Isolation
+        const batch = await prisma.materialBatch.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 project: true
             }
@@ -133,6 +136,7 @@ export const getAvailableStock = async (req, res, next) => {
         const batches = await prisma.materialBatch.findMany({
             where: {
                 projectId: projectId,
+                tenantId: req.user.tenantId, // Enforce Tenant Isolation
                 status: {
                     in: ['AVAILABLE', 'PARTIALLY_USED']
                 }
@@ -174,6 +178,9 @@ export const getAvailableStock = async (req, res, next) => {
 export const getAllBatches = async (req, res, next) => {
     try {
         const batches = await prisma.materialBatch.findMany({
+            where: {
+                tenantId: req.user.tenantId // Enforce Tenant Isolation
+            },
             include: {
                 project: {
                     select: { name: true }
@@ -204,8 +211,11 @@ export const getAllBatches = async (req, res, next) => {
 // @access  Private
 export const getBatch = async (req, res, next) => {
     try {
-        const batch = await prisma.materialBatch.findUnique({
-            where: { id: req.params.id },
+        const batch = await prisma.materialBatch.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId // Enforce Tenant Isolation
+            },
             include: {
                 project: {
                     select: { name: true }

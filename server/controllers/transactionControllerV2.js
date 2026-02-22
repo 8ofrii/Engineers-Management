@@ -38,7 +38,10 @@ const calculateAndTransferProfit = async (tx, project, expenseAmount) => {
     if (profit > 0 && project.revenueModel === 'EXECUTION_COST_PLUS') {
         // Transfer profit from Project Safe to Office Revenue
         await tx.project.update({
-            where: { id: project.id },
+            where: {
+                id: project.id,
+                tenantId: project.tenantId
+            },
             data: {
                 projectSafeBalance: { decrement: profit },
                 officeRevenue: { increment: profit }
@@ -96,8 +99,11 @@ export const createTransactionV2 = async (req, res, next) => {
         }
 
         // Fetch project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId }
+        const project = await prisma.project.findFirst({
+            where: {
+                id: projectId,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!project) {
@@ -139,7 +145,10 @@ export const createTransactionV2 = async (req, res, next) => {
 
                 // Update Project Safe Balance
                 await tx.project.update({
-                    where: { id: projectId },
+                    where: {
+                        id: projectId,
+                        tenantId: req.user.tenantId
+                    },
                     data: {
                         projectSafeBalance: { increment: Number(amount) }
                     }
@@ -198,7 +207,10 @@ export const createTransactionV2 = async (req, res, next) => {
 
                 // Deduct from Project Safe
                 const updatedProject = await tx.project.update({
-                    where: { id: projectId },
+                    where: {
+                        id: projectId,
+                        tenantId: req.user.tenantId
+                    },
                     data: {
                         projectSafeBalance: { decrement: Number(amount) },
                         actualCost: { increment: Number(amount) }
@@ -224,7 +236,10 @@ export const createTransactionV2 = async (req, res, next) => {
                 // Update Cost Item if linked
                 if (finalCostItemId) {
                     await tx.projectCostItem.update({
-                        where: { id: finalCostItemId },
+                        where: {
+                            id: finalCostItemId,
+                            tenantId: req.user.tenantId
+                        },
                         data: {
                             totalPaid: { increment: Number(amount) }
                         }
@@ -234,7 +249,10 @@ export const createTransactionV2 = async (req, res, next) => {
                 // V1.2: Update Workman balance if linked
                 if (workmanId) {
                     await tx.workman.update({
-                        where: { id: workmanId },
+                        where: {
+                            id: workmanId,
+                            tenantId: req.user.tenantId
+                        },
                         data: {
                             totalPaid: { increment: Number(amount) }
                         }
@@ -297,8 +315,11 @@ export const recordInventoryUsage = async (req, res, next) => {
             description
         } = req.body;
 
-        const batch = await prisma.materialBatch.findUnique({
-            where: { id: materialBatchId },
+        const batch = await prisma.materialBatch.findFirst({
+            where: {
+                id: materialBatchId,
+                tenantId: req.user.tenantId
+            },
             include: { project: true }
         });
 
@@ -320,7 +341,10 @@ export const recordInventoryUsage = async (req, res, next) => {
             // Update batch
             const newRemaining = Number(batch.remainingValue) - Number(valueConsumed);
             await tx.materialBatch.update({
-                where: { id: materialBatchId },
+                where: {
+                    id: materialBatchId,
+                    tenantId: req.user.tenantId
+                },
                 data: {
                     remainingValue: newRemaining,
                     status: newRemaining === 0 ? 'CONSUMED' : 'PARTIALLY_USED'
@@ -348,8 +372,11 @@ export const recordInventoryUsage = async (req, res, next) => {
 
             // ALERT: If project safe becomes negative after profit transfer
             if (profitInfo.profit > 0) {
-                const refreshedProject = await tx.project.findUnique({
-                    where: { id: batch.projectId },
+                const refreshedProject = await tx.project.findFirst({
+                    where: {
+                        id: batch.projectId,
+                        tenantId: req.user.tenantId
+                    },
                     include: { engineer: true }
                 });
 
@@ -394,6 +421,7 @@ export const getProjectInventory = async (req, res, next) => {
         const batches = await prisma.materialBatch.findMany({
             where: {
                 projectId: id,
+                tenantId: req.user.tenantId,
                 status: { in: ['AVAILABLE', 'PARTIALLY_USED'] }
             },
             include: {

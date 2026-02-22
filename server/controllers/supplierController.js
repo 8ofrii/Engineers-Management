@@ -6,6 +6,9 @@ import prisma from '../lib/prisma.js';
 export const getSuppliers = async (req, res, next) => {
     try {
         const suppliers = await prisma.supplier.findMany({
+            where: {
+                tenantId: req.user.tenantId
+            },
             orderBy: {
                 createdAt: 'desc'
             }
@@ -26,8 +29,11 @@ export const getSuppliers = async (req, res, next) => {
 // @access  Private
 export const getSupplier = async (req, res, next) => {
     try {
-        const supplier = await prisma.supplier.findUnique({
-            where: { id: req.params.id }
+        const supplier = await prisma.supplier.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!supplier) {
@@ -52,7 +58,10 @@ export const getSupplier = async (req, res, next) => {
 export const createSupplier = async (req, res, next) => {
     try {
         const supplier = await prisma.supplier.create({
-            data: req.body
+            data: {
+                ...req.body,
+                tenantId: req.user.tenantId
+            }
         });
 
         res.status(201).json({
@@ -69,14 +78,27 @@ export const createSupplier = async (req, res, next) => {
 // @access  Private
 export const updateSupplier = async (req, res, next) => {
     try {
-        const supplier = await prisma.supplier.update({
-            where: { id: req.params.id },
+        // Enforce tenant isolation in update
+        const supplier = await prisma.supplier.updateMany({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            },
             data: req.body
         });
 
+        if (supplier.count === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Supplier not found or unauthorized'
+            });
+        }
+
+        const updated = await prisma.supplier.findUnique({ where: { id: req.params.id } });
+
         res.status(200).json({
             success: true,
-            data: supplier
+            data: updated
         });
     } catch (error) {
         next(error);
@@ -88,9 +110,19 @@ export const updateSupplier = async (req, res, next) => {
 // @access  Private
 export const deleteSupplier = async (req, res, next) => {
     try {
-        await prisma.supplier.delete({
-            where: { id: req.params.id }
+        const result = await prisma.supplier.deleteMany({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            }
         });
+
+        if (result.count === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Supplier not found or unauthorized'
+            });
+        }
 
         res.status(200).json({
             success: true,

@@ -174,7 +174,10 @@ export const updateRole = async (req, res, next) => {
 
         // Update role
         const updated = await prisma.role.update({
-            where: { id },
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             data: {
                 name: name || undefined,
                 description: description !== undefined ? description : undefined,
@@ -237,7 +240,10 @@ export const deleteRole = async (req, res, next) => {
 
         // Delete role
         await prisma.role.delete({
-            where: { id }
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
         });
 
         res.status(200).json({

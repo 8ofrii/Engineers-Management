@@ -15,9 +15,12 @@ export const fundEngineer = async (req, res, next) => {
         }
 
         // Get current engineer balance
-        const engineer = await prisma.user.findUnique({
-            where: { id: engineerId },
-            select: { currentCustodyBalance: true, name: true, role: true }
+        const engineer = await prisma.user.findFirst({
+            where: {
+                id: engineerId,
+                tenantId: req.user.tenantId
+            },
+            select: { id: true, currentCustodyBalance: true, name: true, role: true }
         });
 
         if (!engineer) {
@@ -56,7 +59,8 @@ export const fundEngineer = async (req, res, next) => {
                     description: description || `Custody funding`,
                     engineerId: engineerId,
                     balanceBefore: balanceBefore,
-                    balanceAfter: balanceAfter
+                    balanceAfter: balanceAfter,
+                    tenantId: req.user.tenantId
                 }
             }),
 
@@ -67,7 +71,8 @@ export const fundEngineer = async (req, res, next) => {
                     type: 'INFO',
                     title: 'Custody Funded',
                     message: `You received ${amount} EGP custody top-up. New balance: ${balanceAfter} EGP`,
-                    resourceType: 'custody'
+                    resourceType: 'custody',
+                    tenantId: req.user.tenantId
                 }
             })
         ]);
@@ -92,8 +97,11 @@ export const getBalance = async (req, res, next) => {
     try {
         const { engineerId } = req.params;
 
-        const engineer = await prisma.user.findUnique({
-            where: { id: engineerId },
+        const engineer = await prisma.user.findFirst({
+            where: {
+                id: engineerId,
+                tenantId: req.user.tenantId
+            },
             select: {
                 id: true,
                 name: true,
@@ -135,7 +143,10 @@ export const getHistory = async (req, res, next) => {
         const { engineerId } = req.params;
 
         const history = await prisma.custodyTransfer.findMany({
-            where: { engineerId: engineerId },
+            where: {
+                engineerId: engineerId,
+                tenantId: req.user.tenantId
+            },
             orderBy: { createdAt: 'desc' },
             take: 50
         });
@@ -166,8 +177,11 @@ export const returnCustody = async (req, res, next) => {
             });
         }
 
-        const engineer = await prisma.user.findUnique({
-            where: { id: engineerId },
+        const engineer = await prisma.user.findFirst({
+            where: {
+                id: engineerId,
+                tenantId: req.user.tenantId
+            },
             select: { currentCustodyBalance: true, pendingClearance: true, name: true }
         });
 
@@ -200,7 +214,8 @@ export const returnCustody = async (req, res, next) => {
                     description: description || 'Custody return',
                     engineerId: engineerId,
                     balanceBefore: balanceBefore,
-                    balanceAfter: balanceAfter
+                    balanceAfter: balanceAfter,
+                    tenantId: req.user.tenantId
                 }
             })
         ]);
@@ -225,6 +240,7 @@ export const getAllCustodyBalances = async (req, res, next) => {
     try {
         const engineers = await prisma.user.findMany({
             where: {
+                tenantId: req.user.tenantId,
                 role: {
                     in: ['ENGINEER', 'PROJECT_MANAGER']
                 }

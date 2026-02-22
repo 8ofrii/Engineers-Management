@@ -203,6 +203,9 @@
         "initialValue": "القيمة الأصلية",
         "remainingValue": "القيمة المتبقية",
         "remaining": "متبقي",
+        "batches": "دفعات المخزون",
+        "rawMaterials": "الخامات الأساسية",
+        "recordUsage": "تسجيل استهلاك",
         "status": {
             "available": "متوفر",
             "partially_used": "مستخدم جزئياً",
@@ -228,6 +231,7 @@
         "selectWorkman": "نقي الصنايعي",
         "customTrade": "حدد المهنة",
         "customTradePlaceholder": "أدخل اسم المهنة (مثال: مبلط سيراميك، عزل)",
+        "viewId": "عرض صور البطاقة",
         "trades": {
             "CARPENTER": "نجار",
             "MASON": "بناء",

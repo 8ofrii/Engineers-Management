@@ -72,8 +72,11 @@ export const getWorkOrderById = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const workOrder = await prisma.projectCostItem.findUnique({
-            where: { id },
+        const workOrder = await prisma.projectCostItem.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 project: {
                     select: {
@@ -246,8 +249,11 @@ export const updateWorkOrder = async (req, res, next) => {
             workmanId
         } = req.body;
 
-        const workOrder = await prisma.projectCostItem.findUnique({
-            where: { id }
+        const workOrder = await prisma.projectCostItem.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!workOrder) {
@@ -264,7 +270,10 @@ export const updateWorkOrder = async (req, res, next) => {
         }
 
         const updated = await prisma.projectCostItem.update({
-            where: { id },
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             data: {
                 name: name || workOrder.name,
                 category: category || workOrder.category,
@@ -295,8 +304,11 @@ export const deleteWorkOrder = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const workOrder = await prisma.projectCostItem.findUnique({
-            where: { id },
+        const workOrder = await prisma.projectCostItem.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 transactions: true
             }
@@ -319,7 +331,10 @@ export const deleteWorkOrder = async (req, res, next) => {
         }
 
         await prisma.projectCostItem.delete({
-            where: { id }
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
         });
 
         res.status(200).json({
@@ -339,8 +354,11 @@ export const getWorkOrderPayments = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const workOrder = await prisma.projectCostItem.findUnique({
-            where: { id }
+        const workOrder = await prisma.projectCostItem.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!workOrder) {
@@ -352,7 +370,8 @@ export const getWorkOrderPayments = async (req, res, next) => {
 
         const payments = await prisma.transaction.findMany({
             where: {
-                projectCostItemId: id
+                projectCostItemId: id,
+                tenantId: req.user.tenantId
             },
             include: {
                 user: {

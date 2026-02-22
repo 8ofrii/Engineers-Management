@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { clientsAPI } from '../services/api';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
+import AddClientModal from './AddClientModal';
 
 export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData = null }) {
     const { t } = useTranslation();
@@ -25,6 +26,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
     });
 
     const [errors, setErrors] = useState({});
+    const [isClientModalOpen, setIsClientModalOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -165,20 +167,32 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                         <div className="form-grid">
                             <div className="form-group">
                                 <label htmlFor="clientId">{t('projects.modal.fields.client')} <span className="required">*</span></label>
-                                <select
-                                    id="clientId"
-                                    name="clientId"
-                                    value={formData.clientId}
-                                    onChange={handleChange}
-                                    className={errors.clientId ? 'error' : ''}
-                                >
-                                    <option value="">{t('projects.modal.options.selectClient')}</option>
-                                    {clients.map(client => (
-                                        <option key={client.id} value={client.id}>
-                                            {client.name} {client.company ? `(${client.company})` : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="flex gap-sm">
+                                    <select
+                                        id="clientId"
+                                        name="clientId"
+                                        value={formData.clientId}
+                                        onChange={handleChange}
+                                        className={errors.clientId ? 'error' : ''}
+                                        style={{ flex: 1 }}
+                                    >
+                                        <option value="">{t('projects.modal.options.selectClient')}</option>
+                                        {clients.map(client => (
+                                            <option key={client.id} value={client.id}>
+                                                {client.name} {client.company ? `(${client.company})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        title={t('clients.newClient')}
+                                        onClick={() => setIsClientModalOpen(true)}
+                                        style={{ padding: '0 12px' }}
+                                    >
+                                        <Plus size={18} />
+                                    </button>
+                                </div>
                                 {errors.clientId && <span className="error-message">{errors.clientId}</span>}
                             </div>
 
@@ -367,6 +381,22 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     </div>
                 </form>
             </div>
+            {/* Client Creation Modal */}
+            <AddClientModal
+                isOpen={isClientModalOpen}
+                onClose={() => setIsClientModalOpen(false)}
+                onSave={async (clientData) => {
+                    try {
+                        const response = await clientsAPI.create(clientData);
+                        const newClient = response.data.data;
+                        await loadClients();
+                        setFormData(prev => ({ ...prev, clientId: newClient.id }));
+                        setIsClientModalOpen(false);
+                    } catch (error) {
+                        console.error("Failed to create client", error);
+                    }
+                }}
+            />
         </div>
     );
 }

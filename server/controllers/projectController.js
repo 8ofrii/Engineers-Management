@@ -259,8 +259,11 @@ export const getProjectFinancials = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const project = await prisma.project.findUnique({
-            where: { id },
+        const project = await prisma.project.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 transactions: {
                     where: {

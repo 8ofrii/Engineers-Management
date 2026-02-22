@@ -17,9 +17,12 @@ export const createProjectCostItem = async (req, res, next) => {
             estimatedTotal
         } = req.body;
 
-        // Validate project exists
-        const project = await prisma.project.findUnique({
-            where: { id: projectId }
+        // Validate project exists and belongs to tenant
+        const project = await prisma.project.findFirst({
+            where: {
+                id: projectId,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!project) {
@@ -66,7 +69,10 @@ export const getProjectCostItems = async (req, res, next) => {
         const { projectId } = req.params;
 
         const costItems = await prisma.projectCostItem.findMany({
-            where: { projectId },
+            where: {
+                projectId,
+                tenantId: req.user.tenantId
+            },
             include: {
                 transactions: {
                     select: {
@@ -119,8 +125,11 @@ export const getProjectCostItem = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const costItem = await prisma.projectCostItem.findUnique({
-            where: { id },
+        const costItem = await prisma.projectCostItem.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 project: {
                     select: {
@@ -179,14 +188,17 @@ export const updateProjectCostItem = async (req, res, next) => {
             status
         } = req.body;
 
-        const costItem = await prisma.projectCostItem.findUnique({
-            where: { id }
+        const costItem = await prisma.projectCostItem.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!costItem) {
             return res.status(404).json({
                 success: false,
-                message: 'Cost item not found'
+                message: 'Cost item not found or unauthorized'
             });
         }
 
@@ -199,7 +211,10 @@ export const updateProjectCostItem = async (req, res, next) => {
         }
 
         const updated = await prisma.projectCostItem.update({
-            where: { id },
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             data: {
                 name,
                 category,
@@ -229,8 +244,11 @@ export const deleteProjectCostItem = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const costItem = await prisma.projectCostItem.findUnique({
-            where: { id },
+        const costItem = await prisma.projectCostItem.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 _count: {
                     select: { transactions: true }
@@ -241,7 +259,7 @@ export const deleteProjectCostItem = async (req, res, next) => {
         if (!costItem) {
             return res.status(404).json({
                 success: false,
-                message: 'Cost item not found'
+                message: 'Cost item not found or unauthorized'
             });
         }
 
@@ -254,7 +272,10 @@ export const deleteProjectCostItem = async (req, res, next) => {
         }
 
         await prisma.projectCostItem.delete({
-            where: { id }
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
         });
 
         res.status(200).json({
@@ -275,7 +296,9 @@ export const getAllProjectCostItems = async (req, res, next) => {
     try {
         const { status, projectId } = req.query;
 
-        const where = {};
+        const where = {
+            tenantId: req.user.tenantId
+        };
         if (status) where.status = status;
         if (projectId) where.projectId = projectId;
 

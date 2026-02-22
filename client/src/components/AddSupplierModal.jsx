@@ -9,11 +9,11 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
     const { showAlert } = useAlert();
     const [formData, setFormData] = useState({
         name: '',
-        category: 'GENERAL',
-        contact: '',
+        category: 'OTHER',
+        contactName: '',
         email: '',
         phone: '',
-        address: '',
+        street: '',
         notes: ''
     });
     const [errors, setErrors] = useState({});
@@ -23,29 +23,30 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
         if (initialData) {
             setFormData({
                 name: initialData.name || '',
-                category: initialData.category || 'GENERAL',
-                contact: initialData.contact || '',
+                category: initialData.category || 'OTHER',
+                contactName: initialData.contactName || '',
                 email: initialData.email || '',
                 phone: initialData.phone || '',
-                address: initialData.address || '',
+                street: initialData.street || '',
                 notes: initialData.notes || ''
             });
         } else {
             setFormData({
                 name: '',
-                category: 'GENERAL',
-                contact: '',
+                category: 'OTHER',
+                contactName: '',
                 email: '',
                 phone: '',
-                address: '',
+                street: '',
                 notes: ''
             });
         }
     }, [initialData, isOpen]);
 
     const categories = [
-        'GENERAL', 'CONCRETE', 'STEEL', 'CEMENT', 'BRICKS',
-        'ELECTRICAL', 'PLUMBING', 'PAINT', 'WOOD', 'TOOLS'
+        'CONCRETE', 'STEEL', 'CEMENT', 'BRICKS',
+        'ELECTRICAL', 'PLUMBING', 'PAINT', 'WOOD', 'TOOLS',
+        'MATERIALS', 'EQUIPMENT', 'SERVICES', 'LABOR', 'OTHER'
     ];
 
     const handleChange = (e) => {
@@ -176,28 +177,28 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                         </div>
 
                         <div className="form-group">
-                            <label htmlFor="contact">
+                            <label htmlFor="contactName">
                                 {t('suppliers.fields.contactPerson')}
                             </label>
                             <input
                                 type="text"
-                                id="contact"
-                                name="contact"
-                                value={formData.contact}
+                                id="contactName"
+                                name="contactName"
+                                value={formData.contactName}
                                 onChange={handleChange}
                                 placeholder="Contact Person Name"
                             />
                         </div>
 
                         <div className="form-group full-width">
-                            <label htmlFor="address">
+                            <label htmlFor="street">
                                 {t('suppliers.fields.address')}
                             </label>
                             <input
                                 type="text"
-                                id="address"
-                                name="address"
-                                value={formData.address}
+                                id="street"
+                                name="street"
+                                value={formData.street}
                                 onChange={handleChange}
                                 placeholder="Address"
                             />

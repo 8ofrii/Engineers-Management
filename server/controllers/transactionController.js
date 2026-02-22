@@ -156,7 +156,9 @@ export const parseVoiceNote = async (req, res, next) => {
 // @access  Private
 export const getTransactions = async (req, res, next) => {
     try {
-        let whereClause = {};
+        let whereClause = {
+            tenantId: req.user.tenantId
+        };
 
         // Engineers can only see their own transactions
         if (req.user.role === 'ENGINEER') {
@@ -166,7 +168,10 @@ export const getTransactions = async (req, res, next) => {
         // Project Managers see transactions for their projects
         if (req.user.role === 'PROJECT_MANAGER') {
             const projects = await prisma.project.findMany({
-                where: { engineerId: req.user.id },
+                where: {
+                    engineerId: req.user.id,
+                    tenantId: req.user.tenantId
+                },
                 select: { id: true }
             });
             whereClause.projectId = {
@@ -174,7 +179,7 @@ export const getTransactions = async (req, res, next) => {
             };
         }
 
-        // Admins and Accountants see all
+        // Admins and Accountants see all within tenant
 
         const transactions = await prisma.transaction.findMany({
             where: whereClause,
@@ -205,7 +210,10 @@ export const getTransactions = async (req, res, next) => {
 export const getPendingApprovals = async (req, res, next) => {
     try {
         const pending = await prisma.transaction.findMany({
-            where: { status: 'PENDING_APPROVAL' },
+            where: {
+                status: 'PENDING_APPROVAL',
+                tenantId: req.user.tenantId
+            },
             include: {
                 user: { select: { name: true, email: true } },
                 project: { select: { name: true } }
@@ -235,8 +243,11 @@ export const recordIncome = async (req, res, next) => {
         } = req.body;
 
         // Fetch project configuration
-        const project = await prisma.project.findUnique({
-            where: { id: projectId }
+        const project = await prisma.project.findFirst({
+            where: {
+                id: projectId,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!project) {
@@ -313,8 +324,11 @@ export const submitTransaction = async (req, res, next) => {
         const { id } = req.params;
         const { receiptPhotoUrl, confirmedAmount, confirmedDescription } = req.body;
 
-        const transaction = await prisma.transaction.findUnique({
-            where: { id },
+        const transaction = await prisma.transaction.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: { project: { include: { engineer: true } } }
         });
 
@@ -380,8 +394,11 @@ export const approveTransaction = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const transaction = await prisma.transaction.findUnique({
-            where: { id },
+        const transaction = await prisma.transaction.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 user: true,
                 project: true,
@@ -465,7 +482,10 @@ export const approveTransaction = async (req, res, next) => {
                         const totalDeduction = Number(transaction.amount) + officeFee;
 
                         await tx.project.update({
-                            where: { id: transaction.projectId },
+                            where: {
+                                id: transaction.projectId,
+                                tenantId: req.user.tenantId
+                            },
                             data: {
                                 projectSafeBalance: { decrement: totalDeduction },
                                 operationalFund: { decrement: transaction.amount },
@@ -478,8 +498,11 @@ export const approveTransaction = async (req, res, next) => {
 
                 // LINK 3: Update work order if linked
                 if (transaction.projectCostItemId) {
-                    const workOrder = await tx.projectCostItem.findUnique({
-                        where: { id: transaction.projectCostItemId }
+                    const workOrder = await tx.projectCostItem.findFirst({
+                        where: {
+                            id: transaction.projectCostItemId,
+                            tenantId: req.user.tenantId
+                        }
                     });
 
                     if (workOrder) {
@@ -487,7 +510,10 @@ export const approveTransaction = async (req, res, next) => {
                         const isCompleted = workOrder.estimatedTotal && newTotalPaid >= Number(workOrder.estimatedTotal);
 
                         await tx.projectCostItem.update({
-                            where: { id: transaction.projectCostItemId },
+                            where: {
+                                id: transaction.projectCostItemId,
+                                tenantId: req.user.tenantId
+                            },
                             data: {
                                 totalPaid: newTotalPaid,
                                 status: isCompleted ? 'COMPLETED' : 'OPEN'
@@ -538,8 +564,11 @@ export const approveTransaction = async (req, res, next) => {
                 }
 
                 // LINK 6: Check for negative project safe and send alerts
-                const updatedProject = await tx.project.findUnique({
-                    where: { id: transaction.projectId }
+                const updatedProject = await tx.project.findFirst({
+                    where: {
+                        id: transaction.projectId,
+                        tenantId: req.user.tenantId
+                    }
                 });
 
                 if (Number(updatedProject.projectSafeBalance) < 0) {
@@ -608,8 +637,11 @@ export const rejectTransaction = async (req, res, next) => {
         const { id } = req.params;
         const { reason } = req.body;
 
-        const transaction = await prisma.transaction.findUnique({
-            where: { id }
+        const transaction = await prisma.transaction.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!transaction) {
@@ -685,7 +717,8 @@ export const createDraft = async (req, res, next) => {
                 projectId: projectId,
                 createdBy: req.user.id,
                 paymentMethod: 'CUSTODY_WALLET',
-                isOfficeExpense: isOfficeExpense || false
+                isOfficeExpense: isOfficeExpense || false,
+                tenantId: req.user.tenantId
             }
         });
 
@@ -711,7 +744,10 @@ export const createDraft = async (req, res, next) => {
 // Keep existing functions
 export const getStats = async (req, res, next) => {
     try {
-        let whereClause = { status: 'APPROVED' };
+        let whereClause = {
+            status: 'APPROVED',
+            tenantId: req.user.tenantId
+        };
 
         // Role-based filtering
         if (req.user.role === 'ENGINEER') {
@@ -765,8 +801,11 @@ export const getStats = async (req, res, next) => {
 
 export const getTransaction = async (req, res, next) => {
     try {
-        const transaction = await prisma.transaction.findUnique({
-            where: { id: req.params.id },
+        const transaction = await prisma.transaction.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 project: true,
                 supplier: true,
@@ -798,8 +837,11 @@ export const getTransaction = async (req, res, next) => {
 export const deleteTransaction = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const transaction = await prisma.transaction.findUnique({
-            where: { id },
+        const transaction = await prisma.transaction.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
             include: {
                 project: true,
                 user: true
@@ -858,7 +900,10 @@ export const deleteTransaction = async (req, res, next) => {
                         // Reverse Project Impact
                         if (transaction.projectId) {
                             await tx.project.update({
-                                where: { id: transaction.projectId },
+                                where: {
+                                    id: transaction.projectId,
+                                    tenantId: req.user.tenantId
+                                },
                                 data: {
                                     operationalFund: { increment: transaction.amount }, // Give back to fund
                                     actualCost: { decrement: transaction.amount }       // Reduce cost
@@ -895,7 +940,10 @@ export const deleteTransaction = async (req, res, next) => {
                     }
 
                     await tx.project.update({
-                        where: { id: transaction.projectId },
+                        where: {
+                            id: transaction.projectId,
+                            tenantId: req.user.tenantId
+                        },
                         data: {
                             officeRevenue: { decrement: officeShare },
                             operationalFund: { decrement: opsShare }
@@ -906,7 +954,10 @@ export const deleteTransaction = async (req, res, next) => {
 
             // 2. Finally Delete
             await tx.transaction.delete({
-                where: { id }
+                where: {
+                    id,
+                    tenantId: req.user.tenantId
+                }
             });
         });
 
@@ -935,7 +986,12 @@ export const updateTransaction = async (req, res, next) => {
             invoiceNumber
         } = req.body;
 
-        let transaction = await prisma.transaction.findUnique({ where: { id } });
+        let transaction = await prisma.transaction.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            }
+        });
 
         if (!transaction) {
             return res.status(404).json({ success: false, message: 'Transaction not found' });
@@ -972,7 +1028,10 @@ export const updateTransaction = async (req, res, next) => {
         const updated = await prisma.$transaction(async (tx) => {
             // 1. Update the Transaction itself
             const t = await tx.transaction.update({
-                where: { id },
+                where: {
+                    id,
+                    tenantId: req.user.tenantId
+                },
                 data: {
                     amount: amount ? Number(amount) : undefined,
                     description: finalDescription,
@@ -1004,7 +1063,10 @@ export const updateTransaction = async (req, res, next) => {
                     // Update Project Costs (if linked to project and is Expense)
                     if (transaction.projectId && transaction.type === 'EXPENSE') {
                         await tx.project.update({
-                            where: { id: transaction.projectId },
+                            where: {
+                                id: transaction.projectId,
+                                tenantId: req.user.tenantId
+                            },
                             data: {
                                 actualCost: { increment: diff },       // Cost goes up
                                 operationalFund: { decrement: diff }   // Fund goes down
@@ -1073,8 +1135,11 @@ export const createTransaction = async (req, res, next) => {
         }
 
         // Fetch project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId }
+        const project = await prisma.project.findFirst({
+            where: {
+                id: projectId,
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!project) {
@@ -1116,7 +1181,10 @@ export const createTransaction = async (req, res, next) => {
 
                 // V1.2: Update Project Safe Balance (full amount)
                 await tx.project.update({
-                    where: { id: projectId },
+                    where: {
+                        id: projectId,
+                        tenantId: req.user.tenantId
+                    },
                     data: {
                         projectSafeBalance: { increment: Number(amount) }
                     }
@@ -1176,7 +1244,10 @@ export const createTransaction = async (req, res, next) => {
                 // Deduct from Project Safe or Office Expenses
                 if (isOfficeExpense) {
                     await tx.project.update({
-                        where: { id: projectId },
+                        where: {
+                            id: projectId,
+                            tenantId: req.user.tenantId
+                        },
                         data: {
                             officeExpenses: { increment: Number(amount) },
                             actualCost: { increment: Number(amount) }
@@ -1184,7 +1255,10 @@ export const createTransaction = async (req, res, next) => {
                     });
                 } else {
                     await tx.project.update({
-                        where: { id: projectId },
+                        where: {
+                            id: projectId,
+                            tenantId: req.user.tenantId
+                        },
                         data: {
                             projectSafeBalance: { decrement: Number(amount) },
                             actualCost: { increment: Number(amount) }
@@ -1195,7 +1269,10 @@ export const createTransaction = async (req, res, next) => {
                 // Update Cost Item if linked
                 if (finalCostItemId) {
                     await tx.projectCostItem.update({
-                        where: { id: finalCostItemId },
+                        where: {
+                            id: finalCostItemId,
+                            tenantId: req.user.tenantId
+                        },
                         data: {
                             totalPaid: { increment: Number(amount) }
                         }
@@ -1205,7 +1282,10 @@ export const createTransaction = async (req, res, next) => {
                 // V1.2: Update Workman balance if linked
                 if (workmanId) {
                     await tx.workman.update({
-                        where: { id: workmanId },
+                        where: {
+                            id: workmanId,
+                            tenantId: req.user.tenantId
+                        },
                         data: {
                             totalPaid: { increment: Number(amount) }
                         }
@@ -1221,7 +1301,10 @@ export const createTransaction = async (req, res, next) => {
                     if (profit > 0 && project.revenueModel === 'EXECUTION_COST_PLUS') {
                         // Transfer profit from Project Safe to Office Revenue
                         await tx.project.update({
-                            where: { id: projectId },
+                            where: {
+                                id: projectId,
+                                tenantId: req.user.tenantId
+                            },
                             data: {
                                 projectSafeBalance: { decrement: profit },
                                 officeRevenue: { increment: profit }
@@ -1262,8 +1345,11 @@ export const createTransaction = async (req, res, next) => {
                 }
 
                 // Check if Project Safe is negative and send notification
-                const updatedProject = await tx.project.findUnique({
-                    where: { id: projectId },
+                const updatedProject = await tx.project.findFirst({
+                    where: {
+                        id: projectId,
+                        tenantId: req.user.tenantId
+                    },
                     include: { engineer: true }
                 });
 
