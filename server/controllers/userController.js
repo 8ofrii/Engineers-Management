@@ -83,9 +83,9 @@ export const inviteUser = async (req, res) => {
         });
 
         // Send Invitation Email
+        const verifyLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-invite?token=${verificationToken}`;
+        const isDev = process.env.NODE_ENV !== 'production';
         try {
-            const verifyLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-invite?token=${verificationToken}`;
-
             const message = `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                     <h2 style="color: #2563eb;">Welcome to Team!</h2>
@@ -110,12 +110,24 @@ export const inviteUser = async (req, res) => {
                 message
             });
 
-            res.status(201).json({ success: true, data: newUser, message: 'User invited. Verification email sent.' });
+            res.status(201).json({
+                success: true,
+                data: newUser,
+                message: 'User invited. Verification email sent.',
+                devVerifyLink: isDev ? verifyLink : undefined,
+                devTemporaryPassword: isDev ? password : undefined
+            });
 
         } catch (emailError) {
             console.error('Failed to send invitation email:', emailError);
             // Return success even if email fails, but warn
-            res.status(201).json({ success: true, data: newUser, message: 'User created, but failed to send verification email. Please contact admin.' });
+            res.status(201).json({
+                success: true,
+                data: newUser,
+                message: 'User created, but failed to send verification email. Please contact admin.',
+                devVerifyLink: isDev ? verifyLink : undefined,
+                devTemporaryPassword: isDev ? password : undefined
+            });
         }
     } catch (err) {
         console.error(err);

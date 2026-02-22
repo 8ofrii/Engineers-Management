@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAlert } from '../context/AlertContext';
 import { clientsAPI } from '../services/api';
 import { Users, Plus, Mail, Phone, Building2, Pencil, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
@@ -16,6 +17,7 @@ export default function Clients() {
     // Delete state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [clientToDelete, setClientToDelete] = useState(null);
+    const { showAlert } = useAlert();
 
     useEffect(() => {
         loadClients();
@@ -36,13 +38,15 @@ export default function Clients() {
         try {
             if (editingClient) {
                 await clientsAPI.update(editingClient.id, clientData);
+                showAlert({ type: 'success', title: 'Success', message: 'Client updated successfully.' });
             } else {
                 await clientsAPI.create(clientData);
+                showAlert({ type: 'success', title: 'Success', message: 'Client created successfully.' });
             }
             loadClients();
         } catch (error) {
             console.error('Failed to save client:', error);
-            alert('Failed to save client. Please try again.');
+            showAlert({ type: 'error', title: 'Error', message: 'Failed to save client. Please try again.' });
         }
     };
 
@@ -55,10 +59,11 @@ export default function Clients() {
         if (!clientToDelete) return;
         try {
             await clientsAPI.delete(clientToDelete.id);
+            showAlert({ type: 'success', title: 'Success', message: 'Client deleted successfully.' });
             loadClients();
         } catch (error) {
             console.error('Failed to delete client:', error);
-            alert('Failed to delete client. Please try again.');
+            showAlert({ type: 'error', title: 'Error', message: 'Failed to delete client. Please try again.' });
         } finally {
             setClientToDelete(null);
         }

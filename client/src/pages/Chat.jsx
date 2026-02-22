@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { chatAPI } from '../services/api';
+import { useAlert } from '../context/AlertContext';
+import { chatAPI, transactionsAPI } from '../services/api';
 import { MessageSquare, Send, Mic, MicOff, Loader } from 'lucide-react';
 import Layout from '../components/Layout';
 import './Chat.css';
 
 export default function Chat() {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(false);
@@ -128,7 +130,7 @@ export default function Chat() {
             }
         } catch (error) {
             console.error('Action confirmation failed:', error);
-            alert(t('chat.failAction') || 'فشل في تنفيذ العملية. تأكد من البيانات.');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('chat.failAction') || 'فشل في تنفيذ العملية. تأكد من البيانات.' });
         } finally {
             setLoading(false);
         }
@@ -156,7 +158,7 @@ export default function Chat() {
             setRecording(true);
         } catch (error) {
             console.error('Failed to start recording:', error);
-            alert('Could not access microphone. Please check permissions.');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Could not access microphone. Please check permissions.' });
         }
     };
 

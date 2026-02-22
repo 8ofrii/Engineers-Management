@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { useTranslation } from 'react-i18next';
 import { Mic, Send, Trash2, StopCircle } from 'lucide-react';
 import api from '../services/api';
@@ -9,6 +10,7 @@ import './ChatAssistant.css';
 export default function ChatAssistant() {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { showAlert } = useAlert();
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState('');
     const [isRecording, setIsRecording] = useState(false);
@@ -79,7 +81,7 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Microphone access denied:', error);
-            alert(t('chat.micError'));
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('chat.micError') });
         }
     };
 
@@ -126,7 +128,7 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Failed to send voice message:', error);
-            alert(t('chat.error'));
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('chat.error') });
         } finally {
             setIsProcessing(false);
         }
@@ -166,7 +168,7 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Failed to send message:', error);
-            alert(t('chat.error'));
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('chat.error') });
         } finally {
             setIsProcessing(false);
         }
@@ -174,14 +176,20 @@ export default function ChatAssistant() {
 
     // Clear chat history
     const clearHistory = async () => {
-        if (!confirm(t('chat.confirmClear'))) return;
-
-        try {
-            await api.delete('/chat/history');
-            setMessages([]);
-        } catch (error) {
-            console.error('Failed to clear history:', error);
-        }
+        showAlert({
+            type: 'warning',
+            title: t('common.confirm') || 'Confirm',
+            message: t('chat.confirmClear'),
+            showCancel: true,
+            onConfirm: async () => {
+                try {
+                    await api.delete('/chat/history');
+                    setMessages([]);
+                } catch (error) {
+                    console.error('Failed to clear history:', error);
+                }
+            }
+        });
     };
 
     // Format recording time

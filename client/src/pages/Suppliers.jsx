@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { suppliersAPI } from '../services/api';
 import { Package, Plus, Mail, Phone, Edit2 } from 'lucide-react';
 import Layout from '../components/Layout';
+import { useAlert } from '../context/AlertContext';
 import AddSupplierModal from '../components/AddSupplierModal';
 
 export default function Suppliers() {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
@@ -22,6 +24,7 @@ export default function Suppliers() {
             setSuppliers(response.data.data);
         } catch (error) {
             console.error('Failed to load suppliers:', error);
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load suppliers.' });
         } finally {
             setLoading(false);
         }
@@ -36,8 +39,10 @@ export default function Suppliers() {
         try {
             if (selectedSupplier) {
                 await suppliersAPI.update(selectedSupplier.id, data);
+                showAlert({ type: 'success', title: 'Success', message: 'Supplier updated successfully.' });
             } else {
                 await suppliersAPI.create(data);
+                showAlert({ type: 'success', title: 'Success', message: 'Supplier created successfully.' });
             }
             await loadSuppliers();
         } catch (error) {

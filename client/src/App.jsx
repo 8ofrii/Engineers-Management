@@ -7,6 +7,8 @@ import { PrivateRoute } from './components/PrivateRoute';
 import Login from './pages/Login';
 import RegisterCompany from './pages/RegisterCompany'; // New SaaS Sign-up
 import VerifyInvite from './pages/VerifyInvite';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import CompanySettings from './pages/CompanySettings';
 import Projects from './pages/Projects';
@@ -29,6 +31,8 @@ function App() {
                         <Route path="/login" element={<Login />} />
                         <Route path="/signup" element={<RegisterCompany />} />
                         <Route path="/verify-invite" element={<VerifyInvite />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
                         {/* Protected Routes */}
                         <Route

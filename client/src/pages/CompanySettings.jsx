@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { tenantAPI, authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Building2, Save, Upload, AlertCircle, User, UserCircle } from 'lucide-react';
+import { useAlert } from '../context/AlertContext';
 
 export default function CompanySettings() {
     const { user, updateUser } = useAuth();
+    const { showAlert } = useAlert();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('company'); // 'company' or 'profile'
 
     // Feedback
-    const [error, setError] = useState(null);
-    const [success, setSuccess] = useState(null);
+    // Using showAlert instead of local state for consistency across project per user request
 
     // Company State
     const [companyData, setCompanyData] = useState({
@@ -72,7 +73,7 @@ export default function CompanySettings() {
 
         } catch (err) {
             console.error(err);
-            setError('Failed to load data.');
+            showAlert({ type: 'error', title: 'Error', message: 'Failed to load data.' });
         } finally {
             setLoading(false);
         }
@@ -99,8 +100,6 @@ export default function CompanySettings() {
     const handleCompanySubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        setError(null);
-        setSuccess(null);
 
         try {
             const data = new FormData();
@@ -111,13 +110,13 @@ export default function CompanySettings() {
             if (logo) data.append('logo', logo);
 
             const res = await tenantAPI.updateSettings(data);
-            setSuccess('Company settings updated successfully.');
+            showAlert({ type: 'success', title: 'Success', message: 'Company settings updated successfully.' });
             // Refresh user context if needed to update sidebar logo
             const me = await authAPI.getMe();
             updateUser(me.data.data);
             // window.location.reload(); // Force reload to ensure sidebar updates if context sync issues
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to update company.');
+            showAlert({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Failed to update company.' });
         } finally {
             setSaving(false);
         }
@@ -126,8 +125,6 @@ export default function CompanySettings() {
     const handleProfileSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        setError(null);
-        setSuccess(null);
 
         try {
             const data = new FormData();
@@ -140,10 +137,10 @@ export default function CompanySettings() {
             // Assuming we have an endpoint for profile update
             const res = await authAPI.updateProfile(data);
 
-            setSuccess('Profile updated successfully.');
+            showAlert({ type: 'success', title: 'Success', message: 'Profile updated successfully.' });
             updateUser(res.data.data);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to update profile.');
+            showAlert({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Failed to update profile.' });
         } finally {
             setSaving(false);
         }
@@ -172,9 +169,7 @@ export default function CompanySettings() {
                 </div>
 
                 <div className="card-body mt-4">
-                    {/* Feedback Messages */}
-                    {error && <div className="alert alert-danger mb-4"><AlertCircle size={20} /> {error}</div>}
-                    {success && <div className="alert alert-success mb-4 text-green-500">{success}</div>}
+                    {/* Feedback Messages handled by showAlert modal */}
 
                     {/* COMPANY TAB */}
                     {activeTab === 'company' && (

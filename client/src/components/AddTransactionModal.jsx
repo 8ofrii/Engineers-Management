@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Mic, MicOff, Wallet } from 'lucide-react';
 import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI } from '../services/api';
+import { useAlert } from '../context/AlertContext';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 
 export default function AddTransactionModal({ isOpen, onClose, onSubmit, initialData = null, user }) {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
 
     // Helper to get local ISO string for datetime-local
     const getLocalDateTime = (date = new Date()) => {
@@ -331,7 +333,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             setIsRecording(true);
         } catch (error) {
             console.error("Recording failed", error);
-            alert("Could not start recording. Please check microphone permissions.");
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: "Could not start recording. Please check microphone permissions." });
         }
     };
 
@@ -381,7 +383,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
         } catch (error) {
             console.error("Analysis failed:", error);
-            alert("Failed to analyze voice note. Please enter details manually.");
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: "Failed to analyze voice note. Please enter details manually." });
         } finally {
             setIsAnalyzing(false);
         }
@@ -497,7 +499,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             onClose();
         } catch (error) {
             console.error("Submission Failed", error);
-            alert("Failed to submit transaction: " + (error.response?.data?.message || error.message));
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: "Failed to submit transaction: " + (error.response?.data?.message || error.message) });
         } finally {
             setLoading(false);
         }

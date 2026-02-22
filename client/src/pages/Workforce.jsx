@@ -4,9 +4,11 @@ import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI } from '../services/api';
+import { useAlert } from '../context/AlertContext';
 
 export default function Workforce() {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [workmen, setWorkmen] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
@@ -23,6 +25,7 @@ export default function Workforce() {
             setWorkmen(response.data.data);
         } catch (error) {
             console.error('Failed to load workmen:', error);
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load workforce data.' });
         } finally {
             setLoading(false);
         }
@@ -32,14 +35,17 @@ export default function Workforce() {
         try {
             if (selectedWorkman) {
                 await workmenAPI.update(selectedWorkman.id, workmanData);
+                showAlert({ type: 'success', title: 'Success', message: 'Workman updated successfully.' });
             } else {
                 await workmenAPI.create(workmanData);
+                showAlert({ type: 'success', title: 'Success', message: 'Workman added successfully.' });
             }
             await loadWorkmen();
             setModalOpen(false);
             setSelectedWorkman(null);
         } catch (error) {
             console.error('Failed to save workman:', error);
+            showAlert({ type: 'error', title: 'Error', message: 'Failed to save workman data.' });
             throw error;
         }
     };

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { Building2, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import './Auth.css';
 
@@ -13,7 +14,7 @@ export default function Login() {
         email: '',
         password: ''
     });
-    const [error, setError] = useState('');
+    const { showAlert } = useAlert();
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -23,14 +24,13 @@ export default function Login() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
         setLoading(true);
 
         try {
             await login(formData.email, formData.password);
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Login failed. Please check your credentials.' });
         } finally {
             setLoading(false);
         }
@@ -49,13 +49,6 @@ export default function Login() {
                         <h1>{t('auth.welcomeBack')}</h1>
                         <p>{t('projects.subtitle')}</p>
                     </div>
-
-                    {error && (
-                        <div className="alert alert-danger">
-                            <AlertCircle size={20} />
-                            <span>{error}</span>
-                        </div>
-                    )}
 
                     <form onSubmit={handleSubmit} className="auth-form">
                         <div className="input-group">

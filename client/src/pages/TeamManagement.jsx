@@ -235,11 +235,19 @@ export default function TeamManagement() {
             }
 
             if (modalMode === 'add') {
-                await userAPI.invite(submitData);
+                const response = await userAPI.invite(submitData);
+                let messageStr = t('teamManagement.messages.addSuccess');
+                if (response.data?.devVerifyLink) {
+                    messageStr += `\nDev Link: ${response.data.devVerifyLink}`;
+                }
+                if (response.data?.devTemporaryPassword) {
+                    messageStr += `\nTemp Password: ${response.data.devTemporaryPassword}`;
+                }
+
                 showAlert({
                     type: 'success',
                     title: t('teamManagement.messages.addSuccess'),
-                    message: t('teamManagement.messages.addSuccess')
+                    message: messageStr
                 });
             } else {
                 // Don't send password if empty on edit

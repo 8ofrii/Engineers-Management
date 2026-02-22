@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Upload, User, Building2, UserCircle, AlertCircle, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import api, { tenantAPI } from '../services/api';
 import './Modal.css';
 import './Modal.css';
@@ -9,6 +10,7 @@ import './Modal.css';
 export default function ProfileModal({ isOpen, onClose, forceChangePassword = false }) {
     const { t } = useTranslation();
     const { user, updateUser } = useAuth();
+    const { showAlert } = useAlert();
     const fileInputRef = useRef(null);
 
     const [formData, setFormData] = useState({
@@ -195,7 +197,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
             setSuccessMessage('Company settings updated successfully');
         } catch (err) {
             console.error(err);
-            alert(err.response?.data?.message || 'Failed to update company');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Failed to update company' });
         } finally {
             setLoading(false);
         }
@@ -241,9 +243,9 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
         } catch (error) {
             console.error('Failed to update profile:', error);
             if (error.response?.data?.message) {
-                alert(error.response.data.message);
+                showAlert({ type: 'error', title: t('common.error') || 'Error', message: error.response.data.message });
             } else {
-                alert(t('profile.updateError'));
+                showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('profile.updateError') });
             }
         } finally {
             setLoading(false);

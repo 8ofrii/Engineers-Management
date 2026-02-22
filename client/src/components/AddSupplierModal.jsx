@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
+import { useAlert } from '../context/AlertContext';
 import './Modal.css';
 
 export default function AddSupplierModal({ isOpen, onClose, onSave, initialData = null }) {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [formData, setFormData] = useState({
         name: '',
         category: 'GENERAL',
@@ -84,7 +86,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             handleClose();
         } catch (error) {
             console.error('Failed to save supplier:', error);
-            // alert(t('common.error'));
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('common.error') || 'Failed to save supplier' });
         } finally {
             setLoading(false);
         }

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { Building2, Mail, Lock, User, Phone, AlertCircle } from 'lucide-react';
+import { useAlert } from '../context/AlertContext';
 import './Auth.css';
 
 export default function SignUp() {
@@ -17,7 +18,7 @@ export default function SignUp() {
         company: '',
         phone: ''
     });
-    const [error, setError] = useState('');
+    const { showAlert } = useAlert();
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
@@ -26,15 +27,14 @@ export default function SignUp() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
 
         if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match');
+            showAlert({ type: 'error', title: 'Error', message: 'Passwords do not match' });
             return;
         }
 
         if (formData.password.length < 6) {
-            setError('Password must be at least 6 characters');
+            showAlert({ type: 'error', title: 'Error', message: 'Password must be at least 6 characters' });
             return;
         }
 
@@ -50,7 +50,7 @@ export default function SignUp() {
             });
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed. Please try again.');
+            showAlert({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Registration failed. Please try again.' });
         } finally {
             setLoading(false);
         }
@@ -69,13 +69,6 @@ export default function SignUp() {
                         <h1>{t('auth.createAccount')}</h1>
                         <p>{t('projects.subtitle')}</p>
                     </div>
-
-                    {error && (
-                        <div className="alert alert-danger">
-                            <AlertCircle size={20} />
-                            <span>{error}</span>
-                        </div>
-                    )}
 
                     <form onSubmit={handleSubmit} className="auth-form">
                         <div className="input-group">

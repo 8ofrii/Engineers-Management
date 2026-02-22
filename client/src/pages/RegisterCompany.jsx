@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { Building2, Mail, Lock, AlertCircle, User, Phone, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { tenantAPI, authAPI } from '../services/api'; // Use APIs directly for granular control
 import './Auth.css';
@@ -9,6 +10,7 @@ import './Auth.css';
 export default function RegisterCompany() {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { showAlert } = useAlert();
     // const { registerCompany } = useAuth(); // Note: We need to access authAPI directly for verify
 
     // Step State: 1 = Form, 2 = Verification
@@ -17,6 +19,7 @@ export default function RegisterCompany() {
     // UI State
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [devCode, setDevCode] = useState('');
 
     const [formData, setFormData] = useState({
         companyName: '',
@@ -28,7 +31,6 @@ export default function RegisterCompany() {
         code: '' // Verification Code
     });
 
-    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
@@ -38,18 +40,17 @@ export default function RegisterCompany() {
     // Step 1: Submit Details & Request OTP
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
 
         // 1. Email Validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(formData.email)) {
-            setError(t('auth.invalidEmail') || 'Please enter a valid email address');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('auth.invalidEmail') || 'Please enter a valid email address' });
             return;
         }
 
         // 2. Password Match
         if (formData.password !== formData.confirmPassword) {
-            setError(t('auth.passwordsDoNotMatch') || 'Passwords do not match');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('auth.passwordsDoNotMatch') || 'Passwords do not match' });
             return;
         }
 
@@ -58,7 +59,7 @@ export default function RegisterCompany() {
         const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
         if (!strongPasswordRegex.test(formData.password)) {
-            setError('Password must be at least 8 characters and include uppercase, lowercase, number, and symbol.');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Password must be at least 8 characters and include uppercase, lowercase, number, and symbol.' });
             return;
         }
 
@@ -74,10 +75,14 @@ export default function RegisterCompany() {
                 password: formData.password
             });
 
+            if (response.data?.devVerificationCode) {
+                setDevCode(response.data.devVerificationCode);
+            }
+
             // On success
             setStep(2);
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed. Please try again.');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Registration failed. Please try again.' });
         } finally {
             setLoading(false);
         }
@@ -86,7 +91,6 @@ export default function RegisterCompany() {
     // Step 2: Submit Verification Code
     const handleVerify = async (e) => {
         e.preventDefault();
-        setError('');
         setLoading(true);
 
         try {
@@ -104,7 +108,7 @@ export default function RegisterCompany() {
             window.location.href = '/dashboard';
 
         } catch (err) {
-            setError(err.response?.data?.message || 'Verification failed. Invalid code.');
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Verification failed. Invalid code.' });
         } finally {
             setLoading(false);
         }
@@ -123,13 +127,6 @@ export default function RegisterCompany() {
                         <h1>{step === 1 ? 'Start Your Pilot' : 'Verify Email'}</h1>
                         <p>{step === 1 ? 'Create your construction company workspace' : `Enter the code sent to ${formData.email}`}</p>
                     </div>
-
-                    {error && (
-                        <div className="alert alert-danger">
-                            <AlertCircle size={20} />
-                            <span>{error}</span>
-                        </div>
-                    )}
 
                     {step === 1 ? (
                         <form onSubmit={handleSubmit} className="auth-form">
@@ -248,6 +245,12 @@ export default function RegisterCompany() {
                         </form>
                     ) : (
                         <form onSubmit={handleVerify} className="auth-form">
+                            {devCode && (
+                                <div style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid var(--color-success, #22c55e)', color: 'var(--color-success, #22c55e)', padding: '15px', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '8px', marginBottom: '15px' }}>
+                                    <div><CheckCircle size={16} style={{ display: 'inline', marginRight: '5px' }} /> <strong>[Dev Testing Mode]</strong></div>
+                                    <p style={{ margin: 0, fontSize: '14px' }}>Since SMTP might off locally, your code is: <strong style={{ letterSpacing: '2px', fontSize: '18px' }}>{devCode}</strong></p>
+                                </div>
+                            )}
                             {/* Verification Code */}
                             <div className="input-group">
                                 <label className="input-label"><CheckCircle size={16} /> Verification Code</label>

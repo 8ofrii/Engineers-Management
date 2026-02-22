@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { materialUsageAPI, projectsAPI } from '../services/api';
 import { Package, Search, Filter, ArrowRight, History } from 'lucide-react';
 import Layout from '../components/Layout';
+import { useAlert } from '../context/AlertContext';
 
 export default function Inventory() {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [batches, setBatches] = useState([]);
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -27,6 +29,7 @@ export default function Inventory() {
             setProjects(projectsRes.data.data || []);
         } catch (error) {
             console.error("Failed to load inventory data", error);
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load inventory data.' });
         } finally {
             setLoading(false);
         }

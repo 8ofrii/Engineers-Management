@@ -166,7 +166,8 @@ export const registerCompany = async (req, res, next) => {
         res.status(201).json({
             success: true,
             email: result.user.email,
-            message: 'Registration successful. Verification code sent to your email.'
+            message: 'Registration successful. Verification code sent to your email.',
+            devVerificationCode: process.env.NODE_ENV !== 'production' ? verificationCode : undefined
         });
     } catch (error) {
         next(error);
@@ -503,12 +504,10 @@ export const verifyInvite = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
     try {
         const { email } = req.body;
-        // There might be multiple users, but for forgot password we just need one valid one?
-        // Ideally we should send emails to all of them, or ask for tenant context.
-        // For simplicity, we findFirst. If user has multiple accounts, this might be tricky.
-        const user = await prisma.user.findFirst({ where: { email } });
+        // Find all users with this email (might be in multiple tenants)
+        const users = await prisma.user.findMany({ where: { email } });
 
-        if (!user) {
+        if (!users || users.length === 0) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
@@ -524,8 +523,9 @@ export const forgotPassword = async (req, res, next) => {
         // Set expire
         const resetPasswordExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-        await prisma.user.update({
-            where: { id: user.id },
+        // Update all associated accounts with this email
+        await prisma.user.updateMany({
+            where: { email },
             data: {
                 resetPasswordToken,
                 resetPasswordExpire
@@ -546,25 +546,35 @@ export const forgotPassword = async (req, res, next) => {
             </div>
         `;
 
+        // Send email to the first user instance (they all share the same email)
         try {
             await sendEmail({
-                email: user.email,
+                email: users[0].email,
                 subject: 'Password Reset Token',
                 message
             });
 
-            res.status(200).json({ success: true, message: 'Email sent' });
+            // For local development and testing
+            const isDev = process.env.NODE_ENV !== 'production';
+
+            res.status(200).json({
+                success: true,
+                message: 'Email sent. Please check your inbox.',
+                devResetUrl: isDev ? resetUrl : undefined // Expose link for dev testing testing without SMTP
+            });
         } catch (err) {
-            console.error(err);
-            await prisma.user.update({
-                where: { id: user.id },
+            console.error('Email sending failed:', err);
+
+            // Revert on failure
+            await prisma.user.updateMany({
+                where: { email },
                 data: {
                     resetPasswordToken: null,
                     resetPasswordExpire: null
                 }
             });
 
-            return res.status(500).json({ success: false, message: 'Email could not be sent' });
+            return res.status(500).json({ success: false, message: 'Email could not be sent. Please check SMTP configuration.' });
         }
     } catch (err) {
         next(err);
@@ -591,15 +601,16 @@ export const resetPassword = async (req, res, next) => {
         });
 
         if (!user) {
-            return res.status(400).json({ success: false, message: 'Invalid token' });
+            return res.status(400).json({ success: false, message: 'Invalid or expired token' });
         }
 
         // Set new password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(req.body.password, salt);
 
-        await prisma.user.update({
-            where: { id: user.id },
+        // Update all related accounts across tenants
+        await prisma.user.updateMany({
+            where: { resetPasswordToken },
             data: {
                 password: hashedPassword,
                 resetPasswordToken: null,

@@ -17,11 +17,13 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
+import { useAlert } from '../context/AlertContext';
 import './Dashboard.css';
 
 export default function Dashboard() {
     const { user } = useAuth();
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         projects: { total: 0, active: 0 },
@@ -76,6 +78,7 @@ export default function Dashboard() {
             setTransactionStats(statsRes.data.data);
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load dashboard data.' });
         } finally {
             setLoading(false);
         }

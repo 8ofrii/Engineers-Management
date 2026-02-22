@@ -20,6 +20,7 @@
   --bg-tertiary: hsl(220, 20%, 18%);
   --bg-elevated: hsl(220, 22%, 16%);
   --bg-overlay: hsla(220, 25%, 10%, 0.95);
+  --bg-glass: hsla(220, 22%, 16%, 0.7);
 
   /* Text Colors */
   --text-primary: hsl(0, 0%, 98%);
@@ -30,6 +31,7 @@
   /* Borders */
   --border-color: hsl(220, 18%, 22%);
   --border-color-light: hsl(220, 16%, 28%);
+  --border-glass: hsla(220, 80%, 45%, 0.1);
 
   /* Shadows */
   --shadow-sm: 0 2px 8px hsla(0, 0%, 0%, 0.2);
@@ -88,6 +90,7 @@
   --bg-tertiary: hsl(210, 18%, 95%);
   --bg-elevated: hsl(0, 0%, 100%);
   --bg-overlay: hsla(0, 0%, 100%, 0.95);
+  --bg-glass: hsla(0, 0%, 100%, 0.7);
 
   --text-primary: hsl(220, 25%, 15%);
   --text-secondary: hsl(220, 15%, 35%);
@@ -96,6 +99,7 @@
 
   --border-color: hsl(220, 16%, 88%);
   --border-color-light: hsl(220, 16%, 92%);
+  --border-glass: hsla(220, 80%, 45%, 0.15);
 
   --shadow-sm: 0 2px 8px hsla(220, 25%, 20%, 0.08);
   --shadow-md: 0 4px 16px hsla(220, 25%, 20%, 0.12);
@@ -235,10 +239,10 @@ a:hover {
 
 /* Glass Effect */
 .glass {
-  background: hsla(220, 22%, 16%, 0.7);
+  background: var(--bg-glass);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid hsla(220, 80%, 45%, 0.1);
+  border: 1px solid var(--border-glass);
 }
 
 /* Button Styles */
