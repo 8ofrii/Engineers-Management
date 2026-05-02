@@ -71,6 +71,21 @@ export const auditLogAPI = {
     history: (entity, entityId) => api.get(`/audit-logs/${entity}/${entityId}`)
 };
 
+// Phase 3 — Documents/photos per project
+export const documentsAPI = {
+    listByProject: (projectId, params) =>
+        api.get(`/project-documents/${projectId}`, { params }),
+    upload: (projectId, formData) =>
+        api.post(`/project-documents/${projectId}`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        }),
+    remove: (id) => api.delete(`/documents/${id}`),
+    uploadReceipt: (transactionId, formData) =>
+        api.patch(`/transactions/${transactionId}/receipt`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+};
+
 // Tenant approval thresholds (admin-only)
 export const tenantAPI = {
     get: () => api.get('/tenant'),

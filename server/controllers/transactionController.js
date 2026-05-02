@@ -1156,6 +1156,53 @@ export const deleteTransaction = async (req, res, next) => {
 // @desc    Update transaction
 // @route   PUT /api/transactions/:id
 // @access  Private (Owner/Admin)
+// @desc    Attach (or replace) a receipt photo on an existing transaction.
+// @route   PATCH /api/transactions/:id/receipt
+// @access  Private (creator / manager / admin) — multipart with file=image
+export const uploadReceipt = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        const { id } = req.params;
+        const tx = await prisma.transaction.findFirst({
+            where: { id, tenantId: req.user.tenantId }
+        });
+        if (!tx) {
+            return res.status(404).json({ success: false, message: 'Transaction not found' });
+        }
+
+        // Authorization: creator, manager, admin, super-admin
+        const canEdit =
+            tx.createdBy === req.user.id ||
+            req.user.role === 'PROJECT_MANAGER' ||
+            req.user.role === 'ADMIN' ||
+            req.user.role === 'SUPER_ADMIN';
+        if (!canEdit) {
+            return res.status(403).json({ success: false, message: 'Not authorized to attach a receipt to this transaction' });
+        }
+
+        const url = req.file.location || `/uploads/images/${req.file.filename}`;
+
+        const updated = await prisma.transaction.update({
+            where: { id },
+            data: { receiptPhotoUrl: url }
+        });
+
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Transaction',
+            entityId: id,
+            metadata: { field: 'receiptPhotoUrl', from: tx.receiptPhotoUrl || null, to: url }
+        });
+
+        res.status(200).json({ success: true, data: { id: updated.id, receiptPhotoUrl: updated.receiptPhotoUrl } });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const updateTransaction = async (req, res, next) => {
     try {
         const { id } = req.params;

@@ -22,6 +22,7 @@ import Finance from './pages/Finance';
 import Inventory from './pages/Inventory';
 import TwoFactorSettings from './pages/TwoFactorSettings';
 import AuditLog from './pages/AuditLog';
+import ProjectDocuments from './pages/ProjectDocuments';
 
 function App() {
     return (
@@ -138,6 +139,14 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <AuditLog />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/projects/:projectId/documents"
+                            element={
+                                <PrivateRoute>
+                                    <ProjectDocuments />
                                 </PrivateRoute>
                             }
                         />

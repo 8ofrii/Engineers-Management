@@ -381,7 +381,11 @@ If your numbers differ after seeding, the V1.2 math has drifted — investigate 
 - [x] **2FA (TOTP) for any user** — `User.totpSecret` + `User.totpEnabled`. `lib/totp.js` wraps otplib v13. Endpoints: `/api/auth/2fa/{status,enroll,confirm,disable,login}`. Two-step login: regular `/auth/login` returns `{ requires2FA, challengeToken }` if enabled; `/auth/2fa/login` redeems the challenge + 6-digit code for a full session token. QR code rendered server-side. Web page at `/security/two-factor` for self-service enroll/disable. 7 unit tests on the helper.
 - [x] **Activity feed UI** — `/audit-log` (admin-only sidebar entry). Calls `GET /api/audit-logs` with filter UI (entity / action / userId), expandable per-entry detail showing `before` / `after` / `metadata` JSON, cursor pagination, color-coded action badges.
 
-### Phase 3 — Photo & document logs
+### Phase 3 — Photo & document logs *(complete)*
+- [x] **Document model extended** — added `category` (DocumentCategory enum: PHOTO_PROGRESS / PHOTO_RECEIPT / PHOTO_DELIVERY / PHOTO_ISSUE / CONTRACT / PERMIT / DRAWING / REPORT / OTHER), `description`, `latitude`/`longitude` (decimal), `takenAt`, `uploadedBy`. Indexed on `(projectId, uploadedAt)` and `(category)`.
+- [x] **Document endpoints** — `GET /api/project-documents/:projectId` (list, optional `?category=…`), `POST /api/project-documents/:projectId` (multipart upload, S3 or local fallback), `DELETE /api/documents/:id` (uploader / admin only). Audited as `Document CREATE` and `Document DELETE`.
+- [x] **Receipt-photo upload** — `PATCH /api/transactions/:id/receipt` (multipart). Existing `receiptPhotoUrl` field on Transaction now has a real upload path. Audited as transaction `UPDATE` with field metadata.
+- [x] **Web Project Documents page** — `/projects/:projectId/documents`. Camera/upload button, category picker, optional GPS-tag from browser geolocation, gallery view with category icons, lightbox for image preview, delete-with-confirm.
 - [ ] **Receipt photo upload** on transactions (existing `receiptPhotoUrl` field — wire UI)
 - [ ] **Site photos** per project with GPS + timestamp
 - [ ] **Document model UI** (contracts, permits already in schema)

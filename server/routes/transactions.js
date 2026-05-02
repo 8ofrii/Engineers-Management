@@ -2,7 +2,7 @@ import express from 'express';
 import * as transactionController from '../controllers/transactionController.js';
 import { protect } from '../middleware/auth.js';
 import { verifyRole, verifyOwnership } from '../middleware/rbac.js';
-import { audioUpload } from '../middleware/upload.js';
+import { audioUpload, upload } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -92,6 +92,9 @@ router.get('/:id', transactionController.getTransaction);
 
 // Update transaction
 router.put('/:id', transactionController.updateTransaction);
+
+// Phase 3 — attach a receipt photo (multipart, field=file)
+router.patch('/:id/receipt', upload.single('file'), transactionController.uploadReceipt);
 
 // Delete transaction
 router.delete('/:id', transactionController.deleteTransaction);

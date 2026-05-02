@@ -34,6 +34,7 @@ import workOrderRoutes from './routes/workOrders.js';
 import officeFeeRoutes from './routes/officeFees.js';
 import materialRoutes from './routes/materials.js';
 import auditLogRoutes from './routes/auditLogs.js';
+import { projectDocsRouter, docsRouter } from './routes/documents.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -130,6 +131,8 @@ app.use('/api/office-fees', officeFeeRoutes); // V2: Office Fee Configuration
 app.use('/api/categories', categoryRoutes); // V1.2: Arabic Categories
 app.use('/api/materials', materialRoutes); // Added Materials route
 app.use('/api/audit-logs', auditLogRoutes); // Phase 1: audit trail
+app.use('/api/project-documents', projectDocsRouter); // Phase 3: list/upload by project
+app.use('/api/documents', docsRouter);                // Phase 3: delete by document id
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

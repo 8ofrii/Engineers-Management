@@ -87,6 +87,7 @@ model User {
   tenant                Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workmanships          Workmanship[]
   auditLogs             AuditLog[]
+  uploadedDocuments     Document[]
 
   @@unique([email, tenantId])
   @@unique([phone, tenantId])
@@ -463,18 +464,46 @@ model Notification {
 }
 
 model Document {
-  id         String   @id @default(uuid())
-  name       String
-  url        String
-  fileType   String?
-  fileSize   Int?
-  projectId  String
-  uploadedAt DateTime @default(now())
-  tenantId   String?
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String           @id @default(uuid())
+  name        String
+  url         String
+  fileType    String?
+  fileSize    Int?
+  /// Free-form category. Phase 3 conventions:
+  ///   "PHOTO_PROGRESS" | "PHOTO_RECEIPT" | "PHOTO_DELIVERY" | "PHOTO_ISSUE"
+  ///   "CONTRACT" | "PERMIT" | "DRAWING" | "REPORT" | "OTHER" (default)
+  category    DocumentCategory @default(OTHER)
+  description String?
+  /// Optional GPS coordinates captured by the mobile camera at the moment
+  /// of photo capture. Web uploads will leave these null.
+  latitude    Decimal?         @db.Decimal(10, 7)
+  longitude   Decimal?         @db.Decimal(10, 7)
+  /// EXIF-derived "photo taken at" if the client provides it; falls back
+  /// to uploadedAt when missing.
+  takenAt     DateTime?
+  uploadedBy  String?
+  uploader    User?            @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  projectId   String
+  uploadedAt  DateTime         @default(now())
+  tenantId    String?
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([projectId, uploadedAt])
+  @@index([category])
   @@map("documents")
+}
+
+enum DocumentCategory {
+  PHOTO_PROGRESS
+  PHOTO_RECEIPT
+  PHOTO_DELIVERY
+  PHOTO_ISSUE
+  CONTRACT
+  PERMIT
+  DRAWING
+  REPORT
+  OTHER
 }
 
 model Note {
