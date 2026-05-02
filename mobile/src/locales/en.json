@@ -14,8 +14,38 @@
     "tabs": {
         "projects": "Projects",
         "finance": "Finance",
+        "dsr": "Reports",
         "notifications": "Alerts",
         "profile": "Profile"
+    },
+    "dsr": {
+        "title": "Daily Reports",
+        "empty": "No daily reports yet",
+        "filter": {
+            "all": "All",
+            "draft": "Draft",
+            "submitted": "Pending",
+            "acknowledged": "Done"
+        },
+        "weather": "Weather",
+        "temperature": "Temp",
+        "hours": "Hours",
+        "progress": "Progress",
+        "issues": "Issues",
+        "visitors": "Visitors",
+        "attendance": "Workmen Attendance",
+        "materials": "Materials Received",
+        "photos": "Photos",
+        "acknowledge": "Acknowledge",
+        "acknowledged": "Acknowledged",
+        "acknowledgedMsg": "Engineer has been notified.",
+        "managerNote": "Manager note",
+        "ackNotesPlaceholder": "Notes for the engineer (optional)…",
+        "submit": "Submit for review",
+        "submitConfirm": "Submit for review?",
+        "submitConfirmMsg": "Once submitted, you cannot edit until a manager rejects it.",
+        "draftHint": "This report is a draft. Submit it for manager review.",
+        "notFound": "Report not found"
     },
     "auth": {
         "login": "Log in",

@@ -84,4 +84,14 @@ export const usersApi = {
     list: () => api.get('/users')
 };
 
+export const dsrApi = {
+    list: (params) => api.get('/dsr', { params }),
+    get: (id) => api.get(`/dsr/${id}`),
+    create: (data) => api.post('/dsr', data),
+    update: (id, data) => api.put(`/dsr/${id}`, data),
+    submit: (id) => api.put(`/dsr/${id}/submit`),
+    acknowledge: (id, acknowledgeNotes) =>
+        api.put(`/dsr/${id}/acknowledge`, { acknowledgeNotes })
+};
+
 export default api;

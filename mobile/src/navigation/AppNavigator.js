@@ -16,6 +16,8 @@ import ClientsScreen from '../screens/ClientsScreen';
 import SuppliersScreen from '../screens/SuppliersScreen';
 import WorkmenScreen from '../screens/WorkmenScreen';
 import FundEngineerScreen from '../screens/FundEngineerScreen';
+import DSRListScreen from '../screens/DSRListScreen';
+import DSRDetailScreen from '../screens/DSRDetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -31,6 +33,13 @@ const FinanceStack = () => (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="FinanceList" component={FinanceScreen} />
         <Stack.Screen name="AddTransaction" component={AddTransactionScreen} />
+    </Stack.Navigator>
+);
+
+const DSRStack = () => (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="DSRList" component={DSRListScreen} />
+        <Stack.Screen name="DSRDetail" component={DSRDetailScreen} />
     </Stack.Navigator>
 );
 
@@ -58,6 +67,7 @@ const TabBar = () => {
                     const icons = {
                         ProjectsTab: 'folder-open-outline',
                         FinanceTab: 'cash-outline',
+                        DSRTab: 'clipboard-outline',
                         NotificationsTab: 'notifications-outline',
                         ProfileTab: 'person-circle-outline'
                     };
@@ -67,6 +77,7 @@ const TabBar = () => {
         >
             <Tab.Screen name="ProjectsTab" component={ProjectsStack} options={{ title: t('tabs.projects') }} />
             <Tab.Screen name="FinanceTab" component={FinanceStack} options={{ title: t('tabs.finance') }} />
+            <Tab.Screen name="DSRTab" component={DSRStack} options={{ title: t('tabs.dsr') || 'Reports' }} />
             <Tab.Screen name="NotificationsTab" component={NotificationsScreen} options={{ title: t('tabs.notifications') }} />
             <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ title: t('tabs.profile') }} />
         </Tab.Navigator>

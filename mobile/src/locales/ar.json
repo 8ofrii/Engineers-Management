@@ -14,8 +14,38 @@
     "tabs": {
         "projects": "المشاريع",
         "finance": "المالية",
+        "dsr": "التقارير",
         "notifications": "الإشعارات",
         "profile": "الحساب"
+    },
+    "dsr": {
+        "title": "التقارير اليومية",
+        "empty": "لا توجد تقارير يومية",
+        "filter": {
+            "all": "الكل",
+            "draft": "مسودة",
+            "submitted": "بانتظار",
+            "acknowledged": "تم الاعتماد"
+        },
+        "weather": "الطقس",
+        "temperature": "الحرارة",
+        "hours": "ساعات",
+        "progress": "التقدم",
+        "issues": "مشاكل",
+        "visitors": "زيارات",
+        "attendance": "حضور العمال",
+        "materials": "مواد مستلمة",
+        "photos": "صور",
+        "acknowledge": "اعتماد",
+        "acknowledged": "تم الاعتماد",
+        "acknowledgedMsg": "تم إخطار المهندس.",
+        "managerNote": "ملاحظة المدير",
+        "ackNotesPlaceholder": "ملاحظات للمهندس (اختياري)…",
+        "submit": "إرسال للمراجعة",
+        "submitConfirm": "إرسال للمراجعة؟",
+        "submitConfirmMsg": "بعد الإرسال لا يمكن التعديل حتى يرفض المدير التقرير.",
+        "draftHint": "هذا التقرير مسودة. أرسله لمراجعة المدير.",
+        "notFound": "التقرير غير موجود"
     },
     "auth": {
         "login": "تسجيل الدخول",
