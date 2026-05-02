@@ -20,6 +20,8 @@ import Reports from './pages/Reports';
 import TeamManagement from './pages/TeamManagement';
 import Finance from './pages/Finance';
 import Inventory from './pages/Inventory';
+import TwoFactorSettings from './pages/TwoFactorSettings';
+import AuditLog from './pages/AuditLog';
 
 function App() {
     return (
@@ -120,6 +122,22 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <Inventory />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/security/two-factor"
+                            element={
+                                <PrivateRoute>
+                                    <TwoFactorSettings />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/audit-log"
+                            element={
+                                <PrivateRoute>
+                                    <AuditLog />
                                 </PrivateRoute>
                             }
                         />

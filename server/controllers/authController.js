@@ -3,13 +3,32 @@ import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import sendEmail from '../utils/sendEmail.js';
 import crypto from 'crypto';
+import { generateSecret, verifyToken } from '../lib/totp.js';
+import { auditFromReq } from '../lib/audit.js';
 
-// Generate JWT Token
 // Generate JWT Token
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRE
     });
+};
+
+// Short-lived 2FA challenge token. Not a full session — only valid for the
+// /auth/2fa/login exchange. The `purpose: '2fa'` claim prevents this token
+// from being used as a regular auth token even if leaked into another header.
+const generate2faChallenge = (userId) => {
+    return jwt.sign({ id: userId, purpose: '2fa' }, process.env.JWT_SECRET, {
+        expiresIn: '5m'
+    });
+};
+
+const verify2faChallenge = (token) => {
+    try {
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        return payload.purpose === '2fa' ? payload : null;
+    } catch {
+        return null;
+    }
 };
 
 // @desc    Register user (Legacy)
@@ -315,6 +334,18 @@ export const login = async (req, res, next) => {
             });
         }
 
+        // Two-factor challenge — if the user has TOTP enabled, don't issue a
+        // full session yet. Hand back a short-lived challenge token that they
+        // must redeem at /api/auth/2fa/login with a valid 6-digit code.
+        if (user.totpEnabled) {
+            return res.status(200).json({
+                success: true,
+                requires2FA: true,
+                challengeToken: generate2faChallenge(user.id),
+                message: 'Two-factor code required'
+            });
+        }
+
         // Generate token
         const token = generateToken(user.id);
 
@@ -331,6 +362,179 @@ export const login = async (req, res, next) => {
                 tenantId: user.tenantId,
                 permissions: user.permissions || [],
                 mustChangePassword: user.mustChangePassword || false
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Step 2 of 2FA login: redeem challenge token + 6-digit code → full session.
+// @route   POST /api/auth/2fa/login
+// @access  Public (presents a valid challenge token)
+export const login2FA = async (req, res, next) => {
+    try {
+        const { challengeToken, code } = req.body;
+        if (!challengeToken || !code) {
+            return res.status(400).json({ success: false, message: 'challengeToken and code are required' });
+        }
+
+        const claims = verify2faChallenge(challengeToken);
+        if (!claims) {
+            return res.status(401).json({ success: false, message: 'Invalid or expired challenge token' });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: claims.id },
+            include: { tenant: true }
+        });
+        if (!user || !user.isActive || !user.totpEnabled || !user.totpSecret) {
+            return res.status(401).json({ success: false, message: 'Two-factor not enabled for this account' });
+        }
+
+        if (!(await verifyToken(code, user.totpSecret))) {
+            return res.status(401).json({ success: false, message: 'Invalid two-factor code' });
+        }
+
+        const token = generateToken(user.id);
+        res.status(200).json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                company: user.tenant ? user.tenant.name : user.company,
+                companyLogo: user.tenant ? user.tenant.logo : null,
+                tenantId: user.tenantId,
+                permissions: user.permissions || [],
+                mustChangePassword: user.mustChangePassword || false
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Begin 2FA enrollment: generate a fresh secret + QR code data URL.
+//          Caller must verify the secret with `confirmEnroll2FA` before it
+//          becomes active. Until verified, totpEnabled stays false.
+// @route   POST /api/auth/2fa/enroll
+// @access  Private
+export const enroll2FA = async (req, res, next) => {
+    try {
+        if (req.user.totpEnabled) {
+            return res.status(400).json({
+                success: false,
+                message: 'Two-factor is already enabled. Disable it first to re-enroll.'
+            });
+        }
+
+        const { secret, otpauth, qrDataUrl } = await generateSecret(req.user.email);
+
+        // Stage the secret on the user row but keep totpEnabled=false until
+        // the user proves they can produce a code from it.
+        await prisma.user.update({
+            where: { id: req.user.id },
+            data: { totpSecret: secret, totpEnabled: false }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: { secret, otpauth, qrDataUrl }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Confirm 2FA enrollment with a fresh code. Flips totpEnabled=true.
+// @route   POST /api/auth/2fa/confirm
+// @access  Private
+export const confirmEnroll2FA = async (req, res, next) => {
+    try {
+        const { code } = req.body;
+
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (!user.totpSecret) {
+            return res.status(400).json({ success: false, message: 'No enrollment in progress. Call /enroll first.' });
+        }
+        if (user.totpEnabled) {
+            return res.status(400).json({ success: false, message: 'Two-factor already enabled' });
+        }
+        if (!(await verifyToken(code, user.totpSecret))) {
+            return res.status(400).json({ success: false, message: 'Invalid code; try again with the next one shown in your authenticator' });
+        }
+
+        await prisma.user.update({
+            where: { id: req.user.id },
+            data: { totpEnabled: true }
+        });
+
+        await auditFromReq(req, {
+            action: '2FA_ENABLE',
+            entity: 'User',
+            entityId: req.user.id
+        });
+
+        res.status(200).json({ success: true, message: 'Two-factor enabled' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Disable 2FA. Requires the current password AND a valid TOTP code.
+// @route   POST /api/auth/2fa/disable
+// @access  Private
+export const disable2FA = async (req, res, next) => {
+    try {
+        const { password, code } = req.body;
+
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (!user.totpEnabled) {
+            return res.status(400).json({ success: false, message: 'Two-factor not currently enabled' });
+        }
+
+        const passwordOk = await bcrypt.compare(password || '', user.password);
+        if (!passwordOk) {
+            return res.status(401).json({ success: false, message: 'Invalid password' });
+        }
+        if (!(await verifyToken(code, user.totpSecret))) {
+            return res.status(401).json({ success: false, message: 'Invalid two-factor code' });
+        }
+
+        await prisma.user.update({
+            where: { id: req.user.id },
+            data: { totpEnabled: false, totpSecret: null }
+        });
+
+        await auditFromReq(req, {
+            action: '2FA_DISABLE',
+            entity: 'User',
+            entityId: req.user.id
+        });
+
+        res.status(200).json({ success: true, message: 'Two-factor disabled' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Status endpoint — does this account have 2FA enabled?
+// @route   GET /api/auth/2fa/status
+// @access  Private
+export const status2FA = async (req, res, next) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: { totpEnabled: true, totpSecret: true }
+        });
+        res.status(200).json({
+            success: true,
+            data: {
+                enabled: !!user.totpEnabled,
+                pendingEnrollment: !user.totpEnabled && !!user.totpSecret
             }
         });
     } catch (error) {

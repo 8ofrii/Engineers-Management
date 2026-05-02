@@ -65,3 +65,20 @@ export const updateProfileSchema = z.object({
     currentPassword: z.string().min(1).max(200).optional(),
     newPassword: z.string().min(8).max(200).optional()
 });
+
+// 2FA — TOTP code is always exactly 6 digits.
+const totpCode = z.string().regex(/^\d{6}$/, 'Code must be 6 digits');
+
+export const login2FASchema = z.object({
+    challengeToken: z.string().min(20).max(500),
+    code: totpCode
+});
+
+export const confirmEnroll2FASchema = z.object({
+    code: totpCode
+});
+
+export const disable2FASchema = z.object({
+    password: z.string().min(1).max(200),
+    code: totpCode
+});

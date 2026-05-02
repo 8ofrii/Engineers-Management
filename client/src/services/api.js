@@ -50,12 +50,35 @@ export const authAPI = {
     verifyEmail: (data) => api.post('/auth/verify-email', data), // SaaS Sign-up Step 2
     verifyInvite: (token) => api.post('/auth/verify-invite', { token }),
     login: (data) => api.post('/auth/login', data),
+    login2FA: (data) => api.post('/auth/2fa/login', data),
     forgotPassword: (data) => api.post('/auth/forgot-password', data),
     resetPassword: (token, data) => api.put(`/auth/reset-password/${token}`, data),
     getMe: () => api.get('/auth/me'),
     updateProfile: (formData) => api.put('/auth/profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    }),
+    twoFactor: {
+        status: () => api.get('/auth/2fa/status'),
+        enroll: () => api.post('/auth/2fa/enroll'),
+        confirm: (code) => api.post('/auth/2fa/confirm', { code }),
+        disable: (password, code) => api.post('/auth/2fa/disable', { password, code })
+    }
+};
+
+// Audit log API (admin-only listing; per-resource history available to any tenant member)
+export const auditLogAPI = {
+    list: (params) => api.get('/audit-logs', { params }),
+    history: (entity, entityId) => api.get(`/audit-logs/${entity}/${entityId}`)
+};
+
+// Tenant approval thresholds (admin-only)
+export const tenantAPI = {
+    get: () => api.get('/tenant'),
+    update: (formData) => api.put('/tenant', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    getApprovalThresholds: () => api.get('/tenant/approval-thresholds'),
+    updateApprovalThresholds: (thresholds) => api.put('/tenant/approval-thresholds', { thresholds })
 };
 
 export const userAPI = {

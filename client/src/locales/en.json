@@ -36,7 +36,9 @@
         "finance": "Accounting",
         "workOrders": "Work Orders",
         "chat": "Chat Assistant",
-        "reports": "Reports"
+        "reports": "Reports",
+        "auditLog": "Activity Log",
+        "twoFactor": "Two-Factor"
     },
     "dashboard": {
         "title": "Dashboard",

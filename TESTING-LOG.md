@@ -4,6 +4,62 @@
 
 ---
 
+## 2026-05-02 — Phase 2 (part 2): 2FA + Activity Feed UI
+
+**Author**: Claude
+**Scope**: Backend 2FA + frontend 2FA settings + activity feed UI
+
+### What landed
+
+**Backend**
+- `User.totpSecret String?` and `User.totpEnabled Boolean @default(false)` added to schema (db pushed).
+- New `server/lib/totp.js` wrapping `otplib` v13 functional API (the `authenticator` shape no longer exists in v13). `generateSecret()`, `verifyToken()` (async), `getOtpAuthUrl()`. Renders QR via `qrcode` npm package as data-URL.
+- `authController` extended:
+  - `login` now returns `{ requires2FA: true, challengeToken }` when `user.totpEnabled` instead of issuing a full session token. Challenge token is a 5-min JWT with `purpose: '2fa'` claim — explicitly rejected by the regular auth path.
+  - `login2FA` (POST /api/auth/2fa/login) — redeems the challenge token + 6-digit code for a full session.
+  - `enroll2FA` — generates and stages a fresh secret, returns QR + otpauth URL. `totpEnabled` stays false until confirmation.
+  - `confirmEnroll2FA` — verifies a code against the staged secret, flips `totpEnabled=true`. Audits `2FA_ENABLE`.
+  - `disable2FA` — requires current password AND a valid TOTP code. Audits `2FA_DISABLE`.
+  - `status2FA` — returns `{ enabled, pendingEnrollment }`.
+- Zod schemas: `login2FASchema`, `confirmEnroll2FASchema`, `disable2FASchema`. 6-digit regex enforced.
+- New `tests/totp.test.js` — 7 tests on the TOTP helper (success, wrong-secret rejection, malformed input, getOtpAuthUrl shape).
+
+**Frontend**
+- `client/src/services/api.js` — added `authAPI.login2FA`, `authAPI.twoFactor.{status,enroll,confirm,disable}`, plus `auditLogAPI.{list,history}` and `tenantAPI.{getApprovalThresholds, updateApprovalThresholds}`.
+- `AuthContext`:
+  - `login()` now passes through `requires2FA` responses without storing a session.
+  - New `complete2FALogin(challengeToken, code)` finalizes the session.
+- `Login.jsx` — branches into a code-input view when `requires2FA` is returned; auto-strips non-digits, autofocus, calls `complete2FALogin`.
+- New page `TwoFactorSettings.jsx` at `/security/two-factor` — status banner, enroll flow with QR display + secret-copy button + 6-digit confirm input, disable flow requiring password + code.
+- New page `AuditLog.jsx` at `/audit-log` (admin-only) — filterable by entity / action / userId, expandable per-row JSON details (before/after/metadata), cursor-based "Load more" pagination, action-color badges.
+- Sidebar nav: ShieldCheck icon for "Two-Factor" (every user); Activity icon for "Activity Log" (admin/super-admin only). Locale keys `nav.auditLog`, `nav.twoFactor` added in `en.json` + `ar.json`.
+
+### Verified
+
+- 61/61 server tests passing (35 schema + 19 thresholds + 7 totp).
+- Server boots clean.
+- `/api/auth/2fa/status` correctly 401s without token.
+- `/api/auth/2fa/login` validates input (400 for missing fields).
+- Bad challenge tokens return 401 with "Invalid or expired challenge token".
+- All locale JSON parses cleanly.
+
+### Pending live tests (need browser + a real authenticator app)
+
+- [ ] Visit `/security/two-factor` → "Enable Two-Factor" → QR shows
+- [ ] Scan with Google Authenticator → enter code → confirm → status flips to ON
+- [ ] Logout, login again → `/api/auth/login` returns `{ requires2FA, challengeToken }` → form switches to 6-digit input
+- [ ] Enter valid TOTP → land on dashboard
+- [ ] Enter wrong code → 401 "Invalid two-factor code", form stays
+- [ ] Wait 5+ minutes after first step, enter code → 401 "Invalid or expired challenge token"
+- [ ] On `/security/two-factor`, click "Disable" → enter password + code → status flips OFF
+- [ ] Visit `/audit-log` as admin → see entries from prior test sessions
+- [ ] Filter by entity=User action=ROLE_CHANGE → shows only role changes
+- [ ] Expand an entry → see before/after JSON with secrets redacted (no passwords/tokens)
+- [ ] Visit `/audit-log` as engineer → 403 / "Admins only" message
+- [ ] Pagination: trigger >50 entries, click "Load more" → next page appears
+
+---
+
 ## 2026-05-02 — Phase 2 (part 1): Multi-level approvals + Restore endpoints
 
 **Author**: Claude

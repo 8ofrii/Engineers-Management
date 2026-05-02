@@ -21,7 +21,9 @@ import {
     Settings,
     UserCog,
     Wallet,
-    ClipboardList
+    ClipboardList,
+    ShieldCheck,
+    Activity
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -87,7 +89,10 @@ export default function Layout({ children }) {
 
     if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
         navItems.push({ path: '/team', icon: UserCog, label: t('teamManagement.title') });
+        navItems.push({ path: '/audit-log', icon: Activity, label: t('nav.auditLog') || 'Activity Log' });
     }
+    // Two-factor settings — every authenticated user can manage their own.
+    navItems.push({ path: '/security/two-factor', icon: ShieldCheck, label: t('nav.twoFactor') || 'Two-Factor' });
 
 
 

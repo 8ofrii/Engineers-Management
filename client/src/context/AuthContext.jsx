@@ -38,13 +38,30 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         const response = await authAPI.login({ email, password });
-        const { token, user } = response.data;
 
+        // 2FA branch: backend returns { requires2FA: true, challengeToken }
+        // Don't store anything yet — caller (Login page) shows the code prompt
+        // and then calls complete2FALogin().
+        if (response.data?.requires2FA) {
+            return response.data;
+        }
+
+        const { token, user } = response.data;
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
         setToken(token);
         setUser(user);
 
+        return response.data;
+    };
+
+    const complete2FALogin = async (challengeToken, code) => {
+        const response = await authAPI.login2FA({ challengeToken, code });
+        const { token, user } = response.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setToken(token);
+        setUser(user);
         return response.data;
     };
 
@@ -89,6 +106,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         isAuthenticated: !!user,
         login,
+        complete2FALogin,
         register,
         registerCompany,
         logout,

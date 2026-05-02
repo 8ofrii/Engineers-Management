@@ -3,13 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
-import { Building2, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Building2, Mail, Lock, AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import './Auth.css';
 
 export default function Login() {
     const { t } = useTranslation();
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, complete2FALogin } = useAuth();
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -17,6 +17,11 @@ export default function Login() {
     const { showAlert } = useAlert();
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+
+    // 2FA challenge state — when set, the user has passed password but
+    // needs to enter a TOTP code to complete login.
+    const [twoFactor, setTwoFactor] = useState(null); // { challengeToken } | null
+    const [twoFactorCode, setTwoFactorCode] = useState('');
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,7 +32,11 @@ export default function Login() {
         setLoading(true);
 
         try {
-            await login(formData.email, formData.password);
+            const result = await login(formData.email, formData.password);
+            if (result?.requires2FA) {
+                setTwoFactor({ challengeToken: result.challengeToken });
+                return;
+            }
             navigate('/dashboard');
         } catch (err) {
             showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Login failed. Please check your credentials.' });
@@ -35,6 +44,81 @@ export default function Login() {
             setLoading(false);
         }
     };
+
+    const handle2FASubmit = async (e) => {
+        e.preventDefault();
+        if (!/^\d{6}$/.test(twoFactorCode.trim())) {
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Enter a 6-digit code from your authenticator app' });
+            return;
+        }
+        setLoading(true);
+        try {
+            await complete2FALogin(twoFactor.challengeToken, twoFactorCode.trim());
+            navigate('/dashboard');
+        } catch (err) {
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Invalid code' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 2FA challenge view — replaces the email/password form when active.
+    if (twoFactor) {
+        return (
+            <div className="auth-container">
+                <div className="auth-background"></div>
+                <div className="auth-content">
+                    <div className="auth-card glass">
+                        <div className="auth-header">
+                            <div className="auth-logo"><ShieldCheck size={40} /></div>
+                            <h1>{t('auth.twoFactorTitle') || 'Two-Factor Code'}</h1>
+                            <p>{t('auth.twoFactorPrompt') || 'Open your authenticator app and enter the 6-digit code.'}</p>
+                        </div>
+                        <form onSubmit={handle2FASubmit} className="auth-form">
+                            <div className="input-group">
+                                <label className="input-label">
+                                    <Lock size={16} />
+                                    {t('auth.code') || 'Code'}
+                                </label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="\d{6}"
+                                    maxLength={6}
+                                    autoComplete="one-time-code"
+                                    autoFocus
+                                    className="input"
+                                    placeholder="123456"
+                                    value={twoFactorCode}
+                                    onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    required
+                                    style={{ fontSize: '24px', letterSpacing: '8px', textAlign: 'center' }}
+                                />
+                            </div>
+                            <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <div className="spinner" style={{ width: '20px', height: '20px', borderWidth: '2px' }}></div>
+                                        {t('auth.signingIn') || 'Verifying…'}
+                                    </>
+                                ) : (
+                                    t('auth.verify') || 'Verify'
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setTwoFactor(null); setTwoFactorCode(''); }}
+                                className="btn"
+                                style={{ marginTop: '12px', background: 'transparent', color: 'var(--color-primary)' }}
+                            >
+                                {t('common.cancel') || 'Cancel'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="auth-container">

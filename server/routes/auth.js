@@ -1,5 +1,20 @@
 import express from 'express';
-import { register, registerCompany, verifyEmail, login, getMe, updateProfile, verifyInvite, forgotPassword, resetPassword } from '../controllers/authController.js';
+import {
+    register,
+    registerCompany,
+    verifyEmail,
+    login,
+    login2FA,
+    enroll2FA,
+    confirmEnroll2FA,
+    disable2FA,
+    status2FA,
+    getMe,
+    updateProfile,
+    verifyInvite,
+    forgotPassword,
+    resetPassword
+} from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 import { validate } from '../middleware/validate.js';
@@ -12,7 +27,10 @@ import {
     forgotPasswordSchema,
     resetPasswordParamsSchema,
     resetPasswordBodySchema,
-    updateProfileSchema
+    updateProfileSchema,
+    login2FASchema,
+    confirmEnroll2FASchema,
+    disable2FASchema
 } from '../schemas/auth.schema.js';
 
 const router = express.Router();
@@ -36,6 +54,13 @@ router.put(
     validate({ body: updateProfileSchema }),
     updateProfile
 );
+
+// Two-factor authentication (Phase 2)
+router.post('/2fa/login', validate({ body: login2FASchema }), login2FA);
+router.get('/2fa/status', protect, status2FA);
+router.post('/2fa/enroll', protect, enroll2FA);
+router.post('/2fa/confirm', protect, validate({ body: confirmEnroll2FASchema }), confirmEnroll2FA);
+router.post('/2fa/disable', protect, validate({ body: disable2FASchema }), disable2FA);
 
 export default router;
 

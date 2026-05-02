@@ -70,6 +70,8 @@ model User {
   permissions           String[]          @default([])
   resetPasswordExpire   DateTime?
   resetPasswordToken    String?
+  totpSecret            String?           // base32 secret; nullable until enrolled
+  totpEnabled           Boolean           @default(false)
   roleId                String?
   chatMessages          ChatMessage[]
   custodyTransfers      CustodyTransfer[]
