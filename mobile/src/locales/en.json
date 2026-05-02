@@ -1,0 +1,151 @@
+{
+    "app": {
+        "name": "Engineers Management"
+    },
+    "common": {
+        "back": "Back",
+        "loading": "Loading...",
+        "error": "Error",
+        "cancel": "Cancel",
+        "save": "Save",
+        "ok": "OK",
+        "empty": "Nothing to show"
+    },
+    "tabs": {
+        "projects": "Projects",
+        "finance": "Finance",
+        "notifications": "Alerts",
+        "profile": "Profile"
+    },
+    "auth": {
+        "login": "Log in",
+        "email": "Email",
+        "password": "Password",
+        "signIn": "Sign In",
+        "signingIn": "Signing in…",
+        "loginFailed": "Login failed. Please check your credentials."
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "welcome": "Welcome, {{name}}",
+        "logout": "Log out",
+        "switchLanguage": "العربية",
+        "projects": "Projects",
+        "active": "Active",
+        "totalBudget": "Total Budget",
+        "safeBalance": "Safe Balance",
+        "noProjects": "No projects yet"
+    },
+    "status": {
+        "PLANNING": "Planning",
+        "IN_PROGRESS": "In Progress",
+        "ON_HOLD": "On Hold",
+        "COMPLETED": "Completed",
+        "CANCELLED": "Cancelled"
+    },
+    "txStatus": {
+        "DRAFT": "Draft",
+        "PENDING_APPROVAL": "Pending",
+        "APPROVED": "Approved",
+        "REJECTED": "Rejected",
+        "CANCELLED": "Cancelled"
+    },
+    "project": {
+        "notFound": "Project not found",
+        "client": "Client",
+        "engineer": "Engineer",
+        "location": "Location",
+        "type": "Type",
+        "startDate": "Start Date",
+        "endDate": "End Date",
+        "revenueModel": "Revenue Model",
+        "mgmtFee": "Mgmt Fee",
+        "financials": "Financials",
+        "budget": "Budget",
+        "actualCost": "Actual Cost",
+        "officeRevenue": "Office Revenue",
+        "safeBalance": "Project Safe",
+        "transactions": "Transactions",
+        "noTransactions": "No transactions yet",
+        "addTransaction": "Add Transaction"
+    },
+    "directory": {
+        "clients": "Clients",
+        "suppliers": "Suppliers",
+        "workmen": "Workmen",
+        "contact": "Contact",
+        "paymentTerms": "Terms",
+        "dailyRate": "Daily Rate",
+        "totalPaid": "Total Paid",
+        "inactive": "Inactive"
+    },
+    "fund": {
+        "title": "Fund Engineer",
+        "engineer": "Engineer",
+        "selectEngineer": "Select an engineer",
+        "amount": "Amount",
+        "currentBalance": "balance",
+        "description": "Description",
+        "descriptionPlaceholder": "Why this top-up?",
+        "submit": "Send Funds",
+        "success": "Funded",
+        "successMsg": "{{name}} now has {{balance}} EGP",
+        "invalidAmount": "Enter a valid amount",
+        "howItWorks": "How it works",
+        "howItWorksText": "Funding adds to the engineer's custody wallet. They can spend it on approved expenses (CUSTODY_WALLET payments)."
+    },
+    "finance": {
+        "title": "Finance",
+        "noTransactions": "No transactions",
+        "filter": {
+            "ALL": "All",
+            "PENDING": "Pending",
+            "MINE": "Mine"
+        },
+        "approve": "Approve",
+        "reject": "Reject",
+        "approved": "Approved",
+        "approvedMsg": "Transaction approved successfully",
+        "rejectTitle": "Reject Transaction",
+        "rejectReason": "Reason for rejection"
+    },
+    "addTx": {
+        "title": "New Transaction",
+        "type": "Type",
+        "income": "Income",
+        "expense": "Expense",
+        "project": "Project",
+        "selectProject": "Select a project",
+        "category": "Category",
+        "selectCategory": "Select a category",
+        "amount": "Amount",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional notes...",
+        "paymentMethod": "Payment Method",
+        "inventoryPurchase": "Inventory Purchase",
+        "inventoryHint": "Creates a material batch; profit recognized on usage",
+        "submit": "Save Transaction",
+        "success": "Saved",
+        "successMsg": "Transaction created successfully",
+        "invalidAmount": "Please enter a valid amount"
+    },
+    "notif": {
+        "title": "Notifications",
+        "empty": "No notifications",
+        "markAllRead": "Mark all read"
+    },
+    "profile": {
+        "logout": "Log out",
+        "logoutConfirm": "Log out?",
+        "language": "Language",
+        "preferences": "Preferences",
+        "account": "Account",
+        "custody": "My Custody",
+        "currentBalance": "Current balance",
+        "pendingClearance": "Pending clearance",
+        "available": "Available",
+        "management": "Management",
+        "fundEngineer": "Fund Engineer",
+        "directory": "Directory"
+    }
+}

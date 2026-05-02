@@ -1,0 +1,151 @@
+{
+    "app": {
+        "name": "إدارة المهندسين"
+    },
+    "common": {
+        "back": "رجوع",
+        "loading": "جاري التحميل...",
+        "error": "خطأ",
+        "cancel": "إلغاء",
+        "save": "حفظ",
+        "ok": "موافق",
+        "empty": "لا يوجد شيء لعرضه"
+    },
+    "tabs": {
+        "projects": "المشاريع",
+        "finance": "المالية",
+        "notifications": "الإشعارات",
+        "profile": "الحساب"
+    },
+    "auth": {
+        "login": "تسجيل الدخول",
+        "email": "البريد الإلكتروني",
+        "password": "كلمة المرور",
+        "signIn": "دخول",
+        "signingIn": "جاري الدخول…",
+        "loginFailed": "فشل تسجيل الدخول. تحقق من بياناتك."
+    },
+    "dashboard": {
+        "title": "اللوحة الرئيسية",
+        "welcome": "مرحباً، {{name}}",
+        "logout": "تسجيل الخروج",
+        "switchLanguage": "English",
+        "projects": "المشاريع",
+        "active": "نشط",
+        "totalBudget": "إجمالي الميزانية",
+        "safeBalance": "رصيد الخزنة",
+        "noProjects": "لا توجد مشاريع"
+    },
+    "status": {
+        "PLANNING": "تخطيط",
+        "IN_PROGRESS": "جاري التنفيذ",
+        "ON_HOLD": "متوقف",
+        "COMPLETED": "مكتمل",
+        "CANCELLED": "ملغي"
+    },
+    "txStatus": {
+        "DRAFT": "مسودة",
+        "PENDING_APPROVAL": "بانتظار الموافقة",
+        "APPROVED": "معتمد",
+        "REJECTED": "مرفوض",
+        "CANCELLED": "ملغي"
+    },
+    "project": {
+        "notFound": "المشروع غير موجود",
+        "client": "العميل",
+        "engineer": "المهندس",
+        "location": "الموقع",
+        "type": "النوع",
+        "startDate": "تاريخ البدء",
+        "endDate": "تاريخ الانتهاء",
+        "revenueModel": "نموذج الإيرادات",
+        "mgmtFee": "نسبة الإدارة",
+        "financials": "البيانات المالية",
+        "budget": "الميزانية",
+        "actualCost": "التكلفة الفعلية",
+        "officeRevenue": "إيرادات المكتب",
+        "safeBalance": "رصيد المشروع",
+        "transactions": "المعاملات",
+        "noTransactions": "لا توجد معاملات",
+        "addTransaction": "إضافة معاملة"
+    },
+    "directory": {
+        "clients": "العملاء",
+        "suppliers": "الموردين",
+        "workmen": "العمال",
+        "contact": "جهة اتصال",
+        "paymentTerms": "شروط الدفع",
+        "dailyRate": "اليومية",
+        "totalPaid": "إجمالي المدفوع",
+        "inactive": "غير نشط"
+    },
+    "fund": {
+        "title": "تمويل مهندس",
+        "engineer": "المهندس",
+        "selectEngineer": "اختر المهندس",
+        "amount": "المبلغ",
+        "currentBalance": "الرصيد",
+        "description": "الوصف",
+        "descriptionPlaceholder": "سبب التمويل؟",
+        "submit": "إرسال التمويل",
+        "success": "تم التمويل",
+        "successMsg": "{{name}} الآن لديه {{balance}} ج.م",
+        "invalidAmount": "أدخل مبلغ صحيح",
+        "howItWorks": "كيف يعمل",
+        "howItWorksText": "التمويل يضاف لمحفظة العهدة الخاصة بالمهندس. يمكنه إنفاقها على المصاريف المعتمدة (طريقة دفع محفظة العهدة)."
+    },
+    "finance": {
+        "title": "المالية",
+        "noTransactions": "لا توجد معاملات",
+        "filter": {
+            "ALL": "الكل",
+            "PENDING": "بانتظار",
+            "MINE": "خاصتي"
+        },
+        "approve": "اعتماد",
+        "reject": "رفض",
+        "approved": "تم الاعتماد",
+        "approvedMsg": "تم اعتماد المعاملة بنجاح",
+        "rejectTitle": "رفض المعاملة",
+        "rejectReason": "سبب الرفض"
+    },
+    "addTx": {
+        "title": "معاملة جديدة",
+        "type": "النوع",
+        "income": "إيراد",
+        "expense": "مصروف",
+        "project": "المشروع",
+        "selectProject": "اختر مشروع",
+        "category": "البند",
+        "selectCategory": "اختر البند",
+        "amount": "المبلغ",
+        "description": "الوصف",
+        "descriptionPlaceholder": "ملاحظات اختيارية...",
+        "paymentMethod": "طريقة الدفع",
+        "inventoryPurchase": "شراء مخزون",
+        "inventoryHint": "ينشئ دفعة مواد؛ الربح يُحتسب عند الاستهلاك",
+        "submit": "حفظ المعاملة",
+        "success": "تم الحفظ",
+        "successMsg": "تم إنشاء المعاملة بنجاح",
+        "invalidAmount": "أدخل مبلغ صحيح"
+    },
+    "notif": {
+        "title": "الإشعارات",
+        "empty": "لا توجد إشعارات",
+        "markAllRead": "تعليم الكل كمقروء"
+    },
+    "profile": {
+        "logout": "تسجيل الخروج",
+        "logoutConfirm": "تسجيل الخروج؟",
+        "language": "اللغة",
+        "preferences": "التفضيلات",
+        "account": "الحساب",
+        "custody": "العهدة",
+        "currentBalance": "الرصيد الحالي",
+        "pendingClearance": "بانتظار التسوية",
+        "available": "المتاح",
+        "management": "الإدارة",
+        "fundEngineer": "تمويل مهندس",
+        "directory": "الدليل"
+    }
+}
