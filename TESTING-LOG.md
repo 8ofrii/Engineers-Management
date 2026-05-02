@@ -4,6 +4,56 @@
 
 ---
 
+## 2026-05-02 — Phase 2 (part 1): Multi-level approvals + Restore endpoints
+
+**Author**: Claude
+**Scope**: Server-side only; UI tests pending
+
+### What landed
+
+- New `Tenant.approvalThresholds Json?` field; defaults applied when null.
+- `server/lib/approvalThresholds.js`:
+  - `ROLE_RANK` map (ENGINEER/ACCOUNTANT=1, PM=2, ADMIN=3, SUPER_ADMIN=4)
+  - `DEFAULT_THRESHOLDS`: `[{≤5k → ENGINEER}, {≤50k → PM}, {null → ADMIN}]`
+  - `requiredRoleForAmount(amount, tenant)` — picks tier
+  - `canAutoApprove(callerRole, amount, tenant)` — initial status decision
+  - `ensureCanApprove(...)` — throws `InsufficientApprovalRankError` (statusCode 403)
+  - `validateThresholds(input)` — for the PUT endpoint
+- `transactionControllerV2.createTransactionV2` now uses `canAutoApprove` instead of `if role === ENGINEER`.
+- `transactionController.approveTransaction` calls `ensureCanApprove` before the financial side-effects; returns 403 with `requiredRole`/`callerRole` if rank insufficient.
+- New endpoints:
+  - `GET /api/tenant/approval-thresholds` (admin/super-admin)
+  - `PUT /api/tenant/approval-thresholds` (admin/super-admin) with `validateThresholds` + audit
+- Restore endpoints (admin/super-admin) for soft-deleted records:
+  - `PUT /api/clients/:id/restore`
+  - `PUT /api/suppliers/:id/restore`
+  - `PUT /api/materials/:id/restore`
+  - `PUT /api/workmen/:id/restore`
+  - `PUT /api/projects/:id/restore`
+- New file: `tests/approvalThresholds.test.js` — 19 unit tests covering tier lookup, auto-approve decision, rank guard, custom configs, validation errors.
+
+### Verified
+
+- 54/54 tests pass (35 schema + 19 thresholds).
+- Server boots clean.
+- Approval-thresholds endpoint correctly 401s without token.
+- Restore endpoints correctly 401 without token.
+
+### Pending UI / live tests
+
+- [ ] As ENGINEER, create 1k expense → status=APPROVED (auto)
+- [ ] As ENGINEER, create 10k expense → status=PENDING_APPROVAL
+- [ ] As PROJECT_MANAGER, create 100k expense → status=PENDING_APPROVAL
+- [ ] As PROJECT_MANAGER, try to approve 100k pending → 403 with requiredRole=ADMIN
+- [ ] As ADMIN, approve 100k pending → succeeds, audit log shows APPROVE entry
+- [ ] As ADMIN, GET /api/tenant/approval-thresholds → returns defaults + isCustom=false
+- [ ] As ADMIN, PUT thresholds with custom tiers → next transaction uses them
+- [ ] PUT thresholds with `[]` → 400 validation error
+- [ ] Soft-delete a client, then PUT /api/clients/:id/restore → row returns to list
+- [ ] As ENGINEER, try restore endpoint → 403 (admin only)
+
+---
+
 ## 2026-05-02 — Phase 1 foundations shipped
 
 **Author**: Claude
