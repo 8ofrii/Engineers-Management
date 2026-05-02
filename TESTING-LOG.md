@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-05-02 — Phase 4 (mobile capture): DSR creation flow with photo upload
+
+**Author**: Claude
+**Scope**: Mobile DSR creation screen (engineer side)
+
+### What landed
+
+- `expo-image-picker` ~17.0.0 added to `mobile/package.json`. User must run `npm install && npx expo install --fix` to pick up.
+- New screen `mobile/src/screens/DSRCreateScreen.js`:
+  - Project picker modal (lists tenant projects)
+  - Date input with "Today" quick-set button (YYYY-MM-DD)
+  - 8-option weather chip grid with emoji icons (sunny ☀️ / cloudy ⛅ / rainy 🌧️ / windy 🌬️ / dusty 🌫️ / hot 🔥 / cold ❄️ / other 🌤️)
+  - Temperature (°C) + hours-worked numeric inputs side by side
+  - Progress / issues / visitors textareas
+  - Workmen attendance modal (active workmen only, multi-select with checkmarks)
+  - Selected workmen render as inline rows with per-row hours editing + delete
+  - Photo strip: "Take photo" → `launchCameraAsync` with EXIF on; "From library" → `launchImageLibraryAsync` with multi-select up to 10
+  - Each photo gets a thumbnail with delete chip
+  - Save draft / Save & submit dual-button row
+- Submit flow:
+  1. Validates (project + date required, hours 0-24)
+  2. Uploads each photo to `/api/project-documents/:projectId` with category=PHOTO_PROGRESS, collects Document IDs
+  3. POSTs to `/api/dsr` with all fields including `photoIds`
+  4. If "Save & submit", calls `PUT /api/dsr/:id/submit` to flip DRAFT→SUBMITTED
+- DSRListScreen now has a + FAB bottom-right that navigates to DSRCreate.
+- Navigator updated with DSRCreate registered in DSRStack.
+- Locale keys added in both en.json and ar.json (full `dsr.*` namespace + `common.done`).
+
+### Verified
+
+- All `node --check` passes for changed JS files.
+- Locale JSON parses cleanly in both languages.
+- 61/61 server tests still pass.
+
+### Pending live tests
+
+- [ ] On mobile (after `npx expo install --fix`): DSR tab → + FAB → New Daily Report opens
+- [ ] Pick a project → it shows in selector
+- [ ] Pick weather chip → highlights, tap again → deselects
+- [ ] Add 3 workmen, change hours on one to 6, remove another
+- [ ] Tap Take Photo → camera permission prompt → capture → thumbnail appears
+- [ ] Tap From Library → multi-select 2 photos → both appear in strip
+- [ ] Tap Save Draft → DRAFT created, photos uploaded as project documents
+- [ ] Open the created DSR → photos appear in detail view
+- [ ] Try Save & Submit on a fresh report → DRAFT created then auto-submitted
+- [ ] As manager on web `/dsr`, see the submitted report → acknowledge → engineer gets notification
+- [ ] Try to create DSR for the same project + same date → 409 (existing report)
+- [ ] As engineer not assigned to project → create DSR → 403
+
+---
+
 ## 2026-05-02 — Phase 4: Daily Site Reports (backend + web review)
 
 **Author**: Claude
