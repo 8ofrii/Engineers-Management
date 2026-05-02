@@ -17,6 +17,11 @@ model Tenant {
   address             String?
   phone               String?
   email               String?
+  /// Multi-level approval thresholds. Array of { maxAmount, minRole }.
+  /// First tier whose maxAmount >= transaction amount (or maxAmount=null
+  /// fallback) decides the minimum role required to approve. Null/undefined
+  /// → use built-in defaults from lib/approvalThresholds.js.
+  approvalThresholds  Json?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   chatMessages        ChatMessage[]

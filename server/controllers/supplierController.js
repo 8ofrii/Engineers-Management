@@ -122,6 +122,40 @@ export const updateSupplier = async (req, res, next) => {
     }
 };
 
+// @desc    Restore a soft-deleted supplier.
+// @route   PUT /api/suppliers/:id/restore
+// @access  Private (Admin / Super Admin)
+export const restoreSupplier = async (req, res, next) => {
+    try {
+        const supplier = await prisma.supplier.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: { not: null } }
+        });
+
+        if (!supplier) {
+            return res.status(404).json({
+                success: false,
+                message: 'Soft-deleted supplier not found'
+            });
+        }
+
+        const restored = await prisma.supplier.update({
+            where: { id: req.params.id },
+            data: { deletedAt: null }
+        });
+
+        await auditFromReq(req, {
+            action: 'RESTORE',
+            entity: 'Supplier',
+            entityId: restored.id,
+            after: restored
+        });
+
+        res.status(200).json({ success: true, data: restored });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Soft-delete supplier
 // @route   DELETE /api/suppliers/:id
 // @access  Private

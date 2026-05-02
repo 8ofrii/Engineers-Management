@@ -136,6 +136,40 @@ export const update = async (req, res, next) => {
     }
 };
 
+// @desc    Restore a soft-deleted workman.
+// @route   PUT /api/workmen/:id/restore
+// @access  Private (Admin / Super Admin)
+export const restoreWorkman = async (req, res, next) => {
+    try {
+        const workman = await prisma.workman.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: { not: null } }
+        });
+
+        if (!workman) {
+            return res.status(404).json({
+                success: false,
+                message: 'Soft-deleted workman not found'
+            });
+        }
+
+        const restored = await prisma.workman.update({
+            where: { id: req.params.id },
+            data: { deletedAt: null }
+        });
+
+        await auditFromReq(req, {
+            action: 'RESTORE',
+            entity: 'Workman',
+            entityId: restored.id,
+            after: restored
+        });
+
+        res.status(200).json({ success: true, data: restored });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Soft-delete workman
 // @route   DELETE /api/workmen/:id
 // @access  Private

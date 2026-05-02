@@ -14,6 +14,7 @@ import fs from 'fs';
 import * as aiService from '../services/aiService.js';
 import * as transactionV2 from './transactionControllerV2.js';
 import { auditFromReq } from '../lib/audit.js';
+import { ensureCanApprove, InsufficientApprovalRankError } from '../lib/approvalThresholds.js';
 
 // @desc    Get unique cost centers
 // @route   GET /api/transactions/cost-centers
@@ -449,6 +450,26 @@ export const approveTransaction = async (req, res, next) => {
                 success: false,
                 message: 'Transaction is not pending approval'
             });
+        }
+
+        // Multi-level approval guard: caller's role must meet the threshold
+        // tier required for this amount.
+        try {
+            const tenantCfg = await prisma.tenant.findUnique({
+                where: { id: req.user.tenantId },
+                select: { approvalThresholds: true }
+            });
+            ensureCanApprove(req.user.role, transaction.amount, tenantCfg);
+        } catch (err) {
+            if (err instanceof InsufficientApprovalRankError) {
+                return res.status(403).json({
+                    success: false,
+                    message: err.message,
+                    requiredRole: err.requiredRole,
+                    callerRole: err.callerRole
+                });
+            }
+            throw err;
         }
 
         // Import V1.2 office profit calculation

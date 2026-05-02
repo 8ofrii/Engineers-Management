@@ -231,6 +231,40 @@ export const updateProject = async (req, res, next) => {
     }
 };
 
+// @desc    Restore a soft-deleted project.
+// @route   PUT /api/projects/:id/restore
+// @access  Private (Admin / Super Admin)
+export const restoreProject = async (req, res, next) => {
+    try {
+        const project = await prisma.project.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: { not: null } }
+        });
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: 'Soft-deleted project not found'
+            });
+        }
+
+        const restored = await prisma.project.update({
+            where: { id: req.params.id },
+            data: { deletedAt: null }
+        });
+
+        await auditFromReq(req, {
+            action: 'RESTORE',
+            entity: 'Project',
+            entityId: restored.id,
+            after: restored
+        });
+
+        res.status(200).json({ success: true, data: restored });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Soft-delete project (sets deletedAt; cascade-deletes left intact for restore)
 // @route   DELETE /api/projects/:id
 // @access  Private

@@ -124,6 +124,40 @@ export const updateClient = async (req, res, next) => {
     }
 };
 
+// @desc    Restore a soft-deleted client.
+// @route   PUT /api/clients/:id/restore
+// @access  Private (Admin / Super Admin)
+export const restoreClient = async (req, res, next) => {
+    try {
+        const client = await prisma.client.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: { not: null } }
+        });
+
+        if (!client) {
+            return res.status(404).json({
+                success: false,
+                message: 'Soft-deleted client not found'
+            });
+        }
+
+        const restored = await prisma.client.update({
+            where: { id: req.params.id },
+            data: { deletedAt: null }
+        });
+
+        await auditFromReq(req, {
+            action: 'RESTORE',
+            entity: 'Client',
+            entityId: restored.id,
+            after: restored
+        });
+
+        res.status(200).json({ success: true, data: restored });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Soft-delete client (sets deletedAt; record kept for audit)
 // @route   DELETE /api/clients/:id
 // @access  Private

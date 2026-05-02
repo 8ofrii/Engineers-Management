@@ -375,10 +375,11 @@ If your numbers differ after seeding, the V1.2 math has drifted — investigate 
 - [x] **Audit log model + helper** — `lib/audit.js`, wired into Client/Supplier/Material/Workman/Project + User invite/update/delete + Role create/update/delete + Custody fund/return + Transaction approve/reject/delete. `GET /api/audit-logs` (admin) + `GET /api/audit-logs/:entity/:entityId` (any tenant member).
 - [x] **Soft delete pattern** — `deletedAt` on Client, Supplier, Material, Workman, Project. List/find queries filter `deletedAt: null`. Hard-delete replaced with `update({ deletedAt: new Date() })`. Records preserved for audit + future restore.
 
-### Phase 2 — Quick UX wins
-- [ ] **Multi-level approval thresholds** (config-driven amount tiers)
+### Phase 2 — Quick UX wins *(in progress)*
+- [x] **Multi-level approval thresholds** — `Tenant.approvalThresholds Json?`, `lib/approvalThresholds.js` with `requiredRoleForAmount()`, `canAutoApprove()`, `ensureCanApprove()`, `validateThresholds()`. Defaults: ≤5k engineer / ≤50k manager / >50k admin. Wired into `createTransactionV2` (initial status decision) and `approveTransaction` (rank guard). Endpoints: `GET/PUT /api/tenant/approval-thresholds` (admin only). 19 unit tests covering edge cases.
+- [x] **Restore endpoints** for soft-deleted records: `PUT /api/{clients,suppliers,materials,workmen,projects}/:id/restore` (admin/super-admin only). Audits `RESTORE` action.
 - [ ] **2FA for admins** (TOTP via `otplib`)
-- [ ] **Activity feed per project** (powered by audit log)
+- [ ] **Activity feed UI** (web React page powered by `/api/audit-logs`)
 
 ### Phase 3 — Photo & document logs
 - [ ] **Receipt photo upload** on transactions (existing `receiptPhotoUrl` field — wire UI)

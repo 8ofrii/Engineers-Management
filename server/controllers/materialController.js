@@ -126,6 +126,40 @@ export const updateMaterial = async (req, res, next) => {
     }
 };
 
+// @desc    Restore a soft-deleted material.
+// @route   PUT /api/materials/:id/restore
+// @access  Private (Admin / Super Admin)
+export const restoreMaterial = async (req, res, next) => {
+    try {
+        const material = await prisma.material.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: { not: null } }
+        });
+
+        if (!material) {
+            return res.status(404).json({
+                success: false,
+                message: 'Soft-deleted material not found'
+            });
+        }
+
+        const restored = await prisma.material.update({
+            where: { id: req.params.id },
+            data: { deletedAt: null }
+        });
+
+        await auditFromReq(req, {
+            action: 'RESTORE',
+            entity: 'Material',
+            entityId: restored.id,
+            after: restored
+        });
+
+        res.status(200).json({ success: true, data: restored });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Soft-delete material
 // @route   DELETE /api/materials/:id
 // @access  Private

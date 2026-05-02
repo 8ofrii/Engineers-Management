@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { canAutoApprove, requiredRoleForAmount } from '../lib/approvalThresholds.js';
 
 /**
  * V1.2 PROFIT ENGINE: "Profit on Expense" Logic
@@ -141,15 +142,22 @@ export const createTransactionV2 = async (req, res, next) => {
             actualPayer = payerUserId;
         }
 
+        // Multi-level approval: a transaction is auto-approved only if the
+        // creator's role rank is at or above the role required for this
+        // amount tier. The tenant's `approvalThresholds` config drives this;
+        // if not configured, sensible defaults (5k / 50k / unlimited) apply.
+        const tenantConfig = await prisma.tenant.findUnique({
+            where: { id: req.user.tenantId },
+            select: { approvalThresholds: true }
+        });
+
+        const callerRole = req.user.role;
+        const initialStatus = canAutoApprove(callerRole, amount, tenantConfig)
+            ? 'APPROVED'
+            : 'PENDING_APPROVAL';
+
         const result = await prisma.$transaction(async (tx) => {
             let profitInfo = null;
-
-            // Determine default status based on user role
-            // Engineers create DRAFTs (Pending Approval). Managers/Admins create APPROVED.
-            let initialStatus = 'APPROVED';
-            if (req.user.role === 'ENGINEER') {
-                initialStatus = 'PENDING_APPROVAL';
-            }
 
             // ========== INCOME LOGIC ==========
             if (type === 'INCOME') {
