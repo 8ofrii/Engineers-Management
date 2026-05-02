@@ -57,11 +57,12 @@ export const getSupplier = async (req, res, next) => {
 // @access  Private
 export const createSupplier = async (req, res, next) => {
     try {
+        const data = { ...req.body, tenantId: req.user.tenantId };
+        if (!data.email) data.email = "-";
+        if (!data.phone) data.phone = "-";
+
         const supplier = await prisma.supplier.create({
-            data: {
-                ...req.body,
-                tenantId: req.user.tenantId
-            }
+            data: data
         });
 
         res.status(201).json({

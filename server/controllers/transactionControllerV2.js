@@ -29,9 +29,10 @@ import prisma from '../lib/prisma.js';
  * @param {Object} tx - Prisma transaction client
  * @param {Object} project - Project object
  * @param {Number} expenseAmount - The expense amount
+ * @param {String} userId - The user creating the transaction
  * @returns {Object} { profit, projectSafeAfter, officeRevenueAfter }
  */
-const calculateAndTransferProfit = async (tx, project, expenseAmount) => {
+const calculateAndTransferProfit = async (tx, project, expenseAmount, userId) => {
     const feePercent = Number(project.managementFeePercent) || 0;
     const profit = Number(expenseAmount) * (feePercent / 100);
 
@@ -45,6 +46,23 @@ const calculateAndTransferProfit = async (tx, project, expenseAmount) => {
             data: {
                 projectSafeBalance: { decrement: profit },
                 officeRevenue: { increment: profit }
+            }
+        });
+
+        // V1.2 REVISION: Create an explicit ledger transaction for the management fee
+        await tx.transaction.create({
+            data: {
+                type: 'EXPENSE',
+                category: 'MANAGEMENT_FEE_TRANSFER',
+                amount: profit,
+                description: `Cost-Plus Management Fee (${feePercent}%) on ${expenseAmount} EGP expense`,
+                status: 'APPROVED',
+                projectId: project.id,
+                createdBy: userId,
+                transactionDate: new Date(),
+                paymentMethod: 'OTHER',
+                tenantId: project.tenantId,
+                isOfficeExpense: false
             }
         });
 
@@ -87,7 +105,11 @@ export const createTransactionV2 = async (req, res, next) => {
             itemName,   // For creating new ProjectCostItem
             unit,
             quantity,
-            unitPrice
+            unitPrice,
+            costCenter,
+            transactionTo,
+            transactionFrom,
+            physicalAccount
         } = req.body;
 
         // Validate required fields
@@ -122,6 +144,13 @@ export const createTransactionV2 = async (req, res, next) => {
         const result = await prisma.$transaction(async (tx) => {
             let profitInfo = null;
 
+            // Determine default status based on user role
+            // Engineers create DRAFTs (Pending Approval). Managers/Admins create APPROVED.
+            let initialStatus = 'APPROVED';
+            if (req.user.role === 'ENGINEER') {
+                initialStatus = 'PENDING_APPROVAL';
+            }
+
             // ========== INCOME LOGIC ==========
             if (type === 'INCOME') {
                 // V1.2: Add full amount to Project Safe
@@ -131,36 +160,37 @@ export const createTransactionV2 = async (req, res, next) => {
                         category: category || 'PAYMENT',
                         amount: Number(amount),
                         description: description || 'Client Payment',
-                        status: 'APPROVED',
+                        status: initialStatus,
                         projectId,
                         projectCostItemId,
                         clientId: clientId || project.clientId,
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'BANK_TRANSFER',
-                        invoiceNumber,
+                        invoiceNumber: invoiceNumber || null,
+                        costCenter: costCenter || null,
+                        transactionTo: transactionTo || null,
+                        transactionFrom: transactionFrom || null,
+                        physicalAccount: physicalAccount || null,
                         tenantId: req.user.tenantId
                     }
                 });
 
-                // Update Project Safe Balance
-                await tx.project.update({
-                    where: {
-                        id: projectId,
-                        tenantId: req.user.tenantId
-                    },
-                    data: {
-                        projectSafeBalance: { increment: Number(amount) }
-                    }
-                });
+                // Only Update Project Safe Balance if APPROVED
+                if (initialStatus === 'APPROVED') {
+                    await tx.project.update({
+                        where: { id: projectId, tenantId: req.user.tenantId },
+                        data: { projectSafeBalance: { increment: Number(amount) } }
+                    });
+                }
 
                 return {
                     transaction,
                     profitInfo: {
                         type: 'INCOME',
-                        amountToSafe: Number(amount),
+                        amountToSafe: initialStatus === 'APPROVED' ? Number(amount) : 0,
                         profitRecognized: 0,
-                        message: 'Full amount added to Project Safe. Profit will be recognized on expenses.'
+                        message: initialStatus === 'APPROVED' ? 'Full amount added to Project Safe. Profit deferred.' : 'Transaction pending approval.'
                     }
                 };
             }
@@ -192,7 +222,7 @@ export const createTransactionV2 = async (req, res, next) => {
                         category,
                         amount: Number(amount),
                         description,
-                        status: 'APPROVED',
+                        status: initialStatus,
                         projectId,
                         projectCostItemId: finalCostItemId,
                         supplierId,
@@ -200,17 +230,30 @@ export const createTransactionV2 = async (req, res, next) => {
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'CASH',
-                        invoiceNumber,
+                        invoiceNumber: invoiceNumber || null,
+                        costCenter: costCenter || null,
+                        transactionTo: transactionTo || null,
+                        transactionFrom: transactionFrom || null,
+                        physicalAccount: physicalAccount || null,
                         tenantId: req.user.tenantId
                     }
                 });
 
-                // Deduct from Project Safe
+                // If DRAFT, we skip safe deduction and profit calculation
+                if (initialStatus === 'PENDING_APPROVAL') {
+                    // Just return the transaction without calculating profit or deductions
+                    return {
+                        transaction,
+                        profitInfo: {
+                            profit: 0,
+                            message: 'Transaction saved as draft. Waiting for Manager approval.'
+                        }
+                    };
+                }
+
+                // If APPROVED, Deduct from Project Safe
                 const updatedProject = await tx.project.update({
-                    where: {
-                        id: projectId,
-                        tenantId: req.user.tenantId
-                    },
+                    where: { id: projectId, tenantId: req.user.tenantId },
                     data: {
                         projectSafeBalance: { decrement: Number(amount) },
                         actualCost: { increment: Number(amount) }
@@ -260,9 +303,9 @@ export const createTransactionV2 = async (req, res, next) => {
                 }
 
                 // PROFIT CALCULATION
-                // If it's NOT an inventory purchase, recognize profit immediately
+                // If it's NOT an inventory purchase and is APPROVED, recognize profit immediately
                 if (!createBatch) {
-                    profitInfo = await calculateAndTransferProfit(tx, project, amount);
+                    profitInfo = await calculateAndTransferProfit(tx, updatedProject, amount, actualPayer);
                 } else {
                     // Inventory Purchase: Create batch, defer profit
                     await tx.materialBatch.create({
@@ -311,6 +354,7 @@ export const recordInventoryUsage = async (req, res, next) => {
         const {
             materialBatchId,
             valueConsumed,
+            quantityConsumed,
             projectId,
             description
         } = req.body;
@@ -347,7 +391,8 @@ export const recordInventoryUsage = async (req, res, next) => {
                 },
                 data: {
                     remainingValue: newRemaining,
-                    status: newRemaining === 0 ? 'CONSUMED' : 'PARTIALLY_USED'
+                    status: newRemaining === 0 ? 'CONSUMED' : 'PARTIALLY_USED',
+                    ...(quantityConsumed && { quantityUsed: { increment: Number(quantityConsumed) } })
                 }
             });
 
@@ -356,7 +401,7 @@ export const recordInventoryUsage = async (req, res, next) => {
                 data: {
                     materialId: batch.materialId,
                     projectId: projectId || batch.projectId,
-                    quantity: Number(valueConsumed),
+                    quantity: quantityConsumed && Number(quantityConsumed) > 0 ? Number(quantityConsumed) : 1,
                     notes: description,
                     recordedBy: req.user.id,
                     tenantId: req.user.tenantId
@@ -367,7 +412,8 @@ export const recordInventoryUsage = async (req, res, next) => {
             const profitInfo = await calculateAndTransferProfit(
                 tx,
                 batch.project,
-                valueConsumed
+                valueConsumed,
+                req.user.id
             );
 
             // ALERT: If project safe becomes negative after profit transfer
@@ -450,8 +496,11 @@ export const getProjectInventory = async (req, res, next) => {
             acc[key].batches.push({
                 id: batch.id,
                 description: batch.description,
+                initialValue: batch.initialValue,
                 remainingValue: batch.remainingValue,
-                status: batch.status
+                status: batch.status,
+                unitPrice: batch.material?.unitPrice,
+                unit: batch.material?.unit || 'PIECE'
             });
 
             return acc;

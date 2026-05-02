@@ -243,3 +243,37 @@ export const getBatch = async (req, res, next) => {
         next(error);
     }
 };
+
+// @desc    Delete material batch
+// @route   DELETE /api/material-batches/:id
+// @access  Private (Admin only)
+export const deleteBatch = async (req, res, next) => {
+    try {
+        const batch = await prisma.materialBatch.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            }
+        });
+
+        if (!batch) {
+            return res.status(404).json({
+                success: false,
+                message: 'Material batch not found'
+            });
+        }
+
+        await prisma.materialBatch.delete({
+            where: {
+                id: req.params.id
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {}
+        });
+    } catch (error) {
+        next(error);
+    }
+};

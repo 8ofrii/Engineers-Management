@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { suppliersAPI } from '../services/api';
-import { Package, Plus, Mail, Phone, Edit2 } from 'lucide-react';
+import { Package, Plus, Mail, Phone, Edit2, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddSupplierModal from '../components/AddSupplierModal';
@@ -51,6 +51,26 @@ export default function Suppliers() {
         }
     };
 
+    const handleDeleteClick = (supplier) => {
+        showAlert({
+            type: 'warning',
+            title: t('common.deleteConfirmTitle'),
+            message: `${t('common.deleteConfirmMessage')} "${supplier.name}"?`,
+            showCancel: true,
+            confirmText: t('common.delete'),
+            onConfirm: async () => {
+                try {
+                    await suppliersAPI.delete(supplier.id);
+                    showAlert({ type: 'success', title: 'Deleted', message: 'Supplier deleted successfully' });
+                    loadSuppliers();
+                } catch (error) {
+                    console.error('Failed to delete supplier:', error);
+                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete supplier' });
+                }
+            }
+        });
+    };
+
     if (loading) {
         return (
             <Layout>
@@ -94,13 +114,24 @@ export default function Suppliers() {
                             <div key={supplier.id} className="card">
                                 <div className="flex-between mb-md">
                                     <h3 style={{ margin: 0 }}>{supplier.name}</h3>
-                                    <button
-                                        onClick={() => handleOpenModal(supplier)}
-                                        className="btn-icon"
-                                        style={{ padding: '4px', color: 'var(--text-secondary)' }}
-                                    >
-                                        <Edit2 size={16} />
-                                    </button>
+                                    <div className="flex gap-sm">
+                                        <button
+                                            onClick={() => handleOpenModal(supplier)}
+                                            className="btn-icon"
+                                            style={{ padding: '4px', color: 'var(--text-secondary)' }}
+                                            title={t('common.edit')}
+                                        >
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteClick(supplier)}
+                                            className="btn btn-secondary"
+                                            style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444', background: 'transparent' }}
+                                            title={t('common.delete')}
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </div>
                                 <span className="badge badge-primary mb-md" style={{ display: 'inline-block' }}>{supplier.category}</span>
 

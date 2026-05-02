@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon } from 'lucide-react';
+import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI } from '../services/api';
@@ -55,6 +55,26 @@ export default function Workforce() {
             style: 'currency',
             currency: 'EGP'
         }).format(amount);
+    };
+
+    const handleDeleteClick = (workman) => {
+        showAlert({
+            type: 'warning',
+            title: t('common.deleteConfirmTitle'),
+            message: `${t('common.deleteConfirmMessage')} "${workman.name}"?`,
+            showCancel: true,
+            confirmText: t('common.delete'),
+            onConfirm: async () => {
+                try {
+                    await workmenAPI.delete(workman.id);
+                    showAlert({ type: 'success', title: 'Deleted', message: 'Workman deleted successfully' });
+                    loadWorkmen();
+                } catch (error) {
+                    console.error('Failed to delete workman:', error);
+                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete workman' });
+                }
+            }
+        });
     };
 
     // Toggle trade filter
@@ -215,6 +235,26 @@ export default function Workforce() {
                                             title={t('common.edit')}
                                         >
                                             <Edit2 size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteClick(workman)}
+                                            className="btn-icon"
+                                            style={{
+                                                width: '32px',
+                                                height: '32px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#ef4444',
+                                                background: 'transparent',
+                                                border: '1px solid #ef4444',
+                                                borderRadius: 'var(--radius-md)',
+                                                marginLeft: '8px',
+                                                cursor: 'pointer'
+                                            }}
+                                            title={t('common.delete')}
+                                        >
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>

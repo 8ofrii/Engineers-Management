@@ -3,10 +3,12 @@ import { tenantAPI, authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Building2, Save, Upload, AlertCircle, User, UserCircle } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
+import { useTranslation } from 'react-i18next';
 
 export default function CompanySettings() {
     const { user, updateUser } = useAuth();
     const { showAlert } = useAlert();
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('company'); // 'company' or 'profile'
@@ -73,7 +75,7 @@ export default function CompanySettings() {
 
         } catch (err) {
             console.error(err);
-            showAlert({ type: 'error', title: 'Error', message: 'Failed to load data.' });
+            showAlert({ type: 'error', title: t('common.error'), message: t('common.error') });
         } finally {
             setLoading(false);
         }
@@ -110,13 +112,13 @@ export default function CompanySettings() {
             if (logo) data.append('logo', logo);
 
             const res = await tenantAPI.updateSettings(data);
-            showAlert({ type: 'success', title: 'Success', message: 'Company settings updated successfully.' });
+            showAlert({ type: 'success', title: t('common.save'), message: t('profile.updateSuccess') });
             // Refresh user context if needed to update sidebar logo
             const me = await authAPI.getMe();
             updateUser(me.data.data);
             // window.location.reload(); // Force reload to ensure sidebar updates if context sync issues
         } catch (err) {
-            showAlert({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Failed to update company.' });
+            showAlert({ type: 'error', title: t('common.error'), message: t('profile.updateError') });
         } finally {
             setSaving(false);
         }
@@ -137,16 +139,16 @@ export default function CompanySettings() {
             // Assuming we have an endpoint for profile update
             const res = await authAPI.updateProfile(data);
 
-            showAlert({ type: 'success', title: 'Success', message: 'Profile updated successfully.' });
+            showAlert({ type: 'success', title: t('common.save'), message: t('profile.updateSuccess') });
             updateUser(res.data.data);
         } catch (err) {
-            showAlert({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Failed to update profile.' });
+            showAlert({ type: 'error', title: t('common.error'), message: t('profile.updateError') });
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <div>{t('common.loading')}</div>;
 
     return (
         <div className="container mt-4">
@@ -157,13 +159,13 @@ export default function CompanySettings() {
                             className={`pb-4 px-2 font-medium flex items-center gap-2 ${activeTab === 'company' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
                             onClick={() => setActiveTab('company')}
                         >
-                            <Building2 size={20} /> Company Profile
+                            <Building2 size={20} /> {t('profile.sections.basic') || 'بيانات الشركة'}
                         </button>
                         <button
                             className={`pb-4 px-2 font-medium flex items-center gap-2 ${activeTab === 'profile' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
                             onClick={() => setActiveTab('profile')}
                         >
-                            <UserCircle size={20} /> Personal Profile
+                            <UserCircle size={20} /> {t('profile.title') || 'الملف الشخصي'}
                         </button>
                     </div>
                 </div>
@@ -183,31 +185,31 @@ export default function CompanySettings() {
                                     )}
                                 </div>
                                 <label className="btn btn-secondary cursor-pointer flex items-center gap-2">
-                                    <Upload size={16} /> Upload Logo
+                                    <Upload size={16} /> {t('profile.uploadPicture') || 'رفع الشعار'}
                                     <input type="file" className="hidden" accept="image/*" onChange={handleLogoChange} />
                                 </label>
                             </div>
 
                             <div className="input-group">
-                                <label className="input-label">Company Name</label>
+                                <label className="input-label">{t('profile.fields.company') || 'اسم الشركة'}</label>
                                 <input type="text" className="input" value={companyData.name} onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })} required />
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Support Email</label>
+                                <label className="input-label">{t('profile.fields.email') || 'البريد الإلكتروني'}</label>
                                 <input type="email" className="input" value={companyData.email} onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })} />
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Phone</label>
+                                <label className="input-label">{t('profile.fields.phone') || 'الهاتف'}</label>
                                 <input type="text" className="input" value={companyData.phone} onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })} />
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Address</label>
+                                <label className="input-label">{t('auth.company') || 'العنوان'}</label>
                                 <input type="text" className="input" value={companyData.address} onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })} />
                             </div>
 
                             <div className="col-span-2 flex justify-end">
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Saving...' : <><Save size={18} className="mr-2" /> Save Company Settings</>}
+                                    {saving ? t('common.loading') : <><Save size={18} className="mr-2" /> {t('common.save')}</>}
                                 </button>
                             </div>
                         </form>
@@ -225,27 +227,27 @@ export default function CompanySettings() {
                                     )}
                                 </div>
                                 <label className="btn btn-secondary cursor-pointer flex items-center gap-2">
-                                    <Upload size={16} /> Upload Profile Picture
+                                    <Upload size={16} /> {t('profile.uploadPicture')}
                                     <input type="file" className="hidden" accept="image/*" onChange={handleProfileImgChange} />
                                 </label>
                             </div>
 
                             <div className="input-group">
-                                <label className="input-label">Full Name</label>
+                                <label className="input-label">{t('profile.fields.name')}</label>
                                 <input type="text" className="input" value={profileData.name} onChange={(e) => setProfileData({ ...profileData, name: e.target.value })} required />
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Email Address</label>
+                                <label className="input-label">{t('profile.fields.email')}</label>
                                 <input type="email" className="input" value={profileData.email} onChange={(e) => setProfileData({ ...profileData, email: e.target.value })} required />
                             </div>
                             <div className="input-group">
-                                <label className="input-label">Phone Label</label>
+                                <label className="input-label">{t('profile.fields.phone')}</label>
                                 <input type="text" className="input" value={profileData.phone} onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })} />
                             </div>
 
                             <div className="col-span-2 flex justify-end">
                                 <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? 'Saving...' : <><Save size={18} className="mr-2" /> Save Personal Profile</>}
+                                    {saving ? t('common.loading') : <><Save size={18} className="mr-2" /> {t('profile.saveChanges')}</>}
                                 </button>
                             </div>
                         </form>

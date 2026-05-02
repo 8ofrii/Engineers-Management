@@ -78,7 +78,7 @@ export default function Dashboard() {
             setTransactionStats(statsRes.data.data);
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load dashboard data.' });
+            showAlert({ type: 'error', title: t('common.error'), message: t('common.error') });
         } finally {
             setLoading(false);
         }

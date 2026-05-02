@@ -74,6 +74,7 @@ model User {
   approvedTransactions  Transaction[]     @relation("ApprovedBy")
   transactions          Transaction[]
   payerTransactions     Transaction[]     @relation("PayerOfTransaction")
+  receivedTransfers     Transaction[]     @relation("TransferToEngineer")
   customRole            Role?             @relation(fields: [roleId], references: [id], onDelete: SetNull)
   tenant                Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workmanships          Workmanship[]
@@ -367,6 +368,8 @@ model Transaction {
   rejectionReason   String?
   payerUserId       String?
   payer             User?               @relation("PayerOfTransaction", fields: [payerUserId], references: [id])
+  toEngineerId      String?
+  toEngineer        User?               @relation("TransferToEngineer", fields: [toEngineerId], references: [id])
   tenantId          String?
   voiceNoteUrl      String?
   workmanId         String?
@@ -378,6 +381,10 @@ model Transaction {
   supplier          Supplier?           @relation(fields: [supplierId], references: [id])
   tenant            Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workman           Workman?            @relation(fields: [workmanId], references: [id])
+  costCenter        String?
+  transactionTo     String?
+  transactionFrom   String?
+  physicalAccount   String?
 
   @@index([projectId, transactionDate])
   @@index([type, category])
@@ -582,6 +589,7 @@ enum TransactionCategory {
   PAYMENT
   OTHER
   CUSTODY_TRANSFER
+  MANAGEMENT_FEE_TRANSFER
   
   // V1.2 Specific Arabic Categories
   CONCRETE

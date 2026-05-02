@@ -14,6 +14,48 @@ import fs from 'fs';
 import * as aiService from '../services/aiService.js';
 import * as transactionV2 from './transactionControllerV2.js';
 
+// @desc    Get unique cost centers
+// @route   GET /api/transactions/cost-centers
+// @access  Private
+export const getCostCenters = async (req, res, next) => {
+    try {
+        const [costCenterRows, transactionFromRows, physicalAccountRows, transactionToRows] = await Promise.all([
+            prisma.transaction.findMany({
+                where: { tenantId: req.user.tenantId, costCenter: { not: null } },
+                select: { costCenter: true },
+                distinct: ['costCenter']
+            }),
+            prisma.transaction.findMany({
+                where: { tenantId: req.user.tenantId, transactionFrom: { not: null } },
+                select: { transactionFrom: true },
+                distinct: ['transactionFrom']
+            }),
+            prisma.transaction.findMany({
+                where: { tenantId: req.user.tenantId, physicalAccount: { not: null } },
+                select: { physicalAccount: true },
+                distinct: ['physicalAccount']
+            }),
+            prisma.transaction.findMany({
+                where: { tenantId: req.user.tenantId, transactionTo: { not: null } },
+                select: { transactionTo: true },
+                distinct: ['transactionTo']
+            })
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                costCenters: costCenterRows.map(t => t.costCenter).filter(Boolean),
+                transactionFroms: transactionFromRows.map(t => t.transactionFrom).filter(Boolean),
+                physicalAccounts: physicalAccountRows.map(t => t.physicalAccount).filter(Boolean),
+                transactionTos: transactionToRows.map(t => t.transactionTo).filter(Boolean)
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Analyze voice note with AI (Returns JSON, no DB save)
 // @route   POST /api/transactions/analyze
 // @access  Private (Engineer, Manager, Admin)
@@ -160,26 +202,14 @@ export const getTransactions = async (req, res, next) => {
             tenantId: req.user.tenantId
         };
 
-        // Engineers can only see their own transactions
+        // Engineers can only see their own transactions.
         if (req.user.role === 'ENGINEER') {
             whereClause.createdBy = req.user.id;
         }
 
-        // Project Managers see transactions for their projects
-        if (req.user.role === 'PROJECT_MANAGER') {
-            const projects = await prisma.project.findMany({
-                where: {
-                    engineerId: req.user.id,
-                    tenantId: req.user.tenantId
-                },
-                select: { id: true }
-            });
-            whereClause.projectId = {
-                in: projects.map(p => p.id)
-            };
-        }
-
-        // Admins and Accountants see all within tenant
+        // PROJECT_MANAGER, ADMIN, ACCOUNTANT, SUPER_ADMIN all see every
+        // transaction in the tenant — managers need full visibility to
+        // approve/reject submissions raised by any engineer.
 
         const transactions = await prisma.transaction.findMany({
             where: whereClause,
@@ -420,8 +450,8 @@ export const approveTransaction = async (req, res, next) => {
             });
         }
 
-        // Import office fee service
-        const officeFeeService = await import('../services/officeFeeService.js');
+        // Import V1.2 office profit calculation
+        const transactionV2 = await import('./transactionControllerV2.js');
 
         // THE CRITICAL LINKS - All happen atomically
         const updates = await prisma.$transaction(async (tx) => {
@@ -435,62 +465,57 @@ export const approveTransaction = async (req, res, next) => {
                 }
             });
 
-            // LINK 2: Handle EXPENSE transactions with new office fee logic
+            // Make sure we have the latest project data for calculation
+            const project = await tx.project.findFirst({
+                where: { id: transaction.projectId, tenantId: req.user.tenantId }
+            });
+
+            // LINK 2: Handle EXPENSE transactions with logic V1.2
             if (transaction.type === 'EXPENSE') {
-                const isInventory = officeFeeService.isInventoryCategory(transaction.category);
-                let officeFee = 0;
+                const isInventory = transaction.category === 'MATERIALS' || transaction.category === 'ELECTRICITY_MATERIALS' || transaction.category === 'PLUMBING_MATERIALS' || transaction.category === 'PAINTING_MATERIALS' || transaction.category === 'CERAMIC_MATERIALS' || transaction.category === 'CARPENTRY_MATERIALS';
 
-                if (isInventory) {
-                    if (transaction.isOfficeExpense) {
-                        // Office-borne expense for inventory (rare, but possible)
+                // Deduct from Project Safe (Drafts skipped this on creation)
+                const updatedProject = await tx.project.update({
+                    where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                    data: {
+                        projectSafeBalance: { decrement: transaction.amount },
+                        actualCost: { increment: transaction.amount }
+                    },
+                    include: { engineer: true }
+                });
+
+                // V1.2 PROFIT CALCULATION
+                if (!isInventory) {
+                    // Call the V1.2 calculation directly
+                    // Note: We need to recreate calculateAndTransferProfit logic here or import it 
+                    // To keep it simple and avoid circular deps, we rewrite the calculation inline here
+                    const feePercent = Number(updatedProject.managementFeePercent) || 0;
+                    const profit = Number(transaction.amount) * (feePercent / 100);
+
+                    if (profit > 0 && updatedProject.revenueModel === 'EXECUTION_COST_PLUS') {
+                        // Transfer profit
                         await tx.project.update({
-                            where: { id: transaction.projectId },
+                            where: { id: updatedProject.id, tenantId: req.user.tenantId },
                             data: {
-                                officeExpenses: { increment: transaction.amount },
-                                actualCost: { increment: transaction.amount }
+                                projectSafeBalance: { decrement: profit },
+                                officeRevenue: { increment: profit }
                             }
                         });
-                    } else {
-                        // Inventory: Deduct from safe, NO office fee yet (calculated on usage)
-                        await tx.project.update({
-                            where: { id: transaction.projectId },
-                            data: {
-                                projectSafeBalance: { decrement: transaction.amount },
-                                operationalFund: { decrement: transaction.amount },
-                                actualCost: { increment: transaction.amount }
-                            }
-                        });
-                    }
-                } else {
-                    if (transaction.isOfficeExpense) {
-                        // Office-borne expense: Doesn't hit project safe, no office fee generated
-                        await tx.project.update({
-                            where: { id: transaction.projectId },
-                            data: {
-                                officeExpenses: { increment: transaction.amount },
-                                actualCost: { increment: transaction.amount }
-                            }
-                        });
-                    } else {
-                        // Regular expense: Calculate and apply office fee
-                        officeFee = await officeFeeService.calculateOfficeFee(
-                            transaction.projectId,
-                            transaction.category,
-                            transaction.amount
-                        );
 
-                        const totalDeduction = Number(transaction.amount) + officeFee;
-
-                        await tx.project.update({
-                            where: {
-                                id: transaction.projectId,
-                                tenantId: req.user.tenantId
-                            },
+                        // Explicit ledger transaction
+                        await tx.transaction.create({
                             data: {
-                                projectSafeBalance: { decrement: totalDeduction },
-                                operationalFund: { decrement: transaction.amount },
-                                officeRevenue: { increment: officeFee },
-                                actualCost: { increment: transaction.amount }
+                                type: 'EXPENSE',
+                                category: 'MANAGEMENT_FEE_TRANSFER',
+                                amount: profit,
+                                description: `Cost-Plus Management Fee (${feePercent}%) on ${transaction.amount} EGP expense (${transaction.description})`,
+                                status: 'APPROVED',
+                                projectId: updatedProject.id,
+                                createdBy: req.user.id,
+                                transactionDate: new Date(),
+                                paymentMethod: 'OTHER',
+                                tenantId: req.user.tenantId,
+                                isOfficeExpense: false
                             }
                         });
                     }
@@ -499,10 +524,7 @@ export const approveTransaction = async (req, res, next) => {
                 // LINK 3: Update work order if linked
                 if (transaction.projectCostItemId) {
                     const workOrder = await tx.projectCostItem.findFirst({
-                        where: {
-                            id: transaction.projectCostItemId,
-                            tenantId: req.user.tenantId
-                        }
+                        where: { id: transaction.projectCostItemId, tenantId: req.user.tenantId }
                     });
 
                     if (workOrder) {
@@ -510,10 +532,7 @@ export const approveTransaction = async (req, res, next) => {
                         const isCompleted = workOrder.estimatedTotal && newTotalPaid >= Number(workOrder.estimatedTotal);
 
                         await tx.projectCostItem.update({
-                            where: {
-                                id: transaction.projectCostItemId,
-                                tenantId: req.user.tenantId
-                            },
+                            where: { id: transaction.projectCostItemId, tenantId: req.user.tenantId },
                             data: {
                                 totalPaid: newTotalPaid,
                                 status: isCompleted ? 'COMPLETED' : 'OPEN'
@@ -522,8 +541,9 @@ export const approveTransaction = async (req, res, next) => {
                     }
                 }
 
-                // LINK 4: Handle custody wallet payment
+                // LINK 4: Handle custody payment clearance
                 if (transaction.paymentMethod === 'CUSTODY_WALLET') {
+                    // Reduce the user's pending clearance
                     await tx.user.update({
                         where: { id: transaction.createdBy },
                         data: {
@@ -538,6 +558,7 @@ export const approveTransaction = async (req, res, next) => {
                             amount: transaction.amount,
                             description: `Cleared: ${transaction.description}`,
                             engineerId: transaction.createdBy,
+                            // Note: balance is computed below
                             balanceBefore: transaction.user.currentCustodyBalance,
                             balanceAfter: Number(transaction.user.currentCustodyBalance) - Number(transaction.amount),
                             relatedTransactionId: id,
@@ -564,19 +585,19 @@ export const approveTransaction = async (req, res, next) => {
                 }
 
                 // LINK 6: Check for negative project safe and send alerts
-                const updatedProject = await tx.project.findFirst({
+                const finalProject = await tx.project.findFirst({
                     where: {
                         id: transaction.projectId,
                         tenantId: req.user.tenantId
                     }
                 });
 
-                if (Number(updatedProject.projectSafeBalance) < 0) {
+                if (Number(finalProject.projectSafeBalance) < 0) {
                     // Get recipients: Project Manager + All ADMINs + All PROJECT_MANAGERs
                     const recipients = await tx.user.findMany({
                         where: {
                             OR: [
-                                { id: updatedProject.engineerId },
+                                { id: finalProject.engineerId },
                                 { role: 'ADMIN' },
                                 { role: 'PROJECT_MANAGER' }
                             ],
@@ -593,8 +614,8 @@ export const approveTransaction = async (req, res, next) => {
                                 tenantId: req.user.tenantId,
                                 type: 'ALERT',
                                 title: 'تحذير: رصيد المشروع سالب',
-                                message: `مشروع "${updatedProject.name}" رصيده أصبح سالب: ${Number(updatedProject.projectSafeBalance).toLocaleString()} جنيه`,
-                                resourceId: updatedProject.id,
+                                message: `مشروع "${finalProject.name}" رصيده أصبح سالب: ${Number(finalProject.projectSafeBalance).toLocaleString()} جنيه`,
+                                resourceId: finalProject.id,
                                 resourceType: 'project'
                             }
                         });
@@ -700,6 +721,118 @@ export const rejectTransaction = async (req, res, next) => {
     }
 };
 
+// @desc    Transfer custody between employees (e.g. Engineer giving cash to another)
+// @route   POST /api/transactions/transfer-custody
+// @access  Private
+export const transferCustody = async (req, res, next) => {
+    try {
+        const { amount, fromEngineerId, toEngineerId, description } = req.body;
+
+        if (!amount || !fromEngineerId || !toEngineerId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Amount, Sender, and Receiver are required.'
+            });
+        }
+
+        const sender = await prisma.user.findFirst({
+            where: { id: fromEngineerId, tenantId: req.user.tenantId }
+        });
+
+        const receiver = await prisma.user.findFirst({
+            where: { id: toEngineerId, tenantId: req.user.tenantId }
+        });
+
+        if (!sender || !receiver) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            // Deduct from sender
+            const updatedSender = await tx.user.update({
+                where: { id: sender.id },
+                data: { currentCustodyBalance: { decrement: amount } }
+            });
+
+            // Add to receiver
+            const updatedReceiver = await tx.user.update({
+                where: { id: receiver.id },
+                data: { currentCustodyBalance: { increment: amount } }
+            });
+
+            // Create explicitly linked transfer transactions so it shows up globally
+            const txOut = await tx.transaction.create({
+                data: {
+                    type: 'EXPENSE',
+                    category: 'CUSTODY_TRANSFER',
+                    amount: amount,
+                    description: `Custody Out: ${description || 'Transfer to ' + receiver.name}`,
+                    status: 'APPROVED',
+                    createdBy: req.user.id,
+                    transactionDate: new Date(),
+                    paymentMethod: 'CASH',
+                    transactionTo: receiver.name,
+                    toEngineerId: receiver.id,
+                    tenantId: req.user.tenantId
+                }
+            });
+
+            const txIn = await tx.transaction.create({
+                data: {
+                    type: 'INCOME',
+                    category: 'CUSTODY_TRANSFER',
+                    amount: amount,
+                    description: `Custody In: ${description || 'Transfer from ' + sender.name}`,
+                    status: 'APPROVED',
+                    createdBy: req.user.id,
+                    transactionDate: new Date(),
+                    paymentMethod: 'CASH',
+                    transactionFrom: sender.name,
+                    tenantId: req.user.tenantId
+                }
+            });
+
+            // Log custody transfers
+            await tx.custodyTransfer.create({
+                data: {
+                    type: 'CLEARANCE', // Sender gives money
+                    amount: amount,
+                    description: `Transferred to ${receiver.name}: ${description}`,
+                    engineerId: sender.id,
+                    balanceBefore: sender.currentCustodyBalance,
+                    balanceAfter: updatedSender.currentCustodyBalance,
+                    relatedTransactionId: txOut.id,
+                    tenantId: req.user.tenantId
+                }
+            });
+
+            await tx.custodyTransfer.create({
+                data: {
+                    type: 'FUNDING', // Receiver gets money
+                    amount: amount,
+                    description: `Received from ${sender.name}: ${description}`,
+                    engineerId: receiver.id,
+                    balanceBefore: receiver.currentCustodyBalance,
+                    balanceAfter: updatedReceiver.currentCustodyBalance,
+                    relatedTransactionId: txIn.id,
+                    tenantId: req.user.tenantId
+                }
+            });
+
+            return { senderBalance: updatedSender.currentCustodyBalance, receiverBalance: updatedReceiver.currentCustodyBalance };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: result,
+            message: 'Custody transferred successfully.'
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Create draft transaction (manual entry)
 // @route   POST /api/transactions/draft
 // @access  Private
@@ -749,17 +882,11 @@ export const getStats = async (req, res, next) => {
             tenantId: req.user.tenantId
         };
 
-        // Role-based filtering
+        // Role-based filtering. Engineers see only their own; everyone
+        // else sees the full tenant.
         if (req.user.role === 'ENGINEER') {
             whereClause.createdBy = req.user.id;
-        } else if (req.user.role === 'PROJECT_MANAGER') {
-            const projects = await prisma.project.findMany({
-                where: { engineerId: req.user.id },
-                select: { id: true }
-            });
-            whereClause.projectId = { in: projects.map(p => p.id) };
         }
-        // Admin and Accountant see all
 
         const transactions = await prisma.transaction.findMany({
             where: whereClause
@@ -776,16 +903,21 @@ export const getStats = async (req, res, next) => {
             return acc;
         }, []);
 
-        const byCategory = transactions.reduce((acc, t) => {
-            const catKey = t.category.toUpperCase();
-            const existing = acc.find(item => item._id === catKey);
-            if (existing) {
-                existing.total += Number(t.amount);
-            } else {
-                acc.push({ _id: catKey, total: Number(t.amount) });
-            }
-            return acc;
-        }, []);
+        // The dashboard's "Expenses by Category" chart consumes byCategory,
+        // so only EXPENSE transactions belong here. Filter out income (PAYMENT)
+        // and the auto-generated MANAGEMENT_FEE_TRANSFER ledger entries.
+        const byCategory = transactions
+            .filter(t => t.type === 'EXPENSE' && t.category !== 'MANAGEMENT_FEE_TRANSFER')
+            .reduce((acc, t) => {
+                const catKey = t.category.toUpperCase();
+                const existing = acc.find(item => item._id === catKey);
+                if (existing) {
+                    existing.total += Number(t.amount);
+                } else {
+                    acc.push({ _id: catKey, total: Number(t.amount) });
+                }
+                return acc;
+            }, []);
 
         res.status(200).json({
             success: true,

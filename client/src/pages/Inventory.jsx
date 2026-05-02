@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Package, Search, Filter, ArrowRight, History, Plus, Settings } from 'lucide-react';
+import { Package, Search, Filter, ArrowRight, History, Plus, Settings, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddMaterialModal from '../components/AddMaterialModal';
@@ -71,6 +71,26 @@ export default function Inventory() {
         }).format(amount);
     };
 
+    const handleDeleteBatch = (batchId, batchDescription) => {
+        showAlert({
+            type: 'warning',
+            title: t('common.deleteConfirmTitle'),
+            message: `${t('common.deleteConfirmMessage')} "${batchDescription}"?`,
+            showCancel: true,
+            confirmText: t('common.delete'),
+            onConfirm: async () => {
+                try {
+                    await materialUsageAPI.deleteBatch(batchId);
+                    showAlert({ type: 'success', title: 'Deleted', message: 'Batch deleted successfully' });
+                    loadData();
+                } catch (error) {
+                    console.error('Failed to delete batch:', error);
+                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete batch' });
+                }
+            }
+        });
+    };
+
     return (
         <Layout>
             <div className="inventory-page">
@@ -108,22 +128,36 @@ export default function Inventory() {
 
                 {/* Filters */}
                 <div className="card mb-xl" style={{ padding: 'var(--spacing-md)' }}>
-                    <div className="flex gap-md flex-wrap">
-                        <div className="flex-1 min-w-[200px] relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" size={18} />
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1 1 250px', position: 'relative' }}>
+                            <Search style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} size={18} />
                             <input
                                 type="text"
                                 placeholder={t('common.search') || 'بحث...'}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                style={{ paddingLeft: '40px', width: '100%' }}
+                                style={{
+                                    padding: '10px 10px 10px 42px',
+                                    width: '100%',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '6px',
+                                    outline: 'none',
+                                    backgroundColor: 'transparent'
+                                }}
                             />
                         </div>
-                        <div className="min-w-[200px]">
+                        <div style={{ flex: '0 1 250px', minWidth: '200px' }}>
                             <select
                                 value={selectedProjectId}
                                 onChange={(e) => setSelectedProjectId(e.target.value)}
-                                style={{ width: '100%' }}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '6px',
+                                    outline: 'none',
+                                    backgroundColor: 'transparent'
+                                }}
                             >
                                 <option value="all">{t('inventory.allProjects') || 'جميع المشاريع'}</option>
                                 {projects.map(p => (
@@ -157,10 +191,20 @@ export default function Inventory() {
                                         {items.map(item => (
                                             <div key={item.id} className="card inventory-card">
                                                 <div className="flex-between mb-sm">
-                                                    <h4 className="m-0">{item.description}</h4>
-                                                    <span className={`badge ${item.status === 'AVAILABLE' ? 'badge-success' : 'badge-warning'}`}>
-                                                        {t(`inventory.status.${item.status.toLowerCase()}`) || item.status}
-                                                    </span>
+                                                    <h4 className="m-0" style={{ paddingRight: '12px' }}>{item.description}</h4>
+                                                    <div className="flex gap-sm">
+                                                        <span className={`badge ${item.status === 'AVAILABLE' ? 'badge-success' : 'badge-warning'}`}>
+                                                            {t(`inventory.status.${item.status.toLowerCase()}`) || item.status}
+                                                        </span>
+                                                        <button
+                                                            className="btn btn-secondary"
+                                                            onClick={() => handleDeleteBatch(item.id, item.description)}
+                                                            style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444', background: 'transparent' }}
+                                                            title={t('common.delete')}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div className="inventory-metrics grid grid-2 gap-sm my-md">
                                                     <div className="metric">
@@ -186,7 +230,8 @@ export default function Inventory() {
                                                     <span>{((item.remainingValue / item.initialValue) * 100).toFixed(0)}% {t('inventory.remaining') || 'متبقي'}</span>
                                                 </div>
                                                 <button
-                                                    className="btn btn-sm btn-outline btn-primary full-width mt-md"
+                                                    className="btn btn-primary full-width mt-md"
+                                                    style={{ display: 'flex', justifyContent: 'center', padding: '8px' }}
                                                     onClick={() => {
                                                         setUsageProjectId(item.projectId);
                                                         setIsUsageModalOpen(true);
@@ -206,7 +251,7 @@ export default function Inventory() {
                         {filteredMaterials.length === 0 ? (
                             <div className="card text-center py-2xl">
                                 <Package size={48} className="text-tertiary mx-auto mb-md" />
-                                <p className="text-secondary">No raw materials defined yet.</p>
+                                <p className="text-secondary">{t('inventory.noItems')}</p>
                             </div>
                         ) : (
                             <div className="grid grid-4 gap-md">

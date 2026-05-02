@@ -12,6 +12,16 @@ router.use(protect);
 // Stats route
 router.get('/stats', transactionController.getStats);
 
+// Transfer custody route for Engineers
+router.post(
+    '/transfer-custody',
+    verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN']),
+    transactionController.transferCustody
+);
+
+// Get unique cost centers
+router.get('/cost-centers', transactionController.getCostCenters);
+
 // Get pending approvals (Managers & Admins only)
 router.get(
     '/pending',

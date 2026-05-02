@@ -1,26 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    TextField,
-    Grid,
-    Typography,
-    IconButton,
-    Alert,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Card,
-    CardContent,
-    Chip
-} from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import InventoryIcon from '@mui/icons-material/Inventory';
 import { useTranslation } from 'react-i18next';
+import { X, Package } from 'lucide-react';
+import './Modal.css';
 
 const InventoryUsageModal = ({
     open,
@@ -34,6 +15,7 @@ const InventoryUsageModal = ({
     const [formData, setFormData] = useState({
         materialBatchId: '',
         valueConsumed: '',
+        quantityConsumed: '',
         description: ''
     });
 
@@ -65,7 +47,8 @@ const InventoryUsageModal = ({
                             if (batch.status !== 'DEPLETED') {
                                 allBatches.push({
                                     ...batch,
-                                    itemName: item.itemName
+                                    itemName: item.itemName,
+                                    unit: item.unitOfMeasure
                                 });
                             }
                         });
@@ -80,27 +63,54 @@ const InventoryUsageModal = ({
         fetchBatches();
     }, [projectId, open]);
 
-    const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+    const handleChange = (e) => {
+        const { name, value } = e.target;
 
-        // Update selected batch info
-        if (field === 'materialBatchId') {
-            const batch = batches.find(b => b.id === value);
-            setSelectedBatch(batch);
+        // Handle auto-calculation if one of the fields is changed
+        let updates = { [name]: value };
 
-            // Calculate profit preview
-            if (batch && formData.valueConsumed) {
-                calculateProfitPreview(parseFloat(formData.valueConsumed), batch);
+        if (name === 'quantityConsumed' && selectedBatch?.unitPrice && value !== '') {
+            const calculatedValue = (parseFloat(value) * parseFloat(selectedBatch.unitPrice)).toFixed(2);
+            updates.valueConsumed = calculatedValue;
+        } else if (name === 'valueConsumed' && selectedBatch?.unitPrice && value !== '' && selectedBatch.unitPrice > 0) {
+            const calculatedQuantity = (parseFloat(value) / parseFloat(selectedBatch.unitPrice)).toFixed(2);
+            updates.quantityConsumed = calculatedQuantity;
+        }
+
+        setFormData(prev => {
+            const newData = { ...prev, ...updates };
+
+            // Update selected batch info when batch changes
+            if (name === 'materialBatchId') {
+                const batch = batches.find(b => b.id === value);
+                setSelectedBatch(batch);
+
+                // Keep the current input value but apply auto calc if price exists
+                if (batch && batch.unitPrice && newData.quantityConsumed) {
+                    newData.valueConsumed = (parseFloat(newData.quantityConsumed) * parseFloat(batch.unitPrice)).toFixed(2);
+                }
+
+                if (batch && newData.valueConsumed) {
+                    calculateProfitPreview(parseFloat(newData.valueConsumed), batch);
+                } else {
+                    setProfitPreview(null);
+                }
+            } else if ((name === 'valueConsumed' || name === 'quantityConsumed') && selectedBatch) {
+                if (newData.valueConsumed) {
+                    calculateProfitPreview(parseFloat(newData.valueConsumed), selectedBatch);
+                } else {
+                    setProfitPreview(null);
+                }
             }
-        }
 
-        // Calculate profit preview when value changes
-        if (field === 'valueConsumed' && selectedBatch) {
-            calculateProfitPreview(parseFloat(value), selectedBatch);
-        }
+            return newData;
+        });
 
-        if (errors[field]) {
-            setErrors(prev => ({ ...prev, [field]: null }));
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: null }));
+        }
+        if (updates.valueConsumed && errors['valueConsumed']) {
+            setErrors(prev => ({ ...prev, valueConsumed: null }));
         }
     };
 
@@ -161,7 +171,8 @@ const InventoryUsageModal = ({
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (e) => {
+        e.preventDefault();
         if (!validate()) return;
 
         setLoading(true);
@@ -177,7 +188,8 @@ const InventoryUsageModal = ({
                 body: JSON.stringify({
                     ...formData,
                     projectId,
-                    valueConsumed: parseFloat(formData.valueConsumed)
+                    valueConsumed: parseFloat(formData.valueConsumed),
+                    quantityConsumed: formData.quantityConsumed ? parseFloat(formData.quantityConsumed) : undefined
                 })
             });
 
@@ -200,6 +212,7 @@ const InventoryUsageModal = ({
         setFormData({
             materialBatchId: '',
             valueConsumed: '',
+            quantityConsumed: '',
             description: ''
         });
         setSelectedBatch(null);
@@ -208,186 +221,143 @@ const InventoryUsageModal = ({
         onClose();
     };
 
+    if (!open) return null;
+
     return (
-        <Dialog
-            open={open}
-            onClose={handleClose}
-            maxWidth="sm"
-            fullWidth
-            dir={isArabic ? 'rtl' : 'ltr'}
-        >
-            <DialogTitle>
-                <Grid container justifyContent="space-between" alignItems="center">
-                    <Grid item>
-                        <Grid container alignItems="center" spacing={1}>
-                            <Grid item>
-                                <InventoryIcon color="primary" />
-                            </Grid>
-                            <Grid item>
-                                <Typography variant="h6">
-                                    {isArabic ? 'تسجيل استهلاك مخزون' : 'Record Inventory Usage'}
-                                </Typography>
-                            </Grid>
-                        </Grid>
-                    </Grid>
-                    <IconButton onClick={handleClose} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </Grid>
-            </DialogTitle>
+        <div className="modal-overlay" onClick={handleClose}>
+            <div className="modal-container" onClick={(e) => e.stopPropagation()} dir={isArabic ? 'rtl' : 'ltr'} style={{ maxWidth: '600px' }}>
+                <div className="modal-header">
+                    <h2 className="flex gap-sm items-center">
+                        <Package size={24} className="text-primary" />
+                        {t('inventory.recordUsage')}
+                    </h2>
+                    <button className="modal-close" onClick={handleClose}>
+                        <X size={24} />
+                    </button>
+                </div>
 
-            <DialogContent dividers>
-                <Grid container spacing={3}>
+                <form onSubmit={handleSubmit} className="modal-body">
                     {errors.submit && (
-                        <Grid item xs={12}>
-                            <Alert severity="error">{errors.submit}</Alert>
-                        </Grid>
+                        <div className="alert alert-error mb-md" style={{ padding: '10px', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '4px' }}>
+                            {errors.submit}
+                        </div>
                     )}
 
-                    {/* Material Batch Selection */}
-                    <Grid item xs={12}>
-                        <FormControl fullWidth error={!!errors.materialBatchId}>
-                            <InputLabel>{isArabic ? 'دفعة المخزون' : 'Material Batch'}</InputLabel>
-                            <Select
-                                value={formData.materialBatchId}
-                                onChange={(e) => handleChange('materialBatchId', e.target.value)}
-                                label={isArabic ? 'دفعة المخزون' : 'Material Batch'}
-                            >
-                                {batches.length === 0 && (
-                                    <MenuItem disabled>
-                                        <em>{isArabic ? 'لا توجد دفعات متاحة' : 'No batches available'}</em>
-                                    </MenuItem>
-                                )}
-                                {batches.map(batch => (
-                                    <MenuItem key={batch.id} value={batch.id}>
-                                        {batch.itemName} - {batch.description}
-                                        <Chip
-                                            label={`${batch.remainingValue} ${isArabic ? 'جنيه' : 'EGP'}`}
-                                            size="small"
-                                            sx={{ ml: 1 }}
-                                        />
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Grid>
+                    <div className="form-group full-width">
+                        <label>{isArabic ? 'دفعة المخزون' : 'Material Batch'} <span className="required">*</span></label>
+                        <select
+                            name="materialBatchId"
+                            value={formData.materialBatchId}
+                            onChange={handleChange}
+                            className={errors.materialBatchId ? 'error' : ''}
+                        >
+                            <option value="">{isArabic ? '-- اختر دفعة مخزون --' : '-- Select Material Batch --'}</option>
+                            {batches.map(batch => (
+                                <option key={batch.id} value={batch.id}>
+                                    {batch.itemName} - {batch.description} ({batch.remainingValue} {isArabic ? 'جنيه' : 'EGP'})
+                                </option>
+                            ))}
+                        </select>
+                        {errors.materialBatchId && <span className="error-message">{errors.materialBatchId}</span>}
+                    </div>
 
-                    {/* Selected Batch Info */}
                     {selectedBatch && (
-                        <Grid item xs={12}>
-                            <Card variant="outlined">
-                                <CardContent>
-                                    <Typography variant="subtitle2" gutterBottom>
-                                        {isArabic ? 'معلومات الدفعة' : 'Batch Information'}
-                                    </Typography>
-                                    <Grid container spacing={1}>
-                                        <Grid item xs={6}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {isArabic ? 'القيمة الأولية:' : 'Initial Value:'}
-                                            </Typography>
-                                            <Typography variant="body1">
-                                                {selectedBatch.initialValue} {isArabic ? 'جنيه' : 'EGP'}
-                                            </Typography>
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {isArabic ? 'المتبقي:' : 'Remaining:'}
-                                            </Typography>
-                                            <Typography variant="body1" color="primary">
-                                                {selectedBatch.remainingValue} {isArabic ? 'جنيه' : 'EGP'}
-                                            </Typography>
-                                        </Grid>
-                                    </Grid>
-                                </CardContent>
-                            </Card>
-                        </Grid>
+                        <div className="card mb-md" style={{ backgroundColor: 'var(--bg-tertiary)', padding: '12px' }}>
+                            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>{isArabic ? 'معلومات الدفعة' : 'Batch Information'}</h4>
+                            <div className="flex-between">
+                                <div>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{isArabic ? 'القيمة الأولية:' : 'Initial Value:'}</span>
+                                    <div style={{ fontWeight: 'bold' }}>{selectedBatch.initialValue} {isArabic ? 'جنيه' : 'EGP'}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>{isArabic ? 'المتبقي:' : 'Remaining:'}</span>
+                                    <div style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>{selectedBatch.remainingValue} {isArabic ? 'جنيه' : 'EGP'}</div>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
-                    {/* Value Consumed */}
-                    <Grid item xs={12}>
-                        <TextField
-                            fullWidth
-                            label={isArabic ? 'القيمة المستهلكة (جنيه)' : 'Value Consumed (EGP)'}
-                            type="number"
-                            value={formData.valueConsumed}
-                            onChange={(e) => handleChange('valueConsumed', e.target.value)}
-                            error={!!errors.valueConsumed}
-                            helperText={errors.valueConsumed}
-                            inputProps={{
-                                min: 0,
-                                max: selectedBatch?.remainingValue || undefined,
-                                step: 0.01
-                            }}
-                            required
-                        />
-                    </Grid>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-md)' }}>
+                        <div className="form-group mb-0">
+                            <label>{isArabic ? 'الكمية المستهلكة' : 'Quantity Consumed'} {selectedBatch?.unitPrice && '*'}</label>
+                            <input
+                                type="number"
+                                name="quantityConsumed"
+                                value={formData.quantityConsumed}
+                                onChange={handleChange}
+                                min="0"
+                                step="any"
+                                placeholder={isArabic ? `الكمية (${selectedBatch?.unit || '-'})` : `Quantity (${selectedBatch?.unit || '-'})`}
+                            />
+                        </div>
+                        <div className="form-group mb-0">
+                            <label>{isArabic ? 'القيمة المستهلكة (جنيه)' : 'Value Consumed (EGP)'} <span className="required">*</span></label>
+                            <input
+                                type="number"
+                                name="valueConsumed"
+                                value={formData.valueConsumed}
+                                onChange={handleChange}
+                                min="0"
+                                max={selectedBatch?.remainingValue || undefined}
+                                step="any"
+                                className={errors.valueConsumed ? 'error' : ''}
+                                placeholder="0.00"
+                            />
+                            {errors.valueConsumed && <span className="error-message">{errors.valueConsumed}</span>}
+                        </div>
+                    </div>
 
-                    {/* Profit Preview */}
                     {profitPreview && (
-                        <Grid item xs={12}>
-                            <Alert severity="success">
-                                <Typography variant="subtitle2" gutterBottom>
-                                    {isArabic ? 'معاينة الربح' : 'Profit Preview'}
-                                </Typography>
-                                <Grid container spacing={1}>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2">
-                                            {isArabic ? 'القيمة المستهلكة:' : 'Value Consumed:'} {profitPreview.valueConsumed} {isArabic ? 'جنيه' : 'EGP'}
-                                        </Typography>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2">
-                                            {isArabic ? 'نسبة الإدارة:' : 'Management Fee:'} {profitPreview.feePercent}%
-                                        </Typography>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2" fontWeight="bold" color="success.main">
-                                            {isArabic ? 'الربح المحقق:' : 'Profit Recognized:'} {profitPreview.profit.toFixed(2)} {isArabic ? 'جنيه' : 'EGP'}
-                                        </Typography>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Typography variant="body2">
-                                            {isArabic ? 'المتبقي بعد الاستهلاك:' : 'Remaining After:'} {profitPreview.remainingAfter.toFixed(2)} {isArabic ? 'جنيه' : 'EGP'}
-                                        </Typography>
-                                    </Grid>
-                                </Grid>
-                            </Alert>
-                        </Grid>
+                        <div className="alert alert-success mt-md mb-md" style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '12px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>{isArabic ? 'معاينة الربح' : 'Profit Preview'}</h4>
+                            <div className="grid grid-2" style={{ gap: '8px', fontSize: '13px' }}>
+                                <div>
+                                    <span style={{ display: 'block' }}>{isArabic ? 'القيمة المستهلكة:' : 'Value Consumed:'}</span>
+                                    <strong>{profitPreview.valueConsumed} {isArabic ? 'جنيه' : 'EGP'}</strong>
+                                </div>
+                                <div>
+                                    <span style={{ display: 'block' }}>{isArabic ? 'نسبة الإدارة:' : 'Management Fee:'}</span>
+                                    <strong>{profitPreview.feePercent}%</strong>
+                                </div>
+                                <div>
+                                    <span style={{ display: 'block' }}>{isArabic ? 'المتبقي بعد الاستهلاك:' : 'Remaining After:'}</span>
+                                    <strong>{profitPreview.remainingAfter.toFixed(2)} {isArabic ? 'جنيه' : 'EGP'}</strong>
+                                </div>
+                                <div style={{ color: '#059669' }}>
+                                    <span style={{ display: 'block' }}>{isArabic ? 'الربح المحقق:' : 'Profit Recognized:'}</span>
+                                    <strong>{profitPreview.profit.toFixed(2)} {isArabic ? 'جنيه' : 'EGP'}</strong>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
-                    {/* Description */}
-                    <Grid item xs={12}>
-                        <TextField
-                            fullWidth
-                            label={isArabic ? 'الوصف / الغرض من الاستخدام' : 'Description / Purpose'}
-                            multiline
-                            rows={3}
+                    <div className="form-group full-width mb-0">
+                        <label>{isArabic ? 'الوصف / الغرض من الاستخدام' : 'Description / Purpose'} <span className="required">*</span></label>
+                        <textarea
+                            name="description"
                             value={formData.description}
-                            onChange={(e) => handleChange('description', e.target.value)}
-                            error={!!errors.description}
-                            helperText={errors.description || (isArabic ? 'مثال: استخدام الأسمنت لأعمال الأساسات' : 'Example: Used cement for foundation work')}
-                            required
+                            onChange={handleChange}
+                            rows="3"
+                            className={errors.description ? 'error' : ''}
+                            placeholder={isArabic ? 'مثال: استخدام الأسمنت لأعمال الأساسات' : 'Example: Used cement for foundation work'}
+                            style={{ resize: 'vertical' }}
                         />
-                    </Grid>
-                </Grid>
-            </DialogContent>
+                        {errors.description && <span className="error-message">{errors.description}</span>}
+                    </div>
 
-            <DialogActions>
-                <Button onClick={handleClose} color="inherit" disabled={loading}>
-                    {isArabic ? 'إلغاء' : 'Cancel'}
-                </Button>
-                <Button
-                    onClick={handleSubmit}
-                    variant="contained"
-                    color="primary"
-                    disabled={loading || !selectedBatch}
-                >
-                    {loading
-                        ? (isArabic ? 'جاري التسجيل...' : 'Recording...')
-                        : (isArabic ? 'تسجيل الاستهلاك' : 'Record Usage')}
-                </Button>
-            </DialogActions>
-        </Dialog>
+                    <div className="modal-footer" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border-color)' }}>
+                        <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={loading}>
+                            {isArabic ? 'إلغاء' : 'Cancel'}
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={loading || !selectedBatch}>
+                            {loading
+                                ? (isArabic ? 'جاري التسجيل...' : 'Recording...')
+                                : (isArabic ? 'تسجيل الاستهلاك' : 'Record Usage')}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     );
 };
 

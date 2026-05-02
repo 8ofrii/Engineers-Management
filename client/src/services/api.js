@@ -25,10 +25,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        // Don't auto-redirect for 401s on the login endpoint itself —
+        // a wrong-password response is a 401 that the Login page wants to
+        // surface as an error message, not a navigation.
+        const reqUrl = error.config?.url || '';
+        const isAuthAttempt = /\/auth\/(login|register|register-company|verify-email|verify-invite|forgot-password|reset-password)/.test(reqUrl);
+
+        if (error.response?.status === 401 && !isAuthAttempt) {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            // Avoid redirect loop if we're already on /login.
+            if (!window.location.pathname.startsWith('/login')) {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
@@ -76,10 +85,16 @@ export const transactionsAPI = {
     getStats: (params) => api.get('/transactions/stats', { params }),
     recordIncome: (data) => api.post('/transactions/income', data),
     createV2: (data) => api.post('/transactions/v2', data),
+    getPending: (params) => api.get('/transactions/pending', { params }), // For manager view
+    approve: (id) => api.put(`/transactions/${id}/approve`),
+    reject: (id, reason) => api.put(`/transactions/${id}/reject`, { reason }),
+    submitDraft: (id, data) => api.put(`/transactions/${id}/submit`, data), // For engineer submitting draft
+    transferCustody: (data) => api.post('/transactions/transfer-custody', data), // For custody transfers
     getProjectInventory: (projectId) => api.get(`/transactions/projects/${projectId}/inventory`),
     analyze: (formData) => api.post('/transactions/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    }),
+    getCostCenters: () => api.get('/transactions/cost-centers')
 };
 
 // Clients API
@@ -124,6 +139,7 @@ export const materialUsageAPI = {
     create: (data) => api.post('/material-usage', data),
     getBatches: (params) => api.get('/material-batches', { params }),
     consumeBatch: (id, data) => api.post(`/material-batches/${id}/consume`, data),
+    deleteBatch: (id) => api.delete(`/material-batches/${id}`),
     recordUsageV2: (data) => api.post('/transactions/inventory-usage', data)
 };
 

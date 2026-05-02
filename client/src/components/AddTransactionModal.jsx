@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Mic, MicOff, Wallet } from 'lucide-react';
-import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI } from '../services/api';
+import { X, Mic, MicOff, Wallet, Plus } from 'lucide-react';
+import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
+import AddWorkmanModal from './AddWorkmanModal';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 
@@ -17,7 +18,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     };
 
 
-    // Modes: EXPENSE (default), INCOME, USAGE
+    // Modes: EXPENSE (default), INCOME, USAGE, TRANSFER
     const [mode, setMode] = useState('EXPENSE');
 
     // Data Loading
@@ -27,6 +28,20 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [users, setUsers] = useState([]); // Company employees for payer selection
     const [costItems, setCostItems] = useState([]); // Project cost items (Work Orders)
     const [workmen, setWorkmen] = useState([]); // Site workmen for labor payments
+    const [clients, setClients] = useState([]);
+    const [suppliers, setSuppliers] = useState([]);
+    const [existingCostCenters, setExistingCostCenters] = useState([]);
+    const [existingTransactionFroms, setExistingTransactionFroms] = useState([]);
+    const [existingTransactionTos, setExistingTransactionTos] = useState([]);
+    const [existingPhysicalAccounts, setExistingPhysicalAccounts] = useState([]);
+
+    const [customInputs, setCustomInputs] = useState({
+        costCenter: false,
+        transactionTo: false,
+        transactionFrom: false,
+        physicalAccount: false
+    });
+
 
     // Core State
     const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -62,6 +77,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         // Income
         invoiceNumber: '',
         physicalAccount: '',
+
+        // Transfer Custody
+        toEngineerId: '',
     });
 
     // V1.2 UI Logic: New vs Existing Item Switch
@@ -71,6 +89,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [isRecording, setIsRecording] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Dynamic Creation State
+    const [isWorkmanModalOpen, setIsWorkmanModalOpen] = useState(false);
+
     // Initial Load & Edit Mode Setup
     useEffect(() => {
         if (isOpen) {
@@ -78,6 +99,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             loadCategories();
             loadUsers(); // Load company employees for payer selection
             loadWorkforce();
+            loadClients();
+            loadSuppliers();
+            loadCostCenters();
             if (initialData) {
                 // Populate for Editing
                 setMode(initialData.type || 'EXPENSE');
@@ -138,7 +162,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     physicalAccount: initialData.physicalAccount || '',
                     invoiceNumber: initialData.invoiceNumber || '',
                     payerUserId: initialData.payerUserId || '',
-                    projectCostItemId: initialData.projectCostItemId || ''
+                    projectCostItemId: initialData.projectCostItemId || '',
+                    toEngineerId: ''
                 });
 
             } else {
@@ -166,7 +191,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     costCenter: '',
                     physicalAccount: '',
                     payerUserId: user?.id || '',
-                    projectCostItemId: ''
+                    projectCostItemId: '',
+                    toEngineerId: ''
                 });
                 setCostItemMode('NEW');
             }
@@ -251,6 +277,32 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         } catch (error) {
             console.error("Failed to load workforce", error);
         }
+    };
+
+    const loadClients = async () => {
+        try {
+            const res = await clientsAPI.getAll();
+            setClients(res.data.data || []);
+        } catch (e) { console.error("Failed to load clients", e); }
+    };
+
+    const loadSuppliers = async () => {
+        try {
+            const res = await suppliersAPI.getAll();
+            setSuppliers(res.data.data || []);
+        } catch (e) { console.error("Failed to load suppliers", e); }
+    };
+
+    const loadCostCenters = async () => {
+        try {
+            const res = await transactionsAPI.getCostCenters();
+            if (res.data.data) {
+                setExistingCostCenters(res.data.data.costCenters || []);
+                setExistingTransactionFroms(res.data.data.transactionFroms || []);
+                setExistingTransactionTos(res.data.data.transactionTos || []);
+                setExistingPhysicalAccounts(res.data.data.physicalAccounts || []);
+            }
+        } catch (e) { console.error("Failed to load options", e); }
     };
 
     const handleProjectChange = (e) => {
@@ -403,9 +455,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
         if (mode === 'EXPENSE') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
-            if (formData.paymentMethod === 'CUSTODY_WALLET' && Number(formData.amount) > Number(user?.currentCustodyBalance || 0)) {
-                newErrors.amount = t('finance.insufficientFunds');
-            }
+            // Removed constraint that prevented negative custody balances based on client request
+
             if (!formData.description) newErrors.description = t('common.required');
 
             // Category is always required
@@ -421,6 +472,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 newErrors.amount = `${t('finance.exceedsRemaining')} (${selectedBatch.remainingValue})`;
             }
             if (!formData.category) newErrors.category = t('common.required');
+        }
+        else if (mode === 'TRANSFER') {
+            if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
+            if (!formData.toEngineerId) newErrors.toEngineerId = t('common.required');
+            if (!formData.description) newErrors.description = t('common.required');
         }
 
         setErrors(newErrors);
@@ -452,7 +508,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     unit: (costItemMode === 'NEW' || isStockPurchase) ? formData.unit : undefined,
                     unitPrice: (costItemMode === 'NEW' || isStockPurchase) ? (formData.unitPrice ? Number(formData.unitPrice) : undefined) : undefined,
                     quantity: (costItemMode === 'NEW' || isStockPurchase) ? (formData.quantity ? Number(formData.quantity) : undefined) : undefined,
-                    costCenter: formData.costCenter,
+                    costCenter: formData.costCenter || undefined,
+                    transactionTo: formData.transactionTo || undefined,
                     invoiceNumber: formData.invoiceNumber
                 };
             }
@@ -464,11 +521,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     projectId: selectedProjectId,
                     projectCostItemId: formData.projectCostItemId || undefined,
                     payerUserId: formData.payerUserId || user?.id,
-                    description: formData.description || 'Client Payment',
+                    description: formData.description || t('finance.categories.payment'),
                     transactionDate: formData.transactionDate,
                     clientId: selectedProject?.client?.id,
                     paymentMethod: formData.paymentMethod,
-                    physicalAccount: formData.physicalAccount,
+                    physicalAccount: formData.physicalAccount || undefined,
+                    transactionFrom: formData.transactionFrom || undefined,
+                    costCenter: formData.costCenter || undefined,
                     invoiceNumber: formData.invoiceNumber
                 };
             }
@@ -477,18 +536,29 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     materialBatchId: selectedBatchId,
                     valueConsumed: Number(formData.amount),
                     projectId: selectedProjectId,
-                    description: formData.description || 'Inventory Usage',
+                    description: formData.description || t('inventory.recordUsage'),
                     category: formData.category
                 };
             }
 
-            if (initialData && initialData.id && mode !== 'USAGE') {
+            else if (mode === 'TRANSFER') {
+                payload = {
+                    amount: Number(formData.amount),
+                    fromEngineerId: user?.id,
+                    toEngineerId: formData.toEngineerId,
+                    description: formData.description
+                };
+            }
+
+            if (initialData && initialData.id && mode !== 'USAGE' && mode !== 'TRANSFER') {
                 // UPDATE MODE
                 await transactionsAPI.update(initialData.id, payload);
             } else {
                 // CREATE MODE
                 if (mode === 'USAGE') {
                     await materialUsageAPI.recordUsageV2(payload);
+                } else if (mode === 'TRANSFER') {
+                    await transactionsAPI.transferCustody(payload);
                 } else {
                     // Both Income and Expense use V2 logic for profit splitting
                     await transactionsAPI.createV2(payload);
@@ -512,6 +582,54 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         const officeProfit = (total * feePercent) / 100;
         const opsFund = total - officeProfit;
         return { opsFund, officeProfit, feePercent };
+    };
+
+    const renderDropdownWithCustom = (name, label, options, placeholder) => {
+        const isCustom = customInputs[name];
+
+        const handleSelectChange = (e) => {
+            if (e.target.value === '__NEW__') {
+                setCustomInputs(prev => ({ ...prev, [name]: true }));
+                setFormData(prev => ({ ...prev, [name]: '' }));
+            } else {
+                handleChange(e);
+            }
+        };
+
+        const handleCancelCustom = () => {
+            setCustomInputs(prev => ({ ...prev, [name]: false }));
+            setFormData(prev => ({ ...prev, [name]: '' }));
+        };
+
+        return (
+            <div className="form-group">
+                <label>{label}</label>
+                {isCustom ? (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                            name={name}
+                            value={formData[name]}
+                            onChange={handleChange}
+                            placeholder={placeholder}
+                            style={{ flex: 1 }}
+                        />
+                        <button type="button" onClick={handleCancelCustom} className="btn-icon" style={{ padding: '0 8px', color: '#ef4444', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                            <X size={18} />
+                        </button>
+                    </div>
+                ) : (
+                    <select name={name} value={formData[name]} onChange={handleSelectChange}>
+                        <option value="">-- {t('common.select') || 'Select'} --</option>
+                        {options.map((opt, i) => (
+                            <option key={`${name}-${i}`} value={opt.value}>
+                                {opt.label}
+                            </option>
+                        ))}
+                        <option value="__NEW__" style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>+ {t('common.add_new') || 'Add New'}</option>
+                    </select>
+                )}
+            </div>
+        );
     };
 
     const incomeSplit = calculateSplit();
@@ -578,6 +696,18 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         }}
                     >
                         {t('finance.usage')}
+                    </button>
+                    <button
+                        className={`tab-btn ${mode === 'TRANSFER' ? 'active' : ''}`}
+                        onClick={() => setMode('TRANSFER')}
+                        style={{
+                            flex: 1, padding: '16px', background: 'transparent', border: 'none',
+                            borderBottom: mode === 'TRANSFER' ? '3px solid var(--color-primary)' : '3px solid transparent',
+                            color: mode === 'TRANSFER' ? 'var(--color-primary)' : 'var(--text-secondary)',
+                            fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+                        }}
+                    >
+                        {t('finance.transferCustody') || 'تحويل عهدة'}
                     </button>
                 </div>
 
@@ -789,15 +919,12 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             </>
                                         )}
 
-                                        <div className="form-group">
-                                            <label>{t('finance.costCenter')}</label>
-                                            <input
-                                                name="costCenter"
-                                                value={formData.costCenter}
-                                                onChange={handleChange}
-                                                placeholder="e.g. Block A"
-                                            />
-                                        </div>
+                                        {renderDropdownWithCustom(
+                                            "costCenter",
+                                            t('finance.costCenter'),
+                                            existingCostCenters.map(cc => ({ value: cc, label: cc })),
+                                            "e.g. Block A"
+                                        )}
 
                                         <div className="form-group">
                                             <label>{t('finance.paymentMethod')}</label>
@@ -810,15 +937,21 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             </select>
                                         </div>
 
-                                        <div className="form-group">
-                                            <label>{t('finance.transactionTo')}</label>
-                                            <input
-                                                name="transactionTo"
-                                                value={formData.transactionTo}
-                                                onChange={handleChange}
-                                                placeholder={t('finance.transactionToPlaceholder')}
-                                            />
-                                        </div>
+                                        {renderDropdownWithCustom(
+                                            "transactionTo",
+                                            t('finance.transactionTo'),
+                                            [
+                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${t(`teamManagement.roles.${u.role}`) || u.role})` })),
+                                                ...workmen.map(w => ({ value: w.name, label: `${w.name} (${t(`labor.trades.${w.trade}`) || w.trade})` })),
+                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
+                                                ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+                                                ...existingTransactionTos.map(tt => ({ value: tt, label: tt }))
+                                            ].reduce((acc, current) => {
+                                                const x = acc.find(item => item.value === current.value);
+                                                if (!x) { return acc.concat([current]); } else { return acc; }
+                                            }, []),
+                                            t('finance.transactionToPlaceholder')
+                                        )}
 
                                         {/* Workman Selection (Only for Labor Categories) */}
                                         {(() => {
@@ -827,19 +960,31 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 return (
                                                     <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                                         <label>{t('labor.title')} <span className="required">*</span></label>
-                                                        <select
-                                                            name="workmanId"
-                                                            value={formData.workmanId}
-                                                            onChange={handleChange}
-                                                            className={errors.workmanId ? 'error' : ''}
-                                                        >
-                                                            <option value="">-- {t('labor.selectWorkman') || 'نقي الصنيعي'} --</option>
-                                                            {workmen.map(w => (
-                                                                <option key={w.id} value={w.id}>
-                                                                    {w.name} ({t(`labor.trades.${w.trade}`)})
-                                                                </option>
-                                                            ))}
-                                                        </select>
+                                                        <div className="flex gap-sm">
+                                                            <select
+                                                                name="workmanId"
+                                                                value={formData.workmanId}
+                                                                onChange={handleChange}
+                                                                className={errors.workmanId ? 'error' : ''}
+                                                                style={{ flex: 1 }}
+                                                            >
+                                                                <option value="">-- {t('labor.selectWorkman') || 'نقي الصنيعي'} --</option>
+                                                                {workmen.map(w => (
+                                                                    <option key={w.id} value={w.id}>
+                                                                        {w.name} ({t(`labor.trades.${w.trade}`)})
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary"
+                                                                title={t('labor.newWorkman')}
+                                                                onClick={() => setIsWorkmanModalOpen(true)}
+                                                                style={{ padding: '0 12px' }}
+                                                            >
+                                                                <Plus size={18} />
+                                                            </button>
+                                                        </div>
                                                         {errors.workmanId && <span className="error-message">{errors.workmanId}</span>}
                                                     </div>
                                                 );
@@ -929,15 +1074,19 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             <>
                                 <div className="form-section">
                                     <div className="form-grid">
-                                        <div className="form-group">
-                                            <label>{t('finance.transactionFrom')}</label>
-                                            <input
-                                                name="transactionFrom"
-                                                value={formData.transactionFrom}
-                                                onChange={handleChange}
-                                                placeholder={t('finance.clientName')}
-                                            />
-                                        </div>
+                                        {renderDropdownWithCustom(
+                                            "transactionFrom",
+                                            t('finance.transactionFrom'),
+                                            [
+                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${t(`teamManagement.roles.${u.role}`) || u.role})` })),
+                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
+                                                ...existingTransactionFroms.map(tf => ({ value: tf, label: tf }))
+                                            ].reduce((acc, current) => {
+                                                const x = acc.find(item => item.value === current.value);
+                                                if (!x) { return acc.concat([current]); } else { return acc; }
+                                            }, []),
+                                            t('finance.clientName')
+                                        )}
                                         <div className="form-group">
                                             <label>{t('finance.paymentMethod')}</label>
                                             <select name="paymentMethod" value={formData.paymentMethod} onChange={handleChange}>
@@ -947,15 +1096,12 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 <option value="CREDIT_CARD">{t('finance.methods.creditCard')}</option>
                                             </select>
                                         </div>
-                                        <div className="form-group">
-                                            <label>{t('finance.physicalAccount')} (Safe)</label>
-                                            <input
-                                                name="physicalAccount"
-                                                value={formData.physicalAccount}
-                                                onChange={handleChange}
-                                                placeholder="e.g. Main Safe"
-                                            />
-                                        </div>
+                                        {renderDropdownWithCustom(
+                                            "physicalAccount",
+                                            `${t('finance.physicalAccount')} (Safe)`,
+                                            existingPhysicalAccounts.map(pa => ({ value: pa, label: pa })),
+                                            "e.g. Main Safe"
+                                        )}
                                     </div>
                                 </div>
 
@@ -1006,7 +1152,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             <option value="">-- {t('finance.selectBatch')} --</option>
                                             {materialBatches.map(b => (
                                                 <option key={b.id} value={b.id}>
-                                                    {b.description} (Rem: {Number(b.remainingValue).toLocaleString()} EGP)
+                                                    {b.description} ({t('inventory.remaining')}: {Number(b.remainingValue).toLocaleString()} {t('chat.currency')})
                                                 </option>
                                             ))}
                                         </select>
@@ -1015,7 +1161,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 </div>
 
                                 <div className="form-section">
-                                    <h3 className="section-title">Consumption Details</h3>
+                                    <h3 className="section-title">{t('finance.detailsAndAmount') || 'تفاصيل الاستهلاك'}</h3>
                                     <div className="form-grid">
                                         <div className="form-group">
                                             <label>{t('finance.quantity')}</label>
@@ -1073,6 +1219,47 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         )
                     }
 
+                    {/* --- MODE D: TRANSFER --- */}
+                    {
+                        mode === 'TRANSFER' && (
+                            <>
+                                <div className="form-section">
+                                    <div className="form-grid">
+                                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                            <label>{t('finance.transferToEngineer') || 'المستلم'} <span className="required">*</span></label>
+                                            <select
+                                                name="toEngineerId"
+                                                value={formData.toEngineerId}
+                                                onChange={handleChange}
+                                                className={errors.toEngineerId ? 'error' : ''}
+                                            >
+                                                <option value="">-- {t('finance.selectReceiver') || 'اختار المستلم'} --</option>
+                                                {users.filter(u => u.id !== user?.id).map(u => (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.name} ({t(`teamManagement.roles.${u.role}`) || u.role})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {errors.toEngineerId && <span className="error-message">{errors.toEngineerId}</span>}
+                                        </div>
+                                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                            <label>{t('finance.amountToTransfer') || 'مبلغ التحويل'} (EGP) <span className="required">*</span></label>
+                                            <CurrencyInput
+                                                name="amount"
+                                                value={formData.amount}
+                                                onChange={handleChange}
+                                                placeholder="0.00"
+                                                className={errors.amount ? 'error' : ''}
+                                                style={{ fontSize: '1.2rem', fontWeight: 'bold' }}
+                                            />
+                                            {errors.amount && <span className="error-message">{errors.amount}</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )
+                    }
+
                     <div className="form-section">
                         <div className="form-group full-width">
                             <label>{t('finance.description')} / {t('common.notes')}</label>
@@ -1093,6 +1280,24 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
                 </form >
             </div >
+
+            <AddWorkmanModal
+                isOpen={isWorkmanModalOpen}
+                initialData={null}
+                onClose={() => setIsWorkmanModalOpen(false)}
+                onSave={async (workmanData) => {
+                    try {
+                        const response = await workmenAPI.create(workmanData);
+                        const newWorkman = response.data.data;
+                        await loadWorkforce();
+                        setFormData(prev => ({ ...prev, workmanId: newWorkman.id }));
+                        setIsWorkmanModalOpen(false);
+                    } catch (error) {
+                        console.error('Failed to save workman:', error);
+                        showAlert({ type: 'error', title: 'Error', message: 'Failed to create workman.' });
+                    }
+                }}
+            />
         </div >
     );
 }

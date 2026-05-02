@@ -27,4 +27,7 @@ router.get('/', materialBatchController.getAllBatches);
 // Get single batch
 router.get('/:id', materialBatchController.getBatch);
 
+// Delete batch
+router.delete('/:id', verifyRole(['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER']), materialBatchController.deleteBatch);
+
 export default router;

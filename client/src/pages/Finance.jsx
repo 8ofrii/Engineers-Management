@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
@@ -13,12 +13,14 @@ export default function Finance() {
     const { showAlert } = useAlert();
     const [searchParams, setSearchParams] = useSearchParams();
     const [transactions, setTransactions] = useState([]);
+    const [pendingTransactions, setPendingTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState(null);
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
 
     // Filter states (basic implementation, can be expanded)
-    const [filterType, setFilterType] = useState('ALL'); // ALL, INCOME, EXPENSE
+    const [filterType, setFilterType] = useState('ALL'); // ALL, INCOME, EXPENSE, PENDING, MY_LEDGER
     const [filterProjectId, setFilterProjectId] = useState(null);
     const [filterProjectName, setFilterProjectName] = useState(null);
 
@@ -54,8 +56,10 @@ export default function Finance() {
             const response = await transactionsAPI.getAll(params);
             let allTx = response?.data?.data || [];
 
-            // Filter by type
-            if (filterType !== 'ALL') {
+            // If MY_LEDGER is selected, filter everything where user is involved
+            if (filterType === 'MY_LEDGER') {
+                allTx = allTx.filter(tx => tx.creator?.id === user.id || tx.payerUserId === user.id || tx.toEngineerId === user.id);
+            } else if (filterType !== 'ALL') {
                 allTx = allTx.filter(tx => tx.type === filterType);
             }
 
@@ -69,7 +73,19 @@ export default function Finance() {
                 allTx = allTx.filter(tx => tx.workmanId === filterWorkmanId);
             }
 
-            setTransactions(allTx);
+            // Show approved or incomes in standard views by default, EXCEPT for MY_LEDGER where we want to see all
+            if (filterType !== 'MY_LEDGER') {
+                setTransactions(allTx.filter(tx => tx.status === 'APPROVED' || tx.type === 'INCOME'));
+            } else {
+                setTransactions(allTx);
+            }
+
+            // If manager/admin, load pending separately
+            if (user.role === 'PROJECT_MANAGER' || user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+                const pendingRes = await transactionsAPI.getPending();
+                setPendingTransactions(pendingRes?.data?.data || []);
+            }
+
         } catch (error) {
             console.error('Failed to load transactions:', error);
         } finally {
@@ -134,6 +150,28 @@ export default function Finance() {
     const openEditModal = (tx) => {
         setEditingTransaction(tx);
         setIsModalOpen(true);
+    };
+
+    const handleApprove = async (id) => {
+        try {
+            await transactionsAPI.approve(id);
+            showAlert({ type: 'success', title: t('common.success'), message: t('finance.approvedSuccess') || 'Transaction approved successfully' });
+            loadTransactions();
+        } catch (error) {
+            showAlert({ type: 'error', title: t('common.error'), message: error.response?.data?.message || 'Failed to approve' });
+        }
+    };
+
+    const handleReject = async (id) => {
+        const reason = prompt(t('finance.rejectReason') || 'Please enter rejection reason:');
+        if (reason === null) return; // User cancelled
+        try {
+            await transactionsAPI.reject(id, reason || 'No reason provided');
+            showAlert({ type: 'success', title: t('common.success'), message: t('finance.rejectedSuccess') || 'Transaction rejected' });
+            loadTransactions();
+        } catch (error) {
+            showAlert({ type: 'error', title: t('common.error'), message: error.response?.data?.message || 'Failed to reject' });
+        }
     };
 
     const formatDate = (dateString) => {
@@ -295,6 +333,19 @@ export default function Finance() {
                                 >
                                     {t('finance.expense')}
                                 </button>
+                                <button
+                                    className={`btn btn-sm ${filterType === 'MY_LEDGER' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setFilterType('MY_LEDGER')}
+                                    style={{
+                                        borderRadius: 'var(--radius-full)',
+                                        padding: '4px 16px',
+                                        fontSize: 'var(--font-size-sm)',
+                                        fontWeight: '600',
+                                        transition: 'all var(--transition-base)'
+                                    }}
+                                >
+                                    {t('finance.myLedger') || 'عهدتي'}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -411,7 +462,57 @@ export default function Finance() {
                             `}
                         </style>
 
-                        {/* Grouping Logic */}
+                        {/* Pending Approvals Section (Managers Only) */}
+                        {filterType !== 'MY_LEDGER' && pendingTransactions.length > 0 && !!user?.role?.match(/MANAGER|ADMIN/) && (
+                            <div className="project-group mb-xl" style={{ overflow: 'hidden', borderInlineStart: '4px solid var(--color-warning)' }}>
+                                <div className="project-header" style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
+                                    <h3 className="project-title flex gap-sm items-center" style={{ color: 'var(--text-primary)' }}>
+                                        <Clock size={20} className="text-warning" />
+                                        {t('finance.pendingApprovals') || 'موافقات معلقة'}
+                                        <span className="badge badge-warning" style={{ borderRadius: '50%', padding: '2px 8px' }}>{pendingTransactions.length}</span>
+                                    </h3>
+                                </div>
+                                <table className="transaction-table">
+                                    <thead>
+                                        <tr>
+                                            <th>{t('common.date')}</th>
+                                            <th>{t('finance.project')}</th>
+                                            <th>{t('finance.category')}</th>
+                                            <th>{t('finance.description')}</th>
+                                            <th>{t('finance.amount')}</th>
+                                            <th>{t('finance.createdBy') || 'بواسطة'}</th>
+                                            <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pendingTransactions.map((tx) => (
+                                            <tr key={tx.id} style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
+                                                <td style={{ fontWeight: '500' }}>{formatDate(tx.transactionDate)}</td>
+                                                <td>{tx.project?.name || '-'}</td>
+                                                <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                <td style={{ maxWidth: '200px' }} className="truncate" title={tx.description}>{tx.description}</td>
+                                                <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                    {Number(tx.amount).toLocaleString()} EGP
+                                                </td>
+                                                <td>{tx.creator?.name || '-'}</td>
+                                                <td>
+                                                    <div className="flex gap-sm justify-center">
+                                                        <button className="btn-icon-sm" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(tx.id)} title={t('common.approve') || 'Approve'}>
+                                                            <CheckCircle size={16} />
+                                                        </button>
+                                                        <button className="btn-icon-sm" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => handleReject(tx.id)} title={t('common.reject') || 'Reject'}>
+                                                            <XCircle size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* Grouping Logic for Approved/Income Transactions */}
                         {(() => {
                             // If filterProjectId is set, we don't need to group (or we group by Category/Band)
                             // If NOT set, group by Project
@@ -423,14 +524,35 @@ export default function Finance() {
                             }, {});
 
                             return Object.entries(groups).map(([projectName, txs]) => {
-                                const totalAmount = txs.reduce((sum, tx) => sum + (tx.type === 'INCOME' ? Number(tx.amount) : -Number(tx.amount)), 0);
+                                const totalAmount = txs.reduce((sum, tx) => {
+                                    if (filterType === 'MY_LEDGER') {
+                                        // Custody logic:
+                                        // User received money (Transfer TO me) -> + Balance
+                                        // User spent money (Expense FROM me) -> - Balance
+                                        let impact = 0;
+                                        if (tx.type === 'EXPENSE' && tx.category === 'CUSTODY_TRANSFER' && tx.toEngineerId === user.id) {
+                                            impact = Number(tx.amount); // I received custody
+                                        } else if (tx.type === 'EXPENSE' && tx.category === 'CUSTODY_TRANSFER' && tx.creator?.id === user.id) {
+                                            impact = -Number(tx.amount); // I sent custody
+                                        } else if (tx.type === 'EXPENSE' && tx.payerUserId === user.id) {
+                                            impact = -Number(tx.amount); // I paid an expense
+                                        } else if (tx.type === 'INCOME' && tx.payerUserId === user.id) {
+                                            // Edge case: I received income into my custody directly
+                                            impact = Number(tx.amount);
+                                        }
+                                        return sum + impact;
+                                    } else {
+                                        // Standard project logic
+                                        return sum + (tx.type === 'INCOME' ? Number(tx.amount) : -Number(tx.amount));
+                                    }
+                                }, 0);
 
                                 return (
                                     <div key={projectName} className="project-group" style={{ overflow: 'hidden' }}>
                                         <div className="project-header">
                                             <h3 className="project-title">{projectName}</h3>
                                             <div className="project-summary">
-                                                {t('finance.projectNet') || 'صافي المشروع'}:
+                                                {filterType === 'MY_LEDGER' ? (t('finance.myNetCustody') || 'صافي العهدة') : (t('finance.projectNet') || 'صافي المشروع')}:
                                                 <span style={{
                                                     marginLeft: '8px',
                                                     fontWeight: 'bold',
@@ -512,7 +634,7 @@ export default function Finance() {
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleConfirmDelete}
-                itemName="this transaction"
+                itemName={t('finance.newTransaction')}
                 title={t('common.deleteConfirmTitle')}
                 message={t('common.deleteConfirmMessage')}
             />

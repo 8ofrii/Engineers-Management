@@ -35,6 +35,26 @@ export default function Reports() {
         }).format(amount);
     };
 
+    const handleExport = () => {
+        if (!stats || (!stats.byType?.length && !stats.byCategory?.length)) {
+            showAlert({ type: 'warning', title: t('common.warning') || 'No data', message: t('reports.noData') });
+            return;
+        }
+        const rows = [['Section', 'Key', 'Total (EGP)']];
+        (stats.byType || []).forEach(r => rows.push(['Type', r._id, r.total]));
+        (stats.byCategory || []).forEach(r => rows.push(['Category', r._id, r.total]));
+        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `report-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
     if (loading) {
         return (
             <Layout>
@@ -56,7 +76,7 @@ export default function Reports() {
                         </h1>
                         <p className="text-secondary">{t('reports.subtitle')}</p>
                     </div>
-                    <button className="btn btn-primary">
+                    <button className="btn btn-primary" onClick={handleExport}>
                         <Download size={20} />
                         {t('reports.exportReport')}
                     </button>
