@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // @desc    Get all materials
 // @route   GET /api/materials
@@ -7,7 +8,8 @@ export const getMaterials = async (req, res, next) => {
     try {
         const materials = await prisma.material.findMany({
             where: {
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             },
             include: {
                 supplier: {
@@ -37,7 +39,8 @@ export const getMaterial = async (req, res, next) => {
         const material = await prisma.material.findFirst({
             where: {
                 id: req.params.id,
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             }
         });
 
@@ -69,6 +72,13 @@ export const createMaterial = async (req, res, next) => {
             }
         });
 
+        await auditFromReq(req, {
+            action: 'CREATE',
+            entity: 'Material',
+            entityId: material.id,
+            after: material
+        });
+
         res.status(201).json({
             success: true,
             data: material
@@ -83,23 +93,28 @@ export const createMaterial = async (req, res, next) => {
 // @access  Private
 export const updateMaterial = async (req, res, next) => {
     try {
-        const updated = await prisma.material.updateMany({
-            where: {
-                id: req.params.id,
-                tenantId: req.user.tenantId
-            },
-            data: req.body
+        const before = await prisma.material.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
         });
 
-        if (updated.count === 0) {
+        if (!before) {
             return res.status(404).json({
                 success: false,
                 message: 'Material not found or unauthorized'
             });
         }
 
-        const material = await prisma.material.findUnique({
-            where: { id: req.params.id }
+        const material = await prisma.material.update({
+            where: { id: req.params.id },
+            data: req.body
+        });
+
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Material',
+            entityId: material.id,
+            before,
+            after: material
         });
 
         res.status(200).json({
@@ -111,24 +126,33 @@ export const updateMaterial = async (req, res, next) => {
     }
 };
 
-// @desc    Delete material
+// @desc    Soft-delete material
 // @route   DELETE /api/materials/:id
 // @access  Private
 export const deleteMaterial = async (req, res, next) => {
     try {
-        const deleted = await prisma.material.deleteMany({
-            where: {
-                id: req.params.id,
-                tenantId: req.user.tenantId
-            }
+        const before = await prisma.material.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
         });
 
-        if (deleted.count === 0) {
+        if (!before) {
             return res.status(404).json({
                 success: false,
                 message: 'Material not found or unauthorized'
             });
         }
+
+        await prisma.material.update({
+            where: { id: req.params.id },
+            data: { deletedAt: new Date() }
+        });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'Material',
+            entityId: before.id,
+            before
+        });
 
         res.status(200).json({
             success: true,

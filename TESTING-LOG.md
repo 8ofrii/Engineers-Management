@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-05-02 — Phase 1 foundations shipped
+
+**Author**: Claude
+**Scope**: Audit log + soft delete (no UI tests yet)
+
+### What landed
+
+- New `AuditLog` Prisma model with `(entity, entityId)`, `(tenantId, createdAt)`, `(userId, createdAt)` indexes.
+- `server/lib/audit.js` — `audit()` and `auditFromReq()` helpers. Sanitizes `password`, `verificationCode`, `resetPasswordToken`, etc. before persistence. Failures are logged but never throw (audit never breaks the caller).
+- `deletedAt DateTime?` added to Client, Supplier, Material, Workman, Project.
+- All controllers above updated:
+  - List/find queries filter `deletedAt: null`
+  - DELETE endpoints now soft-delete (`update({ deletedAt: new Date() })`)
+  - CREATE/UPDATE/DELETE write audit entries
+- User invite/update/delete writes audit (`INVITE`, `UPDATE`, `ROLE_CHANGE`, `DELETE`).
+- Role create/update/delete writes audit.
+- Custody fund/return writes audit (`FUND`, `RETURN` with balance metadata).
+- Transaction approve/reject/delete writes audit (`APPROVE`, `REJECT` with reason, `DELETE` with snapshot).
+- New endpoints:
+  - `GET /api/audit-logs` (Admin/Super Admin) — paginated, filterable by entity/entityId/action/userId
+  - `GET /api/audit-logs/:entity/:entityId` (any tenant member) — history of one resource
+- Schema synced via `npx prisma db push`.
+
+### Verified
+
+- 35 schema unit tests still pass.
+- Server boots clean.
+- Audit log endpoint correctly 401s without token.
+- All other endpoints still 401 as before (no regression in auth gate).
+
+### Pending UI tests
+
+- [ ] Soft-delete a client → confirm it disappears from list but row still exists in DB
+- [ ] As admin, GET /api/audit-logs → see entries from the recent test session
+- [ ] As engineer, GET /api/audit-logs → expect 403 (admin-only listing)
+- [ ] As any user, GET /api/audit-logs/Client/<id> → see history (cross-role read)
+- [ ] Transaction approve writes a record with action=APPROVE
+- [ ] Custody fund writes a record with action=FUND and balance metadata
+- [ ] User role change writes action=ROLE_CHANGE with `from` / `to` metadata
+- [ ] Soft-deleted client cannot be referenced in a new transaction (FK still works because record exists, but list/picker excludes it)
+
+---
+
 ## 2026-05-01 — Initial smoke pass (web)
 
 **Tester**: 8ofrii

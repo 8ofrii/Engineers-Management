@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // @desc    Get all projects
 // @route   GET /api/projects
@@ -8,12 +9,13 @@ import prisma from '../lib/prisma.js';
 // @access  Private
 export const getProjects = async (req, res, next) => {
     try {
-        // Enforce Tenant Isolation
+        // Enforce Tenant Isolation + hide soft-deleted
         const whereClause = {
-            tenantId: req.user.tenantId
+            tenantId: req.user.tenantId,
+            deletedAt: null
         };
 
-        // If Engineer, show only assigned projects? 
+        // If Engineer, show only assigned projects?
         // Or all company projects? Usually Engineeers see only theirs.
         // Let's keep logic: if ENGINEER, see only own projects.
         // If ADMIN/Manager, see all tenant projects.
@@ -57,7 +59,8 @@ export const getProject = async (req, res, next) => {
         const project = await prisma.project.findFirst({
             where: {
                 id: req.params.id,
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             },
             include: {
                 client: true,
@@ -118,6 +121,13 @@ export const createProject = async (req, res, next) => {
             }
         });
 
+        await auditFromReq(req, {
+            action: 'CREATE',
+            entity: 'Project',
+            entityId: project.id,
+            after: project
+        });
+
         res.status(201).json({
             success: true,
             data: project
@@ -135,7 +145,8 @@ export const updateProject = async (req, res, next) => {
         const project = await prisma.project.findFirst({
             where: {
                 id: req.params.id,
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             }
         });
 
@@ -203,6 +214,14 @@ export const updateProject = async (req, res, next) => {
             }
         });
 
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Project',
+            entityId: updatedProject.id,
+            before: project,
+            after: updatedProject
+        });
+
         res.status(200).json({
             success: true,
             data: updatedProject
@@ -212,7 +231,7 @@ export const updateProject = async (req, res, next) => {
     }
 };
 
-// @desc    Delete project
+// @desc    Soft-delete project (sets deletedAt; cascade-deletes left intact for restore)
 // @route   DELETE /api/projects/:id
 // @access  Private
 export const deleteProject = async (req, res, next) => {
@@ -220,7 +239,8 @@ export const deleteProject = async (req, res, next) => {
         const project = await prisma.project.findFirst({
             where: {
                 id: req.params.id,
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             }
         });
 
@@ -239,8 +259,16 @@ export const deleteProject = async (req, res, next) => {
             });
         }
 
-        await prisma.project.delete({
-            where: { id: req.params.id }
+        await prisma.project.update({
+            where: { id: req.params.id },
+            data: { deletedAt: new Date() }
+        });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'Project',
+            entityId: project.id,
+            before: project
         });
 
         res.status(200).json({

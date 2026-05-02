@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // @desc    Get all workmen
 // @route   GET /api/workmen
@@ -7,7 +8,8 @@ export const getAll = async (req, res, next) => {
     try {
         const workmen = await prisma.workman.findMany({
             where: {
-                tenantId: req.user.tenantId // Tenant Isolation
+                tenantId: req.user.tenantId,
+                deletedAt: null
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -29,7 +31,8 @@ export const getOne = async (req, res, next) => {
         const workman = await prisma.workman.findFirst({
             where: {
                 id: req.params.id,
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             },
             include: {
                 workmanships: true,
@@ -77,6 +80,13 @@ export const create = async (req, res, next) => {
             }
         });
 
+        await auditFromReq(req, {
+            action: 'CREATE',
+            entity: 'Workman',
+            entityId: workman.id,
+            after: workman
+        });
+
         res.status(201).json({
             success: true,
             data: workman
@@ -93,33 +103,28 @@ export const update = async (req, res, next) => {
     try {
         const { name, nameAr, trade, customTrade, dailyRate, phone, nationalId, nationalIdImage, isActive } = req.body;
 
-        const workman = await prisma.workman.updateMany({
-            where: {
-                id: req.params.id,
-                tenantId: req.user.tenantId
-            },
-            data: {
-                name,
-                nameAr,
-                trade,
-                customTrade,
-                dailyRate,
-                phone,
-                nationalId,
-                nationalIdImage,
-                isActive
-            }
+        const before = await prisma.workman.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
         });
 
-        if (workman.count === 0) {
+        if (!before) {
             return res.status(404).json({
                 success: false,
                 message: 'Workman not found or authorized'
             });
         }
 
-        const updatedWorkman = await prisma.workman.findFirst({
-            where: { id: req.params.id }
+        const updatedWorkman = await prisma.workman.update({
+            where: { id: req.params.id },
+            data: { name, nameAr, trade, customTrade, dailyRate, phone, nationalId, nationalIdImage, isActive }
+        });
+
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Workman',
+            entityId: updatedWorkman.id,
+            before,
+            after: updatedWorkman
         });
 
         res.status(200).json({
@@ -131,24 +136,33 @@ export const update = async (req, res, next) => {
     }
 };
 
-// @desc    Delete workman
+// @desc    Soft-delete workman
 // @route   DELETE /api/workmen/:id
 // @access  Private
 export const deleteWorkman = async (req, res, next) => {
     try {
-        const result = await prisma.workman.deleteMany({
-            where: {
-                id: req.params.id,
-                tenantId: req.user.tenantId
-            }
+        const before = await prisma.workman.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
         });
 
-        if (result.count === 0) {
+        if (!before) {
             return res.status(404).json({
                 success: false,
                 message: 'Workman not found or authorized'
             });
         }
+
+        await prisma.workman.update({
+            where: { id: req.params.id },
+            data: { deletedAt: new Date() }
+        });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'Workman',
+            entityId: before.id,
+            before
+        });
 
         res.status(200).json({
             success: true,

@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // @desc    Fund engineer wallet (Tamweel)
 // @route   POST /api/custody/transfer
@@ -76,6 +77,18 @@ export const fundEngineer = async (req, res, next) => {
                 }
             })
         ]);
+
+        await auditFromReq(req, {
+            action: 'FUND',
+            entity: 'Custody',
+            entityId: engineerId,
+            metadata: {
+                amount: Number(amount),
+                balanceBefore: Number(balanceBefore),
+                balanceAfter,
+                description: description || null
+            }
+        });
 
         res.status(200).json({
             success: true,
@@ -219,6 +232,18 @@ export const returnCustody = async (req, res, next) => {
                 }
             })
         ]);
+
+        await auditFromReq(req, {
+            action: 'RETURN',
+            entity: 'Custody',
+            entityId: engineerId,
+            metadata: {
+                amount: Number(amount),
+                balanceBefore: Number(balanceBefore),
+                balanceAfter,
+                description: description || null
+            }
+        });
 
         res.status(200).json({
             success: true,

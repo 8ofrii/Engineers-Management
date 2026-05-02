@@ -2,6 +2,7 @@ import prisma from '../lib/prisma.js';
 import bcrypt from 'bcryptjs';
 import sendEmail from '../utils/sendEmail.js';
 import crypto from 'crypto';
+import { auditFromReq } from '../lib/audit.js';
 
 // Get All Users
 export const getUsers = async (req, res) => {
@@ -86,6 +87,14 @@ export const inviteUser = async (req, res) => {
             select: {
                 id: true, name: true, email: true, role: true
             }
+        });
+
+        await auditFromReq(req, {
+            action: 'INVITE',
+            entity: 'User',
+            entityId: newUser.id,
+            after: newUser,
+            metadata: { invitedRole: newUser.role }
         });
 
         // Send Invitation Email
@@ -177,15 +186,26 @@ export const updateUser = async (req, res) => {
     }
 
     try {
+        const before = await prisma.user.findFirst({
+            where: { id, tenantId: req.user.tenantId },
+            select: { id: true, name: true, email: true, role: true, phone: true, permissions: true, isActive: true }
+        });
+
         const user = await prisma.user.update({
             where: { id, tenantId: req.user.tenantId },
-            data: {
-                role,
-                name,
-                phone,
-                permissions
-            }
+            data: { role, name, phone, permissions }
         });
+
+        const isRoleChange = role && before && role !== before.role;
+        await auditFromReq(req, {
+            action: isRoleChange ? 'ROLE_CHANGE' : 'UPDATE',
+            entity: 'User',
+            entityId: user.id,
+            before,
+            after: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone, permissions: user.permissions, isActive: user.isActive },
+            metadata: isRoleChange ? { from: before?.role, to: role } : undefined
+        });
+
         res.json({ success: true, data: user, message: 'User updated successfully' });
     } catch (err) {
         console.error(err);
@@ -214,9 +234,22 @@ export const deleteUser = async (req, res) => {
             }
         }
 
+        const before = await prisma.user.findFirst({
+            where: { id, tenantId: req.user.tenantId },
+            select: { id: true, name: true, email: true, role: true }
+        });
+
         await prisma.user.delete({
             where: { id, tenantId: req.user.tenantId }
         });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'User',
+            entityId: id,
+            before
+        });
+
         res.json({ success: true, message: 'User removed successfully' });
     } catch (err) {
         console.error(err);

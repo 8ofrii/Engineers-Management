@@ -2,7 +2,7 @@
 
 > **Purpose of this document**: this is the canonical "where are we?" doc. If you (or a future Claude session) need to pick up the work cold, read this first. It captures the project, every architectural decision, current state, and outstanding work as of the last commit on `main`.
 
-Last updated: 2026-05-02 (commit `f53176b`)
+Last updated: 2026-05-02 (Phase 1 foundations shipped)
 
 ---
 
@@ -370,10 +370,10 @@ If your numbers differ after seeding, the V1.2 math has drifted — investigate 
 
 ## 9. Roadmap — what's next
 
-### Phase 1 — Foundations
-- [x] **Structured logger** (pino) — *done in this session*
-- [ ] **Audit log model** + change-tracking middleware *(blocked: needs new Prisma model — wait for V1.2 commit … done in `6024e4f`)*
-- [ ] **Soft delete pattern** (`deletedAt` on Project, Client, Supplier, Workman, Transaction) *(needs schema migration)*
+### Phase 1 — Foundations *(complete)*
+- [x] **Structured logger** (pino)
+- [x] **Audit log model + helper** — `lib/audit.js`, wired into Client/Supplier/Material/Workman/Project + User invite/update/delete + Role create/update/delete + Custody fund/return + Transaction approve/reject/delete. `GET /api/audit-logs` (admin) + `GET /api/audit-logs/:entity/:entityId` (any tenant member).
+- [x] **Soft delete pattern** — `deletedAt` on Client, Supplier, Material, Workman, Project. List/find queries filter `deletedAt: null`. Hard-delete replaced with `update({ deletedAt: new Date() })`. Records preserved for audit + future restore.
 
 ### Phase 2 — Quick UX wins
 - [ ] **Multi-level approval thresholds** (config-driven amount tiers)

@@ -8,17 +8,17 @@ datasource db {
 }
 
 model Tenant {
-  id                  String                @id @default(uuid())
+  id                  String               @id @default(uuid())
   name                String
-  slug                String                @unique
-  subscriptionPlan    String                @default("FREE_PILOT")
-  isActive            Boolean               @default(true)
+  slug                String               @unique
+  subscriptionPlan    String               @default("FREE_PILOT")
+  isActive            Boolean              @default(true)
   logo                String?
   address             String?
   phone               String?
   email               String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   chatMessages        ChatMessage[]
   clients             Client[]
   custodyTransfers    CustodyTransfer[]
@@ -38,6 +38,7 @@ model Tenant {
   workmen             Workman[]
   globalCategoryFees  GlobalCategoryFee[]
   projectCategoryFees ProjectCategoryFee[]
+  auditLogs           AuditLog[]
 
   @@map("tenants")
 }
@@ -78,6 +79,7 @@ model User {
   customRole            Role?             @relation(fields: [roleId], references: [id], onDelete: SetNull)
   tenant                Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workmanships          Workmanship[]
+  auditLogs             AuditLog[]
 
   @@unique([email, tenantId])
   @@unique([phone, tenantId])
@@ -86,22 +88,22 @@ model User {
 
 /// Dynamic Role-Based Access Control (RBAC) Model
 model Role {
-  id          String   @id @default(uuid())
-  name        String   // e.g., "Senior Engineer", "Site Clerk", "Junior Accountant"
+  id          String  @id @default(uuid())
+  name        String // e.g., "Senior Engineer", "Site Clerk", "Junior Accountant"
   description String?
-  isSystem    Boolean  @default(false) // If true, cannot be deleted (e.g., Admin, Engineer)
-  
+  isSystem    Boolean @default(false) // If true, cannot be deleted (e.g., Admin, Engineer)
+
   /// The Permission Matrix: Stored as JSON for flexibility
   /// Example: { "financials": { "view_operational_fund": true, "view_office_profit": false }, ... }
-  permissions Json     
-  
-  tenantId    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  permissions Json
+
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  users       User[]
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users  User[]
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, name]) // Role names must be unique per company
   @@map("roles")
@@ -126,6 +128,7 @@ model Client {
   contactEmail    String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
   tenantId        String?
   tenant          Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   projects        Project[]
@@ -154,6 +157,7 @@ model Supplier {
   notes        String?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
   tenantId     String?
   materials    Material[]
   tenant       Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -163,38 +167,39 @@ model Supplier {
 }
 
 model Project {
-  id                   String            @id @default(uuid())
+  id                   String               @id @default(uuid())
   name                 String
   description          String?
-  status               ProjectStatus     @default(PLANNING)
-  projectType          ProjectType       @default(OTHER)
+  status               ProjectStatus        @default(PLANNING)
+  projectType          ProjectType          @default(OTHER)
   location             String?
   startDate            DateTime
   endDate              DateTime?
-  budget               Decimal           @db.Decimal(15, 2)
-  actualCost           Decimal           @default(0) @db.Decimal(15, 2)
+  budget               Decimal              @db.Decimal(15, 2)
+  actualCost           Decimal              @default(0) @db.Decimal(15, 2)
   clientId             String
   engineerId           String
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  managementFeePercent Decimal?          @db.Decimal(5, 2)
-  officeRevenue        Decimal           @default(0) @db.Decimal(15, 2)
-  officeExpenses       Decimal           @default(0) @db.Decimal(15, 2)
-  operationalFund      Decimal           @default(0) @db.Decimal(15, 2)
-  projectSafeBalance   Decimal           @default(0) @db.Decimal(15, 2)
-  paymentTerms         String            @default("Net 30")
-  revenueModel         RevenueModel      @default(EXECUTION_COST_PLUS)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  managementFeePercent Decimal?             @db.Decimal(5, 2)
+  officeRevenue        Decimal              @default(0) @db.Decimal(15, 2)
+  officeExpenses       Decimal              @default(0) @db.Decimal(15, 2)
+  operationalFund      Decimal              @default(0) @db.Decimal(15, 2)
+  projectSafeBalance   Decimal              @default(0) @db.Decimal(15, 2)
+  paymentTerms         String               @default("Net 30")
+  revenueModel         RevenueModel         @default(EXECUTION_COST_PLUS)
   tenantId             String?
-  totalContractValue   Decimal?          @db.Decimal(15, 2)
+  totalContractValue   Decimal?             @db.Decimal(15, 2)
+  deletedAt            DateTime?
   documents            Document[]
   materialBatches      MaterialBatch[]
   materialUsage        MaterialUsage[]
   notes                Note[]
   projectCostItems     ProjectCostItem[]
   categoryFees         ProjectCategoryFee[]
-  client               Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  engineer             User              @relation(fields: [engineerId], references: [id])
-  tenant               Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client               Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  engineer             User                 @relation(fields: [engineerId], references: [id])
+  tenant               Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions         Transaction[]
   workmanships         Workmanship[]
 
@@ -236,6 +241,7 @@ model Material {
   supplierId   String?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
+  deletedAt    DateTime?
   tenantId     String?
   batches      MaterialBatch[]
   usage        MaterialUsage[]
@@ -264,27 +270,27 @@ model MaterialUsage {
 }
 
 model MaterialBatch {
-  id                String      @id @default(uuid())
+  id                String               @id @default(uuid())
   description       String
   descriptionAr     String?
-  initialValue      Decimal     @db.Decimal(15, 2)
-  remainingValue    Decimal     @db.Decimal(15, 2)
-  quantityUsed      Decimal?    @db.Decimal(15, 2)
-  officeFeeApplied  Decimal     @default(0) @db.Decimal(15, 2)
-  status            BatchStatus @default(AVAILABLE)
+  initialValue      Decimal              @db.Decimal(15, 2)
+  remainingValue    Decimal              @db.Decimal(15, 2)
+  quantityUsed      Decimal?             @db.Decimal(15, 2)
+  officeFeeApplied  Decimal              @default(0) @db.Decimal(15, 2)
+  status            BatchStatus          @default(AVAILABLE)
   category          TransactionCategory?
   projectId         String
   originalReceiptId String?
   recordedBy        String
-  purchaseDate      DateTime    @default(now())
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  purchaseDate      DateTime             @default(now())
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   tenantId          String
   materialId        String?
-  material          Material?   @relation(fields: [materialId], references: [id])
-  project           Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user              User        @relation(fields: [recordedBy], references: [id])
-  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  material          Material?            @relation(fields: [materialId], references: [id])
+  project           Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user              User                 @relation(fields: [recordedBy], references: [id])
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([projectId, status])
   @@map("material_batches")
@@ -303,6 +309,7 @@ model Workman {
   isActive         Boolean           @default(true)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
   tenantId         String?
   totalPaid        Decimal           @default(0) @db.Decimal(15, 2)
   transactions     Transaction[]
@@ -475,6 +482,29 @@ model Note {
   @@map("notes")
 }
 
+/// Immutable audit trail of every meaningful mutation. Never deleted.
+/// `before` / `after` hold sanitized snapshots — never include passwords
+/// or other secrets; the audit helper redacts those before persisting.
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String // CREATE, UPDATE, DELETE, APPROVE, REJECT, FUND, RETURN, ROLE_CHANGE, etc.
+  entity    String // Project, Client, Transaction, User, Role, Custody, ...
+  entityId  String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  before    Json?
+  after     Json?
+  metadata  Json? // Optional: { ip, userAgent, reason, ... }
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
 enum UserRole {
   ADMIN
   ENGINEER
@@ -590,7 +620,7 @@ enum TransactionCategory {
   OTHER
   CUSTODY_TRANSFER
   MANAGEMENT_FEE_TRANSFER
-  
+
   // V1.2 Specific Arabic Categories
   CONCRETE
   SITE_CLEANING

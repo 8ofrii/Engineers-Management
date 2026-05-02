@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { DEFAULT_PERMISSIONS, SYSTEM_ROLES } from '../constants/permissions.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // @desc    Get all roles for tenant
 // @route   GET /api/roles
@@ -112,6 +113,13 @@ export const createRole = async (req, res, next) => {
             }
         });
 
+        await auditFromReq(req, {
+            action: 'CREATE',
+            entity: 'Role',
+            entityId: role.id,
+            after: role
+        });
+
         res.status(201).json({
             success: true,
             data: role
@@ -185,6 +193,14 @@ export const updateRole = async (req, res, next) => {
             }
         });
 
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Role',
+            entityId: updated.id,
+            before: role,
+            after: updated
+        });
+
         res.status(200).json({
             success: true,
             data: updated
@@ -244,6 +260,13 @@ export const deleteRole = async (req, res, next) => {
                 id,
                 tenantId: req.user.tenantId
             }
+        });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'Role',
+            entityId: role.id,
+            before: role
         });
 
         res.status(200).json({

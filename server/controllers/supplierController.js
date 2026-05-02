@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // @desc    Get all suppliers
 // @route   GET /api/suppliers
@@ -7,7 +8,8 @@ export const getSuppliers = async (req, res, next) => {
     try {
         const suppliers = await prisma.supplier.findMany({
             where: {
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             },
             orderBy: {
                 createdAt: 'desc'
@@ -32,7 +34,8 @@ export const getSupplier = async (req, res, next) => {
         const supplier = await prisma.supplier.findFirst({
             where: {
                 id: req.params.id,
-                tenantId: req.user.tenantId
+                tenantId: req.user.tenantId,
+                deletedAt: null
             }
         });
 
@@ -65,6 +68,13 @@ export const createSupplier = async (req, res, next) => {
             data: data
         });
 
+        await auditFromReq(req, {
+            action: 'CREATE',
+            entity: 'Supplier',
+            entityId: supplier.id,
+            after: supplier
+        });
+
         res.status(201).json({
             success: true,
             data: supplier
@@ -79,23 +89,29 @@ export const createSupplier = async (req, res, next) => {
 // @access  Private
 export const updateSupplier = async (req, res, next) => {
     try {
-        // Enforce tenant isolation in update
-        const supplier = await prisma.supplier.updateMany({
-            where: {
-                id: req.params.id,
-                tenantId: req.user.tenantId
-            },
-            data: req.body
+        const before = await prisma.supplier.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
         });
 
-        if (supplier.count === 0) {
+        if (!before) {
             return res.status(404).json({
                 success: false,
                 message: 'Supplier not found or unauthorized'
             });
         }
 
-        const updated = await prisma.supplier.findUnique({ where: { id: req.params.id } });
+        const updated = await prisma.supplier.update({
+            where: { id: req.params.id },
+            data: req.body
+        });
+
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Supplier',
+            entityId: updated.id,
+            before,
+            after: updated
+        });
 
         res.status(200).json({
             success: true,
@@ -106,24 +122,33 @@ export const updateSupplier = async (req, res, next) => {
     }
 };
 
-// @desc    Delete supplier
+// @desc    Soft-delete supplier
 // @route   DELETE /api/suppliers/:id
 // @access  Private
 export const deleteSupplier = async (req, res, next) => {
     try {
-        const result = await prisma.supplier.deleteMany({
-            where: {
-                id: req.params.id,
-                tenantId: req.user.tenantId
-            }
+        const before = await prisma.supplier.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
         });
 
-        if (result.count === 0) {
+        if (!before) {
             return res.status(404).json({
                 success: false,
                 message: 'Supplier not found or unauthorized'
             });
         }
+
+        await prisma.supplier.update({
+            where: { id: req.params.id },
+            data: { deletedAt: new Date() }
+        });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'Supplier',
+            entityId: before.id,
+            before
+        });
 
         res.status(200).json({
             success: true,

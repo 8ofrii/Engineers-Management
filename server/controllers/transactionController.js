@@ -13,6 +13,7 @@ const getOpenAI = () => {
 import fs from 'fs';
 import * as aiService from '../services/aiService.js';
 import * as transactionV2 from './transactionControllerV2.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // @desc    Get unique cost centers
 // @route   GET /api/transactions/cost-centers
@@ -645,6 +646,13 @@ export const approveTransaction = async (req, res, next) => {
             message: 'Transaction approved and all balances updated'
         });
 
+        await auditFromReq(req, {
+            action: 'APPROVE',
+            entity: 'Transaction',
+            entityId: req.params.id,
+            metadata: { type: transaction.type, category: transaction.category, amount: Number(transaction.amount), projectId: transaction.projectId }
+        });
+
     } catch (error) {
         next(error);
     }
@@ -709,6 +717,13 @@ export const rejectTransaction = async (req, res, next) => {
                 }
             })
         ]);
+
+        await auditFromReq(req, {
+            action: 'REJECT',
+            entity: 'Transaction',
+            entityId: id,
+            metadata: { reason, amount: Number(transaction.amount), category: transaction.category }
+        });
 
         res.status(200).json({
             success: true,
@@ -1091,6 +1106,20 @@ export const deleteTransaction = async (req, res, next) => {
                     tenantId: req.user.tenantId
                 }
             });
+        });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'Transaction',
+            entityId: req.params.id,
+            before: {
+                type: transaction.type,
+                category: transaction.category,
+                amount: Number(transaction.amount),
+                status: transaction.status,
+                projectId: transaction.projectId,
+                createdBy: transaction.createdBy
+            }
         });
 
         res.status(200).json({

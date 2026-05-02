@@ -33,6 +33,7 @@ import categoryRoutes from './routes/categories.js';
 import workOrderRoutes from './routes/workOrders.js';
 import officeFeeRoutes from './routes/officeFees.js';
 import materialRoutes from './routes/materials.js';
+import auditLogRoutes from './routes/auditLogs.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -128,6 +129,7 @@ app.use('/api/work-orders', workOrderRoutes); // V2: Work Orders (New)
 app.use('/api/office-fees', officeFeeRoutes); // V2: Office Fee Configuration
 app.use('/api/categories', categoryRoutes); // V1.2: Arabic Categories
 app.use('/api/materials', materialRoutes); // Added Materials route
+app.use('/api/audit-logs', auditLogRoutes); // Phase 1: audit trail
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
