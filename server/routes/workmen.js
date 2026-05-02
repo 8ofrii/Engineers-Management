@@ -1,6 +1,8 @@
 import express from 'express';
 import { protect } from '../middleware/auth.js';
 import * as workmenController from '../controllers/workmenController.js';
+import { validate } from '../middleware/validate.js';
+import { createWorkmanSchema, updateWorkmanSchema, idParamSchema } from '../schemas/workmen.schema.js';
 
 const router = express.Router();
 
@@ -8,9 +10,9 @@ const router = express.Router();
 router.use(protect);
 
 router.get('/', workmenController.getAll);
-router.post('/', workmenController.create);
-router.get('/:id', workmenController.getOne);
-router.put('/:id', workmenController.update);
-router.delete('/:id', workmenController.deleteWorkman);
+router.post('/', validate({ body: createWorkmanSchema }), workmenController.create);
+router.get('/:id', validate({ params: idParamSchema }), workmenController.getOne);
+router.put('/:id', validate({ params: idParamSchema, body: updateWorkmanSchema }), workmenController.update);
+router.delete('/:id', validate({ params: idParamSchema }), workmenController.deleteWorkman);
 
 export default router;

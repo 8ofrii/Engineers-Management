@@ -7,6 +7,8 @@ import {
     deleteMaterial
 } from '../controllers/materialController.js';
 import { protect } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { createMaterialSchema, updateMaterialSchema, idParamSchema } from '../schemas/materials.schema.js';
 
 const router = express.Router();
 
@@ -14,11 +16,11 @@ router.use(protect);
 
 router.route('/')
     .get(getMaterials)
-    .post(createMaterial);
+    .post(validate({ body: createMaterialSchema }), createMaterial);
 
 router.route('/:id')
-    .get(getMaterial)
-    .put(updateMaterial)
-    .delete(deleteMaterial);
+    .get(validate({ params: idParamSchema }), getMaterial)
+    .put(validate({ params: idParamSchema, body: updateMaterialSchema }), updateMaterial)
+    .delete(validate({ params: idParamSchema }), deleteMaterial);
 
 export default router;

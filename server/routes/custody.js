@@ -2,6 +2,12 @@ import express from 'express';
 import * as custodyController from '../controllers/custodyController.js';
 import { protect } from '../middleware/auth.js';
 import { verifyRole, verifyOwnership } from '../middleware/rbac.js';
+import { validate } from '../middleware/validate.js';
+import {
+    fundEngineerSchema,
+    returnCustodySchema,
+    engineerIdParamSchema
+} from '../schemas/custody.schema.js';
 
 const router = express.Router();
 
@@ -12,6 +18,7 @@ router.use(protect);
 router.post(
     '/transfer',
     verifyRole(['ADMIN']),
+    validate({ body: fundEngineerSchema }),
     custodyController.fundEngineer
 );
 
@@ -26,6 +33,7 @@ router.get(
 router.get(
     '/balance/:engineerId',
     verifyOwnership('custody'),
+    validate({ params: engineerIdParamSchema }),
     custodyController.getBalance
 );
 
@@ -33,6 +41,7 @@ router.get(
 router.get(
     '/history/:engineerId',
     verifyOwnership('custody'),
+    validate({ params: engineerIdParamSchema }),
     custodyController.getHistory
 );
 
@@ -40,6 +49,7 @@ router.get(
 router.post(
     '/return',
     verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN']),
+    validate({ body: returnCustodySchema }),
     custodyController.returnCustody
 );
 

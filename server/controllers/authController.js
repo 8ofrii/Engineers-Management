@@ -105,10 +105,13 @@ export const registerCompany = async (req, res, next) => {
         const verificationCode = generateOTP();
         const verificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
-        // Transaction: Create Tenant + Admin User
-        const result = await prisma.$transaction(async (prisma) => {
+        // Transaction: Create Tenant + Admin User.
+        // Use `tx` (not `prisma`) to avoid shadowing the outer client and
+        // accidentally running operations outside the transaction. Explicit
+        // timeout protects against slow-DB P2028 errors.
+        const result = await prisma.$transaction(async (tx) => {
             // 1. Create Tenant
-            const tenant = await prisma.tenant.create({
+            const tenant = await tx.tenant.create({
                 data: {
                     name: companyName,
                     slug: slug,
@@ -117,7 +120,7 @@ export const registerCompany = async (req, res, next) => {
             });
 
             // 2. Create Admin User (Unverified)
-            const user = await prisma.user.create({
+            const user = await tx.user.create({
                 data: {
                     name: adminName,
                     email,
@@ -133,7 +136,7 @@ export const registerCompany = async (req, res, next) => {
             });
 
             return { tenant, user };
-        });
+        }, { timeout: 15000, maxWait: 5000 });
 
         // Send Verification Email
         const message = `

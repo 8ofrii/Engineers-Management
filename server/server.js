@@ -5,10 +5,13 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import cors from 'cors';
-import morgan from 'morgan';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import pinoHttp from 'pino-http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from './lib/prisma.js';
+import logger from './lib/logger.js';
 import { errorHandler } from './middleware/error.js';
 
 // Import routes
@@ -37,33 +40,77 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Body parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Trust proxy (Render/Heroku/etc.) so rate-limit sees real client IPs
+app.set('trust proxy', 1);
 
-// CORS
+// Security headers. CORP relaxed so the React frontend can load /uploads images cross-origin.
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+// Body parser with increased limits for Base64 image uploads
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+// CORS: whitelist via CORS_ALLOWED_ORIGINS (comma-separated). In development, fall back to permissive.
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-
-        // Dynamically allow any origin that starts with http
-        // This stops strict string mismatches from breaking logins
-        callback(null, true);
+        if (process.env.NODE_ENV !== 'production') return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`Origin ${origin} not allowed by CORS`));
     },
     credentials: true
 }));
 
-// Dev logging middleware
-if (process.env.NODE_ENV === 'development') {
-    app.use(morgan('dev'));
-}
+// Global rate limiter — generous so normal usage isn't affected.
+app.use('/api', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 1000,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests, please try again later.' }
+}));
+
+// Stricter limiter on auth endpoints to slow brute-force / credential stuffing.
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { success: false, message: 'Too many authentication attempts, please try again later.' }
+});
+
+// Request logger — assigns each request a unique ID, logs method/url/status/ms.
+// Replaces morgan; gives us structured JSON in production for log aggregators.
+app.use(pinoHttp({
+    logger,
+    customLogLevel: (req, res, err) => {
+        if (err || res.statusCode >= 500) return 'error';
+        if (res.statusCode >= 400) return 'warn';
+        return 'info';
+    },
+    customSuccessMessage: (req, res) => `${req.method} ${req.url} ${res.statusCode}`,
+    customErrorMessage: (req, res, err) => `${req.method} ${req.url} ${res.statusCode} - ${err?.message}`,
+    // Don't log /api/health — it floods the log and tells us nothing.
+    autoLogging: { ignore: (req) => req.url === '/api/health' },
+    serializers: {
+        req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+        res: (res) => ({ statusCode: res.statusCode })
+    }
+}));
 
 // Serve static files (uploads)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Mount routers
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/suppliers', supplierRoutes);
@@ -97,11 +144,16 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    logger.info({ port: PORT, env: process.env.NODE_ENV }, 'Server ready');
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-    console.log(`Error: ${err.message}`);
+// Crash hard on unhandled rejections — better than zombie state.
+process.on('unhandledRejection', (err) => {
+    logger.fatal({ err }, 'Unhandled promise rejection — shutting down');
     server.close(() => process.exit(1));
+});
+
+process.on('uncaughtException', (err) => {
+    logger.fatal({ err }, 'Uncaught exception — shutting down');
+    process.exit(1);
 });

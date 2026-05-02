@@ -2,6 +2,14 @@ import express from 'express';
 import prisma from '../lib/prisma.js';
 import { protect, authorize } from '../middleware/auth.js';
 import * as officeFeeService from '../services/officeFeeService.js';
+import { validate } from '../middleware/validate.js';
+import {
+    setGlobalFeeSchema,
+    setProjectFeeSchema,
+    calculateFeeSchema,
+    projectIdParamSchema,
+    projectAndCategoryParamsSchema
+} from '../schemas/officeFees.schema.js';
 
 const router = express.Router();
 
@@ -11,7 +19,7 @@ router.use(protect);
 // @desc    Get office fee configuration for a project
 // @route   GET /api/office-fees/project/:projectId
 // @access  Private
-router.get('/project/:projectId', async (req, res, next) => {
+router.get('/project/:projectId', validate({ params: projectIdParamSchema }), async (req, res, next) => {
     try {
         const { projectId } = req.params;
 
@@ -58,7 +66,7 @@ router.get('/global', authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) 
 // @desc    Set global category fee
 // @route   POST /api/office-fees/global
 // @access  Private (Admin only)
-router.post('/global', authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next) => {
+router.post('/global', authorize('ADMIN', 'SUPER_ADMIN'), validate({ body: setGlobalFeeSchema }), async (req, res, next) => {
     try {
         const { category, defaultFeePercent } = req.body;
 
@@ -99,7 +107,7 @@ router.post('/global', authorize('ADMIN', 'SUPER_ADMIN'), async (req, res, next)
 // @desc    Get project-specific category fees
 // @route   GET /api/office-fees/project/:projectId/categories
 // @access  Private
-router.get('/project/:projectId/categories', async (req, res, next) => {
+router.get('/project/:projectId/categories', validate({ params: projectIdParamSchema }), async (req, res, next) => {
     try {
         const { projectId } = req.params;
 
@@ -130,7 +138,7 @@ router.get('/project/:projectId/categories', async (req, res, next) => {
 // @desc    Set project-specific category fee
 // @route   POST /api/office-fees/project/:projectId/categories
 // @access  Private (Admin, Project Manager)
-router.post('/project/:projectId/categories', authorize('ADMIN', 'PROJECT_MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+router.post('/project/:projectId/categories', authorize('ADMIN', 'PROJECT_MANAGER', 'SUPER_ADMIN'), validate({ params: projectIdParamSchema, body: setProjectFeeSchema }), async (req, res, next) => {
     try {
         const { projectId } = req.params;
         const { category, feePercent } = req.body;
@@ -173,7 +181,7 @@ router.post('/project/:projectId/categories', authorize('ADMIN', 'PROJECT_MANAGE
 // @desc    Delete project-specific category fee override
 // @route   DELETE /api/office-fees/project/:projectId/categories/:category
 // @access  Private (Admin, Project Manager)
-router.delete('/project/:projectId/categories/:category', authorize('ADMIN', 'PROJECT_MANAGER', 'SUPER_ADMIN'), async (req, res, next) => {
+router.delete('/project/:projectId/categories/:category', authorize('ADMIN', 'PROJECT_MANAGER', 'SUPER_ADMIN'), validate({ params: projectAndCategoryParamsSchema }), async (req, res, next) => {
     try {
         const { projectId, category } = req.params;
 
@@ -192,7 +200,7 @@ router.delete('/project/:projectId/categories/:category', authorize('ADMIN', 'PR
 // @desc    Calculate office fee for a transaction (preview)
 // @route   POST /api/office-fees/calculate
 // @access  Private
-router.post('/calculate', async (req, res, next) => {
+router.post('/calculate', validate({ body: calculateFeeSchema }), async (req, res, next) => {
     try {
         const { projectId, category, amount } = req.body;
 

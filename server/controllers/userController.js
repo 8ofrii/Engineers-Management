@@ -36,6 +36,12 @@ export const inviteUser = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Please provide all required fields (Name, Email, Password, Phone)' });
     }
 
+    // Only SUPER_ADMIN may grant SUPER_ADMIN — prevents tenant ADMINs from
+    // escalating to platform-level access by inviting a peer with that role.
+    if (role === 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ success: false, message: 'You are not authorized to assign the SUPER_ADMIN role' });
+    }
+
     try {
         // Check if user exists in THIS tenant (email unique per tenant)
         const emailExists = await prisma.user.findFirst({
@@ -140,6 +146,22 @@ export const updateUser = async (req, res) => {
     const { id } = req.params;
     const { role, name, phone, permissions } = req.body;
 
+    // Only SUPER_ADMIN may grant SUPER_ADMIN. Also forbid demoting an existing
+    // SUPER_ADMIN unless the caller is one — otherwise an ADMIN could lock out
+    // the platform owner.
+    if (role === 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ success: false, message: 'You are not authorized to assign the SUPER_ADMIN role' });
+    }
+    if (role && role !== 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+        const target = await prisma.user.findFirst({
+            where: { id, tenantId: req.user.tenantId },
+            select: { role: true }
+        });
+        if (target?.role === 'SUPER_ADMIN') {
+            return res.status(403).json({ success: false, message: 'You are not authorized to modify a SUPER_ADMIN' });
+        }
+    }
+
     // Verify new phone isn't taken by another user
     if (phone) {
         const phoneExists = await prisma.user.findFirst({
@@ -179,6 +201,17 @@ export const deleteUser = async (req, res) => {
         // Prevent deleting self
         if (id === req.user.id) {
             return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
+        }
+
+        // Only a SUPER_ADMIN may delete a SUPER_ADMIN.
+        if (req.user.role !== 'SUPER_ADMIN') {
+            const target = await prisma.user.findFirst({
+                where: { id, tenantId: req.user.tenantId },
+                select: { role: true }
+            });
+            if (target?.role === 'SUPER_ADMIN') {
+                return res.status(403).json({ success: false, message: 'You are not authorized to delete a SUPER_ADMIN' });
+            }
         }
 
         await prisma.user.delete({

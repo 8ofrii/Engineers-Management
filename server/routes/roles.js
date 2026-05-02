@@ -2,6 +2,8 @@ import express from 'express';
 import * as roleController from '../controllers/roleController.js';
 import { protect } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
+import { validate } from '../middleware/validate.js';
+import { createRoleSchema, updateRoleSchema, idParamSchema } from '../schemas/roles.schema.js';
 
 const router = express.Router();
 
@@ -33,6 +35,7 @@ router.post(
 router.get(
     '/:id',
     checkPermission('admin.manage_roles'),
+    validate({ params: idParamSchema }),
     roleController.getRole
 );
 
@@ -40,6 +43,7 @@ router.get(
 router.post(
     '/',
     checkPermission('admin.manage_roles'),
+    validate({ body: createRoleSchema }),
     roleController.createRole
 );
 
@@ -47,6 +51,7 @@ router.post(
 router.put(
     '/:id',
     checkPermission('admin.manage_roles'),
+    validate({ params: idParamSchema, body: updateRoleSchema }),
     roleController.updateRole
 );
 
@@ -54,6 +59,7 @@ router.put(
 router.delete(
     '/:id',
     checkPermission('admin.manage_roles'),
+    validate({ params: idParamSchema }),
     roleController.deleteRole
 );
 
