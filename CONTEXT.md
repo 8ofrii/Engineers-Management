@@ -390,10 +390,12 @@ If your numbers differ after seeding, the V1.2 math has drifted — investigate 
 - [ ] **Site photos** per project with GPS + timestamp
 - [ ] **Document model UI** (contracts, permits already in schema)
 
-### Phase 4 — Daily Site Report (DSR)
-- [ ] New `DailySiteReport` Prisma model
-- [ ] Engineer mobile UI: photos, attendance, weather, hours, progress notes
-- [ ] Manager web UI: review and acknowledge
+### Phase 4 — Daily Site Report (DSR) *(complete — all platforms)*
+- [x] **`DailySiteReport` model** — `(projectId, reportDate)` unique. State machine: DRAFT → SUBMITTED → ACKNOWLEDGED. WeatherCondition enum (8 values). Json fields for `workmenAttendance`, `materialsReceived`, `photoIds`. Reverse relations on Tenant, Project, User (DSRReporter + DSRAcknowledger).
+- [x] **DSR API** — 7 endpoints under `/api/dsr/*`: list (filterable; engineer scoped), get (resolves photoIds → Document records), create (DRAFT, 409 on duplicate project+date), update (DRAFT/SUBMITTED), submit, acknowledge (manager+ only), delete (DRAFT-author / admin-any). All audited.
+- [x] **Web review page** — `/dsr` (sidebar entry). Project + status filters, card list, click-row modal with stats grid + sections + photo grid + manager-acknowledge form (with notes) + author-submit-DRAFT button.
+- [x] **Mobile read + acknowledge** — DSRListScreen with status filter pills, DSRDetailScreen with status card + stats grid + sections + manager-acknowledge form. New 5th tab "Reports".
+- [x] **Mobile capture (engineer flow)** — `DSRCreateScreen`: project picker modal, date input + Today button, 8-option weather chip grid, temp + hours inputs, progress / issues / visitors textareas, workmen attendance multi-select (with per-row hours), photo strip with both **camera capture** (`expo-image-picker.launchCameraAsync`) and **library pick** (multi-select up to 10). Submit flow uploads photos to `/api/project-documents/:projectId` first, collects Document IDs, then creates the DSR with `photoIds`. Save-draft and Save-&-submit. FAB on DSR list. **Requires `expo-image-picker` ~17.0.0** (added to mobile/package.json).
 
 ### Phase 5 — Invoicing
 - [ ] PDF template with tenant logo
