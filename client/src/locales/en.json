@@ -39,7 +39,8 @@
         "reports": "Reports",
         "auditLog": "Activity Log",
         "twoFactor": "Two-Factor",
-        "dsr": "Daily Reports"
+        "dsr": "Daily Reports",
+        "invoices": "Invoices"
     },
     "dashboard": {
         "title": "Dashboard",

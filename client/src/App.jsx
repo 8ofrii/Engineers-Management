@@ -24,6 +24,7 @@ import TwoFactorSettings from './pages/TwoFactorSettings';
 import AuditLog from './pages/AuditLog';
 import ProjectDocuments from './pages/ProjectDocuments';
 import DailySiteReports from './pages/DailySiteReports';
+import Invoices from './pages/Invoices';
 
 function App() {
     return (
@@ -156,6 +157,14 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <DailySiteReports />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/invoices"
+                            element={
+                                <PrivateRoute>
+                                    <Invoices />
                                 </PrivateRoute>
                             }
                         />

@@ -1,23 +1,24 @@
 # Engineers Management — Project Context
 
-> **Purpose of this document**: this is the canonical "where are we?" doc. If you (or a future Claude session) need to pick up the work cold, read this first. It captures the project, every architectural decision, current state, and outstanding work as of the last commit on `main`.
+> **Purpose**: this is the canonical "where are we?" doc. If a fresh Claude session needs to pick up the work cold, **read this first**. It captures the project, every architectural decision, current state, and outstanding work as of the most recent local commit.
 
-Last updated: 2026-05-02 (Phase 1 foundations shipped)
+**Last updated:** 2026-05-02 — Phase 5 (Invoicing with PDF + email) shipped locally; ready to push.
 
 ---
 
 ## 1. What this project is
 
-A **multi-tenant SaaS Construction ERP** for Egyptian engineering firms. Each tenant ("company") has its own Projects, Clients, Suppliers, Workmen, Materials, Transactions, etc. Users are scoped to a tenant. The product target is small-to-mid construction contractors in Egypt who currently track jobs in Excel.
+A **multi-tenant SaaS Construction ERP** for Egyptian engineering firms. Each tenant ("company") has its own Projects, Clients, Suppliers, Workmen, Materials, Transactions, DSRs, Invoices, etc. Users are scoped to a tenant. The product target is small-to-mid construction contractors in Egypt who currently track jobs in Excel.
 
 ### What makes it more than a generic accounting app
 
-- **V1.2 "Profit on Expense" engine** — automatically transfers a configurable management fee from project safe balance to office revenue every time an expense is approved on a `EXECUTION_COST_PLUS` project. Inventory purchases defer profit until usage.
+- **V1.2 "Profit on Expense" engine** — automatically transfers a configurable management fee from project safe balance to office revenue when an expense is approved on `EXECUTION_COST_PLUS` projects. Inventory purchases defer profit until usage.
+- **Daily Site Reports (DSR)** — engineers log daily progress, weather, attendance, photos, issues from mobile. Managers review and acknowledge from web.
+- **Invoicing with PDF + email** — auto-numbered invoices (`INV-YYYY-NNNN`), professional PDF generation via pdfkit, send by email with PDF attached, partial-payment tracking.
 - **Bilingual + RTL** — Arabic-first UI with English fallback; transaction categories use Arabic construction terminology (خرسانات, مصنعية بناء, etc.).
-- **Multi-currency-ready in spirit, EGP-only in practice** — all amounts shown as Egyptian pounds.
 - **AI chat assistant** — voice notes (Whisper) → structured transactions; tool-calling (`record_transaction`, `get_financial_summary`).
-- **S3 image uploads** — receipt photos, profile pictures, company logos.
-- **Mobile companion** — React Native + Expo, same backend, role-aware screens.
+- **S3 image uploads** — receipt photos, profile pictures, company logos, project documents.
+- **Mobile companion** — React Native + Expo, same backend, full DSR capture with camera + GPS-tagged photos.
 
 ---
 
@@ -25,26 +26,28 @@ A **multi-tenant SaaS Construction ERP** for Egyptian engineering firms. Each te
 
 ### Backend (`server/`)
 
-- **Node.js 20+ / 22 LTS** (Node 18 no longer supported by Expo SDK 54 toolchain)
+- **Node.js 20+ / 22 LTS** (Node 18 no longer works with the Expo SDK 54 toolchain, and is EOL)
 - **Express** — HTTP server
 - **Prisma 5.22** + **PostgreSQL** (hosted on Render)
 - **Helmet** — security headers (CSP, HSTS, X-Frame-Options, COOP, COEP, CORP)
 - **express-rate-limit** — global 1000 req/15min, stricter 20/15min on `/auth`
 - **CORS** — whitelist via `CORS_ALLOWED_ORIGINS` env (production); permissive in dev
-- **Zod** — input validation, schemas under `server/schemas/` act as field allowlists (kills mass assignment of `tenantId`, `actualCost`, `role`, etc.)
-- **JWT** — auth via `Bearer <token>` headers
+- **Zod** — input validation, schemas under `server/schemas/` act as field allowlists (kills mass assignment)
+- **JWT** — auth via `Bearer <token>` headers; separate 5-min `purpose: '2fa'` challenge tokens
 - **bcryptjs** — password hashing (10 rounds)
+- **otplib** + **qrcode** — TOTP 2FA
 - **multer** + **multer-s3** — file uploads (S3 in prod, local fallback in dev)
+- **pdfkit** — invoice PDF generation (pure JS, no Chromium)
 - **OpenAI** — chat assistant (`gpt-4o-mini`) + Whisper voice transcription
-- **Nodemailer** — SMTP email (verification OTP, password reset, invites)
+- **Nodemailer** — SMTP email (verification, password reset, invites, **invoice PDFs**)
 - **pino** + **pino-http** — structured logging (dev-pretty / prod-JSON)
-- **Vitest** + **supertest** — automated tests (35 schema unit tests passing)
+- **Vitest** + **supertest** — automated tests (**75 unit tests** passing as of 2026-05-02)
 
 ### Frontend — Web (`client/`)
 
 - **React 18** + **Vite** (port 5173 in dev)
 - **React Router** — routing
-- **Axios** — HTTP client (interceptors at `client/src/services/api.js`)
+- **Axios** — HTTP client (`client/src/services/api.js`)
 - **Recharts** — dashboard charts
 - **i18next** + **react-i18next** — AR/EN translations
 - **Lucide React** — icons
@@ -53,17 +56,17 @@ A **multi-tenant SaaS Construction ERP** for Egyptian engineering firms. Each te
 ### Frontend — Mobile (`mobile/`)
 
 - **Expo SDK 54** (managed workflow)
-- **React 19.1** / **React Native 0.81**
-- **React Navigation v7** — bottom tabs + native stacks
+- **React 19.1** / **React Native 0.81** / **React Navigation v7** (bottom tabs + native stacks)
 - **AsyncStorage** — token + language persistence
-- **Axios** — HTTP client mirrors web `api.js`
-- **i18next** + **expo-localization** — AR/EN with RTL handling via `I18nManager`
+- **Axios** — HTTP client mirrors web
+- **i18next** + **expo-localization** — AR/EN with `I18nManager` RTL handling
+- **expo-image-picker** — camera + library photo capture for DSR
 - **@expo/vector-icons** — Ionicons throughout
 
 ### Infrastructure
 
-- **GitHub** — `https://github.com/8ofry/Engineers-Management` (repo URL moved from `8ofrii`; old URL still redirects)
-- **Render** — backend hosting + Postgres
+- **GitHub** — `https://github.com/8ofry/Engineers-Management` (URL moved from `8ofrii`; old URL still redirects)
+- **Render** — backend + Postgres
 - **AWS S3** — image uploads
 - **Expo Go** — mobile dev distribution
 
@@ -76,52 +79,75 @@ Engineers-Management/
 ├── client/                       # React + Vite frontend
 │   ├── src/
 │   │   ├── components/           # Modals, layout, custom inputs
-│   │   ├── pages/                # Login, Dashboard, Projects, Finance, Reports, etc.
-│   │   ├── context/              # AuthContext, AlertContext
-│   │   ├── services/api.js       # Axios client, all API endpoints
-│   │   └── locales/{ar,en}.json  # Translations
+│   │   ├── pages/                # Login, Dashboard, Projects, Finance, Reports, ...
+│   │   │   ├── Invoices.jsx              # Phase 5 — invoice list/create/view/send
+│   │   │   ├── DailySiteReports.jsx      # Phase 4 — DSR review (manager-side)
+│   │   │   ├── ProjectDocuments.jsx      # Phase 3 — photo/doc upload per project
+│   │   │   ├── AuditLog.jsx              # Phase 1+2 — admin activity feed
+│   │   │   ├── TwoFactorSettings.jsx     # Phase 2 — 2FA enroll/disable
+│   │   ├── context/              # AuthContext (with 2FA support), AlertContext
+│   │   ├── services/api.js       # Axios client + every API helper
+│   │   └── locales/{ar,en}.json
 │   └── package.json
 │
 ├── server/                       # Express API
-│   ├── server.js                 # App entry — helmet, rate limit, CORS, pino, routes
+│   ├── server.js                 # App entry — helmet, rate limit, CORS, pino, all routes
 │   ├── prisma/
-│   │   └── schema.prisma         # Database schema (15+ models)
+│   │   └── schema.prisma         # 18+ models including Invoice + DSR + AuditLog
 │   ├── controllers/              # Route handlers
 │   │   ├── transactionController.js     # Main + V1.2 (mounted)
 │   │   ├── transactionControllerV2.js   # Profit-on-Expense engine — re-exported by V1
-│   │   ├── authController.js, userController.js, clientController.js, ...
-│   ├── routes/                   # Express routers (each mounts to /api/<resource>)
+│   │   ├── invoiceController.js         # Phase 5
+│   │   ├── dsrController.js             # Phase 4
+│   │   ├── documentController.js        # Phase 3
+│   │   ├── auditLogController.js        # Phase 1
+│   │   ├── authController.js            # incl. 2FA endpoints (Phase 2)
+│   │   ├── userController.js, clientController.js, ...
+│   ├── routes/                   # Express routers
+│   │   ├── invoices.js                  # Phase 5
+│   │   ├── dsr.js                       # Phase 4
+│   │   ├── documents.js                 # Phase 3 (two routers — projectDocs + docs)
+│   │   ├── auditLogs.js                 # Phase 1
+│   │   ├── auth.js (incl. 2FA), ...
 │   ├── middleware/
 │   │   ├── auth.js               # JWT protect + role authorize
 │   │   ├── rbac.js               # verifyRole + verifyOwnership helpers
 │   │   ├── permissions.js        # Dynamic permission matrix checks
 │   │   ├── validate.js           # Zod validation middleware
 │   │   └── error.js              # Global error handler (Prisma + Zod aware)
-│   ├── schemas/                  # Zod request schemas (13 of ~15 routes)
+│   ├── schemas/                  # Zod request schemas (one per resource)
 │   ├── lib/
 │   │   ├── prisma.js             # Singleton Prisma client
-│   │   └── logger.js             # Pino instance
+│   │   ├── logger.js             # Pino instance
+│   │   ├── audit.js              # Phase 1 — audit() + auditFromReq() helpers
+│   │   ├── approvalThresholds.js # Phase 2 — multi-level approval rank logic
+│   │   ├── totp.js               # Phase 2 — otplib v13 wrapper
+│   │   └── invoicePdf.js         # Phase 5 — pdfkit invoice renderer
 │   ├── services/
-│   │   ├── officeFeeService.js   # Fee calc + project/global override resolution
-│   │   ├── aiService.js          # OpenAI voice + chat
-│   │   └── ...
-│   ├── tests/                    # Vitest schema unit tests
+│   │   ├── officeFeeService.js, aiService.js, ...
+│   ├── tests/                    # Vitest schema unit tests (75 tests)
 │   ├── scripts/                  # Operational scripts (see §6)
 │   └── package.json
 │
 ├── mobile/                       # Expo + React Native app
-│   ├── App.js                    # Root: i18n + auth + navigation
+│   ├── App.js
 │   ├── src/
-│   │   ├── navigation/AppNavigator.js     # Bottom tabs + per-tab stacks
-│   │   ├── screens/                       # 11 screens (see §10)
+│   │   ├── navigation/AppNavigator.js     # 5 bottom tabs + per-tab stacks
+│   │   ├── screens/                       # 14 screens
+│   │   │   ├── DSRListScreen.js, DSRDetailScreen.js, DSRCreateScreen.js  # Phase 4
+│   │   │   ├── DashboardScreen.js, ProjectDetailScreen.js
+│   │   │   ├── FinanceScreen.js, AddTransactionScreen.js
+│   │   │   ├── NotificationsScreen.js, ProfileScreen.js
+│   │   │   ├── FundEngineerScreen.js, ClientsScreen.js, SuppliersScreen.js, WorkmenScreen.js
+│   │   │   ├── LoginScreen.js
 │   │   ├── context/AuthContext.js         # Login/logout + AsyncStorage
 │   │   ├── services/api.js                # Mirrors web api.js shape
 │   │   ├── i18n/index.js                  # Setup + RTL handling
 │   │   └── locales/{ar,en}.json
 │   ├── app.json, package.json, .env.example
 │
-├── CONTEXT.md                    # This file
-├── TESTING-WEB.md                # Web testing plan
+├── CONTEXT.md                    # This file — single source of truth
+├── TESTING-WEB.md                # Web testing plan (470 lines, 20 sections)
 ├── TESTING-LOG.md                # Running findings log
 └── README.md                     # Original project README
 ```
@@ -134,58 +160,60 @@ Engineers-Management/
 
 - Every domain table has a `tenantId String?` foreign key
 - Every controller filters by `req.user.tenantId` — `prisma.x.findFirst({ where: { id, tenantId: req.user.tenantId } })` is the standard pattern
-- Login resolves `req.user.tenantId` from the User record at JWT verify time
-- Cross-tenant ID guess returns 404 (not 403 — don't leak existence)
+- Cross-tenant ID guess returns 404 (don't leak existence)
 - Same email is allowed across tenants: `User @@unique([email, tenantId])`
-- The `register-company` flow creates a fresh tenant + admin in one transaction
 
 ### 4.2 Roles & RBAC
 
-- Five hard-coded roles in `UserRole` enum: `SUPER_ADMIN`, `ADMIN`, `PROJECT_MANAGER`, `ENGINEER`, `ACCOUNTANT`
+- Five hard-coded `UserRole` enum values: `SUPER_ADMIN`, `ADMIN`, `PROJECT_MANAGER`, `ENGINEER`, `ACCOUNTANT`
 - Plus a custom **`Role`** model with a JSON permission matrix per tenant for dynamic permissions
-- Two parallel guards in code:
-  - `authorize(...roles)` from `middleware/auth.js` — coarse role check
-  - `checkPermission(path)` from `middleware/permissions.js` — fine-grained matrix lookup
-- **Privilege escalation guards in `userController`** (added in this session): only `SUPER_ADMIN` may grant/modify/delete a `SUPER_ADMIN`
+- **Privilege escalation guards** in `userController` (Phase 2): only `SUPER_ADMIN` may grant/modify/delete a `SUPER_ADMIN`
+- **Multi-level approval thresholds** (Phase 2): config-driven amount tiers decide who can auto-approve / approve a transaction. Defaults: ≤5k engineer / ≤50k manager / >50k admin.
 
 ### 4.3 V1.2 "Profit on Expense" — the financial heart
 
-Implemented in `server/controllers/transactionControllerV2.js`. Re-exported by V1 controller at the bottom; routes hit the V2 handlers via `transactionController.createTransactionV2` etc.
-
-For a project with `revenueModel: EXECUTION_COST_PLUS` and `managementFeePercent: 10`:
-
-- **INCOME approved** → `projectSafeBalance += amount` (full amount lands in safe)
-- **EXPENSE direct, approved** (non-inventory) → `safeBalance -= amount`, `actualCost += amount`. Then `profit = amount × 10%`; `safeBalance -= profit`, `officeRevenue += profit`. A `MANAGEMENT_FEE_TRANSFER` ledger transaction is auto-created.
-- **EXPENSE inventory purchase, approved** → `safeBalance -= amount`, `actualCost += amount`, **MaterialBatch created** with `initialValue = remainingValue = amount`. **No profit yet** — deferred until usage.
-- **Inventory usage** → `batch.remainingValue -= valueConsumed`. Then `profit = valueConsumed × 10%`; `safeBalance -= profit`, `officeRevenue += profit`. `MANAGEMENT_FEE_TRANSFER` ledger entry created.
-- **Negative-balance alert** — when `safeBalance` goes below zero, a `Notification` is pushed to the project's engineer.
-
-The other revenue models (`DESIGN_ONLY_AREA`, `EXECUTION_LUMP_SUM`) skip the auto profit transfer.
+Implemented in `server/controllers/transactionControllerV2.js`. Re-exported by V1; routes hit V2 handlers via `transactionController.createTransactionV2` etc. See §7 for the verified math.
 
 ### 4.4 Validation strategy
 
-Zod schemas at `server/schemas/*.schema.js` double as field allowlists. They use Zod's default `.strip()` mode: unknown fields are silently dropped before reaching Prisma. This kills **mass-assignment** of:
-- `tenantId` (would break tenant isolation)
-- `role`, `permissions`, `isVerified`, `isActive` (privilege escalation)
-- `actualCost`, `officeRevenue`, `officeExpenses`, `projectSafeBalance` (financial integrity)
-- `id`, `createdAt`, `updatedAt` (server-managed)
-
-For multipart endpoints (auth/profile, tenant/logo, chat/audio), `validate()` runs **after** `multer.single(...)` so `req.body` is already populated.
+Zod schemas at `server/schemas/*.schema.js` double as field allowlists. They use Zod's default `.strip()` mode: unknown fields are silently dropped before reaching Prisma. This kills **mass-assignment** of: `tenantId`, `role`, `permissions`, `isVerified`, `isActive`, `actualCost`, `officeRevenue`, `paidAmount` (invoice), etc.
 
 ### 4.5 Authentication flow
 
-1. **Register company** → creates Tenant + Admin User (unverified). 6-digit OTP emailed (or returned as `devVerificationCode` in non-prod).
+1. **Register company** → creates Tenant + Admin User. 6-digit OTP emailed (returned as `devVerificationCode` in non-prod).
 2. **Verify email** → `isVerified=true`, JWT issued.
-3. **Login** → `findMany({ email })` then bcrypt match across users (since email is unique only per-tenant). JWT issued.
-4. **Forgot password** → SHA256-hashed token mailed; reset endpoint requires the raw token + new password (full complexity check).
-5. **Engineer invite** → admin/super-admin invites via `POST /api/users` with email + temp password. Verification token mailed.
+3. **Login** → if `totpEnabled`, returns `{ requires2FA, challengeToken }`; otherwise full session token.
+4. **2FA login** → `POST /api/auth/2fa/login` with challenge + 6-digit code.
+5. **2FA enroll/confirm/disable** → endpoints under `/api/auth/2fa/*`.
+6. **Forgot password** → SHA256-hashed token mailed.
+7. **Engineer invite** → admin/super-admin invites via `POST /api/users`.
 
-### 4.6 Why pino, not winston/morgan
+### 4.6 Soft delete + audit log
 
-- **Faster** under load (pino's async transport)
-- **JSON-native** — production log aggregators (Datadog, Logtail, Render's UI) parse JSON automatically
-- **Per-request logger** via `pino-http` adds an auto-incrementing request ID, accessible as `req.log` in any controller
-- **Secret redaction** built-in: `password`, `authorization`, `set-cookie` are scrubbed before logging
+- **Soft delete** on Project, Client, Supplier, Material, Workman: `deletedAt DateTime?`. List/find queries filter `deletedAt: null`. DELETE endpoints become `update({ deletedAt: new Date() })`. **Restore endpoints**: `PUT /api/{resource}/:id/restore` (admin only).
+- **Audit log**: every meaningful mutation writes an `AuditLog` row with `before` / `after` snapshots, sanitized for secrets via `lib/audit.js`. Read via `GET /api/audit-logs` (admin) or `GET /api/audit-logs/:entity/:entityId` (any tenant member).
+
+### 4.7 Document & photo system
+
+- `Document` model with `category` enum (PHOTO_PROGRESS / PHOTO_RECEIPT / PHOTO_DELIVERY / PHOTO_ISSUE / CONTRACT / PERMIT / DRAWING / REPORT / OTHER), GPS coordinates, `takenAt`, `uploadedBy`.
+- Endpoints: `GET/POST /api/project-documents/:projectId`, `DELETE /api/documents/:id`.
+- Receipt-photo upload on transactions: `PATCH /api/transactions/:id/receipt`.
+- DSR photos: uploaded as documents first, then DSR's `photoIds` JSON array references them.
+
+### 4.8 Daily Site Report (DSR)
+
+- `DailySiteReport` model with state machine: DRAFT → SUBMITTED → ACKNOWLEDGED.
+- Unique `(projectId, reportDate)` constraint — one report per project per day.
+- Json fields for `workmenAttendance`, `materialsReceived`, `photoIds`.
+- Engineer creates from mobile (`DSRCreateScreen` with camera + GPS), submits → manager acknowledges via web `/dsr` page.
+
+### 4.9 Invoicing (Phase 5)
+
+- `Invoice` model with line items (Json), per-tenant auto-numbering `INV-YYYY-NNNN`.
+- State machine: DRAFT → SENT → PARTIALLY_PAID → PAID; CANCELLED can be set from any state except PAID.
+- PDF generation via pdfkit (`lib/invoicePdf.js`) — pure JS, no Chromium.
+- Email send: pdfkit Buffer attached via nodemailer.
+- Egyptian VAT default 14% in the create form; tenant-configurable per-invoice.
 
 ---
 
@@ -193,57 +221,77 @@ For multipart endpoints (auth/profile, tenant/logo, chat/audio), `validate()` ru
 
 ### Backend (`server/`)
 
-| Area | Status |
-|---|---|
-| Auth (register-company, verify-email, login, forgot/reset password, invite, profile) | ✅ Working |
-| RBAC (5 hard-coded roles + dynamic Role model with JSON permissions) | ✅ Working |
-| Multi-tenant isolation | ✅ Enforced everywhere |
-| Projects CRUD + financials endpoint | ✅ Working |
-| Clients/Suppliers/Workmen/Materials CRUD | ✅ Working |
-| V1.2 Profit-on-Expense engine | ✅ Working (verified math in seed) |
-| Inventory: MaterialBatch + MaterialUsage | ✅ Working |
-| Custody (fund engineer, return, history, overdraft check) | ✅ Working |
-| Notifications | ✅ Working |
-| Office fee config (global + per-project overrides) | ✅ Working |
-| Chat assistant + voice transcription | ✅ Working |
-| Image upload to S3 | ✅ Working |
-| Helmet + rate limit + CORS whitelist | ✅ Wired |
-| Zod validation on 13 route groups | ✅ Wired |
-| Privilege-escalation guards (SUPER_ADMIN) | ✅ Wired |
-| Prisma-aware error handler | ✅ Wired |
-| pino structured logger | ✅ Wired |
-| 35 Vitest schema unit tests | ✅ Passing |
+| Area | Status | Phase |
+|---|---|---|
+| Auth (register, verify, login, forgot/reset) | ✅ | Pre-existing |
+| **2FA (TOTP enroll/login/disable)** | ✅ | 2 |
+| RBAC (5 hard-coded roles + dynamic Role model) | ✅ | Pre-existing |
+| Multi-tenant isolation | ✅ | Pre-existing |
+| **Privilege-escalation guards** (SUPER_ADMIN) | ✅ | 2 |
+| **Multi-level approval thresholds** | ✅ | 2 |
+| Projects CRUD + financials | ✅ | Pre-existing |
+| **Soft delete + restore on Client/Supplier/Material/Workman/Project** | ✅ | 1 |
+| Clients/Suppliers/Workmen/Materials CRUD | ✅ | Pre-existing |
+| V1.2 Profit-on-Expense engine | ✅ | V1.2 |
+| Inventory: MaterialBatch + MaterialUsage | ✅ | V1.2 |
+| Custody (fund / return / overdraft check) | ✅ | Pre-existing |
+| Notifications | ✅ | Pre-existing |
+| Office fee config (global + per-project) | ✅ | V1.2 |
+| Chat assistant + voice transcription | ✅ | Pre-existing |
+| Image upload to S3 | ✅ | Pre-existing |
+| Helmet + rate limit + CORS whitelist | ✅ | Pre-existing security audit |
+| Zod validation on 14 route groups | ✅ | Pre-existing security audit |
+| **Prisma-aware error handler** | ✅ | 1 |
+| **pino structured logger** | ✅ | 1 |
+| **AuditLog model + helper, wired to all mutations** | ✅ | 1 |
+| `GET /api/audit-logs` (admin) + `:entity/:entityId` | ✅ | 1 |
+| **Document model + photo upload** | ✅ | 3 |
+| **Receipt-photo on transaction** (PATCH) | ✅ | 3 |
+| **DailySiteReport model + 7 endpoints** | ✅ | 4 |
+| **Invoice model + 9 endpoints + PDF + email** | ✅ | 5 |
+| **75 Vitest schema unit tests** (35 + 19 thresholds + 7 totp + 14 invoices) | ✅ | All |
 
 ### Web (`client/`)
 
-| Page | Status |
-|---|---|
-| Login, Register Company, Verify Email, Forgot/Reset Password | ✅ Working |
-| Dashboard with stats + charts | ✅ Working |
-| Projects (list, create, edit, delete, financials) | ✅ Working |
-| Clients/Suppliers/Workmen/Materials | ✅ Working |
-| Inventory (per-project material batches + usage) | ✅ Working |
-| Finance (transactions list, filter, approve/reject) | ✅ Working |
-| Reports (charts + CSV export with UTF-8 BOM) | ✅ Working |
-| Company Settings (logo upload, etc.) | ✅ Working |
-| Chat Assistant | ✅ Working |
-| AR/EN with RTL | ✅ Working |
-| Light/Dark theme | ✅ Working |
+| Page | Path | Status |
+|---|---|---|
+| Login | `/login` | ✅ + 2FA branch |
+| Register Company | `/signup` | ✅ |
+| Verify Email / Reset / Forgot | various | ✅ |
+| Dashboard | `/dashboard` | ✅ |
+| Projects (list, CRUD, financials) | `/projects` | ✅ |
+| Clients/Suppliers/Workmen/Materials | various | ✅ |
+| Inventory | `/inventory` | ✅ |
+| Finance (transactions list/approve) | `/finance` | ✅ |
+| Reports + CSV export | `/reports` | ✅ |
+| Company Settings | `/settings` | ✅ |
+| Chat Assistant | `/chat` | ✅ |
+| Team Management | `/team` | ✅ |
+| **Two-Factor Settings** | `/security/two-factor` | ✅ Phase 2 |
+| **Activity Log** (admin) | `/audit-log` | ✅ Phase 1+2 |
+| **Project Documents** | `/projects/:id/documents` | ✅ Phase 3 |
+| **Daily Site Reports** | `/dsr` | ✅ Phase 4 |
+| **Invoices** | `/invoices` | ✅ Phase 5 |
+| AR/EN with RTL | global | ✅ |
+| Light/Dark theme | global | ✅ |
 
 ### Mobile (`mobile/`)
 
-| Screen | Status |
-|---|---|
-| Login (with diagnostic API URL display) | ✅ Working |
-| Bottom tab nav: Projects, Finance, Notifications, Profile | ✅ Working |
-| Dashboard (project list with status badges + budget bars) | ✅ Working |
-| Project Detail (info grid + financials + transactions) | ✅ Working |
-| Finance (filter pills + approve/reject + FAB) | ✅ Working |
-| Add Transaction (project + category modal pickers, inventory toggle) | ✅ Working |
-| Notifications (read/unread, mark all read) | ✅ Working |
-| Profile (avatar + custody balance + nav hub) | ✅ Working |
-| Fund Engineer (admin-only, with current balance preview) | ✅ Working |
-| Clients / Suppliers / Workmen (read-only directory) | ✅ Working |
+| Screen | Status | Phase |
+|---|---|---|
+| Login (with diagnostic + 2FA stub) | ✅ | Pre-existing |
+| Bottom tabs (Projects / Finance / DSR / Notifications / Profile) | ✅ | 4 |
+| Dashboard | ✅ | Pre-existing |
+| Project Detail | ✅ | Pre-existing |
+| Finance + Add Transaction | ✅ | Pre-existing |
+| Notifications | ✅ | Pre-existing |
+| Profile (with custody balance) | ✅ | Pre-existing |
+| Fund Engineer | ✅ | Pre-existing |
+| Clients / Suppliers / Workmen | ✅ | Pre-existing |
+| **DSR List** + filter pills | ✅ | 4 |
+| **DSR Detail** + manager acknowledge | ✅ | 4 |
+| **DSR Create** with camera + library + attendance picker | ✅ | 4 |
+| Invoicing (mobile) | ⏭️ pending | 5 |
 
 ---
 
@@ -255,24 +303,22 @@ For multipart endpoints (auth/profile, tenant/logo, chat/audio), `validate()` ru
 cd server
 npm install
 npm run dev          # nodemon
-# OR
-npm start            # production-style
 ```
 
 Required env vars (see `server/.env.example`):
-- `DATABASE_URL` — Postgres connection string
-- `JWT_SECRET`, `JWT_EXPIRE`
+- `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRE`
 - `OPENAI_API_KEY` (chat + voice)
-- `SMTP_*` (verification/reset emails)
+- `SMTP_*` (verification/reset/invoice emails)
 - `AWS_*` + `AWS_S3_BUCKET` (S3 uploads)
 - `CORS_ALLOWED_ORIGINS` (production only)
+- `LOG_LEVEL` (optional; defaults debug in dev / info in prod)
 
 ### Web
 
 ```cmd
 cd client
 npm install
-npm run dev          # Vite on http://localhost:5173
+npm run dev          # http://localhost:5173
 ```
 
 ### Mobile
@@ -280,11 +326,11 @@ npm run dev          # Vite on http://localhost:5173
 ```cmd
 cd mobile
 npm install
-npx expo install --fix
+npx expo install --fix       # IMPORTANT after package.json changes
 npx expo start --clear
 ```
 
-For physical-device testing:
+For **physical-device testing**:
 - Edit `mobile/.env` → `EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:5000/api`
 - Backend on Windows: ensure firewall allows inbound on port 5000
 
@@ -292,7 +338,7 @@ For physical-device testing:
 
 ```cmd
 cd server
-npm test             # 35 schema unit tests
+npm test                # 75 schema/lib unit tests
 npm run test:watch
 npm run test:coverage
 ```
@@ -317,7 +363,7 @@ All passwords: `Demo@1234`
 | ENGINEER | engineer@demo.local |
 | ACCOUNTANT | accountant@demo.local |
 
-Demo data: 5 clients, 6 suppliers, 8 materials, 6 workmen, 3 projects (Villa in-progress / Office planning / Apartment completed), 17 transactions with V1.2 profit math applied, 1 cement batch 50% consumed, 3 custody transfers.
+Demo data: 5 clients, 6 suppliers, 8 materials, 6 workmen, 3 projects (Villa in-progress / Office planning / Apartment completed), 17 transactions with V1.2 profit math, 1 cement batch 50% consumed, 3 custody transfers.
 
 ---
 
@@ -331,7 +377,7 @@ Demo data: 5 clients, 6 suppliers, 8 materials, 6 workmen, 3 projects (Villa in-
 - Project Safe Balance: **309,500 EGP**
 - One transaction in `PENDING_APPROVAL` (50,000 EGP carpentry awaiting manager)
 
-If your numbers differ after seeding, the V1.2 math has drifted — investigate immediately.
+If your numbers differ after seeding, V1.2 math has drifted — investigate.
 
 ### Math derivation
 
@@ -344,132 +390,100 @@ If your numbers differ after seeding, the V1.2 math has drifted — investigate 
 
 ---
 
-## 8. Recent work (this session)
+## 8. Phases & roadmap
 
-### Bugs fixed (verified)
+### ✅ Completed phases
 
-1. **Login form blank, no error on wrong password** — `client/src/services/api.js` interceptor was redirecting on every 401, including the login attempt itself. Fixed by exempting auth-endpoint URLs from the auto-redirect.
-2. **Signup `Database error (P2028)`** — `prisma.$transaction(async (prisma) => {...})` shadowed the outer client + no timeout. Renamed to `tx`, added `{ timeout: 15000, maxWait: 5000 }`.
-3. **Manager sees no transactions on Finance page** — `getTransactions` was filtering PROJECT_MANAGER by `engineerId === manager.id`, but managers don't necessarily own projects. Removed the filter; managers/admins/accountants now see the full tenant.
-4. **"Client Payment" appearing in Expenses by Category chart** — `getStats` lumped all transactions into `byCategory`. Now filters to `type === 'EXPENSE'` and excludes `MANAGEMENT_FEE_TRANSFER` ledger entries.
-5. **Missing translation key `finance.categories.management_fee_transfer`** — added in both `ar.json` and `en.json`.
+| Phase | What | Commit |
+|---|---|---|
+| **Pre-existing security audit** | helmet, rate limit, CORS whitelist, Zod validation, privilege-escalation guards, Prisma error handler | pushed earlier |
+| **V1.2 Profit on Expense** | transactionControllerV2, MaterialBatch, profit-on-expense math, AR categories, frontend modals | pushed earlier |
+| **1 — Foundations** | structured logger (pino), AuditLog + soft delete + restore endpoints | pushed earlier |
+| **2 — Quick UX wins** | multi-level approvals, restore endpoints, **2FA TOTP**, **Activity Feed UI** | local |
+| **3 — Photo & document logs** | Document extensions (GPS, category, takenAt), upload/list/delete API, web Project Documents page, receipt-photo upload | local |
+| **4 — Daily Site Report** | DSR Prisma model + 7 endpoints, web review page, mobile list+detail+acknowledge, **mobile capture flow with camera + library + attendance picker + photo upload chain** | local |
+| **5 — Invoicing** | Invoice Prisma model, 9 endpoints, **PDF generation via pdfkit**, **email-with-PDF-attachment**, web Invoices page (list + form + send + payment + cancel + delete) | local |
 
-### Features delivered
+### ⏭️ Pending — Phase 6 (next)
 
-- **Backend security hardening**: helmet, rate limit, CORS whitelist
-- **Zod validation** on 13 route groups (auth, clients, projects, users, roles, workmen, notifications, tenant, chat, suppliers, materials, custody, office-fees)
-- **Privilege-escalation guards** on user inviting/updating/deletion
-- **Prisma-aware error handler** (P2002, P2003, P2025, P2014 mapped properly)
-- **Structured logger** (pino) replacing morgan + console.log
-- **35 Vitest schema unit tests** (mass-assignment defence proven)
-- **Demo data seeder** with realistic Egyptian construction context
-- **Mobile app** (React Native + Expo SDK 54): 11 screens, 4 tabs, AR/EN/RTL, custody management, fund engineer
-- **Reports CSV export** wired up (UTF-8 BOM for Arabic)
+- **Sentry-style error monitoring** (~30 min) — drop-in for production observability
+- **Backup verification** — Render handles automatic Postgres backups; verify enabled + tested
+- **Bank reconciliation** — CSV import → match transactions
+- **Subscription billing** (Stripe or Paymob) — tied to existing `Tenant.subscriptionPlan` field
+- **Mobile invoicing** — view + send from mobile (low priority; web is the natural creation surface)
+- **WhatsApp Business API** for invoice send (deferred from Phase 5 — needs WhatsApp Cloud API account)
 
----
+### ❌ Explicitly NOT doing
 
-## 9. Roadmap — what's next
-
-### Phase 1 — Foundations *(complete)*
-- [x] **Structured logger** (pino)
-- [x] **Audit log model + helper** — `lib/audit.js`, wired into Client/Supplier/Material/Workman/Project + User invite/update/delete + Role create/update/delete + Custody fund/return + Transaction approve/reject/delete. `GET /api/audit-logs` (admin) + `GET /api/audit-logs/:entity/:entityId` (any tenant member).
-- [x] **Soft delete pattern** — `deletedAt` on Client, Supplier, Material, Workman, Project. List/find queries filter `deletedAt: null`. Hard-delete replaced with `update({ deletedAt: new Date() })`. Records preserved for audit + future restore.
-
-### Phase 2 — Quick UX wins *(complete)*
-- [x] **Multi-level approval thresholds** — `Tenant.approvalThresholds Json?`, `lib/approvalThresholds.js` with `requiredRoleForAmount()`, `canAutoApprove()`, `ensureCanApprove()`, `validateThresholds()`. Defaults: ≤5k engineer / ≤50k manager / >50k admin. Wired into `createTransactionV2` (initial status decision) and `approveTransaction` (rank guard). Endpoints: `GET/PUT /api/tenant/approval-thresholds` (admin only). 19 unit tests covering edge cases.
-- [x] **Restore endpoints** for soft-deleted records: `PUT /api/{clients,suppliers,materials,workmen,projects}/:id/restore` (admin/super-admin only). Audits `RESTORE` action.
-- [x] **2FA (TOTP) for any user** — `User.totpSecret` + `User.totpEnabled`. `lib/totp.js` wraps otplib v13. Endpoints: `/api/auth/2fa/{status,enroll,confirm,disable,login}`. Two-step login: regular `/auth/login` returns `{ requires2FA, challengeToken }` if enabled; `/auth/2fa/login` redeems the challenge + 6-digit code for a full session token. QR code rendered server-side. Web page at `/security/two-factor` for self-service enroll/disable. 7 unit tests on the helper.
-- [x] **Activity feed UI** — `/audit-log` (admin-only sidebar entry). Calls `GET /api/audit-logs` with filter UI (entity / action / userId), expandable per-entry detail showing `before` / `after` / `metadata` JSON, cursor pagination, color-coded action badges.
-
-### Phase 3 — Photo & document logs *(complete)*
-- [x] **Document model extended** — added `category` (DocumentCategory enum: PHOTO_PROGRESS / PHOTO_RECEIPT / PHOTO_DELIVERY / PHOTO_ISSUE / CONTRACT / PERMIT / DRAWING / REPORT / OTHER), `description`, `latitude`/`longitude` (decimal), `takenAt`, `uploadedBy`. Indexed on `(projectId, uploadedAt)` and `(category)`.
-- [x] **Document endpoints** — `GET /api/project-documents/:projectId` (list, optional `?category=…`), `POST /api/project-documents/:projectId` (multipart upload, S3 or local fallback), `DELETE /api/documents/:id` (uploader / admin only). Audited as `Document CREATE` and `Document DELETE`.
-- [x] **Receipt-photo upload** — `PATCH /api/transactions/:id/receipt` (multipart). Existing `receiptPhotoUrl` field on Transaction now has a real upload path. Audited as transaction `UPDATE` with field metadata.
-- [x] **Web Project Documents page** — `/projects/:projectId/documents`. Camera/upload button, category picker, optional GPS-tag from browser geolocation, gallery view with category icons, lightbox for image preview, delete-with-confirm.
-- [ ] **Receipt photo upload** on transactions (existing `receiptPhotoUrl` field — wire UI)
-- [ ] **Site photos** per project with GPS + timestamp
-- [ ] **Document model UI** (contracts, permits already in schema)
-
-### Phase 4 — Daily Site Report (DSR) *(complete — all platforms)*
-- [x] **`DailySiteReport` model** — `(projectId, reportDate)` unique. State machine: DRAFT → SUBMITTED → ACKNOWLEDGED. WeatherCondition enum (8 values). Json fields for `workmenAttendance`, `materialsReceived`, `photoIds`. Reverse relations on Tenant, Project, User (DSRReporter + DSRAcknowledger).
-- [x] **DSR API** — 7 endpoints under `/api/dsr/*`: list (filterable; engineer scoped), get (resolves photoIds → Document records), create (DRAFT, 409 on duplicate project+date), update (DRAFT/SUBMITTED), submit, acknowledge (manager+ only), delete (DRAFT-author / admin-any). All audited.
-- [x] **Web review page** — `/dsr` (sidebar entry). Project + status filters, card list, click-row modal with stats grid + sections + photo grid + manager-acknowledge form (with notes) + author-submit-DRAFT button.
-- [x] **Mobile read + acknowledge** — DSRListScreen with status filter pills, DSRDetailScreen with status card + stats grid + sections + manager-acknowledge form. New 5th tab "Reports".
-- [x] **Mobile capture (engineer flow)** — `DSRCreateScreen`: project picker modal, date input + Today button, 8-option weather chip grid, temp + hours inputs, progress / issues / visitors textareas, workmen attendance multi-select (with per-row hours), photo strip with both **camera capture** (`expo-image-picker.launchCameraAsync`) and **library pick** (multi-select up to 10). Submit flow uploads photos to `/api/project-documents/:projectId` first, collects Document IDs, then creates the DSR with `photoIds`. Save-draft and Save-&-submit. FAB on DSR list. **Requires `expo-image-picker` ~17.0.0** (added to mobile/package.json).
-
-### Phase 5 — Invoicing
-- [ ] PDF template with tenant logo
-- [ ] Auto-numbering (already exists: `Transaction.invoiceNumber`)
-- [ ] Send via SMTP email
-- [ ] WhatsApp Business API integration
-- [ ] Paid / partial / overdue tracking
-
-### Phase 6 — Operational
-- [ ] **Bank reconciliation** (CSV import → match to transactions)
-- [ ] **Subscription billing** (Stripe or Paymob, tied to existing `Tenant.subscriptionPlan`)
-- [ ] **Sentry error monitoring**
-- [ ] **Backup verification** (Render handles automatic backups; verify they're enabled)
-
-### Explicitly NOT doing (unless we change our minds)
-
-- ETA Tax Authority integration — *deferred per user request 2026-05-01*
-- Multi-currency — Egypt SMEs operate in EGP only; complexity not worth it
-- Offline mobile mode — engineers usually have 4G
-- Generic CRM features — out of scope (this is an ERP, not a CRM)
+- **ETA Tax Authority integration** — deferred per user request 2026-05-01
+- **Multi-currency** — Egypt SMEs operate in EGP only
+- **Offline mobile mode** — engineers usually have 4G
+- **Generic CRM features** — out of scope
+- **Mobile DSR PDF export** — web export is sufficient for the foreseeable future
 
 ---
 
-## 10. Mobile screens — quick reference
+## 9. Mobile screens — quick reference
 
 | Screen | Path | Notes |
 |---|---|---|
-| Login | `mobile/src/screens/LoginScreen.js` | Shows API URL diagnostic + structured error box |
+| Login | `LoginScreen.js` | Shows API URL diagnostic + structured error box; 2FA branch (pending mobile UI) |
 | Dashboard | `DashboardScreen.js` | Quick stats + tappable project cards |
-| Project Detail | `ProjectDetailScreen.js` | Info grid + financials + transactions; "Add Transaction" deep-links to Finance tab pre-filled |
-| Finance | `FinanceScreen.js` | Filter pills (All/Pending/Mine), approve/reject inline, FAB |
-| Add Transaction | `AddTransactionScreen.js` | Type toggle, modal pickers for project + category, inventory checkbox |
+| Project Detail | `ProjectDetailScreen.js` | Info + financials + transactions + Add-Tx deep-link |
+| Finance | `FinanceScreen.js` | Filter pills, approve/reject, FAB |
+| Add Transaction | `AddTransactionScreen.js` | Type toggle, modal pickers, inventory checkbox |
+| **DSR List** | `DSRListScreen.js` | Status filters, FAB to create |
+| **DSR Detail** | `DSRDetailScreen.js` | Status card + sections + manager acknowledge |
+| **DSR Create** | `DSRCreateScreen.js` | Project picker, weather chips, attendance modal, **camera + library photo upload** |
 | Notifications | `NotificationsScreen.js` | Read/unread, mark all read |
-| Profile | `ProfileScreen.js` | Avatar + custody card + nav hub |
-| Fund Engineer | `FundEngineerScreen.js` | Admin-only; pick engineer + amount + description |
-| Clients | `ClientsScreen.js` | Read-only list |
-| Suppliers | `SuppliersScreen.js` | Read-only list |
-| Workmen | `WorkmenScreen.js` | Read-only list |
+| Profile | `ProfileScreen.js` | Custody balance + nav hub |
+| Fund Engineer | `FundEngineerScreen.js` | Admin only |
+| Clients / Suppliers / Workmen | `*Screen.js` | Read-only directories |
 
 ---
 
-## 11. Conventions — where to look for X
+## 10. Conventions — where to look for X
 
 | Question | Answer |
 |---|---|
 | Where do new API endpoints get registered? | `server/routes/<resource>.js`, mounted in `server/server.js` |
-| Where do I add validation for a new endpoint? | Create `server/schemas/<resource>.schema.js`, wire `validate({ body: schema })` in the route |
+| Where do I add validation for a new endpoint? | `server/schemas/<resource>.schema.js`, wire `validate({ body: schema })` in the route |
 | Where's the V1.2 profit math? | `server/controllers/transactionControllerV2.js` — `calculateAndTransferProfit` helper |
 | Where do new translation strings go? | `client/src/locales/{ar,en}.json` (web) + `mobile/src/locales/{ar,en}.json` (mobile) |
-| How do I add a new mobile screen? | Create file in `mobile/src/screens/`, register in `mobile/src/navigation/AppNavigator.js` (pick the right Stack) |
-| Where are user-management security guards? | `server/controllers/userController.js` (SUPER_ADMIN guards on invite/update/delete) |
+| How do I add a new mobile screen? | Create file in `mobile/src/screens/`, register in `mobile/src/navigation/AppNavigator.js` |
+| Where are user-management security guards? | `server/controllers/userController.js` |
 | How do I run automated tests? | `cd server && npm test` |
-| How do I reset the demo data? | `cd server && node scripts/seed-demo-data.js` (it wipes Demo Co domain data first) |
+| How do I reset the demo data? | `cd server && node scripts/seed-demo-data.js` (wipes Demo Co domain data first) |
+| Where's the audit helper? | `server/lib/audit.js` — `audit()` and `auditFromReq()` |
+| Where's the PDF generator? | `server/lib/invoicePdf.js` (pdfkit) |
+| Where's the TOTP helper? | `server/lib/totp.js` (otplib v13) |
+| Where's the approval-threshold lookup? | `server/lib/approvalThresholds.js` |
 
 ---
 
-## 12. Memory & gotchas (lived experience)
+## 11. Memory & gotchas (lived experience)
 
-- **Login response is non-deterministic if the same email exists in multiple tenants with the same password** — `findMany({ email })` then iterating with bcrypt picks the first match. The demo seed uses unique emails to avoid this. Worth fixing later by accepting an optional tenant slug at login.
+- **Login response is non-deterministic if same email exists in multiple tenants** with the same password — `findMany({ email })` then bcrypt loop picks the first. Demo seed uses unique emails. Worth fixing later by accepting an optional tenant slug at login.
 - **Two transaction controllers** — `transactionController.js` is the main file, `transactionControllerV2.js` holds the V1.2 engine. V1 re-exports V2's three functions at the bottom. Naming is misleading; rename to `profitEngine.js` someday.
-- **Hand-written SQL migration** at `server/prisma/manual_v1_2_migration.sql` exists alongside Prisma migrations — drift risk between dev and prod. Audit before any deploy.
-- **`server/find_users.js` and `server/test_accounting.js`** are legacy debug scripts. Kept for posterity but consider moving to `server/scripts/dev/` later.
-- **Repository URL has moved** from `8ofrii` to `8ofry` on GitHub. Old URL still redirects on push. Run `git remote set-url origin https://github.com/8ofry/Engineers-Management.git` to update.
+- **Hand-written SQL migration** at `server/prisma/manual_v1_2_migration.sql` exists alongside Prisma migrations — drift risk; audit before any prod deploy.
+- **Repository URL has moved** from `8ofrii` to `8ofry` on GitHub. Old URL still redirects on push. Run `git remote set-url origin https://github.com/8ofry/Engineers-Management.git` to silence the warning.
 - **Windows + PowerShell**: scripts may be blocked by execution policy. Either `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or use plain `cmd`.
 - **Node 18 doesn't work** with Expo SDK 54. Mobile dev requires Node 20.19.4+ or 22 LTS. Backend works on 18 but should also be on 22 for consistency.
+- **otplib v13** has a different API than v12 (`authenticator` is gone; use functional `generate`/`verify`/`generateSecret`). Already handled in `lib/totp.js`.
+- **`prisma format`** runs after `prisma db push` and reformats whitespace, which can break subsequent Edit calls — re-read the file before editing if a push has just run.
+- **Documents are image-only** at upload time — multer's fileFilter allows JPEG/PNG/GIF/WebP. PDFs would need `application/pdf` added to the filter.
+- **`/api` mount** must be specific (e.g. `/api/project-documents`, not bare `/api`) to avoid shadowing `/api/health`.
+- **Email attachments** require `options.attachments` on `sendEmail()` (added in Phase 5). The original implementation ignored attachments.
+- **Transaction.invoiceNumber** field exists since pre-existing schema but is unrelated to the new `Invoice.invoiceNumber` (Phase 5). Don't conflate.
 
 ---
 
-## 13. Where state lives
+## 12. Where state lives
 
 | Where | What |
 |---|---|
-| **Postgres on Render** | Single source of truth for tenants, users, projects, transactions, etc. |
-| **AWS S3** | Receipt photos, profile pictures, company logos |
+| **Postgres on Render** | Single source of truth for tenants, users, projects, transactions, DSRs, invoices, audit logs, etc. |
+| **AWS S3** | Receipt photos, profile pictures, company logos, project documents, DSR photos |
 | **`server/uploads/`** | Local fallback for audio voice notes (deleted after AI processing) |
 | **Browser localStorage** | JWT, user object, theme preference, language preference |
 | **Mobile AsyncStorage** | Token, user object, language preference |
@@ -478,13 +492,65 @@ If your numbers differ after seeding, the V1.2 math has drifted — investigate 
 
 ---
 
-## 14. If you're picking this up cold
+## 13. If you're picking this up cold (fresh session)
 
 1. **Read this doc top to bottom** (15 min). You'll know more than 90% of the project.
 2. **Read [TESTING-LOG.md](TESTING-LOG.md)** — running record of what's been tested and what's been fixed.
-3. **Read [TESTING-WEB.md](TESTING-WEB.md)** — the master test plan.
-4. **Start the backend, run `npm test`, eyeball the demo data**. If 35 tests pass and Villa shows safe=309,500, the system is healthy.
-5. **Pick a phase from §9 and tell the team you're starting on it.**
+3. **Check `git status` + `git log -10 --oneline`** — see what's local vs. pushed. As of last update, **N commits queued locally on `main` waiting to push**.
+4. **Run the backend tests**: `cd server && npm test` — should be **75 / 75 passing**.
+5. **Boot the backend**: `cd server && npm run dev` — should log `Server ready` on port 5000.
+6. **Eyeball the demo data**: hit `http://localhost:5000/api/health` for a 200 with helmet headers. Run `node scripts/list-users.js` to see seeded users.
+7. **Decide what's next** from §8 roadmap. Phase 6 ops layer is the natural next step.
+
+### Local commits waiting to push (as of 2026-05-02 EOD)
+
+The user said "stop pushing till we reach a milestone." Phase 5 is complete; **9+ local commits** spanning Phases 2-5 are queued. Run `git push origin main` when ready.
+
+Use `git log origin/main..HEAD --oneline` to see the queue.
+
+---
+
+## 14. Key API endpoints by phase
+
+### Phase 1 — Foundations
+- `GET /api/audit-logs` (admin) — paginated list with filters
+- `GET /api/audit-logs/:entity/:entityId` — full history of one resource
+- `PUT /api/clients/:id/restore` (and same pattern for suppliers, materials, workmen, projects)
+
+### Phase 2 — Quick UX wins
+- `POST /api/auth/2fa/enroll` — generate secret + QR
+- `POST /api/auth/2fa/confirm` — verify code → enable
+- `POST /api/auth/2fa/login` — redeem challenge token
+- `POST /api/auth/2fa/disable` — password + code required
+- `GET /api/auth/2fa/status` — { enabled, pendingEnrollment }
+- `GET /api/tenant/approval-thresholds` (admin) + `PUT` to update
+- Modified: `POST /api/auth/login` returns `{ requires2FA, challengeToken }` if enabled
+
+### Phase 3 — Photos & Documents
+- `GET /api/project-documents/:projectId` — list with optional `?category=...`
+- `POST /api/project-documents/:projectId` — multipart upload (file=image, optional name/category/description/lat/lng/takenAt)
+- `DELETE /api/documents/:id`
+- `PATCH /api/transactions/:id/receipt` — multipart receipt-photo upload
+
+### Phase 4 — DSR
+- `GET /api/dsr` — list, filterable
+- `GET /api/dsr/:id` — detail with photos resolved
+- `POST /api/dsr` — create DRAFT
+- `PUT /api/dsr/:id` — update DRAFT/SUBMITTED
+- `PUT /api/dsr/:id/submit` — DRAFT → SUBMITTED
+- `PUT /api/dsr/:id/acknowledge` (manager+) — SUBMITTED → ACKNOWLEDGED
+- `DELETE /api/dsr/:id` — DRAFT-author / admin
+
+### Phase 5 — Invoicing
+- `GET /api/invoices` — list
+- `GET /api/invoices/:id` — detail
+- `POST /api/invoices` — create DRAFT (auto-numbers)
+- `PUT /api/invoices/:id` — update (DRAFT only)
+- `DELETE /api/invoices/:id` — delete (DRAFT only)
+- `GET /api/invoices/:id/pdf` — returns PDF stream
+- `POST /api/invoices/:id/send` — email with PDF attached → SENT
+- `POST /api/invoices/:id/payment` — record (partial) payment
+- `PUT /api/invoices/:id/cancel` — set CANCELLED status
 
 ---
 

@@ -45,6 +45,7 @@ model Tenant {
   projectCategoryFees ProjectCategoryFee[]
   auditLogs           AuditLog[]
   dailySiteReports    DailySiteReport[]
+  invoices            Invoice[]
 
   @@map("tenants")
 }
@@ -91,6 +92,7 @@ model User {
   uploadedDocuments     Document[]
   reportedDsrs          DailySiteReport[] @relation("DSRReporter")
   acknowledgedDsrs      DailySiteReport[] @relation("DSRAcknowledger")
+  invoicesCreated       Invoice[]         @relation("InvoiceCreator")
 
   @@unique([email, tenantId])
   @@unique([phone, tenantId])
@@ -144,6 +146,7 @@ model Client {
   tenant          Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   projects        Project[]
   transactions    Transaction[]
+  invoices        Invoice[]
 
   @@map("clients")
 }
@@ -209,6 +212,7 @@ model Project {
   projectCostItems     ProjectCostItem[]
   categoryFees         ProjectCategoryFee[]
   dailySiteReports     DailySiteReport[]
+  invoices             Invoice[]
   client               Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   engineer             User                 @relation(fields: [engineerId], references: [id])
   tenant               Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -565,6 +569,56 @@ enum DSRStatus {
   DRAFT
   SUBMITTED
   ACKNOWLEDGED
+}
+
+/// Phase 5 — Client-facing invoice. Generated as PDF, sent via email/WhatsApp.
+/// Line items stored as JSON for flexibility (free-form lines, no FK).
+model Invoice {
+  id             String        @id @default(uuid())
+  /// INV-YYYY-NNNN format. Unique per tenant.
+  invoiceNumber  String
+  projectId      String?
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  issueDate      DateTime      @default(now())
+  dueDate        DateTime?
+  status         InvoiceStatus @default(DRAFT)
+  /// [{ description, quantity, unitPrice, total }, ...]
+  lineItems      Json
+  subtotal       Decimal       @db.Decimal(15, 2)
+  taxRate        Decimal       @default(0) @db.Decimal(5, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(15, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(15, 2)
+  totalAmount    Decimal       @db.Decimal(15, 2)
+  paidAmount     Decimal       @default(0) @db.Decimal(15, 2)
+  currency       String        @default("EGP")
+  notes          String?
+  terms          String?
+  sentAt         DateTime?
+  sentToEmail    String?
+  paidAt         DateTime?
+  createdBy      String
+  creator        User          @relation("InvoiceCreator", fields: [createdBy], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([projectId, status])
+  @@index([clientId, status])
+  @@index([tenantId, issueDate])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
 }
 
 model Note {

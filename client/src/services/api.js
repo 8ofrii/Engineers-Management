@@ -71,6 +71,28 @@ export const auditLogAPI = {
     history: (entity, entityId) => api.get(`/audit-logs/${entity}/${entityId}`)
 };
 
+// Phase 5 — Invoicing
+export const invoicesAPI = {
+    list: (params) => api.get('/invoices', { params }),
+    get: (id) => api.get(`/invoices/${id}`),
+    create: (data) => api.post('/invoices', data),
+    update: (id, data) => api.put(`/invoices/${id}`, data),
+    remove: (id) => api.delete(`/invoices/${id}`),
+    pdfUrl: (id) => {
+        // Returns a URL the browser can open in a new tab. Uses the bearer
+        // token from localStorage; for download we fetch+blob via the helper below.
+        return `${API_URL}/invoices/${id}/pdf`;
+    },
+    downloadPdf: async (id) => {
+        const r = await api.get(`/invoices/${id}/pdf`, { responseType: 'blob' });
+        return r.data; // Blob
+    },
+    send: (id, body) => api.post(`/invoices/${id}/send`, body || {}),
+    recordPayment: (id, amount, paidAt) =>
+        api.post(`/invoices/${id}/payment`, { amount, paidAt }),
+    cancel: (id) => api.put(`/invoices/${id}/cancel`)
+};
+
 // Phase 4 — Daily Site Reports
 export const dsrAPI = {
     list: (params) => api.get('/dsr', { params }),

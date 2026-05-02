@@ -4,6 +4,79 @@
 
 ---
 
+## 2026-05-02 — Phase 5: Invoicing with PDF + email send
+
+**Author**: Claude
+**Scope**: Backend invoicing complete + web Invoices page
+
+### What landed
+
+**Schema**
+- New `Invoice` Prisma model (line items as JSON; per-tenant unique `invoiceNumber` `INV-YYYY-NNNN`).
+- New `InvoiceStatus` enum: DRAFT / SENT / PARTIALLY_PAID / PAID / OVERDUE / CANCELLED.
+- Reverse relations on Tenant, Client, Project, User (`InvoiceCreator`).
+- Synced via `prisma db push`.
+
+**Backend libraries**
+- `pdfkit` installed for pure-JS PDF generation (no Chromium needed).
+- New `server/lib/invoicePdf.js` — A4 invoice render with company header, bill-to + project box, status badge, line items table, totals box (subtotal, discount, tax, total, paid, balance), notes + terms footer.
+- `server/utils/sendEmail.js` extended to pass through `options.attachments` to nodemailer.
+
+**Endpoints (`/api/invoices/*`)** — 9 total
+- `GET /` — list with filters (status, clientId, projectId); engineer scope: own only
+- `POST /` — create DRAFT. Auto-generates `INV-YYYY-NNNN`. Validates line items, computes subtotal/tax/total
+- `GET /:id` — detail with relations
+- `PUT /:id` — update (DRAFT only; SENT/PAID locked); re-computes totals when line items/tax/discount change
+- `DELETE /:id` — DRAFT only; SENT/PAID can only be cancelled
+- `GET /:id/pdf` — returns PDF stream with `Content-Type: application/pdf`
+- `POST /:id/send` — generates PDF, attaches to email, sends via SMTP, flips DRAFT→SENT
+- `POST /:id/payment` — record (partial) payment; PARTIALLY_PAID until full; validates amount > 0 and ≤ outstanding
+- `PUT /:id/cancel` — sets CANCELLED (anything except PAID)
+- All mutations audited (CREATE / UPDATE / SEND / PAYMENT / CANCEL / DELETE)
+
+**Validation** (`schemas/invoices.schema.js`)
+- Zod schemas: `createInvoiceSchema`, `updateInvoiceSchema`, `sendInvoiceSchema`, `recordPaymentSchema`, `idParamSchema`
+- Mass-assignment protection: tenantId, status, paidAmount, invoiceNumber stripped via `.strip()`
+- Tax rate capped 0–100, line items 1–200, positive quantities + non-negative unit prices
+
+**Web (`client/src/pages/Invoices.jsx`)**
+- Sidebar entry `/invoices` with Receipt icon
+- Status filter pills (All + 6 statuses)
+- Table with action icons (View, PDF download, Edit, Send, Payment, Cancel, Delete) gated by status + role
+- Create/Edit modal with full line-item editor (add/remove, auto-compute totals), tax rate (default 14% for Egyptian VAT), discount, notes, terms, due date
+- View modal with stats grid + line items table + notes + PDF download
+- Send modal with recipient email + custom message
+- Payment modal with outstanding-balance hint + amount input
+- All money formatted with Egyptian locale (`en-EG`)
+
+**Tests** (`server/tests/invoices.schema.test.js`)
+- 14 new tests: minimum viable invoice, empty line items, missing description, negative quantity, tax >100%, mass-assignment defence (status/paidAmount/invoiceNumber/tenantId stripped), update partial, send valid/invalid email, payment positive/zero/negative
+- **75 / 75 total tests passing**
+
+### Verified
+
+- Server boots clean
+- All invoice endpoints correctly 401 without token
+- `/api/health` unchanged at 200
+- Locale JSON valid in EN + AR (added `nav.invoices` key in both)
+
+### Pending live tests
+
+- [ ] As manager, click + New Invoice → form opens with default 14% tax + 30-day terms
+- [ ] Pick client + add 3 line items → totals auto-compute
+- [ ] Save → invoice appears in list with auto `INV-2026-NNNN` number
+- [ ] Click PDF icon → professional A4 PDF downloads
+- [ ] Click Send → email modal → enter recipient → invoice flips to SENT, email arrives with PDF attached
+- [ ] Click Payment icon on SENT → enter partial amount → status flips to PARTIALLY_PAID, balance updates
+- [ ] Pay full balance → status flips to PAID, paidAt populated
+- [ ] Try to edit a SENT invoice → 400 "cannot edit"
+- [ ] Try to delete a PAID invoice → 400 "use cancel"
+- [ ] Cancel a SENT invoice → status flips, audit log shows CANCEL action
+- [ ] As engineer, GET /api/invoices → only own invoices visible
+- [ ] Audit log shows CREATE/SEND/PAYMENT/CANCEL entries with metadata
+
+---
+
 ## 2026-05-02 — Phase 4 (mobile capture): DSR creation flow with photo upload
 
 **Author**: Claude

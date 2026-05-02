@@ -15,7 +15,9 @@ const sendEmail = async (options) => {
         from: `Civil Engine <${process.env.SMTP_EMAIL || 'ai.8ofry@gmail.com'}>`,
         to: options.email,
         subject: options.subject,
-        html: options.message
+        html: options.message,
+        // Optional attachments (Phase 5: invoice PDFs). Each: { filename, content, contentType }
+        ...(options.attachments ? { attachments: options.attachments } : {})
     };
 
     // Send email

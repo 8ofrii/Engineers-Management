@@ -23,7 +23,8 @@ import {
     Wallet,
     ClipboardList,
     ShieldCheck,
-    Activity
+    Activity,
+    Receipt
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -85,7 +86,8 @@ export default function Layout({ children }) {
         { path: '/finance', icon: Wallet, label: t('finance.title') }, // or 'Accounting'
         { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
         { path: '/reports', icon: FileText, label: t('nav.reports') },
-        { path: '/dsr', icon: ClipboardList, label: t('nav.dsr') || 'Daily Reports' }
+        { path: '/dsr', icon: ClipboardList, label: t('nav.dsr') || 'Daily Reports' },
+        { path: '/invoices', icon: Receipt, label: t('nav.invoices') || 'Invoices' }
     ];
 
     if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
