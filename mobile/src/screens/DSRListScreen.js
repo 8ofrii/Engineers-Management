@@ -109,6 +109,13 @@ export default function DSRListScreen({ navigation }) {
                     })
                 )}
             </ScrollView>
+
+            <TouchableOpacity
+                style={styles.fab}
+                onPress={() => navigation.navigate('DSRCreate')}
+            >
+                <Ionicons name="add" size={28} color="#fff" />
+            </TouchableOpacity>
         </SafeAreaView>
     );
 }
@@ -145,5 +152,12 @@ const styles = StyleSheet.create({
     reporter: { fontSize: 12, color: '#6b7280', marginTop: 2 },
     preview: { fontSize: 13, color: '#111827', marginTop: 6 },
     issuePreview: { fontSize: 12, color: '#ef4444', marginTop: 4 },
-    empty: { textAlign: 'center', color: '#9ca3af', marginTop: 40 }
+    empty: { textAlign: 'center', color: '#9ca3af', marginTop: 40 },
+    fab: {
+        position: 'absolute', right: 20, bottom: 20,
+        width: 56, height: 56, borderRadius: 28,
+        backgroundColor: '#2563eb', justifyContent: 'center', alignItems: 'center',
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25, shadowRadius: 4, elevation: 5
+    }
 });

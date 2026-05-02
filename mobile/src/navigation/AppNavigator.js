@@ -18,6 +18,7 @@ import WorkmenScreen from '../screens/WorkmenScreen';
 import FundEngineerScreen from '../screens/FundEngineerScreen';
 import DSRListScreen from '../screens/DSRListScreen';
 import DSRDetailScreen from '../screens/DSRDetailScreen';
+import DSRCreateScreen from '../screens/DSRCreateScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -40,6 +41,7 @@ const DSRStack = () => (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="DSRList" component={DSRListScreen} />
         <Stack.Screen name="DSRDetail" component={DSRDetailScreen} />
+        <Stack.Screen name="DSRCreate" component={DSRCreateScreen} />
     </Stack.Navigator>
 );
 

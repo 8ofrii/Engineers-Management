@@ -17,6 +17,7 @@
     "axios": "^1.7.9",
     "babel-preset-expo": "~54.0.10",
     "expo": "~54.0.0",
+    "expo-image-picker": "~17.0.0",
     "expo-localization": "~17.0.0",
     "expo-status-bar": "~3.0.0",
     "i18next": "^23.15.1",
