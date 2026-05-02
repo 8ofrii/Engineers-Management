@@ -84,7 +84,8 @@ export default function Layout({ children }) {
         { path: '/workforce', icon: HardHat, label: t('nav.labor') },
         { path: '/finance', icon: Wallet, label: t('finance.title') }, // or 'Accounting'
         { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
-        { path: '/reports', icon: FileText, label: t('nav.reports') }
+        { path: '/reports', icon: FileText, label: t('nav.reports') },
+        { path: '/dsr', icon: ClipboardList, label: t('nav.dsr') || 'Daily Reports' }
     ];
 
     if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {

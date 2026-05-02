@@ -4,6 +4,112 @@
 
 ---
 
+## 2026-05-02 — Phase 4: Daily Site Reports (backend + web review)
+
+**Author**: Claude
+**Scope**: DSR Prisma model, full CRUD endpoints with state machine (DRAFT → SUBMITTED → ACKNOWLEDGED), web review page
+
+### What landed
+
+**Backend**
+- `DailySiteReport` model with state machine, weather enum (`SUNNY/CLOUDY/RAINY/WINDY/DUSTY/HOT/COLD/OTHER`), Json fields for `workmenAttendance` and `materialsReceived` and `photoIds`. Unique constraint on `(projectId, reportDate)` prevents duplicate-day reports.
+- New `DSRStatus` enum: DRAFT / SUBMITTED / ACKNOWLEDGED.
+- 7 endpoints under `/api/dsr/*`:
+  - `GET /` — list with filters (projectId, status, from, to). Engineer scope: own only.
+  - `POST /` — create DRAFT. Returns 409 with `existingId` if same project+date already has a report.
+  - `GET /:id` — single DSR with `photos` field resolving Document refs.
+  - `PUT /:id` — edit (DRAFT/SUBMITTED). Acknowledged is locked.
+  - `PUT /:id/submit` — DRAFT → SUBMITTED + author notification.
+  - `PUT /:id/acknowledge` — SUBMITTED → ACKNOWLEDGED, manager-only, optional notes, engineer notified.
+  - `DELETE /:id` — DRAFT-only for author; admin can delete any.
+- Audit log: CREATE / UPDATE / SUBMIT / ACKNOWLEDGE / DELETE actions.
+- Zod validation: weather enum, hours (0-24), 200-entry attendance cap, 100-material cap, 50-photo cap.
+
+**Frontend (web)**
+- `dsrAPI` added to api.js: list/get/create/update/submit/acknowledge/remove.
+- New page `/dsr` (sidebar "Daily Reports", visible to all roles):
+  - Project + status filters
+  - Card list with status badge, weather icon, hours, reporter, progress preview, red-highlighted issues
+  - Click row → modal with full details (stats grid, progress, issues, visitors, attendance table, materials list, photo grid)
+  - Manager acknowledge form (optional notes), engineer can submit DRAFT from modal
+
+### Verified
+
+- 61/61 server tests still pass.
+- Server boots clean; all DSR endpoints 401 without token; /api/health stays 200.
+- Locale JSON valid.
+
+### Pending live tests
+
+- [ ] As engineer: visit `/dsr`, see only own reports
+- [ ] Try to create DSR without a project assignment → 403
+- [ ] Create DSR for project on date that already has one → 409 with existingId
+- [ ] Author submits DRAFT → status flips, notification appears
+- [ ] As manager, click submitted DSR → see acknowledge button
+- [ ] Add notes, click Acknowledge → status flips, engineer gets notification
+- [ ] Try to edit ACKNOWLEDGED DSR → 400 "cannot be edited"
+- [ ] Engineer scope: log in as engineer A, try GET /api/dsr/:id of engineer B's report → 403
+- [ ] Audit log shows CREATE/SUBMIT/ACKNOWLEDGE entries with metadata
+
+### Pending mobile work (next turn)
+
+- [ ] Mobile DSR capture screen (engineer pick project + date, weather picker, attendance multi-select, in-app camera, submit)
+- [ ] Mobile DSR list view (engineer's own + status badges)
+- [ ] Mobile notification handler for "DSR acknowledged"
+
+---
+
+## 2026-05-02 — Phase 3: Photo & document logs
+
+**Author**: Claude
+**Scope**: Document upload/list/delete endpoints + receipt-photo endpoint + web Project Documents page
+
+### What landed
+
+**Backend**
+- `Document` model extended with `category` (DocumentCategory enum), `description`, `latitude`, `longitude`, `takenAt`, `uploadedBy` + uploader relation.
+- New enum `DocumentCategory`: PHOTO_PROGRESS / PHOTO_RECEIPT / PHOTO_DELIVERY / PHOTO_ISSUE / CONTRACT / PERMIT / DRAWING / REPORT / OTHER.
+- Indexes on `(projectId, uploadedAt)` and `(category)`. Pushed via `prisma db push`.
+- New `documentController.js` with `listDocuments`, `uploadDocument`, `deleteDocument`. Multipart via existing multer/S3 middleware. GPS coords validated to ±90 / ±180. Hard-delete with audit trail.
+- Routes mounted at `/api/project-documents/:projectId` (list + upload) and `/api/documents/:id` (delete) — split to avoid the bare `/api` mount that briefly shadowed `/api/health`.
+- Receipt-photo endpoint: `PATCH /api/transactions/:id/receipt` (multipart `file`), authorized to creator / manager / admin. Audited.
+
+**Frontend**
+- `documentsAPI` added to `client/src/services/api.js`.
+- New page `/projects/:projectId/documents` — `ProjectDocuments.jsx`:
+  - Category filter dropdown
+  - Choose-photo button → preview → category picker → optional name + description → optional "Tag with GPS" checkbox (browser geolocation)
+  - Grid gallery with category-icon thumbnails (image previews for actual images)
+  - Lightbox click-to-zoom
+  - Delete-with-confirm (uploader or admin only)
+- App.jsx route registered.
+
+### Verified
+
+- 61/61 server tests still passing.
+- Server boots clean; `/api/health` returns 200.
+- Document endpoints correctly 401 without token.
+- Receipt endpoint 401s without token.
+- All locale JSON parses cleanly.
+
+### Pending live tests
+
+- [ ] Visit `/projects/<id>/documents` → see empty state on a fresh project
+- [ ] Upload a photo with category PHOTO_PROGRESS + GPS → appears in grid with 📍 footer
+- [ ] Click thumbnail → lightbox opens
+- [ ] Filter by category → only matching docs appear
+- [ ] Try to delete someone else's photo as engineer → 403
+- [ ] Delete own photo → grid updates immediately
+- [ ] As admin, delete any photo → succeeds; audit log shows DELETE entry
+
+### Known limitations
+
+- **Image-only at upload time** — multer's `fileFilter` allows JPEG/PNG/GIF/WebP only; PDFs/contracts will be rejected with "Invalid file type". Broaden the fileFilter to accept `application/pdf` if needed.
+- **No EXIF parsing** — `takenAt` only set if client passes it. Mobile capture will populate this.
+- **No mobile UI yet** — endpoint and upload paths are ready, but no mobile screen calls them yet (Phase 4 mobile work will add).
+
+---
+
 ## 2026-05-02 — Phase 2 (part 2): 2FA + Activity Feed UI
 
 **Author**: Claude

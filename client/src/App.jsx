@@ -23,6 +23,7 @@ import Inventory from './pages/Inventory';
 import TwoFactorSettings from './pages/TwoFactorSettings';
 import AuditLog from './pages/AuditLog';
 import ProjectDocuments from './pages/ProjectDocuments';
+import DailySiteReports from './pages/DailySiteReports';
 
 function App() {
     return (
@@ -147,6 +148,14 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <ProjectDocuments />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/dsr"
+                            element={
+                                <PrivateRoute>
+                                    <DailySiteReports />
                                 </PrivateRoute>
                             }
                         />

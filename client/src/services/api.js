@@ -71,6 +71,18 @@ export const auditLogAPI = {
     history: (entity, entityId) => api.get(`/audit-logs/${entity}/${entityId}`)
 };
 
+// Phase 4 — Daily Site Reports
+export const dsrAPI = {
+    list: (params) => api.get('/dsr', { params }),
+    get: (id) => api.get(`/dsr/${id}`),
+    create: (data) => api.post('/dsr', data),
+    update: (id, data) => api.put(`/dsr/${id}`, data),
+    submit: (id) => api.put(`/dsr/${id}/submit`),
+    acknowledge: (id, acknowledgeNotes) =>
+        api.put(`/dsr/${id}/acknowledge`, { acknowledgeNotes }),
+    remove: (id) => api.delete(`/dsr/${id}`)
+};
+
 // Phase 3 — Documents/photos per project
 export const documentsAPI = {
     listByProject: (projectId, params) =>

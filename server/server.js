@@ -35,6 +35,7 @@ import officeFeeRoutes from './routes/officeFees.js';
 import materialRoutes from './routes/materials.js';
 import auditLogRoutes from './routes/auditLogs.js';
 import { projectDocsRouter, docsRouter } from './routes/documents.js';
+import dsrRoutes from './routes/dsr.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -133,6 +134,7 @@ app.use('/api/materials', materialRoutes); // Added Materials route
 app.use('/api/audit-logs', auditLogRoutes); // Phase 1: audit trail
 app.use('/api/project-documents', projectDocsRouter); // Phase 3: list/upload by project
 app.use('/api/documents', docsRouter);                // Phase 3: delete by document id
+app.use('/api/dsr', dsrRoutes);                       // Phase 4: Daily Site Reports
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

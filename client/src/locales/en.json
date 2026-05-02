@@ -38,7 +38,8 @@
         "chat": "Chat Assistant",
         "reports": "Reports",
         "auditLog": "Activity Log",
-        "twoFactor": "Two-Factor"
+        "twoFactor": "Two-Factor",
+        "dsr": "Daily Reports"
     },
     "dashboard": {
         "title": "Dashboard",

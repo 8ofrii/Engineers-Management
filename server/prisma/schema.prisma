@@ -44,6 +44,7 @@ model Tenant {
   globalCategoryFees  GlobalCategoryFee[]
   projectCategoryFees ProjectCategoryFee[]
   auditLogs           AuditLog[]
+  dailySiteReports    DailySiteReport[]
 
   @@map("tenants")
 }
@@ -88,6 +89,8 @@ model User {
   workmanships          Workmanship[]
   auditLogs             AuditLog[]
   uploadedDocuments     Document[]
+  reportedDsrs          DailySiteReport[] @relation("DSRReporter")
+  acknowledgedDsrs      DailySiteReport[] @relation("DSRAcknowledger")
 
   @@unique([email, tenantId])
   @@unique([phone, tenantId])
@@ -205,6 +208,7 @@ model Project {
   notes                Note[]
   projectCostItems     ProjectCostItem[]
   categoryFees         ProjectCategoryFee[]
+  dailySiteReports     DailySiteReport[]
   client               Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
   engineer             User                 @relation(fields: [engineerId], references: [id])
   tenant               Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -504,6 +508,63 @@ enum DocumentCategory {
   DRAWING
   REPORT
   OTHER
+}
+
+/// Daily Site Report — engineer's daily log: weather, hours, attendance,
+/// progress notes, issues, photos. Submitted to manager who acknowledges.
+/// One report per project per day.
+model DailySiteReport {
+  id                String            @id @default(uuid())
+  projectId         String
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reportDate        DateTime          @db.Date
+  reportedBy        String
+  reporter          User              @relation("DSRReporter", fields: [reportedBy], references: [id])
+  weather           WeatherCondition?
+  temperatureC      Decimal?          @db.Decimal(4, 1)
+  hoursWorked       Decimal?          @db.Decimal(4, 1)
+  progressNotes     String?
+  issues            String?
+  visitorsNotes     String?
+  /// Array of objects: [{ workmanId, hoursPresent, role? }, ...]
+  workmenAttendance Json?
+  /// Array of objects: [{ name, quantity, unit, supplierId?, notes? }, ...]
+  materialsReceived Json?
+  /// Array of Document UUIDs uploaded for this DSR.
+  photoIds          Json?             @default("[]")
+  status            DSRStatus         @default(DRAFT)
+  submittedAt       DateTime?
+  acknowledgedBy    String?
+  acknowledger      User?             @relation("DSRAcknowledger", fields: [acknowledgedBy], references: [id])
+  acknowledgedAt    DateTime?
+  acknowledgeNotes  String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenantId          String?
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, reportDate])
+  @@index([tenantId, reportDate])
+  @@index([reportedBy, reportDate])
+  @@index([status])
+  @@map("daily_site_reports")
+}
+
+enum WeatherCondition {
+  SUNNY
+  CLOUDY
+  RAINY
+  WINDY
+  DUSTY
+  HOT
+  COLD
+  OTHER
+}
+
+enum DSRStatus {
+  DRAFT
+  SUBMITTED
+  ACKNOWLEDGED
 }
 
 model Note {
