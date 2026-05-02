@@ -375,11 +375,11 @@ If your numbers differ after seeding, the V1.2 math has drifted — investigate 
 - [x] **Audit log model + helper** — `lib/audit.js`, wired into Client/Supplier/Material/Workman/Project + User invite/update/delete + Role create/update/delete + Custody fund/return + Transaction approve/reject/delete. `GET /api/audit-logs` (admin) + `GET /api/audit-logs/:entity/:entityId` (any tenant member).
 - [x] **Soft delete pattern** — `deletedAt` on Client, Supplier, Material, Workman, Project. List/find queries filter `deletedAt: null`. Hard-delete replaced with `update({ deletedAt: new Date() })`. Records preserved for audit + future restore.
 
-### Phase 2 — Quick UX wins *(in progress)*
+### Phase 2 — Quick UX wins *(complete)*
 - [x] **Multi-level approval thresholds** — `Tenant.approvalThresholds Json?`, `lib/approvalThresholds.js` with `requiredRoleForAmount()`, `canAutoApprove()`, `ensureCanApprove()`, `validateThresholds()`. Defaults: ≤5k engineer / ≤50k manager / >50k admin. Wired into `createTransactionV2` (initial status decision) and `approveTransaction` (rank guard). Endpoints: `GET/PUT /api/tenant/approval-thresholds` (admin only). 19 unit tests covering edge cases.
 - [x] **Restore endpoints** for soft-deleted records: `PUT /api/{clients,suppliers,materials,workmen,projects}/:id/restore` (admin/super-admin only). Audits `RESTORE` action.
-- [ ] **2FA for admins** (TOTP via `otplib`)
-- [ ] **Activity feed UI** (web React page powered by `/api/audit-logs`)
+- [x] **2FA (TOTP) for any user** — `User.totpSecret` + `User.totpEnabled`. `lib/totp.js` wraps otplib v13. Endpoints: `/api/auth/2fa/{status,enroll,confirm,disable,login}`. Two-step login: regular `/auth/login` returns `{ requires2FA, challengeToken }` if enabled; `/auth/2fa/login` redeems the challenge + 6-digit code for a full session token. QR code rendered server-side. Web page at `/security/two-factor` for self-service enroll/disable. 7 unit tests on the helper.
+- [x] **Activity feed UI** — `/audit-log` (admin-only sidebar entry). Calls `GET /api/audit-logs` with filter UI (entity / action / userId), expandable per-entry detail showing `before` / `after` / `metadata` JSON, cursor pagination, color-coded action badges.
 
 ### Phase 3 — Photo & document logs
 - [ ] **Receipt photo upload** on transactions (existing `receiptPhotoUrl` field — wire UI)
