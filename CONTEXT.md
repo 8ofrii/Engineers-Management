@@ -2,7 +2,7 @@
 
 > **Purpose**: this is the canonical "where are we?" doc. If a fresh Claude session needs to pick up the work cold, **read this first**. It captures the project, every architectural decision, current state, and outstanding work as of the most recent local commit.
 
-**Last updated:** 2026-05-02 — Phase 5 (Invoicing with PDF + email) shipped locally; ready to push.
+**Last updated:** 2026-05-03 — Phase 6.1 (Sentry error monitoring) shipped locally. Phases 2-5 + 6.1 still queued, awaiting milestone push.
 
 ---
 
@@ -404,14 +404,26 @@ If your numbers differ after seeding, V1.2 math has drifted — investigate.
 | **4 — Daily Site Report** | DSR Prisma model + 7 endpoints, web review page, mobile list+detail+acknowledge, **mobile capture flow with camera + library + attendance picker + photo upload chain** | local |
 | **5 — Invoicing** | Invoice Prisma model, 9 endpoints, **PDF generation via pdfkit**, **email-with-PDF-attachment**, web Invoices page (list + form + send + payment + cancel + delete) | local |
 
-### ⏭️ Pending — Phase 6 (next)
+### 🟡 In progress — Phase 6 (ops & growth)
 
-- **Sentry-style error monitoring** (~30 min) — drop-in for production observability
-- **Backup verification** — Render handles automatic Postgres backups; verify enabled + tested
-- **Bank reconciliation** — CSV import → match transactions
-- **Subscription billing** (Stripe or Paymob) — tied to existing `Tenant.subscriptionPlan` field
-- **Mobile invoicing** — view + send from mobile (low priority; web is the natural creation surface)
-- **WhatsApp Business API** for invoice send (deferred from Phase 5 — needs WhatsApp Cloud API account)
+| Track | Status | Commit |
+|---|---|---|
+| **6.1 — Sentry error monitoring** | ✅ shipped | local |
+| 6.2 — Backup verification (Render Postgres) | ⏭️ pending | — |
+| 6.3 — Bank reconciliation (CSV import → match) | ⏭️ pending | — |
+| 6.4 — Subscription billing (Stripe vs Paymob TBD) | ⏭️ pending | — |
+| 6.5 — Mobile invoicing (view + send) | ⏭️ pending (low priority) | — |
+| 6.6 — WhatsApp Business API for invoice send | ⏭️ deferred (needs account) | — |
+
+#### 6.1 — Sentry error monitoring (shipped 2026-05-03)
+
+- `@sentry/node` v10 installed
+- `server/instrument.js` — initialized via `Sentry.init` only when `SENTRY_DSN` is set; otherwise fully inert (no SDK calls, no overhead)
+- `server/server.js` imports `instrument.js` as the **first line** so OpenTelemetry can patch `http`/`express` before they load
+- `Sentry.setupExpressErrorHandler(app)` runs **before** the app's error handler so Sentry sees raw exceptions with original stacks
+- `tracesSampleRate: 0.1` in production, `0` in development
+- `sendDefaultPii: false` — multi-tenant SaaS, don't leak emails/IPs to error tracker by default
+- To enable: set `SENTRY_DSN` in `.env` (or Render env vars); no other code changes required
 
 ### ❌ Explicitly NOT doing
 

@@ -1,8 +1,13 @@
+// Sentry must be initialized before any module that needs HTTP/express patching.
+import './instrument.js';
+
 import express from 'express';
 import dotenv from 'dotenv';
 
 // Load env vars at the very top before any other imports
 dotenv.config();
+
+import { wrapExpress } from './instrument.js';
 
 import cors from 'cors';
 import helmet from 'helmet';
@@ -146,6 +151,9 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+// Sentry must wrap errors BEFORE the app's own handler, so it sees raw exceptions.
+wrapExpress(app);
 
 // Error handler
 app.use(errorHandler);
