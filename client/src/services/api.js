@@ -120,16 +120,6 @@ export const documentsAPI = {
         })
 };
 
-// Tenant approval thresholds (admin-only)
-export const tenantAPI = {
-    get: () => api.get('/tenant'),
-    update: (formData) => api.put('/tenant', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    }),
-    getApprovalThresholds: () => api.get('/tenant/approval-thresholds'),
-    updateApprovalThresholds: (thresholds) => api.put('/tenant/approval-thresholds', { thresholds })
-};
-
 export const userAPI = {
     getAll: () => api.get('/users'),
     invite: (data) => api.post('/users', data),
@@ -238,12 +228,14 @@ export const chatAPI = {
     clearHistory: () => api.delete('/chat/history')
 };
 
-// Tenant API
+// Tenant API — settings + approval thresholds (admin-only)
 export const tenantAPI = {
     getSettings: () => api.get('/tenant'),
     updateSettings: (formData) => api.put('/tenant', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    }),
+    getApprovalThresholds: () => api.get('/tenant/approval-thresholds'),
+    updateApprovalThresholds: (thresholds) => api.put('/tenant/approval-thresholds', { thresholds })
 };
 
 // Roles API (RBAC)
