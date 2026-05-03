@@ -128,9 +128,24 @@ export default function Clients() {
                     <div className="grid grid-3">
                         {clients.map((client) => (
                             <div key={client.id} className="card">
-                                <div className="flex-between mb-md">
-                                    <h3>{client.name}</h3>
-                                    <div className="flex gap-sm">
+                                <div className="flex-between mb-md" style={{ alignItems: 'flex-start' }}>
+                                    <h3
+                                        style={{
+                                            flex: 1,
+                                            minWidth: 0,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical',
+                                            marginInlineEnd: 8,
+                                            wordBreak: 'break-word'
+                                        }}
+                                        title={client.name}
+                                    >
+                                        {client.name}
+                                    </h3>
+                                    <div className="flex gap-sm" style={{ flexShrink: 0 }}>
                                         <span className={`badge badge-${client.status?.toLowerCase() === 'active' ? 'success' : 'warning'}`}>
                                             {t(`clients.status.${client.status?.toLowerCase()}`)}
                                         </span>

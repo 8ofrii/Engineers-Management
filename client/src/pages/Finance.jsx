@@ -7,10 +7,12 @@ import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import { useFormat } from '../utils/format';
 
 export default function Finance() {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const { currency: fmtCurrency } = useFormat();
     const [searchParams, setSearchParams] = useSearchParams();
     const [transactions, setTransactions] = useState([]);
     const [pendingTransactions, setPendingTransactions] = useState([]);
@@ -492,7 +494,7 @@ export default function Finance() {
                                                 <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
                                                 <td style={{ maxWidth: '200px' }} className="truncate" title={tx.description}>{tx.description}</td>
                                                 <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                                                    {Number(tx.amount).toLocaleString()} EGP
+                                                    {fmtCurrency(tx.amount)}
                                                 </td>
                                                 <td>{tx.creator?.name || '-'}</td>
                                                 <td>
@@ -558,7 +560,7 @@ export default function Finance() {
                                                     fontWeight: 'bold',
                                                     color: totalAmount >= 0 ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 200, 200, 1)'
                                                 }}>
-                                                    {totalAmount.toLocaleString()} EGP
+                                                    {fmtCurrency(totalAmount)}
                                                 </span>
                                             </div>
                                         </div>
@@ -593,7 +595,7 @@ export default function Finance() {
                                                             )}
                                                         </td>
                                                         <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                                                            {Number(tx.amount).toLocaleString()} EGP
+                                                            {fmtCurrency(tx.amount)}
                                                         </td>
                                                         <td>
                                                             <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>

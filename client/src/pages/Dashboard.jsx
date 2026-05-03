@@ -18,12 +18,14 @@ import {
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
+import { useFormat } from '../utils/format';
 import './Dashboard.css';
 
 export default function Dashboard() {
     const { user } = useAuth();
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const { currency: formatCurrency } = useFormat();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         projects: { total: 0, active: 0 },
@@ -82,13 +84,6 @@ export default function Dashboard() {
         } finally {
             setLoading(false);
         }
-    };
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-EG', {
-            style: 'currency',
-            currency: 'EGP'
-        }).format(amount);
     };
 
     const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];

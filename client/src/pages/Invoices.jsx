@@ -7,6 +7,7 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { invoicesAPI, clientsAPI, projectsAPI } from '../services/api';
+import i18n from '../utils/i18n';
 
 const STATUS_COLORS = {
     DRAFT:          { bg: '#f3f4f6', fg: '#374151' },
@@ -17,12 +18,21 @@ const STATUS_COLORS = {
     CANCELLED:      { bg: '#e5e7eb', fg: '#6b7280' }
 };
 
+// Locale picked at call time so a language switch re-renders with new digits/symbol
+// without having to thread `lang` through every callsite.
 const fmtMoney = (amount, currency = 'EGP') => {
-    const num = Number(amount || 0);
-    return `${num.toLocaleString('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+    const lang = i18n.language?.startsWith('ar') ? 'ar-EG' : 'en-EG';
+    return new Intl.NumberFormat(lang, {
+        style: 'currency', currency,
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+    }).format(Number(amount || 0));
 };
 
-const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
+const fmtDate = (s) => {
+    if (!s) return '-';
+    const lang = i18n.language?.startsWith('ar') ? 'ar-EG' : 'en-GB';
+    return new Date(s).toLocaleDateString(lang);
+};
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const emptyLine = () => ({ description: '', quantity: 1, unitPrice: 0, total: 0 });

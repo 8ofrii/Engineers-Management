@@ -6,6 +6,7 @@ import { FolderKanban, Plus, Pencil, Trash2, Receipt } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import Layout from '../components/Layout';
 import AddProjectModal from '../components/AddProjectModal';
+import { useFormat } from '../utils/format';
 
 export default function Projects() {
     const { t } = useTranslation();
@@ -52,12 +53,7 @@ export default function Projects() {
         return colors[status] || 'primary';
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-EG', {
-            style: 'currency',
-            currency: 'EGP'
-        }).format(amount);
-    };
+    const { currency: formatCurrency } = useFormat();
 
     const handleSaveProject = async (projectData) => {
         try {
