@@ -83,8 +83,9 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
     const validate = () => {
         const newErrors = {};
 
-        if (!formData.name.trim()) newErrors.name = t('clients.modal.fields.name') + ' is required'; // Ideally move validation messages to i18n too
-        if (formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('clients.modal.fields.email') + ' is invalid';
+        if (!formData.name.trim()) newErrors.name = t('clients.modal.fields.name') + ' is required';
+        if (!formData.email.trim()) newErrors.email = t('clients.modal.fields.email') + ' is required';
+        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('clients.modal.fields.email') + ' is invalid';
         if (!formData.phone.trim()) newErrors.phone = t('clients.modal.fields.phone') + ' is required';
 
         setErrors(newErrors);
@@ -94,7 +95,12 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (validate()) {
-            onSubmit(formData);
+            // Drop empty optional strings so the schema's optional+nullable fields
+            // see undefined rather than '', avoiding e.g. "" failing email().
+            const payload = Object.fromEntries(
+                Object.entries(formData).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+            );
+            onSubmit(payload);
             handleClose();
         }
     };

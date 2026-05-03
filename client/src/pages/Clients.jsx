@@ -46,7 +46,15 @@ export default function Clients() {
             loadClients();
         } catch (error) {
             console.error('Failed to save client:', error);
-            showAlert({ type: 'error', title: 'Error', message: 'Failed to save client. Please try again.' });
+            const data = error.response?.data;
+            const fieldErrors = Array.isArray(data?.errors) && data.errors.length
+                ? data.errors.map(e => `${e.path}: ${e.message}`).join('\n')
+                : null;
+            showAlert({
+                type: 'error',
+                title: 'Error',
+                message: fieldErrors || data?.message || 'Failed to save client. Please try again.'
+            });
         }
     };
 

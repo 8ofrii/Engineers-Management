@@ -223,11 +223,29 @@ export default function TeamManagement() {
         });
     };
 
+    // Backend stores User.permissions as String[]; UI manages a category->key->bool matrix.
+    // Flatten to "category.key" entries for the truthy values so the schema accepts it.
+    const flattenPermissions = (matrix) => {
+        if (!matrix || typeof matrix !== 'object' || Array.isArray(matrix)) return [];
+        const flat = [];
+        for (const category of Object.keys(matrix)) {
+            const inner = matrix[category];
+            if (!inner || typeof inner !== 'object') continue;
+            for (const key of Object.keys(inner)) {
+                if (inner[key]) flat.push(`${category}.${key}`);
+            }
+        }
+        return flat;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             // Prepare data for submission
             const submitData = { ...formData };
+
+            // Convert UI permission matrix to flat string array the API expects
+            submitData.permissions = flattenPermissions(submitData.permissions);
 
             // If roleId is empty, remove it (use legacy role)
             if (!submitData.roleId) {
@@ -264,10 +282,14 @@ export default function TeamManagement() {
             setShowModal(false);
             loadData();
         } catch (err) {
+            const data = err.response?.data;
+            const fieldErrors = Array.isArray(data?.errors) && data.errors.length
+                ? data.errors.map(e => `${e.path}: ${e.message}`).join('\n')
+                : null;
             showAlert({
                 type: 'error',
                 title: t('common.error'),
-                message: err.response?.data?.message || t('teamManagement.messages.error')
+                message: fieldErrors || data?.message || t('teamManagement.messages.error')
             });
         }
     };
