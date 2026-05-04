@@ -153,8 +153,20 @@ export default function ChatAssistant() {
         setIsProcessing(true);
 
         try {
+            // Send the last few turns so the assistant has context across
+            // messages. Only plain text content — skip draftCard messages
+            // (those are visual UI only, not conversational turns).
+            const history = messages
+                .filter(m => m.content && !m.draftCard)
+                .slice(-10)
+                .map(m => ({
+                    role: m.isUser ? 'user' : 'assistant',
+                    content: String(m.content).slice(0, 2000)
+                }));
+
             const { data } = await api.post('/chat/message', {
-                message: inputMessage
+                message: inputMessage,
+                history
             });
 
             setMessages(prev => [

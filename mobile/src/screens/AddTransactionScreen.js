@@ -14,6 +14,7 @@ import {
     Platform
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import { projectsApi, transactionsApi } from '../services/api';
 
 const CATEGORIES_EXPENSE = [
@@ -105,6 +106,21 @@ export default function AddTransactionScreen({ navigation, route }) {
                 style={{ flex: 1 }}
             >
                 <ScrollView contentContainerStyle={styles.form}>
+                    {/* AI capture entry — opens DraftsList where the engineer
+                        can record a voice note or photograph a receipt. The
+                        AI builds a pre-filled draft they review before saving. */}
+                    <TouchableOpacity
+                        style={aiBoxStyle.box}
+                        onPress={() => navigation.navigate('DraftsList')}
+                    >
+                        <Ionicons name="sparkles" size={22} color="#2563eb" />
+                        <View style={{ flex: 1 }}>
+                            <Text style={aiBoxStyle.title}>Use AI to capture</Text>
+                            <Text style={aiBoxStyle.subtitle}>Record voice or photograph a receipt — AI fills the form</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color="#2563eb" />
+                    </TouchableOpacity>
+
                     <Text style={styles.label}>{t('addTx.type')}</Text>
                     <View style={styles.typeRow}>
                         {['EXPENSE', 'INCOME'].map(opt => (
@@ -264,6 +280,18 @@ export default function AddTransactionScreen({ navigation, route }) {
         </SafeAreaView>
     );
 }
+
+const aiBoxStyle = StyleSheet.create({
+    box: {
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        padding: 14, marginBottom: 16,
+        backgroundColor: '#dbeafe',
+        borderRadius: 12,
+        borderWidth: 1, borderColor: '#bfdbfe'
+    },
+    title: { fontWeight: '700', color: '#1e3a8a', fontSize: 14 },
+    subtitle: { color: '#1e40af', fontSize: 12, marginTop: 2 }
+});
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f9fafb' },

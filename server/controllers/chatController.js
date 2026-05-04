@@ -28,7 +28,7 @@ const toIntent = (action) => (action && ACTION_TO_INTENT[action]) || 'GENERAL';
 // @access  Private
 export const sendMessage = async (req, res, next) => {
     try {
-        const { message } = req.body;
+        const { message, history } = req.body;
         const userId = req.user.id;
         let userMessage = message;
         let isAudio = !!req.file;
@@ -124,15 +124,22 @@ export const sendMessage = async (req, res, next) => {
             ];
 
             const client = getOpenAI();
+            // Optional rolling history from the FE so the model remembers
+            // earlier turns ("yes that one", "show last week's instead"). Empty
+            // array ⇒ stateless behavior, same as before.
+            const priorTurns = Array.isArray(history)
+                ? history.filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content).slice(-12)
+                : [];
             const completion = await client.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages: [
                     {
                         role: "system",
-                        content: `You are a professional construction assistant in Egypt. 
+                        content: `You are a professional construction assistant in Egypt.
                         You help engineers manage sites. You can process transactions and answer project questions.
                         Respond in Egyptian Arabic unless English is used.`
                     },
+                    ...priorTurns,
                     { role: "user", content: userMessage }
                 ],
                 tools,

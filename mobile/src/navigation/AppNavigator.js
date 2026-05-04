@@ -19,6 +19,8 @@ import FundEngineerScreen from '../screens/FundEngineerScreen';
 import DSRListScreen from '../screens/DSRListScreen';
 import DSRDetailScreen from '../screens/DSRDetailScreen';
 import DSRCreateScreen from '../screens/DSRCreateScreen';
+import DraftsListScreen from '../screens/DraftsListScreen';
+import DraftReviewScreen from '../screens/DraftReviewScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -34,6 +36,8 @@ const FinanceStack = () => (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="FinanceList" component={FinanceScreen} />
         <Stack.Screen name="AddTransaction" component={AddTransactionScreen} />
+        <Stack.Screen name="DraftsList" component={DraftsListScreen} />
+        <Stack.Screen name="DraftReview" component={DraftReviewScreen} />
     </Stack.Navigator>
 );
 

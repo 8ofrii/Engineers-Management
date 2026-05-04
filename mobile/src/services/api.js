@@ -84,6 +84,35 @@ export const usersApi = {
     list: () => api.get('/users')
 };
 
+// Phase 7 — AI extraction (voice / receipt → persisted draft) + drafts CRUD.
+// audio: pass { uri, name, type } object the way React Native FormData expects.
+// image: same shape (uri, name, type).
+export const aiExtractApi = {
+    voice: ({ uri, name = 'voice.m4a', type = 'audio/m4a' }) => {
+        const fd = new FormData();
+        fd.append('audio', { uri, name, type });
+        return api.post('/ai/extract/voice', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    receipt: ({ uri, name = 'receipt.jpg', type = 'image/jpeg' }) => {
+        const fd = new FormData();
+        fd.append('image', { uri, name, type });
+        return api.post('/ai/extract/receipt', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    }
+};
+
+export const draftsApi = {
+    list: (params) => api.get('/transaction-drafts', { params }),
+    get: (id) => api.get(`/transaction-drafts/${id}`),
+    update: (id, matchedDraft) => api.put(`/transaction-drafts/${id}`, { matchedDraft }),
+    rematch: (id) => api.post(`/transaction-drafts/${id}/rematch`),
+    commit: (id, transactionId) => api.post(`/transaction-drafts/${id}/commit`, { transactionId }),
+    discard: (id) => api.delete(`/transaction-drafts/${id}`)
+};
+
 export const dsrApi = {
     list: (params) => api.get('/dsr', { params }),
     get: (id) => api.get(`/dsr/${id}`),

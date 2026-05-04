@@ -89,8 +89,19 @@ export default function FinanceScreen({ navigation }) {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
                 <Text style={styles.title}>{t('finance.title')}</Text>
+                <TouchableOpacity
+                    onPress={() => navigation.navigate('DraftsList')}
+                    style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 6,
+                        paddingHorizontal: 12, paddingVertical: 8,
+                        backgroundColor: '#dbeafe', borderRadius: 20
+                    }}
+                >
+                    <Ionicons name="sparkles" size={16} color="#1e40af" />
+                    <Text style={{ color: '#1e40af', fontWeight: '600', fontSize: 12 }}>AI Drafts</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.filterRow}>
