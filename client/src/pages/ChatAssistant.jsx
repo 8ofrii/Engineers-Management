@@ -82,7 +82,7 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Microphone access denied:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('chat.micError') });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: t('chat.micError') });
         }
     };
 
@@ -136,7 +136,7 @@ export default function ChatAssistant() {
             console.error('Failed to send voice message:', error);
             showAlert({
                 type: 'error',
-                title: t('common.error') || 'Error',
+                title: t('common.error', 'Error'),
                 message: error.response?.data?.message || t('chat.error')
             });
         } finally {
@@ -192,7 +192,7 @@ export default function ChatAssistant() {
             console.error('Failed to send message:', error);
             showAlert({
                 type: 'error',
-                title: t('common.error') || 'Error',
+                title: t('common.error', 'Error'),
                 message: error.response?.data?.message || t('chat.error')
             });
         } finally {
@@ -204,7 +204,7 @@ export default function ChatAssistant() {
     const clearHistory = async () => {
         showAlert({
             type: 'warning',
-            title: t('common.confirm') || 'Confirm',
+            title: t('common.confirm', 'Confirm'),
             message: t('chat.confirmClear'),
             showCancel: true,
             onConfirm: async () => {
@@ -273,7 +273,7 @@ export default function ChatAssistant() {
                                         >
                                             <div className="flex gap-sm" style={{ alignItems: 'center', marginBottom: 4 }}>
                                                 <Sparkles size={14} />
-                                                <strong>{t('drafts.created') || 'AI draft created'}</strong>
+                                                <strong>{t('drafts.created', 'AI draft created')}</strong>
                                                 <span style={{ fontSize: '0.7rem', opacity: 0.7, marginInlineStart: 'auto' }}>
                                                     {msg.draftCard.confidence || 'medium'} confidence
                                                 </span>
@@ -287,7 +287,7 @@ export default function ChatAssistant() {
                                                     {msg.draftCard.category ? ` · ${msg.draftCard.category}` : ''}
                                                 </span>
                                                 <ArrowRight size={14} style={{ marginInlineStart: 'auto' }} />
-                                                <span style={{ fontWeight: 600 }}>{t('drafts.review') || 'Review draft'}</span>
+                                                <span style={{ fontWeight: 600 }}>{t('drafts.review', 'Review draft')}</span>
                                             </div>
                                         </Link>
                                     )}

@@ -423,14 +423,21 @@ Log in as `engineer@demo.local` (web).
 2. File picker opens → choose any receipt or invoice photo (JPEG/PNG/HEIC, ≤8 MB).
 3. **Expected:** Land on review screen. Image renders on the left, form pre-filled on the right with vendor / total / items extracted.
 
-### 5.5 Review screen — edit before saving
+### 5.5 Review modal — edit before saving
 
-On `/drafts/<id>` while status is **Pending Review**:
+The review surface is a **modal popup** that opens over `/drafts` (not a separate page). Clicking a row, opening from the FAB, or arriving via `/drafts/:id` deep-link all open the same modal.
 
-1. Edit the **Amount** field — confidence pill should update or stay (your edit is final).
-2. Pick a different **Project** from the dropdown.
-3. Click **Re-match** — should re-run matching against the latest tenant data without losing your manual edits.
-4. **Expected:** Project/supplier fields keep your selections; only fields you didn't touch get re-suggested.
+Inside the modal:
+
+1. **Amount** field — pre-filled from AI extraction.
+2. **Cost Category** — full Arabic-categorized dropdown (خرسانات / أسمنت / مصنعية بناء / مصنعية محارة / etc.) grouped by general type, just like the manual Add Transaction modal. AI's high-level inference seeds a sensible default but you can drill down.
+3. **Project / Supplier** — dropdowns with confidence pills next to the label ("AI · 92%" or yellow "no match").
+4. **Item Name / Qty / Unit / Unit Price** — pre-filled from the first item the AI detected. Useful for inventory-style purchases.
+5. **Payment Method** — defaults to Custody Wallet.
+6. **Cost Center / Paid by** — optional.
+7. **Description / Date** — Description pre-filled by AI; Date defaults to today.
+8. Click **Re-match** — should re-run matching against the latest tenant data without losing your manual edits.
+9. **Expected:** Project/supplier fields keep your selections; only fields you didn't touch get re-suggested.
 
 ### 5.6 Commit draft → real transaction
 

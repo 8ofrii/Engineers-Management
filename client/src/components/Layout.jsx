@@ -83,22 +83,22 @@ export default function Layout({ children }) {
         { path: '/projects', icon: FolderKanban, label: t('nav.projects') },
         { path: '/clients', icon: Users, label: t('nav.clients') },
         { path: '/suppliers', icon: Package, label: t('nav.suppliers') },
-        { path: '/inventory', icon: Package, label: t('nav.inventory') || 'Inventory' },
+        { path: '/inventory', icon: Package, label: t('nav.inventory', 'Inventory') },
         { path: '/workforce', icon: HardHat, label: t('nav.labor') },
         { path: '/finance', icon: Wallet, label: t('finance.title') }, // or 'Accounting'
         { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
         { path: '/reports', icon: FileText, label: t('nav.reports') },
-        { path: '/dsr', icon: ClipboardList, label: t('nav.dsr') || 'Daily Reports' },
-        { path: '/invoices', icon: Receipt, label: t('nav.invoices') || 'Invoices' },
-        { path: '/drafts', icon: Sparkles, label: t('nav.drafts') || 'AI Drafts' }
+        { path: '/dsr', icon: ClipboardList, label: t('nav.dsr', 'Daily Reports') },
+        { path: '/invoices', icon: Receipt, label: t('nav.invoices', 'Invoices') },
+        { path: '/drafts', icon: Sparkles, label: t('nav.drafts', 'AI Drafts') }
     ];
 
     if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
         navItems.push({ path: '/team', icon: UserCog, label: t('teamManagement.title') });
-        navItems.push({ path: '/audit-log', icon: Activity, label: t('nav.auditLog') || 'Activity Log' });
+        navItems.push({ path: '/audit-log', icon: Activity, label: t('nav.auditLog', 'Activity Log') });
     }
     // Two-factor settings — every authenticated user can manage their own.
-    navItems.push({ path: '/security/two-factor', icon: ShieldCheck, label: t('nav.twoFactor') || 'Two-Factor' });
+    navItems.push({ path: '/security/two-factor', icon: ShieldCheck, label: t('nav.twoFactor', 'Two-Factor') });
 
 
 

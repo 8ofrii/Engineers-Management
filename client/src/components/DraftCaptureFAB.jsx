@@ -40,7 +40,7 @@ export default function DraftCaptureFAB() {
         } catch (err) {
             showAlert({
                 type: 'error',
-                title: t('common.error') || 'Error',
+                title: t('common.error', 'Error'),
                 message: err.response?.data?.message || 'Voice extraction failed'
             });
         } finally {
@@ -59,7 +59,7 @@ export default function DraftCaptureFAB() {
         } catch (err) {
             showAlert({
                 type: 'error',
-                title: t('common.error') || 'Error',
+                title: t('common.error', 'Error'),
                 message: err.response?.data?.message || 'Receipt extraction failed'
             });
         } finally {
@@ -108,10 +108,10 @@ export default function DraftCaptureFAB() {
                             cursor: busy ? 'not-allowed' : 'pointer',
                             fontWeight: 600
                         }}
-                        title={t('drafts.captureVoice') || 'Voice Draft'}
+                        title={t('drafts.captureVoice', 'Voice Draft')}
                     >
                         <Mic size={18} />
-                        <span>{t('drafts.captureVoice') || 'Voice'}</span>
+                        <span>{t('drafts.captureVoice', 'Voice')}</span>
                     </button>
                 )}
 
@@ -129,10 +129,10 @@ export default function DraftCaptureFAB() {
                             cursor: busy ? 'not-allowed' : 'pointer',
                             fontWeight: 600
                         }}
-                        title={t('drafts.captureReceipt') || 'Receipt Draft'}
+                        title={t('drafts.captureReceipt', 'Receipt Draft')}
                     >
                         <Camera size={18} />
-                        <span>{t('drafts.captureReceipt') || 'Receipt'}</span>
+                        <span>{t('drafts.captureReceipt', 'Receipt')}</span>
                         <input
                             type="file"
                             accept="image/*"
@@ -149,7 +149,7 @@ export default function DraftCaptureFAB() {
                     type="button"
                     onClick={() => setOpen(prev => !prev)}
                     disabled={busy}
-                    aria-label={t('drafts.fabLabel') || 'Capture AI draft'}
+                    aria-label={t('drafts.fabLabel', 'Capture AI draft')}
                     style={{
                         width: 60, height: 60,
                         borderRadius: '50%',

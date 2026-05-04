@@ -26,7 +26,6 @@ import ProjectDocuments from './pages/ProjectDocuments';
 import DailySiteReports from './pages/DailySiteReports';
 import Invoices from './pages/Invoices';
 import Drafts from './pages/Drafts';
-import DraftReview from './pages/DraftReview';
 
 function App() {
     return (
@@ -178,11 +177,13 @@ function App() {
                                 </PrivateRoute>
                             }
                         />
+                        {/* /drafts/:id deep-link opens the same page with the
+                            review modal pre-opened (Drafts reads the param). */}
                         <Route
                             path="/drafts/:id"
                             element={
                                 <PrivateRoute>
-                                    <DraftReview />
+                                    <Drafts />
                                 </PrivateRoute>
                             }
                         />

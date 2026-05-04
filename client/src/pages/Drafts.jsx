@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, Mic, Camera, Trash2, ArrowRight, Volume2, ImageIcon, Loader2 } from 'lucide-react';
 import Layout from '../components/Layout';
@@ -7,6 +7,7 @@ import { useAlert } from '../context/AlertContext';
 import { draftsAPI, aiExtractAPI } from '../services/api';
 import { useFormat } from '../utils/format';
 import VoiceRecorderModal from '../components/VoiceRecorderModal';
+import DraftReviewModal from '../components/DraftReviewModal';
 
 const sourceIcon = (source) => source === 'VOICE' ? <Volume2 size={16} /> : <ImageIcon size={16} />;
 
@@ -29,12 +30,27 @@ export default function Drafts() {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
     const navigate = useNavigate();
+    const { id: routeDraftId } = useParams();
     const { currency } = useFormat();
     const [drafts, setDrafts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('PENDING_REVIEW');
     const [voiceOpen, setVoiceOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
+    // The review modal opens locally on row click. /drafts/:id deep-links
+    // also work — we sync the URL param into the same state.
+    const [reviewId, setReviewId] = useState(null);
+
+    // Open the review modal automatically when the URL is /drafts/:id
+    useEffect(() => {
+        if (routeDraftId) setReviewId(routeDraftId);
+    }, [routeDraftId]);
+
+    const closeReview = () => {
+        setReviewId(null);
+        // If we got here via /drafts/:id, return to /drafts so the URL is honest
+        if (routeDraftId) navigate('/drafts', { replace: true });
+    };
 
     const load = async () => {
         try {
@@ -59,7 +75,9 @@ export default function Drafts() {
         try {
             setUploading(true);
             const r = await aiExtractAPI.voice(blob);
-            navigate(`/drafts/${r.data.draft.id}`);
+            // Open review locally (no full-page navigation)
+            setReviewId(r.data.draft.id);
+            load();
         } catch (err) {
             showAlert({
                 type: 'error',
@@ -77,7 +95,8 @@ export default function Drafts() {
         try {
             setUploading(true);
             const r = await aiExtractAPI.receipt(file);
-            navigate(`/drafts/${r.data.draft.id}`);
+            setReviewId(r.data.draft.id);
+            load();
         } catch (err) {
             showAlert({
                 type: 'error',
@@ -97,10 +116,10 @@ export default function Drafts() {
                     <div>
                         <h1 className="flex gap-md" style={{ alignItems: 'center' }}>
                             <Sparkles size={28} />
-                            {t('drafts.title') || 'AI Drafts'}
+                            {t('drafts.title', 'AI Drafts')}
                         </h1>
                         <p className="text-secondary">
-                            {t('drafts.subtitle') || 'Capture a voice note or receipt photo and let AI prepare a draft transaction for you.'}
+                            {t('drafts.subtitle', 'Capture a voice note or receipt photo and let AI prepare a draft transaction for you.')}
                         </p>
                     </div>
                 </div>
@@ -123,9 +142,9 @@ export default function Drafts() {
                         onClick={() => setVoiceOpen(true)}
                     >
                         {uploading ? <Loader2 size={28} className="spin" /> : <Mic size={28} />}
-                        <span>{t('drafts.captureVoice') || 'Voice Draft'}</span>
+                        <span>{t('drafts.captureVoice', 'Voice Draft')}</span>
                         <small style={{ opacity: 0.8, fontWeight: 400 }}>
-                            {t('drafts.captureVoiceHint') || 'Speak the expense in Arabic or English'}
+                            {t('drafts.captureVoiceHint', 'Speak the expense in Arabic or English')}
                         </small>
                     </button>
 
@@ -144,9 +163,9 @@ export default function Drafts() {
                         }}
                     >
                         {uploading ? <Loader2 size={28} className="spin" /> : <Camera size={28} />}
-                        <span>{t('drafts.captureReceipt') || 'Receipt Draft'}</span>
+                        <span>{t('drafts.captureReceipt', 'Receipt Draft')}</span>
                         <small style={{ opacity: 0.8, fontWeight: 400 }}>
-                            {t('drafts.captureReceiptHint') || 'Photograph a receipt or invoice'}
+                            {t('drafts.captureReceiptHint', 'Photograph a receipt or invoice')}
                         </small>
                         <input
                             type="file"
@@ -180,9 +199,9 @@ export default function Drafts() {
                 ) : drafts.length === 0 ? (
                     <div className="card text-center" style={{ padding: 48 }}>
                         <Sparkles size={48} style={{ margin: '0 auto 12px', color: 'var(--text-tertiary)' }} />
-                        <h3>{t('drafts.empty') || 'No drafts yet'}</h3>
+                        <h3>{t('drafts.empty', 'No drafts yet')}</h3>
                         <p className="text-secondary">
-                            {t('drafts.emptyHint') || 'Tap one of the buttons above to capture your first AI draft.'}
+                            {t('drafts.emptyHint', 'Tap one of the buttons above to capture your first AI draft.')}
                         </p>
                     </div>
                 ) : (
@@ -190,17 +209,21 @@ export default function Drafts() {
                         {drafts.map((d) => {
                             const md = d.matchedDraft || {};
                             return (
-                                <Link
+                                <button
                                     key={d.id}
-                                    to={`/drafts/${d.id}`}
+                                    type="button"
+                                    onClick={() => setReviewId(d.id)}
                                     className="card"
                                     style={{
-                                        textDecoration: 'none',
-                                        color: 'inherit',
+                                        background: 'var(--bg-primary, white)',
+                                        border: '1px solid var(--border-color, #e5e7eb)',
+                                        textAlign: 'inherit',
+                                        cursor: 'pointer',
                                         padding: 16,
                                         display: 'flex',
                                         gap: 16,
-                                        alignItems: 'center'
+                                        alignItems: 'center',
+                                        width: '100%'
                                     }}
                                 >
                                     <div style={{
@@ -215,7 +238,7 @@ export default function Drafts() {
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div className="flex gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                                             <strong>
-                                                {md.description || t('drafts.untitled') || '(no summary)'}
+                                                {md.description || t('drafts.untitled', '(no summary)')}
                                             </strong>
                                             {statusBadge(d.status)}
                                         </div>
@@ -226,7 +249,7 @@ export default function Drafts() {
                                         </div>
                                     </div>
                                     <ArrowRight size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
-                                </Link>
+                                </button>
                             );
                         })}
                     </div>
@@ -238,6 +261,15 @@ export default function Drafts() {
                 onClose={() => setVoiceOpen(false)}
                 onCaptured={handleVoiceCaptured}
                 maxSeconds={60}
+            />
+
+            {/* In-place review modal — clicking a draft opens it without a
+                full-page navigation. /drafts/:id deep-links also route here. */}
+            <DraftReviewModal
+                draftId={reviewId}
+                isOpen={!!reviewId}
+                onClose={closeReview}
+                onCommitted={load}
             />
         </Layout>
     );

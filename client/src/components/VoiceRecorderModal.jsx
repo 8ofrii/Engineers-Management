@@ -89,8 +89,8 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
         } catch (err) {
             setErrorMsg(
                 err?.name === 'NotAllowedError'
-                    ? (t('drafts.micDenied') || 'Microphone permission denied. Please enable it in your browser settings.')
-                    : (t('drafts.micUnavailable') || 'Could not access microphone.')
+                    ? (t('drafts.micDenied', 'Microphone permission denied. Please enable it in your browser settings.'))
+                    : (t('drafts.micUnavailable', 'Could not access microphone.'))
             );
         }
     };
@@ -123,7 +123,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                 <div className="modal-header">
                     <h2 className="flex gap-sm" style={{ alignItems: 'center' }}>
                         <Mic size={20} />
-                        {t('drafts.voiceTitle') || 'Record voice note'}
+                        {t('drafts.voiceTitle', 'Record voice note')}
                     </h2>
                     <button className="modal-close" onClick={handleClose}>
                         <X size={24} />
@@ -157,7 +157,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                             onClick={startRecording}
                         >
                             <Mic size={20} />
-                            {t('drafts.start') || 'Start recording'}
+                            {t('drafts.start', 'Start recording')}
                         </button>
                     )}
 
@@ -174,7 +174,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                             onClick={stopRecording}
                         >
                             <Square size={20} fill="white" />
-                            {t('drafts.stop') || 'Stop'}
+                            {t('drafts.stop', 'Stop')}
                         </button>
                     )}
 
@@ -190,11 +190,11 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                             <div className="flex gap-sm" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
                                 <button className="btn btn-secondary" onClick={startRecording}>
                                     <Mic size={16} />
-                                    {t('drafts.reRecord') || 'Re-record'}
+                                    {t('drafts.reRecord', 'Re-record')}
                                 </button>
                                 <button className="btn btn-primary" onClick={handleSend}>
                                     <Send size={16} />
-                                    {t('drafts.send') || 'Process with AI'}
+                                    {t('drafts.send', 'Process with AI')}
                                 </button>
                             </div>
                         </>
@@ -203,7 +203,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                     {phase === 'uploading' && (
                         <div className="flex gap-sm" style={{ justifyContent: 'center', alignItems: 'center', padding: 16 }}>
                             <Loader2 size={24} className="spin" />
-                            <span>{t('drafts.processing') || 'Processing voice with AI…'}</span>
+                            <span>{t('drafts.processing', 'Processing voice with AI…')}</span>
                         </div>
                     )}
                 </div>

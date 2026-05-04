@@ -93,6 +93,10 @@ export const invoicesAPI = {
     cancel: (id) => api.put(`/invoices/${id}/cancel`)
 };
 
+export const categoriesAPI = {
+    list: (grouped = true) => api.get('/categories', { params: { grouped } })
+};
+
 // Phase 7 — AI extraction (voice / receipt → persisted draft) + draft CRUD
 export const aiExtractAPI = {
     voice: (audioBlob) => {
