@@ -93,6 +93,33 @@ export const invoicesAPI = {
     cancel: (id) => api.put(`/invoices/${id}/cancel`)
 };
 
+// Phase 7 — AI extraction (voice / receipt → persisted draft) + draft CRUD
+export const aiExtractAPI = {
+    voice: (audioBlob) => {
+        const fd = new FormData();
+        fd.append('audio', audioBlob, 'voice.webm');
+        return api.post('/ai/extract/voice', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    receipt: (imageFile) => {
+        const fd = new FormData();
+        fd.append('image', imageFile, imageFile.name || 'receipt.jpg');
+        return api.post('/ai/extract/receipt', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    }
+};
+
+export const draftsAPI = {
+    list: (params) => api.get('/transaction-drafts', { params }),
+    get: (id) => api.get(`/transaction-drafts/${id}`),
+    update: (id, matchedDraft) => api.put(`/transaction-drafts/${id}`, { matchedDraft }),
+    rematch: (id) => api.post(`/transaction-drafts/${id}/rematch`),
+    commit: (id, transactionId) => api.post(`/transaction-drafts/${id}/commit`, { transactionId }),
+    discard: (id) => api.delete(`/transaction-drafts/${id}`)
+};
+
 // Phase 4 — Daily Site Reports
 export const dsrAPI = {
     list: (params) => api.get('/dsr', { params }),

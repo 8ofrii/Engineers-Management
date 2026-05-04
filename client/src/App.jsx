@@ -25,6 +25,8 @@ import AuditLog from './pages/AuditLog';
 import ProjectDocuments from './pages/ProjectDocuments';
 import DailySiteReports from './pages/DailySiteReports';
 import Invoices from './pages/Invoices';
+import Drafts from './pages/Drafts';
+import DraftReview from './pages/DraftReview';
 
 function App() {
     return (
@@ -165,6 +167,22 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <Invoices />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/drafts"
+                            element={
+                                <PrivateRoute>
+                                    <Drafts />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/drafts/:id"
+                            element={
+                                <PrivateRoute>
+                                    <DraftReview />
                                 </PrivateRoute>
                             }
                         />

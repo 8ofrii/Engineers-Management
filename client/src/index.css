@@ -400,6 +400,10 @@ a:hover {
   }
 }
 
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Fade In Animation */
 @keyframes fadeIn {
   from {

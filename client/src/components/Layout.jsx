@@ -24,7 +24,8 @@ import {
     ClipboardList,
     ShieldCheck,
     Activity,
-    Receipt
+    Receipt,
+    Sparkles
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -87,7 +88,8 @@ export default function Layout({ children }) {
         { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
         { path: '/reports', icon: FileText, label: t('nav.reports') },
         { path: '/dsr', icon: ClipboardList, label: t('nav.dsr') || 'Daily Reports' },
-        { path: '/invoices', icon: Receipt, label: t('nav.invoices') || 'Invoices' }
+        { path: '/invoices', icon: Receipt, label: t('nav.invoices') || 'Invoices' },
+        { path: '/drafts', icon: Sparkles, label: t('nav.drafts') || 'AI Drafts' }
     ];
 
     if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
