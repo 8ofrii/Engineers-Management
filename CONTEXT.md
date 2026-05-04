@@ -2,7 +2,7 @@
 
 > **Purpose**: this is the canonical "where are we?" doc. If a fresh Claude session needs to pick up the work cold, **read this first**. It captures the project, every architectural decision, current state, and outstanding work as of the most recent local commit.
 
-**Last updated:** 2026-05-03 — Phase 6.1 (Sentry error monitoring) shipped locally. Phases 2-5 + 6.1 still queued, awaiting milestone push.
+**Last updated:** 2026-05-03 — Phase 7.1 + 7.2 backend (AI voice + receipt extraction → draft transactions) shipped. Phase 6.1 Sentry already pushed.
 
 ---
 
@@ -404,7 +404,30 @@ If your numbers differ after seeding, V1.2 math has drifted — investigate.
 | **4 — Daily Site Report** | DSR Prisma model + 7 endpoints, web review page, mobile list+detail+acknowledge, **mobile capture flow with camera + library + attendance picker + photo upload chain** | local |
 | **5 — Invoicing** | Invoice Prisma model, 9 endpoints, **PDF generation via pdfkit**, **email-with-PDF-attachment**, web Invoices page (list + form + send + payment + cancel + delete) | local |
 
-### 🟡 In progress — Phase 6 (ops & growth)
+### 🟡 In progress — Phase 7 (AI extraction → draft transactions)
+
+The flagship UX feature — engineers on-site speak or photograph a receipt and the form pre-fills. v1 wires direct to OpenAI behind a service abstraction (`server/services/aiService.js`) so we can swap in OpenRouter or MicroMind orchestration later without touching controllers.
+
+| Track | Status | Commit |
+|---|---|---|
+| **7.1 — Voice → draft (backend)** | ✅ shipped | local |
+| **7.2 — Receipt photo → draft (backend)** | ✅ shipped | local |
+| 7.3 — Web UI: voice + photo buttons in AddTransactionModal | ⏭️ next | — |
+| 7.4 — Mobile UI: same in AddTransactionScreen | ⏭️ pending | — |
+| 7.5 — Cost guardrails (per-tenant cap, observability) | ⏭️ pending | — |
+| 7.6 — MicroMind / OpenRouter binding | ⏭️ deferred | — |
+
+#### 7.1 + 7.2 — backend extraction (shipped 2026-05-03)
+
+- New `POST /api/ai/extract/voice` (multipart `audio` field): Whisper transcription + GPT-4o-mini → returns `{ rawText, draft }` shaped for the AddTransaction form
+- New `POST /api/ai/extract/receipt` (multipart `image` field): GPT-4o-mini vision → returns `{ confidence, draft }` with vendor / total / items / date
+- Receipt images are processed in-memory only (`multer.memoryStorage`) — never written to disk or S3 (privacy: receipts contain personal/financial PII)
+- Audio files use the existing local-disk temp pattern, deleted in `finally`
+- Per-user rate limit: 60 extractions / 15 min (uses `ipKeyGenerator` for v8 IPv6 correctness)
+- Audited via `auditFromReq` with action `AI_EXTRACT` — metadata only (provider, category, amount, file size); raw transcript / image bytes are never logged
+- `aiService.processReceiptImage` added alongside `processVoiceNote`; both functions are the swap point for a future OpenRouter / MicroMind provider
+
+### ✅ Phase 6 (ops) — partial
 
 | Track | Status | Commit |
 |---|---|---|

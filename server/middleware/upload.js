@@ -93,6 +93,19 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-export { upload, audioUpload };
+// Receipt images for AI extraction — processed in memory, never persisted.
+// Privacy: receipts often contain personal/financial details; we only need the
+// extracted JSON, not the raw image. memoryStorage keeps the bytes in req.file.buffer.
+const receiptMemoryUpload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+        if (allowedTypes.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Invalid file type. Receipt must be JPEG/PNG/WebP/HEIC.'), false);
+    },
+    limits: { fileSize: 8 * 1024 * 1024 } // 8 MB; phone photos comfortably fit
+});
+
+export { upload, audioUpload, receiptMemoryUpload };
 export default audioUpload;
 

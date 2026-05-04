@@ -42,6 +42,7 @@ import auditLogRoutes from './routes/auditLogs.js';
 import { projectDocsRouter, docsRouter } from './routes/documents.js';
 import dsrRoutes from './routes/dsr.js';
 import invoiceRoutes from './routes/invoices.js';
+import aiExtractionRoutes from './routes/aiExtraction.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -142,6 +143,7 @@ app.use('/api/project-documents', projectDocsRouter); // Phase 3: list/upload by
 app.use('/api/documents', docsRouter);                // Phase 3: delete by document id
 app.use('/api/dsr', dsrRoutes);                       // Phase 4: Daily Site Reports
 app.use('/api/invoices', invoiceRoutes);              // Phase 5: Invoicing + PDF
+app.use('/api/ai', aiExtractionRoutes);               // Phase 7: AI extraction (voice + receipt → draft)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
