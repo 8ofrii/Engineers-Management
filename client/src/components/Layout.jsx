@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
+import DraftCaptureFAB from './DraftCaptureFAB';
 import './Layout.css';
 
 export default function Layout({ children }) {
@@ -224,6 +225,9 @@ export default function Layout({ children }) {
                 onClose={() => setProfileModalOpen(false)}
                 forceChangePassword={user?.mustChangePassword}
             />
+
+            {/* Global AI capture button — voice + receipt photo from anywhere */}
+            <DraftCaptureFAB />
         </div>
     );
 }
