@@ -40,11 +40,12 @@ export const sendMessage = async (req, res, next) => {
         if (!userMessage && !isAudio) return res.status(400).json({ success: false, message: 'No content' });
 
         // Save User Message
-        await prisma.chatMessage.create({
+        const userChatMessage = await prisma.chatMessage.create({
             data: {
                 userId,
+                tenantId: req.user.tenantId,
                 content: userMessage || "Voice Note",
-                type: isAudio ? 'AUDIO' : 'TEXT'
+                messageType: isAudio ? 'AUDIO' : 'TEXT'
             }
         });
 
@@ -137,7 +138,10 @@ export const sendMessage = async (req, res, next) => {
                         let projectId = null;
                         if (args.projectName) {
                             const project = await prisma.project.findFirst({
-                                where: { name: { contains: args.projectName, mode: 'insensitive' } }
+                                where: {
+                                    tenantId: req.user.tenantId,
+                                    name: { contains: args.projectName, mode: 'insensitive' }
+                                }
                             });
                             projectId = project?.id;
                         }
@@ -154,7 +158,10 @@ export const sendMessage = async (req, res, next) => {
                         let summaryText = "";
                         if (args.projectName) {
                             const project = await prisma.project.findFirst({
-                                where: { name: { contains: args.projectName, mode: 'insensitive' } },
+                                where: {
+                                    tenantId: req.user.tenantId,
+                                    name: { contains: args.projectName, mode: 'insensitive' }
+                                },
                                 include: { transactions: { where: { status: 'APPROVED' } } }
                             });
 
@@ -168,7 +175,7 @@ export const sendMessage = async (req, res, next) => {
                         } else {
                             const stats = await prisma.transaction.groupBy({
                                 by: ['type'],
-                                where: { status: 'APPROVED' },
+                                where: { tenantId: req.user.tenantId, status: 'APPROVED' },
                                 _sum: { amount: true }
                             });
                             const income = stats.find(s => s.type === 'INCOME')?._sum.amount || 0;
@@ -188,8 +195,9 @@ export const sendMessage = async (req, res, next) => {
         const aiChatMessage = await prisma.chatMessage.create({
             data: {
                 userId,
+                tenantId: req.user.tenantId,
                 content: aiResponse,
-                type: toolData ? 'COMMAND' : 'TEXT',
+                messageType: toolData ? 'COMMAND' : 'TEXT',
                 intent: toolData ? toolData.action : 'GENERAL',
                 extractedData: toolData ? toolData : undefined,
                 processed: false
@@ -199,10 +207,17 @@ export const sendMessage = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: {
-                id: aiChatMessage.id,
-                content: aiResponse,
-                createdAt: aiChatMessage.createdAt,
-                transcript: userMessage,
+                userMessage: {
+                    id: userChatMessage.id,
+                    content: userChatMessage.content,
+                    createdAt: userChatMessage.createdAt
+                },
+                aiResponse: {
+                    id: aiChatMessage.id,
+                    content: aiResponse,
+                    createdAt: aiChatMessage.createdAt
+                },
+                transcript: isAudio ? userMessage : null,
                 extractedData: toolData
             }
         });
