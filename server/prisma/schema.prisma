@@ -47,6 +47,7 @@ model Tenant {
   dailySiteReports    DailySiteReport[]
   invoices            Invoice[]
   transactionDrafts   TransactionDraft[]
+  bankStatements      BankStatement[]
 
   @@map("tenants")
 }
@@ -95,6 +96,7 @@ model User {
   acknowledgedDsrs      DailySiteReport[] @relation("DSRAcknowledger")
   invoicesCreated       Invoice[]         @relation("InvoiceCreator")
   transactionDrafts     TransactionDraft[]
+  bankStatements        BankStatement[]
 
   @@unique([email, tenantId])
   @@unique([phone, tenantId])
@@ -411,6 +413,9 @@ model Transaction {
   transactionFrom   String?
   physicalAccount   String?
   draft             TransactionDraft?
+  // Phase 6.3 — set when this transaction was matched to a bank-statement row
+  reconciledAt      DateTime?
+  bankStatementRow  BankStatementRow?
 
   @@index([projectId, transactionDate])
   @@index([type, category])
@@ -942,4 +947,75 @@ enum DraftStatus {
   PENDING_REVIEW
   COMMITTED
   DISCARDED
+}
+
+/// Phase 6.3 — Bank reconciliation.
+///
+/// One BankStatement row per CSV upload. Each statement parses into
+/// BankStatementRow rows; each row is auto-matched against unreconciled
+/// Transactions in the tenant by amount + date proximity, then reviewed
+/// + confirmed by the user. Confirming sets:
+///   row.matchedTransactionId
+///   row.status = MATCHED
+///   transaction.reconciledAt
+model BankStatement {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  uploadedById    String
+  originalName    String
+  status          BankStatementStatus     @default(PENDING)
+  totalRows       Int                     @default(0)
+  matchedRows     Int                     @default(0)
+  ignoredRows     Int                     @default(0)
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy      User                    @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  rows            BankStatementRow[]
+
+  @@index([tenantId, status])
+  @@map("bank_statements")
+}
+
+model BankStatementRow {
+  id                     String                @id @default(uuid())
+  statementId            String
+  tenantId               String
+  rowIndex               Int                   // original line number in the CSV (for ordering)
+  rawDate                String?               // raw text from CSV
+  parsedDate             DateTime?
+  amount                 Decimal               @db.Decimal(15, 2)
+  // Sign convention: positive = credit (money in), negative = debit (money out).
+  // Egyptian banks vary; the parser normalizes Debit → -, Credit → +.
+  description            String?
+  reference              String?
+  status                 BankStatementRowStatus @default(UNMATCHED)
+  matchedTransactionId   String?               @unique
+  matchedAt              DateTime?
+  // Cached top-N suggestion list as Json: [{ transactionId, score, reason }]
+  suggestions            Json?
+
+  statement              BankStatement         @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  matchedTransaction     Transaction?          @relation(fields: [matchedTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([statementId, status])
+  @@index([tenantId, status])
+  @@map("bank_statement_rows")
+}
+
+enum BankStatementStatus {
+  PENDING       // just uploaded, suggestions not yet generated
+  REVIEWING     // suggestions generated, awaiting user confirmation
+  COMPLETED     // all rows either matched or ignored
+  CANCELLED
+}
+
+enum BankStatementRowStatus {
+  UNMATCHED
+  SUGGESTED
+  MATCHED
+  IGNORED
 }

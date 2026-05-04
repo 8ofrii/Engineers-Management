@@ -26,6 +26,9 @@ import ProjectDocuments from './pages/ProjectDocuments';
 import DailySiteReports from './pages/DailySiteReports';
 import Invoices from './pages/Invoices';
 import Drafts from './pages/Drafts';
+import ApprovalThresholds from './pages/ApprovalThresholds';
+import BankReconciliation from './pages/BankReconciliation';
+import BankStatementReview from './pages/BankStatementReview';
 
 function App() {
     return (
@@ -184,6 +187,30 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <Drafts />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/settings/approval-thresholds"
+                            element={
+                                <PrivateRoute>
+                                    <ApprovalThresholds />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/reconcile"
+                            element={
+                                <PrivateRoute>
+                                    <BankReconciliation />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/reconcile/:id"
+                            element={
+                                <PrivateRoute>
+                                    <BankStatementReview />
                                 </PrivateRoute>
                             }
                         />

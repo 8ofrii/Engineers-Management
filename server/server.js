@@ -44,6 +44,7 @@ import dsrRoutes from './routes/dsr.js';
 import invoiceRoutes from './routes/invoices.js';
 import aiExtractionRoutes from './routes/aiExtraction.js';
 import transactionDraftRoutes from './routes/transactionDrafts.js';
+import bankStatementRoutes from './routes/bankStatements.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -146,6 +147,7 @@ app.use('/api/dsr', dsrRoutes);                       // Phase 4: Daily Site Rep
 app.use('/api/invoices', invoiceRoutes);              // Phase 5: Invoicing + PDF
 app.use('/api/ai', aiExtractionRoutes);               // Phase 7: AI extraction (voice + receipt → draft)
 app.use('/api/transaction-drafts', transactionDraftRoutes); // Phase 7: draft review queue
+app.use('/api/bank-statements', bankStatementRoutes);       // Phase 6.3: bank reconciliation
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

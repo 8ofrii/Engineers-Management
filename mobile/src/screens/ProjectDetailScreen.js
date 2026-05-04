@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { projectsApi, transactionsApi } from '../services/api';
+import DraftCaptureFAB from '../components/DraftCaptureFAB';
 
 const STATUS_STYLES = {
     PLANNING:    { bg: '#dbeafe', fg: '#1e40af' },
@@ -175,6 +176,7 @@ export default function ProjectDetailScreen({ route, navigation }) {
                     <Text style={styles.moreText}>+ {transactions.length - 20} more</Text>
                 ) : null}
             </ScrollView>
+            <DraftCaptureFAB />
         </SafeAreaView>
     );
 }

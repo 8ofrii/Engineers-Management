@@ -12,6 +12,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { projectsApi, transactionsApi } from '../services/api';
+import DraftCaptureFAB from '../components/DraftCaptureFAB';
 
 const STATUS_STYLES = {
     PLANNING:    { bg: '#dbeafe', fg: '#1e40af' },
@@ -142,6 +143,7 @@ export default function DashboardScreen({ navigation }) {
                     })
                 )}
             </ScrollView>
+            <DraftCaptureFAB />
         </SafeAreaView>
     );
 }

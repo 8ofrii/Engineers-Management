@@ -25,7 +25,8 @@ import {
     ShieldCheck,
     Activity,
     Receipt,
-    Sparkles
+    Sparkles,
+    Banknote
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -93,9 +94,15 @@ export default function Layout({ children }) {
         { path: '/drafts', icon: Sparkles, label: t('nav.drafts', 'AI Drafts') }
     ];
 
+    // Reconciliation is finance work — admin/manager/accountant.
+    if (['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER', 'ACCOUNTANT'].includes(user?.role)) {
+        navItems.push({ path: '/reconcile', icon: Banknote, label: t('nav.reconcile', 'Bank Reconciliation') });
+    }
+
     if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
         navItems.push({ path: '/team', icon: UserCog, label: t('teamManagement.title') });
         navItems.push({ path: '/audit-log', icon: Activity, label: t('nav.auditLog', 'Activity Log') });
+        navItems.push({ path: '/settings/approval-thresholds', icon: ShieldCheck, label: t('nav.approvalThresholds', 'Approval Thresholds') });
     }
     // Two-factor settings — every authenticated user can manage their own.
     navItems.push({ path: '/security/two-factor', icon: ShieldCheck, label: t('nav.twoFactor', 'Two-Factor') });

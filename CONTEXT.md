@@ -414,7 +414,10 @@ The flagship UX feature — engineers on-site speak or photograph a receipt and 
 | **7.2 — Receipt photo → draft (backend)** | ✅ shipped (with persistence + matching) | local |
 | **7.2.5 — Draft persistence + matching layer** | ✅ shipped | local |
 | **7.2.6 — Draft CRUD endpoints** | ✅ shipped | local |
-| 7.3 — Web UI: voice + photo buttons + draft review screen | ⏭️ next | — |
+| **7.3 — Web UI: voice/photo capture + draft review modal** | ✅ shipped | local |
+| **7.4 — Mobile capture + review + global FAB** | ✅ shipped (needs `npx expo install expo-av`) | local |
+| **6.3 — Bank reconciliation (CSV import + match)** | ✅ shipped | local |
+| 6.4 — Subscription billing | ⏭️ blocked on Stripe vs Paymob decision | — |
 | 7.4 — Mobile UI: same in AddTransactionScreen | ⏭️ pending | — |
 | 7.5 — Cost guardrails (per-tenant cap, observability) | ⏭️ pending | — |
 | 7.6 — MicroMind / OpenRouter binding | ⏭️ deferred | — |

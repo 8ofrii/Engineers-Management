@@ -97,6 +97,26 @@ export const categoriesAPI = {
     list: (grouped = true) => api.get('/categories', { params: { grouped } })
 };
 
+// Phase 6.3 — Bank reconciliation
+export const bankStatementsAPI = {
+    list: () => api.get('/bank-statements'),
+    get: (id) => api.get(`/bank-statements/${id}`),
+    upload: (file) => {
+        const fd = new FormData();
+        fd.append('file', file, file.name || 'statement.csv');
+        return api.post('/bank-statements/upload', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+    },
+    rematch: (id) => api.post(`/bank-statements/${id}/rematch`),
+    matchRow: (statementId, rowId, transactionId) =>
+        api.post(`/bank-statements/${statementId}/rows/${rowId}/match`, { transactionId }),
+    unmatchRow: (statementId, rowId) =>
+        api.post(`/bank-statements/${statementId}/rows/${rowId}/unmatch`),
+    ignoreRow: (statementId, rowId) =>
+        api.post(`/bank-statements/${statementId}/rows/${rowId}/ignore`)
+};
+
 // Phase 7 — AI extraction (voice / receipt → persisted draft) + draft CRUD
 export const aiExtractAPI = {
     voice: (audioBlob) => {
