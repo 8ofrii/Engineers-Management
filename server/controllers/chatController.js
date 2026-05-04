@@ -2,6 +2,8 @@ import prisma from '../lib/prisma.js';
 import OpenAI from 'openai';
 import fs from 'fs';
 import * as aiService from '../services/aiService.js';
+import { aiErrorResponse } from '../lib/aiErrors.js';
+import logger from '../lib/logger.js';
 
 // Lazy initialization to ensure env vars are loaded
 let openai = null;
@@ -30,8 +32,9 @@ export const sendMessage = async (req, res, next) => {
                 userMessage = result.raw_text;
                 aiParsedData = result.parsed_data;
             } catch (error) {
-                console.error('AI Service processing failed:', error);
-                return res.status(500).json({ success: false, message: 'Voice processing failed' });
+                logger.warn({ err: error, code: error?.code, status: error?.status }, 'AI voice processing failed');
+                const { statusCode, body } = aiErrorResponse(error);
+                return res.status(statusCode).json(body);
             } finally {
                 if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             }

@@ -128,7 +128,11 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Failed to send voice message:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('chat.error') });
+            showAlert({
+                type: 'error',
+                title: t('common.error') || 'Error',
+                message: error.response?.data?.message || t('chat.error')
+            });
         } finally {
             setIsProcessing(false);
         }
@@ -168,7 +172,11 @@ export default function ChatAssistant() {
 
         } catch (error) {
             console.error('Failed to send message:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('chat.error') });
+            showAlert({
+                type: 'error',
+                title: t('common.error') || 'Error',
+                message: error.response?.data?.message || t('chat.error')
+            });
         } finally {
             setIsProcessing(false);
         }

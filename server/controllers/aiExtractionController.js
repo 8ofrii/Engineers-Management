@@ -5,6 +5,7 @@ import { uploadBuffer, uploadFile } from '../lib/storage.js';
 import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
 import logger from '../lib/logger.js';
+import { aiErrorResponse } from '../lib/aiErrors.js';
 
 /**
  * POST /api/ai/extract/voice
@@ -64,8 +65,9 @@ export const extractFromVoice = async (req, res) => {
             }
         });
     } catch (err) {
-        logger.error({ err }, 'AI voice extraction failed');
-        return res.status(500).json({ success: false, message: 'Voice extraction failed' });
+        logger.error({ err, code: err?.code, status: err?.status }, 'AI voice extraction failed');
+        const { statusCode, body } = aiErrorResponse(err);
+        return res.status(statusCode).json(body);
     } finally {
         try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
     }
@@ -121,7 +123,8 @@ export const extractFromReceipt = async (req, res) => {
             }
         });
     } catch (err) {
-        logger.error({ err }, 'AI receipt extraction failed');
-        return res.status(500).json({ success: false, message: 'Receipt extraction failed' });
+        logger.error({ err, code: err?.code, status: err?.status }, 'AI receipt extraction failed');
+        const { statusCode, body } = aiErrorResponse(err);
+        return res.status(statusCode).json(body);
     }
 };

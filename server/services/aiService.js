@@ -136,7 +136,9 @@ export const processVoiceNote = async (filePath) => {
         };
 
     } catch (error) {
-        console.error("AI Service Error:", error);
-        throw new Error("Failed to process voice note");
+        // Re-throw so callers can introspect status/code (quota vs rate limit vs
+        // input rejection) and produce a specific user-facing message.
+        console.error("AI Service Error:", error?.status, error?.code, error?.message);
+        throw error;
     }
 };
