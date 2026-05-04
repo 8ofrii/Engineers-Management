@@ -43,6 +43,7 @@ import { projectDocsRouter, docsRouter } from './routes/documents.js';
 import dsrRoutes from './routes/dsr.js';
 import invoiceRoutes from './routes/invoices.js';
 import aiExtractionRoutes from './routes/aiExtraction.js';
+import transactionDraftRoutes from './routes/transactionDrafts.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -144,6 +145,7 @@ app.use('/api/documents', docsRouter);                // Phase 3: delete by docu
 app.use('/api/dsr', dsrRoutes);                       // Phase 4: Daily Site Reports
 app.use('/api/invoices', invoiceRoutes);              // Phase 5: Invoicing + PDF
 app.use('/api/ai', aiExtractionRoutes);               // Phase 7: AI extraction (voice + receipt → draft)
+app.use('/api/transaction-drafts', transactionDraftRoutes); // Phase 7: draft review queue
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

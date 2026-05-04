@@ -1,114 +1,124 @@
 import fs from 'fs';
 import * as aiService from '../services/aiService.js';
+import { matchExtractionToTenant } from '../services/matchingService.js';
+import { uploadBuffer, uploadFile } from '../lib/storage.js';
+import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
 import logger from '../lib/logger.js';
 
-// Map the AI's high-level category enum onto a transaction-form `type`.
-// Specific Arabic sub-category is left for the user to pick — AI can't reliably
-// hit 1-of-25 fine-grained categories, but high-level intent is solid.
-const draftFromVoice = (parsed) => ({
-    type: 'EXPENSE',
-    amount: parsed?.amount ?? null,
-    category: parsed?.category ?? 'OTHER',
-    description: parsed?.summary ?? '',
-    payee: parsed?.vendor ?? null,
-    vendor: parsed?.vendor ?? null,
-    isStockPurchase: !!parsed?.is_stock_purchase,
-    items: Array.isArray(parsed?.items) ? parsed.items : []
-});
-
-const draftFromReceipt = (parsed) => ({
-    type: 'EXPENSE',
-    amount: parsed?.totalAmount ?? null,
-    subtotal: parsed?.subtotal ?? null,
-    taxAmount: parsed?.taxAmount ?? null,
-    currency: parsed?.currency ?? 'EGP',
-    transactionDate: parsed?.transactionDate ?? null,
-    category: parsed?.category ?? 'OTHER',
-    description: parsed?.summary ?? '',
-    payee: parsed?.vendor ?? null,
-    vendor: parsed?.vendor ?? null,
-    items: Array.isArray(parsed?.items) ? parsed.items : []
-});
-
 /**
- * POST /api/ai/extract/voice — multipart audio → draft transaction JSON.
- * Audio file is deleted after processing regardless of outcome.
+ * POST /api/ai/extract/voice
+ * Multipart audio in field "audio". Persists a TransactionDraft and returns it
+ * with the matched fields + S3 URL of the audio (so user can replay before
+ * committing).
  */
-export const extractFromVoice = async (req, res, next) => {
+export const extractFromVoice = async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ success: false, message: 'Audio file is required (field "audio")' });
     }
     const filePath = req.file.path;
 
     try {
-        const result = await aiService.processVoiceNote(filePath);
-        const draft = draftFromVoice(result.parsed_data);
+        // Step 1 — AI: transcribe + extract
+        const aiResult = await aiService.processVoiceNote(filePath);
 
-        // Audit the AI call. Don't store raw transcript — could contain PII.
-        // We log only metadata: did it work, what category was inferred, file size.
-        auditFromReq(req, {
-            action: 'AI_EXTRACT',
-            entity: 'TransactionDraft',
-            entityId: 'voice',
-            metadata: {
-                source: 'voice',
-                provider: 'openai:whisper-1+gpt-4o-mini',
-                category: draft.category,
-                amount: draft.amount,
-                durationBytes: req.file.size
+        // Step 2 — Persist the audio so the user can replay it later
+        const audioUrl = await uploadFile(filePath, req.file.mimetype, 'audio/voice-drafts');
+
+        // Step 3 — Match extraction against tenant DB (vendor, project, items, etc.)
+        const matched = await matchExtractionToTenant(aiResult.parsed_data, 'VOICE', req.user.tenantId);
+
+        // Step 4 — Persist the draft
+        const draft = await prisma.transactionDraft.create({
+            data: {
+                tenantId: req.user.tenantId,
+                createdById: req.user.id,
+                source: 'VOICE',
+                originalMediaUrl: audioUrl,
+                originalMediaMime: req.file.mimetype,
+                transcript: aiResult.raw_text,
+                rawExtraction: aiResult.parsed_data,
+                matchedDraft: matched.draft,
+                confidence: aiResult.parsed_data?.confidence ?? null
             }
         });
 
-        return res.json({
+        auditFromReq(req, {
+            action: 'AI_EXTRACT',
+            entity: 'TransactionDraft',
+            entityId: draft.id,
+            metadata: {
+                source: 'voice',
+                provider: 'openai:whisper-1+gpt-4o-mini',
+                category: matched.draft.category,
+                amount: matched.draft.amount,
+                bytes: req.file.size
+            }
+        });
+
+        return res.status(201).json({
             success: true,
-            source: 'voice',
-            rawText: result.raw_text,
-            draft
+            draft: {
+                ...draft,
+                matches: matched.matches
+            }
         });
     } catch (err) {
         logger.error({ err }, 'AI voice extraction failed');
         return res.status(500).json({ success: false, message: 'Voice extraction failed' });
     } finally {
-        // Belt and braces — chatController already does this, but if anything
-        // before the await throws, we'd otherwise leak the temp file.
         try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
     }
 };
 
 /**
- * POST /api/ai/extract/receipt — multipart image → draft transaction JSON.
- * Image is held in memory only; never written to disk or S3.
+ * POST /api/ai/extract/receipt
+ * Multipart image in field "image". Image is read from memory, sent to GPT-4o
+ * vision, then persisted to S3 alongside the draft so user can re-view it.
  */
-export const extractFromReceipt = async (req, res, next) => {
+export const extractFromReceipt = async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ success: false, message: 'Image file is required (field "image")' });
     }
 
     try {
         const parsed = await aiService.processReceiptImage(req.file.buffer, req.file.mimetype);
-        const draft = draftFromReceipt(parsed);
+        const imageUrl = await uploadBuffer(req.file.buffer, req.file.mimetype, 'images/receipt-drafts');
+        const matched = await matchExtractionToTenant(parsed, 'RECEIPT', req.user.tenantId);
+
+        const draft = await prisma.transactionDraft.create({
+            data: {
+                tenantId: req.user.tenantId,
+                createdById: req.user.id,
+                source: 'RECEIPT',
+                originalMediaUrl: imageUrl,
+                originalMediaMime: req.file.mimetype,
+                rawExtraction: parsed,
+                matchedDraft: matched.draft,
+                confidence: parsed?.confidence ?? null
+            }
+        });
 
         auditFromReq(req, {
             action: 'AI_EXTRACT',
             entity: 'TransactionDraft',
-            entityId: 'receipt',
+            entityId: draft.id,
             metadata: {
                 source: 'receipt',
                 provider: 'openai:gpt-4o-mini-vision',
-                category: draft.category,
-                amount: draft.amount,
-                vendor: draft.vendor,
-                confidence: parsed?.confidence ?? null,
-                imageBytes: req.file.size
+                category: matched.draft.category,
+                amount: matched.draft.amount,
+                vendor: matched.draft.supplierId ? 'matched' : 'unmatched',
+                bytes: req.file.size
             }
         });
 
-        return res.json({
+        return res.status(201).json({
             success: true,
-            source: 'receipt',
-            confidence: parsed?.confidence ?? 'medium',
-            draft
+            draft: {
+                ...draft,
+                matches: matched.matches
+            }
         });
     } catch (err) {
         logger.error({ err }, 'AI receipt extraction failed');

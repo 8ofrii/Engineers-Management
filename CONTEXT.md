@@ -410,9 +410,11 @@ The flagship UX feature — engineers on-site speak or photograph a receipt and 
 
 | Track | Status | Commit |
 |---|---|---|
-| **7.1 — Voice → draft (backend)** | ✅ shipped | local |
-| **7.2 — Receipt photo → draft (backend)** | ✅ shipped | local |
-| 7.3 — Web UI: voice + photo buttons in AddTransactionModal | ⏭️ next | — |
+| **7.1 — Voice → draft (backend)** | ✅ shipped (with persistence + matching) | local |
+| **7.2 — Receipt photo → draft (backend)** | ✅ shipped (with persistence + matching) | local |
+| **7.2.5 — Draft persistence + matching layer** | ✅ shipped | local |
+| **7.2.6 — Draft CRUD endpoints** | ✅ shipped | local |
+| 7.3 — Web UI: voice + photo buttons + draft review screen | ⏭️ next | — |
 | 7.4 — Mobile UI: same in AddTransactionScreen | ⏭️ pending | — |
 | 7.5 — Cost guardrails (per-tenant cap, observability) | ⏭️ pending | — |
 | 7.6 — MicroMind / OpenRouter binding | ⏭️ deferred | — |
@@ -426,6 +428,39 @@ The flagship UX feature — engineers on-site speak or photograph a receipt and 
 - Per-user rate limit: 60 extractions / 15 min (uses `ipKeyGenerator` for v8 IPv6 correctness)
 - Audited via `auditFromReq` with action `AI_EXTRACT` — metadata only (provider, category, amount, file size); raw transcript / image bytes are never logged
 - `aiService.processReceiptImage` added alongside `processVoiceNote`; both functions are the swap point for a future OpenRouter / MicroMind provider
+
+#### 7.2.5 + 7.2.6 — draft persistence + matching layer (shipped 2026-05-03)
+
+The extraction endpoints don't return ephemeral JSON anymore — they persist a `TransactionDraft` row, store the audio/image, run a matching pass, and let the user review before committing.
+
+**New Prisma model: `TransactionDraft`**
+- Source media (`originalMediaUrl`, mime) survives Render deploys via S3, with local fallback in dev
+- `transcript` (voice only), `rawExtraction` (untouched AI JSON), `matchedDraft` (after matching), `confidence`
+- Lifecycle: `PENDING_REVIEW` → `COMMITTED` (linked to a real Transaction) or `DISCARDED`
+- One-to-one optional relation back to `Transaction` so you can trace any approved transaction back to its source draft
+
+**New matching service** (`server/services/matchingService.js`)
+- Arabic-normalized Levenshtein similarity ratio, no external deps
+- Matches AI free-text strings to tenant rows: vendor → Supplier, project → Project, client → Client, item → Material
+- Threshold 0.5 confidence minimum; below that the field stays as raw AI string
+- Top-level `matchExtractionToTenant(extraction, source, tenantId)` returns `{ draft, matches }` — the latter is per-field metadata (raw + matched candidate + score) the UI uses to render confidence pills
+
+**New `lib/storage.js`**
+- `uploadBuffer(buf, mime, prefix)` and `uploadFile(path, mime, prefix)` — abstract over S3 (prod) vs local-disk (dev)
+- `deleteByUrl(url)` for orphan-media cleanup on draft discard
+
+**Endpoints**
+- `GET /api/transaction-drafts` — list. Engineers see own only; Manager/Admin/Accountant see all in tenant. Default `status=PENDING_REVIEW`
+- `GET /api/transaction-drafts/:id` — detail
+- `PUT /api/transaction-drafts/:id` — user edits the matched fields before committing
+- `POST /api/transaction-drafts/:id/rematch` — re-run matching (after the user has just created the missing Supplier/Material the AI couldn't find)
+- `POST /api/transaction-drafts/:id/commit` — body `{ transactionId }`, links to a freshly-created Transaction. The frontend creates the Transaction via existing `POST /api/transactions` so the V1.2 profit engine runs once and only once
+- `DELETE /api/transaction-drafts/:id` — soft-discard, deletes stored media
+
+**Schema migration needed on prod DB**
+- New model + enums (`DraftSource`, `DraftStatus`) added to `schema.prisma`
+- Render build script does NOT run migrations — same gap as Phases 1-5
+- Run `DATABASE_URL='<prod>' npx prisma db push` from local once before testers hit Phase 7 endpoints
 
 ### ✅ Phase 6 (ops) — partial
 

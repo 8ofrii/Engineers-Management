@@ -46,6 +46,7 @@ model Tenant {
   auditLogs           AuditLog[]
   dailySiteReports    DailySiteReport[]
   invoices            Invoice[]
+  transactionDrafts   TransactionDraft[]
 
   @@map("tenants")
 }
@@ -93,6 +94,7 @@ model User {
   reportedDsrs          DailySiteReport[] @relation("DSRReporter")
   acknowledgedDsrs      DailySiteReport[] @relation("DSRAcknowledger")
   invoicesCreated       Invoice[]         @relation("InvoiceCreator")
+  transactionDrafts     TransactionDraft[]
 
   @@unique([email, tenantId])
   @@unique([phone, tenantId])
@@ -408,6 +410,7 @@ model Transaction {
   transactionTo     String?
   transactionFrom   String?
   physicalAccount   String?
+  draft             TransactionDraft?
 
   @@index([projectId, transactionDate])
   @@index([type, category])
@@ -877,4 +880,66 @@ model ProjectCategoryFee {
 
   @@unique([projectId, category])
   @@map("project_category_fees")
+}
+
+/// Phase 7 — AI-assisted draft transaction.
+///
+/// Lifecycle:
+///   1. Engineer records voice / photographs receipt → upload endpoint stores the
+///      media on S3 (or local fallback) so user can replay/re-view it.
+///   2. AI extracts structured data → rawExtraction.
+///   3. Matching service resolves vendor/project/material/category against the
+///      tenant's existing records → matchedDraft (per-field { value, candidateId,
+///      confidence } shape). User reviews + edits in the UI.
+///   4. On commit, a real Transaction row is created and committedTransactionId
+///      is set; the draft is kept for audit but no longer surfaces in the queue.
+///   5. On discard, status flips and the draft drops out of the queue.
+///
+/// Multi-tenant: filter by tenantId in every query, like every other resource.
+/// Source media URL is preserved until the draft is hard-deleted by an admin.
+model TransactionDraft {
+  id                     String                @id @default(uuid())
+  tenantId               String
+  createdById            String
+  source                 DraftSource
+  status                 DraftStatus           @default(PENDING_REVIEW)
+
+  // Original media so the user can review their input before committing
+  originalMediaUrl       String?               // S3 URL or local path
+  originalMediaMime      String?
+  transcript             String?               // raw Whisper text (voice only)
+
+  // What the AI returned, untouched
+  rawExtraction          Json
+  // After DB matching: { type, amount, ..., vendorMatch:{ name, supplierId?, confidence }, ... }
+  matchedDraft           Json
+  // Overall extraction confidence reported by the AI (high|medium|low)
+  confidence             String?
+
+  // Set when promoted to a real Transaction
+  committedTransactionId String?               @unique
+  committedTransaction   Transaction?          @relation(fields: [committedTransactionId], references: [id], onDelete: SetNull)
+  committedAt            DateTime?
+  discardedAt            DateTime?
+
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy              User                  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([createdById, status])
+  @@map("transaction_drafts")
+}
+
+enum DraftSource {
+  VOICE
+  RECEIPT
+}
+
+enum DraftStatus {
+  PENDING_REVIEW
+  COMMITTED
+  DISCARDED
 }
