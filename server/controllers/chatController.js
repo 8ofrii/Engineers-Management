@@ -14,6 +14,15 @@ const getOpenAI = () => {
     return openai;
 };
 
+// Map the FE-facing action keys (kept stable for the chat UI's confirm flow)
+// onto the MessageIntent enum stored in the DB. Anything unmapped falls back
+// to GENERAL — better than a 400 from an enum violation.
+const ACTION_TO_INTENT = {
+    CREATE_TRANSACTION: 'ADD_TRANSACTION',
+    FETCH_SUMMARY: 'QUERY'
+};
+const toIntent = (action) => (action && ACTION_TO_INTENT[action]) || 'GENERAL';
+
 // @desc    Chat with AI assistant (with voice support)
 // @route   POST /api/chat/message
 // @access  Private
@@ -201,7 +210,7 @@ export const sendMessage = async (req, res, next) => {
                 tenantId: req.user.tenantId,
                 content: aiResponse,
                 messageType: toolData ? 'COMMAND' : 'TEXT',
-                intent: toolData ? toolData.action : 'GENERAL',
+                intent: toIntent(toolData?.action),
                 extractedData: toolData ? toolData : undefined,
                 processed: false
             }
