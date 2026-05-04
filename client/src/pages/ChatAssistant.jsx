@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { useTranslation } from 'react-i18next';
-import { Mic, Send, Trash2, StopCircle } from 'lucide-react';
-import api from '../services/api';
+import { Mic, Send, Trash2, StopCircle, Sparkles, ArrowRight } from 'lucide-react';
+import api, { aiExtractAPI } from '../services/api';
 import Layout from '../components/Layout';
 import './ChatAssistant.css';
 
@@ -94,38 +95,43 @@ export default function ChatAssistant() {
         }
     };
 
-    // Send voice message to backend
+    // Send voice message — routes to the AI draft pipeline (Phase 7) so the
+    // engineer ends up with a real reviewable TransactionDraft, not just an
+    // inline AI summary that vanishes. Text messages still go to /chat/message
+    // for Q&A.
     const sendVoiceMessage = async (audioBlob) => {
         setIsProcessing(true);
 
         try {
-            const formData = new FormData();
-            formData.append('audio', audioBlob, 'voice.webm');
+            const r = await aiExtractAPI.voice(audioBlob);
+            const draft = r.data.draft;
+            const md = draft.matchedDraft || {};
 
-            const { data } = await api.post('/chat/message', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
-
-            // Add both user message and AI response to chat
+            // Show transcript as the user's message + an AI summary card with
+            // a link to open the draft for review.
             setMessages(prev => [
                 ...prev,
                 {
-                    id: data.data.userMessage.id,
-                    content: data.data.userMessage.content,
+                    id: `transcript-${draft.id}`,
+                    content: draft.transcript || 'Voice note',
                     isUser: true,
                     transcribed: true,
-                    createdAt: data.data.userMessage.createdAt
+                    createdAt: draft.createdAt
                 },
                 {
-                    id: data.data.aiResponse.id,
-                    content: data.data.aiResponse.content,
+                    id: `summary-${draft.id}`,
+                    content: '',
                     isUser: false,
-                    createdAt: data.data.aiResponse.createdAt
+                    createdAt: draft.createdAt,
+                    draftCard: {
+                        id: draft.id,
+                        amount: md.amount,
+                        category: md.category,
+                        description: md.description,
+                        confidence: draft.confidence
+                    }
                 }
             ]);
-
         } catch (error) {
             console.error('Failed to send voice message:', error);
             showAlert({
@@ -238,7 +244,41 @@ export default function ChatAssistant() {
                                     {msg.transcribed && (
                                         <span className="transcribed-badge">🎤 {t('chat.transcribed')}</span>
                                     )}
-                                    <p>{msg.content}</p>
+                                    {msg.content && <p>{msg.content}</p>}
+                                    {msg.draftCard && (
+                                        <Link
+                                            to={`/drafts/${msg.draftCard.id}`}
+                                            style={{
+                                                display: 'block',
+                                                background: 'rgba(37, 99, 235, 0.08)',
+                                                border: '1px solid rgba(37, 99, 235, 0.25)',
+                                                padding: 12,
+                                                borderRadius: 10,
+                                                textDecoration: 'none',
+                                                color: 'inherit',
+                                                marginTop: 4
+                                            }}
+                                        >
+                                            <div className="flex gap-sm" style={{ alignItems: 'center', marginBottom: 4 }}>
+                                                <Sparkles size={14} />
+                                                <strong>{t('drafts.created') || 'AI draft created'}</strong>
+                                                <span style={{ fontSize: '0.7rem', opacity: 0.7, marginInlineStart: 'auto' }}>
+                                                    {msg.draftCard.confidence || 'medium'} confidence
+                                                </span>
+                                            </div>
+                                            <div style={{ fontSize: '0.9rem', marginBottom: 4 }}>
+                                                {msg.draftCard.description || '(no summary)'}
+                                            </div>
+                                            <div className="flex gap-sm" style={{ fontSize: '0.85rem', opacity: 0.85, alignItems: 'center' }}>
+                                                <span>
+                                                    {msg.draftCard.amount != null ? `${msg.draftCard.amount} EGP` : '—'}
+                                                    {msg.draftCard.category ? ` · ${msg.draftCard.category}` : ''}
+                                                </span>
+                                                <ArrowRight size={14} style={{ marginInlineStart: 'auto' }} />
+                                                <span style={{ fontWeight: 600 }}>{t('drafts.review') || 'Review draft'}</span>
+                                            </div>
+                                        </Link>
+                                    )}
                                 </div>
                             </div>
                         ))
