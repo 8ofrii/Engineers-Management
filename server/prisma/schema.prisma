@@ -48,6 +48,8 @@ model Tenant {
   invoices            Invoice[]
   transactionDrafts   TransactionDraft[]
   bankStatements      BankStatement[]
+  subscriptions       Subscription[]
+  paymentAttempts     PaymentAttempt[]
 
   @@map("tenants")
 }
@@ -1018,4 +1020,83 @@ enum BankStatementRowStatus {
   SUGGESTED
   MATCHED
   IGNORED
+}
+
+/// Phase 6.4 — Subscription billing.
+///
+/// One Subscription row per tenant per period. New tenants start with a
+/// FREE_PILOT subscription auto-created at register-company time. Upgrades
+/// flow through Paymob: user clicks "Subscribe to BASIC", we create a
+/// PaymentAttempt + redirect to a Paymob iframe; on successful HMAC-verified
+/// webhook callback, the previous active sub is closed and a new one starts
+/// with status=ACTIVE + currentPeriodEnd = now + 30 days.
+///
+/// No auto-renewal in v1 — when currentPeriodEnd passes, status flips to
+/// EXPIRED via a daily cron (not yet shipped) or on next API call.
+/// Renewal is a manual re-checkout for now.
+model Subscription {
+  id                  String              @id @default(uuid())
+  tenantId            String
+  plan                String              // matches a key in lib/plans.js — flexible vs an enum because plan catalog evolves
+  status              SubscriptionStatus  @default(ACTIVE)
+  currentPeriodStart  DateTime            @default(now())
+  currentPeriodEnd    DateTime
+  amountEgp           Decimal             @db.Decimal(10, 2)
+  // Paymob references for support / refunds
+  paymobOrderId       String?
+  paymobTransactionId String?
+  // Set when admin manually cancels OR when the period ends without renewal
+  cancelledAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  paymentAttempts     PaymentAttempt[]
+
+  @@index([tenantId, status])
+  @@map("subscriptions")
+}
+
+/// Phase 6.4 — Audit trail of every checkout attempt, including failures.
+/// We need this to debug "I paid but my account didn't upgrade" — common
+/// on Egyptian payment flows where Fawry receipts can take minutes to
+/// reconcile.
+model PaymentAttempt {
+  id                  String                @id @default(uuid())
+  tenantId            String
+  subscriptionId      String?
+  plan                String
+  amountEgp           Decimal               @db.Decimal(10, 2)
+  status              PaymentAttemptStatus  @default(PENDING)
+  // Paymob references
+  paymobOrderId       String?
+  paymobPaymentKey    String?
+  paymobTransactionId String?
+  paymobIframeUrl     String?
+  failureReason       String?
+  // Raw webhook payload for forensics — tenantless when fingerprint matches but we can't find the tenant
+  rawWebhook          Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription        Subscription?         @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([paymobOrderId])
+  @@map("payment_attempts")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE      // payment failed but period not yet expired
+  CANCELLED     // admin or user cancelled
+  EXPIRED       // period ended without renewal
+}
+
+enum PaymentAttemptStatus {
+  PENDING       // checkout created, waiting for Paymob
+  SUCCESS       // webhook confirmed
+  FAILED        // webhook reported failure
+  EXPIRED       // user never completed checkout, abandoned
 }

@@ -26,7 +26,8 @@ import {
     Activity,
     Receipt,
     Sparkles,
-    Banknote
+    Banknote,
+    CreditCard
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -103,6 +104,7 @@ export default function Layout({ children }) {
         navItems.push({ path: '/team', icon: UserCog, label: t('teamManagement.title') });
         navItems.push({ path: '/audit-log', icon: Activity, label: t('nav.auditLog', 'Activity Log') });
         navItems.push({ path: '/settings/approval-thresholds', icon: ShieldCheck, label: t('nav.approvalThresholds', 'Approval Thresholds') });
+        navItems.push({ path: '/billing', icon: CreditCard, label: t('nav.billing', 'Billing') });
     }
     // Two-factor settings — every authenticated user can manage their own.
     navItems.push({ path: '/security/two-factor', icon: ShieldCheck, label: t('nav.twoFactor', 'Two-Factor') });

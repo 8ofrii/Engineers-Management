@@ -45,6 +45,7 @@ import invoiceRoutes from './routes/invoices.js';
 import aiExtractionRoutes from './routes/aiExtraction.js';
 import transactionDraftRoutes from './routes/transactionDrafts.js';
 import bankStatementRoutes from './routes/bankStatements.js';
+import billingRoutes from './routes/billing.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -148,6 +149,7 @@ app.use('/api/invoices', invoiceRoutes);              // Phase 5: Invoicing + PD
 app.use('/api/ai', aiExtractionRoutes);               // Phase 7: AI extraction (voice + receipt → draft)
 app.use('/api/transaction-drafts', transactionDraftRoutes); // Phase 7: draft review queue
 app.use('/api/bank-statements', bankStatementRoutes);       // Phase 6.3: bank reconciliation
+app.use('/api/billing', billingRoutes);                     // Phase 6.4: Paymob subscriptions
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

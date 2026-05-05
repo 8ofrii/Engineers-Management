@@ -79,6 +79,12 @@ CREATE TYPE "BankStatementStatus" AS ENUM ('PENDING', 'REVIEWING', 'COMPLETED', 
 -- CreateEnum
 CREATE TYPE "BankStatementRowStatus" AS ENUM ('UNMATCHED', 'SUGGESTED', 'MATCHED', 'IGNORED');
 
+-- CreateEnum
+CREATE TYPE "SubscriptionStatus" AS ENUM ('ACTIVE', 'PAST_DUE', 'CANCELLED', 'EXPIRED');
+
+-- CreateEnum
+CREATE TYPE "PaymentAttemptStatus" AS ENUM ('PENDING', 'SUCCESS', 'FAILED', 'EXPIRED');
+
 -- CreateTable
 CREATE TABLE "tenants" (
     "id" TEXT NOT NULL,
@@ -625,6 +631,44 @@ CREATE TABLE "bank_statement_rows" (
     CONSTRAINT "bank_statement_rows_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "subscriptions" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "plan" TEXT NOT NULL,
+    "status" "SubscriptionStatus" NOT NULL DEFAULT 'ACTIVE',
+    "currentPeriodStart" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "currentPeriodEnd" TIMESTAMP(3) NOT NULL,
+    "amountEgp" DECIMAL(10,2) NOT NULL,
+    "paymobOrderId" TEXT,
+    "paymobTransactionId" TEXT,
+    "cancelledAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "payment_attempts" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "subscriptionId" TEXT,
+    "plan" TEXT NOT NULL,
+    "amountEgp" DECIMAL(10,2) NOT NULL,
+    "status" "PaymentAttemptStatus" NOT NULL DEFAULT 'PENDING',
+    "paymobOrderId" TEXT,
+    "paymobPaymentKey" TEXT,
+    "paymobTransactionId" TEXT,
+    "paymobIframeUrl" TEXT,
+    "failureReason" TEXT,
+    "rawWebhook" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "payment_attempts_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "tenants_slug_key" ON "tenants"("slug");
 
@@ -723,6 +767,15 @@ CREATE INDEX "bank_statement_rows_statementId_status_idx" ON "bank_statement_row
 
 -- CreateIndex
 CREATE INDEX "bank_statement_rows_tenantId_status_idx" ON "bank_statement_rows"("tenantId", "status");
+
+-- CreateIndex
+CREATE INDEX "subscriptions_tenantId_status_idx" ON "subscriptions"("tenantId", "status");
+
+-- CreateIndex
+CREATE INDEX "payment_attempts_tenantId_status_idx" ON "payment_attempts"("tenantId", "status");
+
+-- CreateIndex
+CREATE INDEX "payment_attempts_paymobOrderId_idx" ON "payment_attempts"("paymobOrderId");
 
 -- AddForeignKey
 ALTER TABLE "users" ADD CONSTRAINT "users_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -925,3 +978,22 @@ ALTER TABLE "bank_statement_rows" ADD CONSTRAINT "bank_statement_rows_statementI
 -- AddForeignKey
 ALTER TABLE "bank_statement_rows" ADD CONSTRAINT "bank_statement_rows_matchedTransactionId_fkey" FOREIGN KEY ("matchedTransactionId") REFERENCES "transactions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- AddForeignKey
+ALTER TABLE "subscriptions" ADD CONSTRAINT "subscriptions_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_attempts" ADD CONSTRAINT "payment_attempts_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_attempts" ADD CONSTRAINT "payment_attempts_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+┌─────────────────────────────────────────────────────────┐
+│  Update available 5.22.0 -> 7.8.0                       │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘

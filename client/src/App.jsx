@@ -29,6 +29,8 @@ import Drafts from './pages/Drafts';
 import ApprovalThresholds from './pages/ApprovalThresholds';
 import BankReconciliation from './pages/BankReconciliation';
 import BankStatementReview from './pages/BankStatementReview';
+import Billing from './pages/Billing';
+import Landing from './pages/Landing';
 
 function App() {
     return (
@@ -214,10 +216,19 @@ function App() {
                                 </PrivateRoute>
                             }
                         />
+                        <Route
+                            path="/billing"
+                            element={
+                                <PrivateRoute>
+                                    <Billing />
+                                </PrivateRoute>
+                            }
+                        />
 
-                        {/* Default Route */}
-                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                        {/* Public marketing landing page */}
+                        <Route path="/" element={<Landing />} />
+                        {/* Catch-all → marketing page (logged-in users see "Open App" CTA) */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </BrowserRouter>
             </AlertProvider>

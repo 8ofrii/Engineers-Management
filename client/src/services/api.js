@@ -97,6 +97,15 @@ export const categoriesAPI = {
     list: (grouped = true) => api.get('/categories', { params: { grouped } })
 };
 
+// Phase 6.4 — Subscription billing (Paymob)
+export const billingAPI = {
+    listPlans: () => api.get('/billing/plans'),
+    getSubscription: () => api.get('/billing/subscription'),
+    startCheckout: (plan) => api.post('/billing/checkout', { plan }),
+    cancel: () => api.post('/billing/cancel'),
+    listAttempts: () => api.get('/billing/payment-attempts')
+};
+
 // Phase 6.3 — Bank reconciliation
 export const bankStatementsAPI = {
     list: () => api.get('/bank-statements'),
