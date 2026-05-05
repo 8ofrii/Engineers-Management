@@ -87,7 +87,15 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             handleClose();
         } catch (error) {
             console.error('Failed to save supplier:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: t('common.error') || 'Failed to save supplier' });
+            const data = error.response?.data;
+            const fieldErrors = Array.isArray(data?.errors) && data.errors.length
+                ? data.errors.map(e => `${e.path}: ${e.message}`).join('\n')
+                : null;
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: fieldErrors || data?.message || 'Failed to save supplier'
+            });
         } finally {
             setLoading(false);
         }

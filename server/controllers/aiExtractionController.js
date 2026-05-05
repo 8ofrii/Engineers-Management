@@ -6,6 +6,7 @@ import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
 import logger from '../lib/logger.js';
 import { aiErrorResponse } from '../lib/aiErrors.js';
+import { enforceAiBudget } from '../lib/aiUsage.js';
 
 /**
  * POST /api/ai/extract/voice
@@ -20,6 +21,9 @@ export const extractFromVoice = async (req, res) => {
     const filePath = req.file.path;
 
     try {
+        // Step 0 — protect the bill: refuse if this tenant has hit the monthly cap
+        await enforceAiBudget(req.user.tenantId);
+
         // Step 1 — AI: transcribe + extract
         const aiResult = await aiService.processVoiceNote(filePath);
 
@@ -65,6 +69,14 @@ export const extractFromVoice = async (req, res) => {
             }
         });
     } catch (err) {
+        if (err.code === 'AI_BUDGET_EXHAUSTED') {
+            return res.status(429).json({
+                success: false,
+                code: 'AI_BUDGET_EXHAUSTED',
+                message: `Monthly AI budget exhausted (${err.usage.count}/${err.usage.cap}). Contact your administrator.`,
+                usage: err.usage
+            });
+        }
         logger.error({ err, code: err?.code, status: err?.status }, 'AI voice extraction failed');
         const { statusCode, body } = aiErrorResponse(err);
         return res.status(statusCode).json(body);
@@ -84,6 +96,7 @@ export const extractFromReceipt = async (req, res) => {
     }
 
     try {
+        await enforceAiBudget(req.user.tenantId);
         const parsed = await aiService.processReceiptImage(req.file.buffer, req.file.mimetype);
         const imageUrl = await uploadBuffer(req.file.buffer, req.file.mimetype, 'images/receipt-drafts');
         const matched = await matchExtractionToTenant(parsed, 'RECEIPT', req.user.tenantId);
@@ -123,6 +136,14 @@ export const extractFromReceipt = async (req, res) => {
             }
         });
     } catch (err) {
+        if (err.code === 'AI_BUDGET_EXHAUSTED') {
+            return res.status(429).json({
+                success: false,
+                code: 'AI_BUDGET_EXHAUSTED',
+                message: `Monthly AI budget exhausted (${err.usage.count}/${err.usage.cap}). Contact your administrator.`,
+                usage: err.usage
+            });
+        }
         logger.error({ err, code: err?.code, status: err?.status }, 'AI receipt extraction failed');
         const { statusCode, body } = aiErrorResponse(err);
         return res.status(statusCode).json(body);

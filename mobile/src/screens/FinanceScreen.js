@@ -14,8 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { transactionsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useFormat } from '../utils/format';
 
-const fmtEGP = (n) => Number(n || 0).toLocaleString('en-EG', { maximumFractionDigits: 0 });
 const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 
 const STATUS_COLORS = {
@@ -29,6 +29,7 @@ const STATUS_COLORS = {
 export default function FinanceScreen({ navigation }) {
     const { t } = useTranslation();
     const { user } = useAuth();
+    const { currency } = useFormat();
     const [filter, setFilter] = useState('ALL');  // ALL / PENDING / MINE
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -135,7 +136,7 @@ export default function FinanceScreen({ navigation }) {
                             <View key={tx.id} style={styles.card}>
                                 <View style={styles.txHeader}>
                                     <Text style={[styles.amount, { color: isExpense ? '#ef4444' : '#10b981' }]}>
-                                        {isExpense ? '-' : '+'}{fmtEGP(tx.amount)} EGP
+                                        {isExpense ? '-' : '+'}{currency(tx.amount)}
                                     </Text>
                                     <View style={[styles.badge, { backgroundColor: sc.bg }]}>
                                         <Text style={[styles.badgeText, { color: sc.fg }]}>

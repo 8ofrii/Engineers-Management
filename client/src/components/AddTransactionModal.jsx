@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Mic, MicOff, Wallet, Plus } from 'lucide-react';
 import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
+import { useFormat } from '../utils/format';
 import AddWorkmanModal from './AddWorkmanModal';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
@@ -10,6 +11,7 @@ import CurrencyInput from './CurrencyInput';
 export default function AddTransactionModal({ isOpen, onClose, onSubmit, initialData = null, user }) {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const { currency: fmtCurrency } = useFormat();
 
     // Helper to get local ISO string for datetime-local
     const getLocalDateTime = (date = new Date()) => {
@@ -650,7 +652,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         {mode === 'EXPENSE' && (
                             <div className="badge badge-warning flex gap-xs items-center">
                                 <Wallet size={14} />
-                                <span style={{ fontWeight: 'bold' }}>{Number(user?.currentCustodyBalance || 0).toLocaleString()} EGP</span>
+                                <span style={{ fontWeight: 'bold' }}>{fmtCurrency(user?.currentCustodyBalance || 0)}</span>
                             </div>
                         )}
                         <button className="modal-close" onClick={onClose}>
@@ -1152,7 +1154,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             <option value="">-- {t('finance.selectBatch')} --</option>
                                             {materialBatches.map(b => (
                                                 <option key={b.id} value={b.id}>
-                                                    {b.description} ({t('inventory.remaining')}: {Number(b.remainingValue).toLocaleString()} {t('chat.currency')})
+                                                    {b.description} ({t('inventory.remaining')}: {fmtCurrency(b.remainingValue)})
                                                 </option>
                                             ))}
                                         </select>

@@ -6,10 +6,13 @@ import { useAlert } from '../context/AlertContext';
 import AddMaterialModal from '../components/AddMaterialModal';
 import InventoryUsageModal from '../components/InventoryUsageModal';
 import { materialsAPI, projectsAPI, materialUsageAPI } from '../services/api';
+import { useFormat } from '../utils/format';
+import { apiErrorMessage } from '../utils/apiError';
 
 export default function Inventory() {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const { currency: formatCurrency } = useFormat();
     const [batches, setBatches] = useState([]);
     const [materials, setMaterials] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -38,7 +41,7 @@ export default function Inventory() {
             setMaterials(materialsRes.data.data || []);
         } catch (error) {
             console.error("Failed to load inventory data", error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load inventory data.' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to load inventory data.') });
         } finally {
             setLoading(false);
         }
@@ -64,13 +67,6 @@ export default function Inventory() {
         return acc;
     }, {});
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-EG', {
-            style: 'currency',
-            currency: 'EGP'
-        }).format(amount);
-    };
-
     const handleDeleteBatch = (batchId, batchDescription) => {
         showAlert({
             type: 'warning',
@@ -85,7 +81,7 @@ export default function Inventory() {
                     loadData();
                 } catch (error) {
                     console.error('Failed to delete batch:', error);
-                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete batch' });
+                    showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to delete batch.') });
                 }
             }
         });

@@ -2,11 +2,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, SafeAreaView, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { workmenApi } from '../services/api';
-
-const fmtEGP = (n) => Number(n || 0).toLocaleString('en-EG', { maximumFractionDigits: 0 });
+import { useFormat } from '../utils/format';
 
 export default function WorkmenScreen({ navigation }) {
     const { t } = useTranslation();
+    const { currency } = useFormat();
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -45,11 +45,11 @@ export default function WorkmenScreen({ navigation }) {
                             <View style={styles.statsRow}>
                                 <View style={styles.stat}>
                                     <Text style={styles.statLabel}>{t('directory.dailyRate')}</Text>
-                                    <Text style={styles.statValue}>{fmtEGP(w.dailyRate)} EGP</Text>
+                                    <Text style={styles.statValue}>{currency(w.dailyRate)}</Text>
                                 </View>
                                 <View style={styles.stat}>
                                     <Text style={styles.statLabel}>{t('directory.totalPaid')}</Text>
-                                    <Text style={styles.statValue}>{fmtEGP(w.totalPaid)} EGP</Text>
+                                    <Text style={styles.statValue}>{currency(w.totalPaid)}</Text>
                                 </View>
                             </View>
                             {w.phone ? <Text style={styles.meta}>📞 {w.phone}</Text> : null}

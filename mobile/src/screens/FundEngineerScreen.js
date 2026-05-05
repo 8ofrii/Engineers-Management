@@ -6,11 +6,12 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { custodyApi, usersApi } from '../services/api';
-
-const fmtEGP = (n) => Number(n || 0).toLocaleString('en-EG', { maximumFractionDigits: 2 });
+import { useFormat } from '../utils/format';
+import { apiErrorMessage } from '../utils/apiError';
 
 export default function FundEngineerScreen({ navigation }) {
     const { t } = useTranslation();
+    const { currency } = useFormat();
     const [engineers, setEngineers] = useState([]);
     const [selected, setSelected] = useState(null);
     const [amount, setAmount] = useState('');
@@ -43,7 +44,7 @@ export default function FundEngineerScreen({ navigation }) {
         try {
             const res = await custodyApi.fund(selected.id, Number(amount), description);
             const newBalance = res.data?.balanceAfter ?? '?';
-            Alert.alert(t('fund.success'), t('fund.successMsg', { name: selected.name, balance: fmtEGP(newBalance) }), [
+            Alert.alert(t('fund.success'), t('fund.successMsg', { name: selected.name, balance: currency(newBalance) }), [
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
         } catch (err) {
@@ -68,7 +69,7 @@ export default function FundEngineerScreen({ navigation }) {
                                 <Text style={styles.selectorText}>{selected.name}</Text>
                                 <Text style={styles.selectorSub}>
                                     {selected.role}
-                                    {selected.balance ? ` · ${t('fund.currentBalance')}: ${fmtEGP(selected.balance.currentCustodyBalance)} EGP` : ''}
+                                    {selected.balance ? ` · ${t('fund.currentBalance')}: ${currency(selected.balance.currentCustodyBalance)}` : ''}
                                 </Text>
                             </View>
                         ) : (
@@ -115,7 +116,7 @@ export default function FundEngineerScreen({ navigation }) {
                                     <Text style={styles.modalItemText}>{e.name}</Text>
                                     <Text style={styles.modalItemMeta}>
                                         {e.role}
-                                        {e.balance ? ` · ${fmtEGP(e.balance.currentCustodyBalance)} EGP` : ''}
+                                        {e.balance ? ` · ${currency(e.balance.currentCustodyBalance)}` : ''}
                                     </Text>
                                 </TouchableOpacity>
                             ))}

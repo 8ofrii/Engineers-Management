@@ -117,7 +117,15 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
             handleClose();
         } catch (error) {
             console.error('Failed to save workman:', error);
-            showAlert({ type: 'error', title: t('common.error'), message: error.response?.data?.message || t('common.error') });
+            const data = error.response?.data;
+            const fieldErrors = Array.isArray(data?.errors) && data.errors.length
+                ? data.errors.map(e => `${e.path}: ${e.message}`).join('\n')
+                : null;
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: fieldErrors || data?.message || 'Failed to save workman'
+            });
         } finally {
             setLoading(false);
         }

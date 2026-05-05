@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { aiExtractApi } from '../services/api';
+import { apiErrorMessage } from '../utils/apiError';
 import VoiceRecorderSheet from './VoiceRecorderSheet';
 
 export default function DraftCaptureFAB() {
@@ -34,7 +35,7 @@ export default function DraftCaptureFAB() {
                 params: { id: r.data.draft.id }
             });
         } catch (err) {
-            Alert.alert('Voice extraction failed', err.response?.data?.message || String(err?.message || err));
+            Alert.alert('Voice extraction failed', apiErrorMessage(err, 'Try again or check your connection.'));
         } finally {
             setBusy(false);
         }
@@ -65,7 +66,7 @@ export default function DraftCaptureFAB() {
                 params: { id: apiRes.data.draft.id }
             });
         } catch (err) {
-            Alert.alert('Receipt extraction failed', err.response?.data?.message || String(err?.message || err));
+            Alert.alert('Receipt extraction failed', apiErrorMessage(err, 'Try again or check your connection.'));
         } finally {
             setBusy(false);
         }

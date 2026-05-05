@@ -5,6 +5,7 @@ import { Package, Plus, Mail, Phone, Edit2, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddSupplierModal from '../components/AddSupplierModal';
+import { apiErrorMessage } from '../utils/apiError';
 
 export default function Suppliers() {
     const { t } = useTranslation();
@@ -24,7 +25,7 @@ export default function Suppliers() {
             setSuppliers(response.data.data);
         } catch (error) {
             console.error('Failed to load suppliers:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load suppliers.' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to load suppliers.') });
         } finally {
             setLoading(false);
         }
@@ -65,7 +66,7 @@ export default function Suppliers() {
                     loadSuppliers();
                 } catch (error) {
                     console.error('Failed to delete supplier:', error);
-                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete supplier' });
+                    showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to delete supplier.') });
                 }
             }
         });

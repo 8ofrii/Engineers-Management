@@ -8,12 +8,12 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { setLanguage } from '../i18n';
 import { custodyApi } from '../services/api';
-
-const fmtEGP = (n) => Number(n || 0).toLocaleString('en-EG', { maximumFractionDigits: 2 });
+import { useFormat } from '../utils/format';
 
 export default function ProfileScreen({ navigation }) {
     const { t, i18n } = useTranslation();
     const { user, logout } = useAuth();
+    const { currency } = useFormat();
     const [custody, setCustody] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -74,9 +74,9 @@ export default function ProfileScreen({ navigation }) {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>{t('profile.custody')}</Text>
                         <View style={styles.custodyCard}>
-                            <Row label={t('profile.currentBalance')} value={`${fmtEGP(custody.currentCustodyBalance)} EGP`} primary />
-                            <Row label={t('profile.pendingClearance')} value={`${fmtEGP(custody.pendingClearance)} EGP`} />
-                            <Row label={t('profile.available')} value={`${fmtEGP(custody.availableBalance)} EGP`} accent />
+                            <Row label={t('profile.currentBalance')} value={currency(custody.currentCustodyBalance)} primary />
+                            <Row label={t('profile.pendingClearance')} value={currency(custody.pendingClearance)} />
+                            <Row label={t('profile.available')} value={currency(custody.availableBalance)} accent />
                         </View>
                     </View>
                 )}

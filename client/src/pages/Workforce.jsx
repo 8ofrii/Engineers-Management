@@ -5,10 +5,13 @@ import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
+import { apiErrorMessage } from '../utils/apiError';
+import { useFormat } from '../utils/format';
 
 export default function Workforce() {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const { currency: formatCurrency } = useFormat();
     const [workmen, setWorkmen] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
@@ -25,7 +28,7 @@ export default function Workforce() {
             setWorkmen(response.data.data);
         } catch (error) {
             console.error('Failed to load workmen:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load workforce data.' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to load workforce data.') });
         } finally {
             setLoading(false);
         }
@@ -45,16 +48,9 @@ export default function Workforce() {
             setSelectedWorkman(null);
         } catch (error) {
             console.error('Failed to save workman:', error);
-            showAlert({ type: 'error', title: 'Error', message: 'Failed to save workman data.' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to save workman data.') });
             throw error;
         }
-    };
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-EG', {
-            style: 'currency',
-            currency: 'EGP'
-        }).format(amount);
     };
 
     const handleDeleteClick = (workman) => {
@@ -71,7 +67,7 @@ export default function Workforce() {
                     loadWorkmen();
                 } catch (error) {
                     console.error('Failed to delete workman:', error);
-                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete workman' });
+                    showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to delete workman.') });
                 }
             }
         });

@@ -5,10 +5,13 @@ import { FileText, Download } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
+import { useFormat } from '../utils/format';
+import { apiErrorMessage } from '../utils/apiError';
 
 export default function Reports() {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const { currency: formatCurrency } = useFormat();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -22,17 +25,10 @@ export default function Reports() {
             setStats(response.data.data);
         } catch (error) {
             console.error('Failed to load stats:', error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Failed to load report data.' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to load report data.') });
         } finally {
             setLoading(false);
         }
-    };
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-EG', {
-            style: 'currency',
-            currency: 'EGP'
-        }).format(amount);
     };
 
     const handleExport = () => {

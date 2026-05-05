@@ -6,11 +6,14 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { draftsApi, projectsApi, suppliersApi, transactionsApi } from '../services/api';
+import { useFormat } from '../utils/format';
+import { apiErrorMessage } from '../utils/apiError';
 
 const CATEGORIES = ['MATERIALS', 'LABOR', 'EQUIPMENT', 'SERVICES', 'OTHER'];
 
 export default function DraftReviewScreen({ route, navigation }) {
     const { id } = route.params || {};
+    const { currency } = useFormat();
     const [draft, setDraft] = useState(null);
     const [projects, setProjects] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
@@ -51,7 +54,7 @@ export default function DraftReviewScreen({ route, navigation }) {
                 transactionDate: md.transactionDate || new Date().toISOString().slice(0, 10)
             });
         } catch (err) {
-            Alert.alert('Failed to load draft', err.response?.data?.message || String(err?.message || err));
+            Alert.alert('Failed to load draft', apiErrorMessage(err, 'Please retry.'));
             navigation.goBack();
         } finally {
             setLoading(false);
@@ -96,7 +99,7 @@ export default function DraftReviewScreen({ route, navigation }) {
             }));
             setDraft(r.data.data);
         } catch (err) {
-            Alert.alert('Re-match failed', err.response?.data?.message || String(err?.message || err));
+            Alert.alert('Re-match failed', apiErrorMessage(err, 'Please retry.'));
         } finally {
             setRematching(false);
         }
@@ -113,7 +116,7 @@ export default function DraftReviewScreen({ route, navigation }) {
                         await draftsApi.discard(id);
                         navigation.goBack();
                     } catch (err) {
-                        Alert.alert('Discard failed', err.response?.data?.message || String(err?.message || err));
+                        Alert.alert('Discard failed', apiErrorMessage(err, 'Please retry.'));
                     }
                 }
             }
@@ -144,11 +147,7 @@ export default function DraftReviewScreen({ route, navigation }) {
             Alert.alert('Saved', 'Draft committed as a new transaction.');
             navigation.goBack();
         } catch (err) {
-            const data = err.response?.data;
-            const fieldErrors = Array.isArray(data?.errors) && data.errors.length
-                ? data.errors.map(e => `${e.path}: ${e.message}`).join('\n')
-                : null;
-            Alert.alert('Save failed', fieldErrors || data?.message || String(err?.message || err));
+            Alert.alert('Save failed', apiErrorMessage(err, 'Please retry.'));
         } finally {
             setSaving(false);
         }

@@ -84,7 +84,7 @@ export default function VoiceRecorderSheet({ visible, onClose, onCaptured, maxSe
                 });
             }, 1000);
         } catch (err) {
-            Alert.alert('Recording failed', String(err?.message || err));
+            Alert.alert('Recording failed', err?.message || 'Could not start recording.');
             setPhase('idle');
         }
     };

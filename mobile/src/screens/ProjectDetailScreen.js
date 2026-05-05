@@ -12,6 +12,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { projectsApi, transactionsApi } from '../services/api';
 import DraftCaptureFAB from '../components/DraftCaptureFAB';
+import { useFormat } from '../utils/format';
 
 const STATUS_STYLES = {
     PLANNING:    { bg: '#dbeafe', fg: '#1e40af' },
@@ -21,15 +22,11 @@ const STATUS_STYLES = {
     CANCELLED:   { bg: '#fee2e2', fg: '#991b1b' }
 };
 
-const fmtEGP = (n) => {
-    const num = Number(n || 0);
-    return num.toLocaleString('en-EG', { maximumFractionDigits: 0 });
-};
-
 const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 
 export default function ProjectDetailScreen({ route, navigation }) {
     const { t } = useTranslation();
+    const { currency } = useFormat();
     const { projectId, projectName } = route.params || {};
     const [project, setProject] = useState(null);
     const [transactions, setTransactions] = useState([]);
@@ -125,12 +122,12 @@ export default function ProjectDetailScreen({ route, navigation }) {
                 {/* Financial summary */}
                 <Text style={styles.sectionTitle}>{t('project.financials')}</Text>
                 <View style={styles.financeGrid}>
-                    <FinanceCell label={t('project.budget')} value={project.budget} color="#3b82f6" />
-                    <FinanceCell label={t('project.actualCost')} value={project.actualCost} color="#ef4444" />
-                    <FinanceCell label={t('project.officeRevenue')} value={project.officeRevenue} color="#10b981" />
+                    <FinanceCell label={t('project.budget')} value={currency(project.budget)} color="#3b82f6" />
+                    <FinanceCell label={t('project.actualCost')} value={currency(project.actualCost)} color="#ef4444" />
+                    <FinanceCell label={t('project.officeRevenue')} value={currency(project.officeRevenue)} color="#10b981" />
                     <FinanceCell
                         label={t('project.safeBalance')}
-                        value={project.projectSafeBalance}
+                        value={currency(project.projectSafeBalance)}
                         color={Number(project.projectSafeBalance) < 0 ? '#ef4444' : '#0ea5e9'}
                     />
                 </View>
@@ -160,7 +157,7 @@ export default function ProjectDetailScreen({ route, navigation }) {
                                     styles.txAmount,
                                     { color: tx.type === 'INCOME' ? '#10b981' : '#ef4444' }
                                 ]}>
-                                    {tx.type === 'INCOME' ? '+' : '-'}{fmtEGP(tx.amount)} EGP
+                                    {tx.type === 'INCOME' ? '+' : '-'}{currency(tx.amount)}
                                 </Text>
                                 <Text style={styles.txStatus}>{tx.status}</Text>
                             </View>
@@ -192,9 +189,8 @@ const FinanceCell = ({ label, value, color }) => (
     <View style={styles.financeCell}>
         <Text style={styles.financeLabel}>{label}</Text>
         <Text style={[styles.financeValue, { color }]}>
-            {fmtEGP(value)}
+            {value}
         </Text>
-        <Text style={styles.financeUnit}>EGP</Text>
     </View>
 );
 

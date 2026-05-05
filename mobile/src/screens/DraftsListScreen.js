@@ -8,6 +8,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { draftsApi, aiExtractApi } from '../services/api';
 import VoiceRecorderSheet from '../components/VoiceRecorderSheet';
+import { useFormat } from '../utils/format';
+import { apiErrorMessage } from '../utils/apiError';
 
 const STATUS_STYLES = {
     PENDING_REVIEW: { bg: '#fef3c7', fg: '#92400e', label: 'Pending' },
@@ -16,6 +18,7 @@ const STATUS_STYLES = {
 };
 
 export default function DraftsListScreen({ navigation }) {
+    const { currency } = useFormat();
     const [filter, setFilter] = useState('PENDING_REVIEW');
     const [drafts, setDrafts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -47,7 +50,7 @@ export default function DraftsListScreen({ navigation }) {
             const r = await aiExtractApi.voice({ uri });
             navigation.navigate('DraftReview', { id: r.data.draft.id });
         } catch (err) {
-            Alert.alert('Voice extraction failed', err.response?.data?.message || String(err?.message || err));
+            Alert.alert('Voice extraction failed', apiErrorMessage(err, 'Try again or check your connection.'));
         } finally {
             setBusy(false);
         }
@@ -75,7 +78,7 @@ export default function DraftsListScreen({ navigation }) {
             });
             navigation.navigate('DraftReview', { id: apiRes.data.draft.id });
         } catch (err) {
-            Alert.alert('Receipt extraction failed', err.response?.data?.message || String(err?.message || err));
+            Alert.alert('Receipt extraction failed', apiErrorMessage(err, 'Try again or check your connection.'));
         } finally {
             setBusy(false);
         }
@@ -162,7 +165,7 @@ export default function DraftsListScreen({ navigation }) {
                                         {md.description || '(no summary)'}
                                     </Text>
                                     <Text style={s.rowSubtitle}>
-                                        {md.amount != null ? `${md.amount} EGP` : '—'}
+                                        {md.amount != null ? currency(md.amount) : '—'}
                                         {md.category ? ` · ${md.category}` : ''}
                                     </Text>
                                 </View>
