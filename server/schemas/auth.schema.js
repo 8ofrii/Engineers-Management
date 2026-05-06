@@ -1,11 +1,23 @@
 import { z } from 'zod';
 
-const passwordSchema = z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[a-z]/, 'Password must include a lowercase letter')
-    .regex(/[A-Z]/, 'Password must include an uppercase letter')
-    .regex(/\d/, 'Password must include a digit')
-    .regex(/[@$!%*?&]/, 'Password must include a special character (@$!%*?&)');
+// Combined password validation — same rules as users.schema.js. Single
+// superRefine returns ALL violations as one message so users see every
+// missing requirement on the first submit instead of fixing them
+// one-at-a-time across multiple round trips.
+const passwordSchema = z.string().superRefine((val, ctx) => {
+    const issues = [];
+    if (!val || val.length < 8) issues.push('at least 8 characters');
+    if (!/[a-z]/.test(val))     issues.push('one lowercase letter');
+    if (!/[A-Z]/.test(val))     issues.push('one uppercase letter');
+    if (!/\d/.test(val))        issues.push('one digit');
+    if (!/[^a-zA-Z0-9]/.test(val)) issues.push('one special character (e.g. # @ ! _ -)');
+    if (issues.length) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Password must include: ${issues.join(', ')}.`
+        });
+    }
+});
 
 const emailSchema = z.string().email('Invalid email').max(254);
 const phoneSchema = z.string().min(5).max(30).optional().nullable();

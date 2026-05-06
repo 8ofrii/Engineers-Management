@@ -5,9 +5,11 @@ import { clientsAPI } from '../services/api';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 import AddClientModal from './AddClientModal';
+import { useAlert } from '../context/AlertContext';
 
 export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData = null }) {
     const { t } = useTranslation();
+    const { showAlert } = useAlert();
     const [clients, setClients] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
@@ -385,7 +387,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
             <AddClientModal
                 isOpen={isClientModalOpen}
                 onClose={() => setIsClientModalOpen(false)}
-                onSave={async (clientData) => {
+                onSubmit={async (clientData) => {
                     try {
                         const response = await clientsAPI.create(clientData);
                         const newClient = response.data.data;
@@ -394,6 +396,15 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                         setIsClientModalOpen(false);
                     } catch (error) {
                         console.error("Failed to create client", error);
+                        const data = error.response?.data;
+                        const fieldErrors = Array.isArray(data?.errors) && data.errors.length
+                            ? data.errors.map(e => `${e.path}: ${e.message}`).join('\n')
+                            : null;
+                        showAlert({
+                            type: 'error',
+                            title: t('common.error', 'Error'),
+                            message: fieldErrors || data?.message || 'Failed to create client'
+                        });
                     }
                 }}
             />

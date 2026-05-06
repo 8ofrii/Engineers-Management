@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Package, Search, Filter, ArrowRight, History, Plus, Settings, Trash2 } from 'lucide-react';
+import { Package, Search, Filter, ArrowRight, History, Plus, Settings, Trash2, Pencil } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddMaterialModal from '../components/AddMaterialModal';
@@ -21,8 +21,32 @@ export default function Inventory() {
     const [selectedProjectId, setSelectedProjectId] = useState('all');
     const [viewMode, setViewMode] = useState('BATCHES'); // BATCHES | MATERIALS
     const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
+    const [editingMaterial, setEditingMaterial] = useState(null);
     const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
     const [usageProjectId, setUsageProjectId] = useState(null);
+
+    const openEditMaterial = (material) => {
+        setEditingMaterial(material);
+        setIsMaterialModalOpen(true);
+    };
+    const handleDeleteMaterial = (material) => {
+        showAlert({
+            type: 'warning',
+            title: t('common.deleteConfirmTitle', 'Delete?'),
+            message: `${t('common.deleteConfirmMessage', 'Permanently delete')} "${material.nameAr || material.name}"?`,
+            showCancel: true,
+            confirmText: t('common.delete', 'Delete'),
+            onConfirm: async () => {
+                try {
+                    await materialsAPI.delete(material.id);
+                    showAlert({ type: 'success', title: t('common.success', 'Deleted'), message: t('inventory.materialDeleted', 'Material deleted') });
+                    loadData();
+                } catch (error) {
+                    showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to delete material.') });
+                }
+            }
+        });
+    };
 
     useEffect(() => {
         loadData();
@@ -253,7 +277,29 @@ export default function Inventory() {
                             <div className="grid grid-4 gap-md">
                                 {filteredMaterials.map(material => (
                                     <div key={material.id} className="card material-card">
-                                        <h4 className="mb-xs">{material.nameAr || material.name}</h4>
+                                        <div className="flex-between mb-xs" style={{ alignItems: 'flex-start', gap: 8 }}>
+                                            <h4 style={{ margin: 0, flex: 1, minWidth: 0 }}>{material.nameAr || material.name}</h4>
+                                            <div className="flex gap-xs" style={{ flexShrink: 0 }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary btn-sm"
+                                                    style={{ padding: '4px 8px' }}
+                                                    title={t('common.edit', 'Edit')}
+                                                    onClick={() => openEditMaterial(material)}
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary btn-sm"
+                                                    style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444' }}
+                                                    title={t('common.delete', 'Delete')}
+                                                    onClick={() => handleDeleteMaterial(material)}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div className="flex-between text-xs text-tertiary mb-md">
                                             <span>{material.name}</span>
                                             <span className="badge badge-info">{material.unit}</span>
@@ -278,16 +324,23 @@ export default function Inventory() {
 
             <AddMaterialModal
                 isOpen={isMaterialModalOpen}
-                onClose={() => setIsMaterialModalOpen(false)}
+                onClose={() => { setIsMaterialModalOpen(false); setEditingMaterial(null); }}
+                initialData={editingMaterial}
                 onSave={async (data) => {
                     try {
-                        await materialsAPI.create(data);
-                        showAlert({ type: 'success', title: 'Success', message: 'Material added successfully' });
+                        if (editingMaterial) {
+                            await materialsAPI.update(editingMaterial.id, data);
+                            showAlert({ type: 'success', title: t('common.success', 'Success'), message: t('inventory.materialUpdated', 'Material updated successfully') });
+                        } else {
+                            await materialsAPI.create(data);
+                            showAlert({ type: 'success', title: t('common.success', 'Success'), message: t('inventory.materialAdded', 'Material added successfully') });
+                        }
                         setIsMaterialModalOpen(false);
+                        setEditingMaterial(null);
                         loadData();
                     } catch (error) {
-                        console.error("Failed to add material", error);
-                        showAlert({ type: 'error', title: 'Error', message: 'Failed to add material' });
+                        console.error("Failed to save material", error);
+                        showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to save material') });
                     }
                 }}
             />

@@ -88,6 +88,39 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [costItemMode, setCostItemMode] = useState('NEW'); // NEW | EXISTING
 
     const [errors, setErrors] = useState({});
+
+    // Switch tabs (Expense / Income / Usage / Transfer) AND wipe per-tab
+    // form state so the next tab opens clean. Without this, fields filled
+    // in for an Expense leak into an Income or Usage entry — confusing and
+    // dangerous for accounting accuracy. Skipped when we're in edit mode
+    // (initialData) since edit-mode is single-tab anyway.
+    const switchMode = (next) => {
+        if (next === mode) return;
+        if (!initialData) {
+            setFormData({
+                amount: '',
+                description: '',
+                transactionDate: getLocalDateTime(),
+                category: '',
+                itemName: '',
+                unit: 'TON',
+                transactionFrom: '',
+                transactionTo: '',
+                paymentMethod: 'CUSTODY_WALLET',
+                unitPrice: '',
+                quantity: '',
+                costCenter: '',
+                payerUserId: user?.id || '',
+                projectCostItemId: '',
+                workmanId: '',
+                invoiceNumber: '',
+                physicalAccount: '',
+                toEngineerId: ''
+            });
+            setErrors({});
+        }
+        setMode(next);
+    };
     const [isRecording, setIsRecording] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -665,7 +698,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
                     <button
                         className={`tab-btn ${mode === 'EXPENSE' ? 'active' : ''}`}
-                        onClick={() => setMode('EXPENSE')}
+                        onClick={() => switchMode('EXPENSE')}
                         style={{
                             flex: 1, padding: '16px', background: 'transparent', border: 'none',
                             borderBottom: mode === 'EXPENSE' ? '3px solid var(--color-primary)' : '3px solid transparent',
@@ -677,7 +710,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     </button>
                     <button
                         className={`tab-btn ${mode === 'INCOME' ? 'active' : ''}`}
-                        onClick={() => setMode('INCOME')}
+                        onClick={() => switchMode('INCOME')}
                         style={{
                             flex: 1, padding: '16px', background: 'transparent', border: 'none',
                             borderBottom: mode === 'INCOME' ? '3px solid var(--color-primary)' : '3px solid transparent',
@@ -689,7 +722,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     </button>
                     <button
                         className={`tab-btn ${mode === 'USAGE' ? 'active' : ''}`}
-                        onClick={() => setMode('USAGE')}
+                        onClick={() => switchMode('USAGE')}
                         style={{
                             flex: 1, padding: '16px', background: 'transparent', border: 'none',
                             borderBottom: mode === 'USAGE' ? '3px solid var(--color-primary)' : '3px solid transparent',
@@ -701,7 +734,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     </button>
                     <button
                         className={`tab-btn ${mode === 'TRANSFER' ? 'active' : ''}`}
-                        onClick={() => setMode('TRANSFER')}
+                        onClick={() => switchMode('TRANSFER')}
                         style={{
                             flex: 1, padding: '16px', background: 'transparent', border: 'none',
                             borderBottom: mode === 'TRANSFER' ? '3px solid var(--color-primary)' : '3px solid transparent',

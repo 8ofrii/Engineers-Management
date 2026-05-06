@@ -218,8 +218,9 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                                     value={formData.status}
                                     onChange={handleChange}
                                 >
-                                    <option value="ACTIVE">{t('clients.status.active')}</option>
-                                    <option value="INACTIVE">{t('clients.status.inactive')}</option>
+                                    <option value="ACTIVE">{t('clients.status.active', 'Active')}</option>
+                                    <option value="INACTIVE">{t('clients.status.inactive', 'Inactive')}</option>
+                                    <option value="PENDING">{t('clients.status.pending', 'Pending')}</option>
                                 </select>
                             </div>
                         </div>

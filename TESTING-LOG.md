@@ -4,6 +4,112 @@
 
 ---
 
+## 2026-05-06 — UAT Round 1 triage (Admin persona, 39 bugs reported)
+
+**Source**: 11-page handwritten scan + typed bug report from a colleague's UAT pass against the production deployment.
+**Counts**: 5 Critical · 9 High · 16 Medium · 9 Low.
+**Persona tested**: Admin (other personas not yet exercised).
+
+### TL;DR root causes
+
+1. **Prod DB schema is stale.** Drives 4 of the 5 Critical bugs and some Highs (F07, F10, F14, F16, F17). Phases 1-7 + 6.3 + 6.4 schema additions were never pushed to prod after the initial baseline. **Fix is operational, not code** — see Action Items below.
+2. **Recent SMTP rotation broke email send (F11).** Our hardcoded fallback was removed (security), so SMTP now requires `SMTP_EMAIL` + `SMTP_PASSWORD` in Render env. If the Gmail app password was rotated without updating Render, email send returns SMTP error.
+3. **Several UAT-grade FE wiring bugs surfaced** that no automated test would catch (F02 prop-name mismatch, F04 missing edit/delete, F13 no save-draft path, F15 narrow special-char regex). All fixed in this session.
+
+### Fixed this session (10 bugs)
+
+| ID | Title | Fix |
+|---|---|---|
+| **F02** | "New Client" inline button no-op | `AddProjectModal` was passing `onSave`; `AddClientModal` expects `onSubmit`. One-line rename. Plus surfaced server validation errors in the alert. |
+| **F03** | Client status missing INACTIVE / PENDING | Added all three options to the status dropdown. |
+| **F04** | Raw Materials missing Edit / Delete | Added pencil + trash buttons on each material card, wired to `materialsAPI.update` / `delete`, plus edit-mode for the existing modal. |
+| **F09** | Stale data persists across Add Transaction tabs | New `switchMode` helper resets formData + errors when switching Expense / Income / Usage / Transfer (skipped in edit mode). |
+| **F11** | Invoice SMTP error | No code fix needed — see Action Item 2. Our recent `sendEmail.js` security cleanup correctly throws when env is missing. |
+| **F13** | AI Drafts can't save edits | Added a **Save Draft** button (alongside the existing **Save as transaction**) that calls `PUT /api/transaction-drafts/:id` to persist edits without committing. |
+| **F15** | Password validation rejects `#`, errors one-at-a-time | Replaced the four chained `.regex()` calls with one `.superRefine()` that gathers all violations. Special-char set broadened from `[@$!%*?&]` to `[^a-zA-Z0-9]` so `#` / `_` / `-` etc. all work. |
+| **F17** | 2FA stats fail to load | Improved alert to surface the real server error. Underlying cause is schema sync — see Action Item 1. |
+| **F18** | Chat replies in Arabic to English questions | Tightened the system prompt with explicit "match the language of the user's most recent message" rule. |
+| F02 (cont'd) | Generic "Failed to create client" alert | Now shows per-field server errors via `apiErrorMessage`. |
+
+### Action Items on your side (NO code can fix these — operational only)
+
+#### 1. ⚠️ Schema sync to prod DB (highest priority — fixes 4-5 critical bugs)
+
+The prod Postgres has been drifting since Phase 1. Recent additions never made it: `audit_logs`, `daily_site_reports`, `documents`, `invoices`, `transaction_drafts`, `bank_statements`, `bank_statement_rows`, `subscriptions`, `payment_attempts`, plus column additions (`Transaction.reconciledAt`, `User.totpEnabled`, `User.totpSecret`, etc.).
+
+From your local machine with prod credentials:
+
+```bash
+cd C:\8ofri\civil\Engineers-Management\server
+set DATABASE_URL=<your Render Postgres connection string>
+npx prisma db push
+```
+
+Inspect the proposed changes — should be additive (new tables + new columns); nothing destructive. If Prisma asks to drop columns, **stop and check** before confirming.
+
+After this single command:
+- BUG-F07 (Database error new expense) → resolved
+- BUG-F10 (Reports P2022) → resolved
+- BUG-F14 (Bank Reconciliation) → resolved
+- BUG-F16 (Billing) → resolved (also needs Action Item 3 for paid plans)
+- BUG-F17 (2FA stats) → resolved
+
+#### 2. Update SMTP credentials on Render
+
+You rotated the leaked Gmail app password (correctly). The new password must be set in Render environment:
+
+```
+SMTP_EMAIL    = ai.8ofry@gmail.com  (or whichever sender)
+SMTP_PASSWORD = <new app password from myaccount.google.com/apppasswords>
+```
+
+After Render redeploys, BUG-F11 (Invoice SMTP error) is resolved.
+
+#### 3. Set Paymob env vars on Render (only if going live with paid plans)
+
+If you don't have a Paymob account yet, Billing keeps showing "billing disabled" and the free plan works. Once you're ready:
+
+```
+PAYMOB_API_KEY        = <from Paymob → Profile → API Key>
+PAYMOB_INTEGRATION_ID = <from Paymob → Developers → Payment Integrations>
+PAYMOB_IFRAME_ID      = <from Paymob → Developers → Iframes>
+PAYMOB_HMAC_SECRET    = <from Paymob → Profile → HMAC>
+```
+
+Plus configure Paymob's webhook URL to:
+```
+https://engineers-management.onrender.com/api/billing/webhook
+```
+
+### Bugs deferred to next session (all Medium / Low)
+
+| ID | Title | Effort | Why deferred |
+|---|---|---|---|
+| F05 | Record Usage button does nothing + auto-pull missing | M | Multi-part feature (button wiring + pre-fill flow); needs separate commit |
+| F06 | Adding workman ~2 minutes | S | Investigation needed — likely N+1 or S3 upload latency |
+| F08 | Existing Item selector validation false positive + cost category not refreshed | M | Multi-step interaction bug; needs careful repro |
+| F12 | AI Drafts receipt upload returns error | S | Need actual error from network tab to triage |
+| U01-U21 | UI/UX improvements (filters, multi-select, copy renames, dark mode persistence, …) | varies | None are blockers; batched as a polish sprint |
+
+### Re-test order after Action Items 1-2 are done
+
+1. Open Reports → expect data to load (verifies F10)
+2. Add new expense from Accounting → expect success (verifies F07)
+3. Open Bank Reconciliation → expect page to load (verifies F14)
+4. Open Billing → expect plan grid (verifies F16)
+5. Security → 2FA → expect status to load (verifies F17)
+6. Send invoice email → expect delivery (verifies F11)
+7. New project → New Client inline → fill → submit → expect client created (verifies F02)
+8. Edit a raw material name → expect persistence (verifies F04 edit)
+9. Delete a raw material → expect row removal (verifies F04 delete)
+10. AI Draft → edit project → click **Save draft** → reopen → expect edits persisted (verifies F13)
+11. Add team member with password `Test#2026!` → expect single-shot success (verifies F15 — `#` works AND all errors show together if missing)
+12. Switch Expense → Income tab → expect blank form (verifies F09)
+13. Chat in English → expect English reply (verifies F18)
+14. Edit client status to PENDING → expect option present (verifies F03)
+
+---
+
 ## 2026-05-02 — Phase 5: Invoicing with PDF + email send
 
 **Author**: Claude

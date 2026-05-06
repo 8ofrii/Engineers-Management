@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import { authAPI } from '../services/api';
+import { apiErrorMessage } from '../utils/apiError';
 
 export default function TwoFactorSettings() {
     const { t } = useTranslation();
@@ -23,7 +24,7 @@ export default function TwoFactorSettings() {
             const r = await authAPI.twoFactor.status();
             setStatus(r.data.data);
         } catch (err) {
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Failed to load 2FA status' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(err, 'Failed to load 2FA status') });
         } finally {
             setLoading(false);
         }

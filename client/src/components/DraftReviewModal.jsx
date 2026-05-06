@@ -167,6 +167,51 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
         }
     };
 
+    // Save edits without committing — user wants to keep iterating on the
+    // draft (e.g. add the supplier first, then come back). Persists the
+    // current form into matchedDraft via PUT /transaction-drafts/:id.
+    const [savingDraft, setSavingDraft] = useState(false);
+    const handleSaveDraft = async () => {
+        try {
+            setSavingDraft(true);
+            const matchedDraft = {
+                ...(draft.matchedDraft || {}),
+                amount: form.amount === '' ? null : Number(form.amount),
+                category: form.category,
+                description: form.description,
+                projectId: form.projectId || null,
+                supplierId: form.supplierId || null,
+                transactionDate: form.transactionDate || null,
+                itemName: form.itemName,
+                quantity: form.quantity === '' ? null : Number(form.quantity),
+                unit: form.unit,
+                unitPrice: form.unitPrice === '' ? null : Number(form.unitPrice),
+                costCenter: form.costCenter,
+                paymentMethod: form.paymentMethod,
+                payerUserId: form.payerUserId
+            };
+            const r = await draftsAPI.update(draftId, matchedDraft);
+            setDraft(r.data.data);
+            showAlert({
+                type: 'success',
+                title: t('common.success', 'Saved'),
+                message: t('drafts.draftSaved', 'Draft saved. You can come back and finish later.')
+            });
+        } catch (err) {
+            const data = err.response?.data;
+            const fieldErrors = Array.isArray(data?.errors) && data.errors.length
+                ? data.errors.map(e => `${e.path}: ${e.message}`).join('\n')
+                : null;
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: fieldErrors || data?.message || 'Failed to save draft'
+            });
+        } finally {
+            setSavingDraft(false);
+        }
+    };
+
     const handleCommit = async () => {
         if (!form.amount || Number(form.amount) <= 0) {
             return showAlert({ type: 'error', title: t('drafts.missingAmount', 'Missing amount'), message: t('drafts.missingAmountHint', 'Please set the amount before saving.') });
@@ -446,6 +491,14 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                                                 {t('drafts.discard', 'Discard')}
                                             </button>
                                             <div style={{ flex: 1 }} />
+                                            <button
+                                                type="button" className="btn btn-secondary btn-sm"
+                                                onClick={handleSaveDraft} disabled={savingDraft}
+                                                title={t('drafts.saveDraftHint', 'Save your edits without committing yet')}
+                                            >
+                                                {savingDraft ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                                                {t('drafts.saveDraft', 'Save draft')}
+                                            </button>
                                             <button
                                                 type="button" className="btn btn-primary"
                                                 onClick={handleCommit} disabled={saving}

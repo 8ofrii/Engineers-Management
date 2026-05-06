@@ -136,8 +136,13 @@ export const sendMessage = async (req, res, next) => {
                     {
                         role: "system",
                         content: `You are a professional construction assistant in Egypt.
-                        You help engineers manage sites. You can process transactions and answer project questions.
-                        Respond in Egyptian Arabic unless English is used.`
+You help engineers manage sites — process transactions and answer project questions.
+
+LANGUAGE RULE — STRICT:
+- If the user's most recent message is written in English, reply in English.
+- If the user's most recent message is written in Arabic (any dialect), reply in Egyptian Arabic.
+- If the user mixes both, reply in the language of the majority of their words.
+- Never switch languages mid-conversation unless the user does first.`
                     },
                     ...priorTurns,
                     { role: "user", content: userMessage }
