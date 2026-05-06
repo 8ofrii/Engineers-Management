@@ -49,6 +49,7 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
     const [categoryGroups, setCategoryGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [rematching, setRematching] = useState(false);
 
     const [form, setForm] = useState({
@@ -170,7 +171,6 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
     // Save edits without committing — user wants to keep iterating on the
     // draft (e.g. add the supplier first, then come back). Persists the
     // current form into matchedDraft via PUT /transaction-drafts/:id.
-    const [savingDraft, setSavingDraft] = useState(false);
     const handleSaveDraft = async () => {
         try {
             setSavingDraft(true);
