@@ -1,23 +1,36 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-    Building2, Mic, Camera, Sparkles, Smartphone, Banknote,
-    ClipboardList, Receipt, Users, ShieldCheck, Languages,
-    Check, ArrowRight, AlertTriangle, FileText
-} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { billingAPI } from '../services/api';
 import { useFormat } from '../utils/format';
 
-// Public landing page at /. Sections: hero → pain points → features →
-// mobility → pricing (live from /api/billing/plans) → CTA. Sign in /
-// sign up buttons send to existing /login + /signup routes.
+// Phase B — public marketing landing page using the new Tailwind + Material 3
+// design system from website design.txt. Sections: top nav → hero → pain
+// points → bento feature grid → mobility → pricing (live from API) → CTA →
+// footer. Bilingual + auth-aware ("Open App" for logged-in users, "Start free"
+// for guests). Material Symbols replace lucide-react throughout.
+//
+// Tailwind preflight is OFF (see tailwind.config.js) so this page coexists
+// with the legacy app — no risk to other screens.
+
+// Inline icon helper. Material Symbols is loaded via index.html so we just
+// emit the right text content with the variation-axis font CSS class.
+const Icon = ({ name, fill, className = '', size = 24 }) => (
+    <span
+        className={`material-symbols-outlined ${className}`}
+        style={{
+            fontSize: `${size}px`,
+            fontVariationSettings: fill ? "'FILL' 1" : "'FILL' 0"
+        }}
+    >
+        {name}
+    </span>
+);
 
 export default function Landing() {
     const { t, i18n } = useTranslation();
     const { user } = useAuth();
-    const navigate = useNavigate();
     const { currency } = useFormat();
     const [plans, setPlans] = useState([]);
     const isRTL = i18n.language === 'ar';
@@ -25,414 +38,460 @@ export default function Landing() {
     useEffect(() => {
         billingAPI.listPlans()
             .then(r => setPlans(r.data.data || []))
-            .catch(() => { /* ok if backend down — page still renders */ });
+            .catch(() => { /* page still renders without prices */ });
     }, []);
 
-    const toggleLanguage = () => {
-        i18n.changeLanguage(i18n.language === 'en' ? 'ar' : 'en');
-    };
+    const toggleLang = () => i18n.changeLanguage(isRTL ? 'en' : 'ar');
 
-    const primaryCta = user
-        ? { label: t('landing.openApp', 'Open App'), to: '/dashboard' }
-        : { label: t('landing.startFree', 'Start free'), to: '/signup' };
+    const ctaTo = user ? '/dashboard' : '/signup';
+    const ctaLabel = user
+        ? t('landing.openApp', 'Open App')
+        : t('landing.startFree', 'Start Your Free Pilot');
 
     return (
-        <div style={{ minHeight: '100vh', background: 'white', color: '#111827' }}>
-            {/* Top bar */}
-            <header style={{
-                position: 'sticky', top: 0, zIndex: 10,
-                background: 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(8px)',
-                borderBottom: '1px solid #e5e7eb',
-                padding: '12px 24px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 18 }}>
-                    <Building2 size={24} color="#2563eb" />
-                    <span>Engineers Management</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button
-                        onClick={toggleLanguage}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 4,
-                            background: 'transparent', border: '1px solid #e5e7eb',
-                            padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
-                            fontSize: 13, fontWeight: 600
-                        }}
-                    >
-                        <Languages size={14} />
-                        {i18n.language === 'en' ? 'AR' : 'EN'}
-                    </button>
-                    {user ? (
-                        <Link to="/dashboard" style={btnStyle('primary')}>
-                            {t('landing.openApp', 'Open App')}
-                        </Link>
-                    ) : (
-                        <>
-                            <Link to="/login" style={btnStyle('ghost')}>
-                                {t('landing.signIn', 'Sign in')}
+        <div
+            className="bg-background text-on-background min-h-screen flex flex-col"
+            style={{ fontFamily: isRTL ? 'Cairo, system-ui, sans-serif' : 'Inter, system-ui, sans-serif' }}
+            dir={isRTL ? 'rtl' : 'ltr'}
+        >
+            {/* ---------- Top Nav ---------- */}
+            <header className="bg-surface-container-lowest border-b border-outline-variant w-full sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto flex justify-between items-center px-margin-desktop py-md">
+                    <div className="flex items-center gap-sm font-h3 text-h3 text-primary">
+                        <Icon name="domain" size={28} fill />
+                        <span>Engineers Management</span>
+                    </div>
+                    <div className="flex items-center gap-md">
+                        <button
+                            onClick={toggleLang}
+                            className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors flex items-center gap-xs"
+                        >
+                            <Icon name="translate" size={16} />
+                            {isRTL ? 'EN' : 'AR'}
+                        </button>
+                        {user ? (
+                            <Link
+                                to="/dashboard"
+                                className="bg-primary text-on-primary px-lg py-sm rounded font-body-sm text-body-sm hover:opacity-90 transition-opacity"
+                            >
+                                {t('landing.openApp', 'Open App')}
                             </Link>
-                            <Link to="/signup" style={btnStyle('primary')}>
-                                {t('landing.startFree', 'Start free')}
-                            </Link>
-                        </>
-                    )}
+                        ) : (
+                            <>
+                                <Link
+                                    to="/login"
+                                    className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors"
+                                >
+                                    {t('landing.signIn', 'Sign in')}
+                                </Link>
+                                <Link
+                                    to="/signup"
+                                    className="bg-primary text-on-primary px-lg py-sm rounded font-body-sm text-body-sm hover:opacity-90 transition-opacity"
+                                >
+                                    {t('landing.startFree', 'Start Your Free Pilot')}
+                                </Link>
+                            </>
+                        )}
+                    </div>
                 </div>
             </header>
 
-            {/* Hero */}
-            <section style={{ padding: '80px 24px 60px', textAlign: 'center', maxWidth: 1100, margin: '0 auto' }}>
-                <div style={{
-                    display: 'inline-block',
-                    background: '#dbeafe', color: '#1e40af',
-                    padding: '6px 14px', borderRadius: 999,
-                    fontSize: 13, fontWeight: 600, marginBottom: 20
-                }}>
-                    {t('landing.tagline', 'Built for Egyptian construction firms')}
-                </div>
-                <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, marginBottom: 20 }}>
-                    {t('landing.heroTitle', 'Stop running your sites on Excel.')}<br />
-                    <span style={{ color: '#2563eb' }}>
-                        {t('landing.heroAccent', 'Capture, approve, and bill in seconds.')}
-                    </span>
-                </h1>
-                <p style={{ fontSize: 18, color: '#4b5563', maxWidth: 720, margin: '0 auto 32px', lineHeight: 1.6 }}>
-                    {t('landing.heroSub', 'A bilingual ERP that understands construction in Egypt — with voice + receipt-photo capture, multi-tier approvals, the V1.2 Profit-on-Expense engine, mobile DSRs, and Egyptian VAT-ready invoicing.')}
-                </p>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <Link to={primaryCta.to} style={{ ...btnStyle('primary'), padding: '14px 28px', fontSize: 16 }}>
-                        {primaryCta.label}
-                        <ArrowRight size={18} style={{ marginInlineStart: 6, verticalAlign: 'middle' }} />
-                    </Link>
-                    <a href="#features" style={{ ...btnStyle('ghost'), padding: '14px 28px', fontSize: 16 }}>
-                        {t('landing.seeFeatures', 'See what it does')}
-                    </a>
-                </div>
-                <div style={{ marginTop: 24, color: '#6b7280', fontSize: 14 }}>
-                    {t('landing.freemiumNote', 'Free forever for 1 project · No credit card required · Arabic + English')}
-                </div>
-            </section>
-
-            {/* Pain points */}
-            <section style={{ background: '#f9fafb', padding: '60px 24px' }}>
-                <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-                    <h2 style={sectionTitle}>{t('landing.painTitle', 'Sound familiar?')}</h2>
-                    <div className="grid" style={{
-                        display: 'grid', gap: 16,
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                        marginTop: 32
-                    }}>
-                        {[
-                            { t: t('landing.pain1', 'Receipts disappear before they hit the books'), s: t('landing.pain1Sub', 'Engineers stuff them in their pockets, then it rains, then it\'s payroll Friday.') },
-                            { t: t('landing.pain2', 'Excel sheets fight each other across phones'), s: t('landing.pain2Sub', 'The site has v3.xlsx, the office has v5.xlsx, the bank has its own number.') },
-                            { t: t('landing.pain3', 'Approvals take three WhatsApp messages and an angry call'), s: t('landing.pain3Sub', 'Who can approve 200,000 EGP? Nobody knows. Project stalls.') },
-                            { t: t('landing.pain4', 'Profit on cost-plus jobs is a guess'), s: t('landing.pain4Sub', 'You think the margin is 10%. Sometimes it\'s 4%. Sometimes you don\'t find out for months.') }
-                        ].map((p, i) => (
-                            <div key={i} style={painCardStyle}>
-                                <AlertTriangle size={20} color="#f59e0b" style={{ marginBottom: 8 }} />
-                                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{p.t}</h3>
-                                <p style={{ fontSize: 14, color: '#6b7280', margin: 0, lineHeight: 1.5 }}>{p.s}</p>
+            <main className="flex-grow flex flex-col">
+                {/* ---------- Hero ---------- */}
+                <section className="w-full bg-surface-container-low py-20 px-margin-desktop">
+                    <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-center gap-xl">
+                        <div className="flex-1 flex flex-col gap-lg items-start max-w-2xl">
+                            <span className="inline-flex items-center gap-xs bg-primary-container/10 text-primary px-md py-xs rounded-full text-label-caps font-label-caps">
+                                <Icon name="construction" size={14} fill />
+                                {t('landing.tagline', 'Built for Egyptian construction firms')}
+                            </span>
+                            <h1
+                                className="font-h1 text-on-surface font-bold"
+                                style={{ fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: 1.1 }}
+                            >
+                                {t('landing.heroTitle', 'Never Lose a Single Record Again.')}
+                            </h1>
+                            <p className="font-body-lg text-body-lg text-on-surface-variant">
+                                {t('landing.heroSub', 'The first AI-powered Construction ERP built specifically for Egyptian engineering firms. Say it, snap it, log it.')}
+                            </p>
+                            <div className="flex gap-md mt-sm flex-wrap">
+                                <Link
+                                    to={ctaTo}
+                                    className="bg-primary text-on-primary px-xl py-md rounded font-body-md text-body-md hover:opacity-90 transition-opacity flex items-center gap-sm shadow-sm"
+                                >
+                                    {ctaLabel}
+                                    <Icon name="arrow_forward" size={18} />
+                                </Link>
+                                <a
+                                    href="#features"
+                                    className="bg-surface-container-lowest text-primary border border-outline-variant px-xl py-md rounded font-body-md text-body-md hover:bg-surface-variant transition-colors flex items-center gap-sm"
+                                >
+                                    <Icon name="play_circle" size={18} fill />
+                                    {t('landing.seeFeatures', 'See what it does')}
+                                </a>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Features */}
-            <section id="features" style={{ padding: '80px 24px' }}>
-                <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-                    <h2 style={sectionTitle}>{t('landing.featuresTitle', 'What you get')}</h2>
-                    <p style={sectionSub}>{t('landing.featuresSub', 'Built for the way Egyptian sites actually run.')}</p>
-                    <div style={{
-                        display: 'grid', gap: 20,
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                        marginTop: 40
-                    }}>
-                        <FeatureCard
-                            icon={<Mic size={22} />}
-                            title={t('landing.f1', 'Voice → draft transaction')}
-                            desc={t('landing.f1Sub', 'Speak in Arabic ("اشترينا 50 شيكارة أسمنت بـ 25 ألف"). AI parses it, matches the vendor + project, hands you a draft to confirm.')}
-                            color="#2563eb"
-                        />
-                        <FeatureCard
-                            icon={<Camera size={22} />}
-                            title={t('landing.f2', 'Receipt photo → draft transaction')}
-                            desc={t('landing.f2Sub', 'Snap a receipt or supplier invoice. AI reads vendor, total, line items. Engineer reviews + saves in 5 seconds.')}
-                            color="#10b981"
-                        />
-                        <FeatureCard
-                            icon={<Sparkles size={22} />}
-                            title={t('landing.f3', 'V1.2 Profit-on-Expense engine')}
-                            desc={t('landing.f3Sub', 'Auto-transfers your management fee from project safe to office revenue when expenses approve — accurate margin in real time, not at month-end.')}
-                            color="#8b5cf6"
-                        />
-                        <FeatureCard
-                            icon={<ClipboardList size={22} />}
-                            title={t('landing.f4', 'Mobile Daily Site Reports')}
-                            desc={t('landing.f4Sub', 'Engineers log weather, attendance, materials received, issues, GPS-tagged photos — manager acknowledges from the office.')}
-                            color="#f59e0b"
-                        />
-                        <FeatureCard
-                            icon={<Receipt size={22} />}
-                            title={t('landing.f5', 'Egyptian-VAT invoicing')}
-                            desc={t('landing.f5Sub', '14% VAT pre-filled. PDF auto-generated with your logo. Email to client. Track partial payments.')}
-                            color="#ec4899"
-                        />
-                        <FeatureCard
-                            icon={<Banknote size={22} />}
-                            title={t('landing.f6', 'Bank reconciliation')}
-                            desc={t('landing.f6Sub', 'Upload your NBE / CIB / QNB statement CSV. AI matches each row to your transactions. You confirm.')}
-                            color="#0ea5e9"
-                        />
-                        <FeatureCard
-                            icon={<ShieldCheck size={22} />}
-                            title={t('landing.f7', 'Multi-tier approvals')}
-                            desc={t('landing.f7Sub', 'Engineer approves up to 5,000 EGP, manager up to 50,000, admin above that. Configure tiers per company.')}
-                            color="#dc2626"
-                        />
-                        <FeatureCard
-                            icon={<Users size={22} />}
-                            title={t('landing.f8', 'Multi-tenant + RBAC')}
-                            desc={t('landing.f8Sub', 'Admins, managers, engineers, accountants — each sees what they need. SUPER_ADMIN scopes for franchises.')}
-                            color="#0f766e"
-                        />
-                    </div>
-                </div>
-            </section>
-
-            {/* Mobility */}
-            <section style={{
-                background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-                color: 'white', padding: '80px 24px'
-            }}>
-                <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'center' }}>
-                    <div>
-                        <Smartphone size={32} style={{ marginBottom: 12 }} />
-                        <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 16 }}>
-                            {t('landing.mobileTitle', 'On the site, in the office, on the go.')}
-                        </h2>
-                        <p style={{ fontSize: 17, opacity: 0.9, lineHeight: 1.6, marginBottom: 24 }}>
-                            {t('landing.mobileSub', 'Engineers capture from their phones. Managers review from the office. Same data, no Excel exchange. Native Android + iOS apps via Expo.')}
-                        </p>
-                        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                            <BadgeStub icon="🤖" topLine={t('landing.getOn', 'GET IT ON')} botLine="Google Play" />
-                            <BadgeStub icon="" topLine={t('landing.downloadOn', 'Download on the')} botLine="App Store" />
+                            <div className="mt-lg flex items-center gap-sm text-on-surface-variant font-body-sm text-body-sm">
+                                <Icon name="verified" size={16} className="text-primary" fill />
+                                {t('landing.freemiumNote', 'Free forever for 1 project · No credit card required · Arabic + English')}
+                            </div>
                         </div>
-                        <div style={{ marginTop: 12, fontSize: 13, opacity: 0.8 }}>
-                            {t('landing.appsComing', 'Stores coming soon — beta available via Expo Go today')}
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <div style={{
-                            width: 280, height: 540,
-                            border: '8px solid #1f2937',
-                            borderRadius: 36,
-                            background: '#f9fafb',
-                            padding: 14,
-                            boxShadow: '0 30px 60px rgba(0,0,0,0.3)',
-                            display: 'flex', flexDirection: 'column'
-                        }}>
-                            <div style={{ flex: 1, background: 'white', borderRadius: 24, padding: 20, color: '#111827' }}>
-                                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>AI Drafts</div>
-                                <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-                                    <div style={{ flex: 1, background: '#2563eb', color: 'white', padding: 12, borderRadius: 8, fontSize: 12, textAlign: 'center', fontWeight: 600 }}>🎤 Voice</div>
-                                    <div style={{ flex: 1, background: '#2563eb', color: 'white', padding: 12, borderRadius: 8, fontSize: 12, textAlign: 'center', fontWeight: 600 }}>📷 Camera</div>
-                                </div>
-                                {[
-                                    { name: 'شركة القاهرة للأسمنت', amt: '25,000 EGP', tag: 'Pending' },
-                                    { name: 'مصنعية بناء — مبنى A', amt: '8,500 EGP', tag: 'Pending' },
-                                    { name: 'Steel rebar 12mm', amt: '12,400 EGP', tag: 'Committed' }
-                                ].map((it, i) => (
-                                    <div key={i} style={{ background: '#f9fafb', padding: 10, borderRadius: 6, marginBottom: 6, fontSize: 12 }}>
-                                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{it.name}</div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#6b7280' }}>
-                                            <span>{it.amt}</span>
-                                            <span style={{
-                                                background: it.tag === 'Committed' ? '#d1fae5' : '#fef3c7',
-                                                color: it.tag === 'Committed' ? '#065f46' : '#92400e',
-                                                padding: '2px 6px', borderRadius: 8, fontSize: 10, fontWeight: 600
-                                            }}>{it.tag}</span>
+
+                        {/* Hero illustration: stacked phone mockups (CSS-only) */}
+                        <div className="flex-1 w-full max-w-xl relative">
+                            <div className="aspect-[4/3] rounded-xl overflow-hidden shadow-lg border border-outline-variant bg-surface-container-lowest relative">
+                                <div
+                                    className="w-full h-full"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #2563eb 0%, #004ac6 50%, #1e3a8a 100%)'
+                                    }}
+                                />
+                                {/* Floating "voice capture" overlay */}
+                                <div className="absolute bottom-md right-md bg-surface-container-lowest/95 backdrop-blur-sm p-md rounded shadow-sm border border-outline-variant flex items-center gap-md">
+                                    <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
+                                        <Icon name="mic" size={20} fill className="text-on-primary" />
+                                    </div>
+                                    <div>
+                                        <div className="font-body-sm text-body-sm font-semibold text-on-surface">
+                                            {t('landing.heroBadgeTitle', 'Voice Capture Active')}
+                                        </div>
+                                        <div className="font-label-caps text-label-caps text-on-surface-variant">
+                                            {t('landing.heroBadgeSub', 'Logging material receipt…')}
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                                {/* Floating draft preview */}
+                                <div className="absolute top-md left-md bg-surface-container-lowest/95 backdrop-blur-sm p-md rounded shadow-sm border border-outline-variant max-w-[220px]">
+                                    <div className="flex items-center gap-xs mb-xs">
+                                        <Icon name="auto_awesome" size={14} className="text-primary" fill />
+                                        <span className="font-label-caps text-label-caps text-primary">
+                                            {t('landing.heroChip', 'AI DRAFT READY')}
+                                        </span>
+                                    </div>
+                                    <div className="font-body-sm text-body-sm text-on-surface">
+                                        {isRTL ? '٢٥٬٠٠٠ ج.م.' : 'EGP 25,000'}
+                                    </div>
+                                    <div className="font-label-caps text-label-caps text-on-surface-variant">
+                                        {isRTL ? 'أسمنت بورتلاندي' : 'Cement Portland — 50 bags'}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            {/* Pricing */}
-            <section id="pricing" style={{ padding: '80px 24px' }}>
-                <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-                    <h2 style={sectionTitle}>{t('landing.pricingTitle', 'Simple, fair pricing')}</h2>
-                    <p style={sectionSub}>
-                        {t('landing.pricingSub', 'Start free, forever. Upgrade when your team and projects grow.')}
-                    </p>
-                    <div style={{
-                        display: 'grid', gap: 16,
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                        marginTop: 40, alignItems: 'stretch'
-                    }}>
-                        {plans.length === 0 ? (
-                            // Static fallback if /api/billing/plans is unreachable
-                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#6b7280' }}>
-                                {t('landing.pricingLoading', 'Loading pricing…')}
-                            </div>
-                        ) : plans.map(plan => (
-                            <div key={plan.key} style={{
-                                ...painCardStyle,
-                                padding: 24,
-                                borderColor: plan.key === 'BASIC' ? '#2563eb' : '#e5e7eb',
-                                borderWidth: plan.key === 'BASIC' ? 2 : 1,
-                                position: 'relative'
-                            }}>
-                                {plan.key === 'BASIC' && (
-                                    <div style={{
-                                        position: 'absolute', top: -10, insetInlineEnd: 16,
-                                        background: '#2563eb', color: 'white',
-                                        padding: '2px 12px', borderRadius: 12,
-                                        fontSize: 11, fontWeight: 700
-                                    }}>
-                                        {t('landing.popular', 'MOST POPULAR')}
-                                    </div>
-                                )}
-                                <h3 style={{ fontSize: 20, fontWeight: 700, marginTop: 0, marginBottom: 4 }}>
-                                    {plan.name}
-                                </h3>
-                                <div style={{ fontSize: 32, fontWeight: 800, marginBottom: 4 }}>
-                                    {plan.priceEgp > 0 ? currency(plan.priceEgp) : t('landing.free', 'Free')}
+                {/* ---------- Pain points ---------- */}
+                <section className="w-full py-16 px-margin-desktop bg-surface-container-low border-t border-outline-variant">
+                    <div className="max-w-7xl mx-auto">
+                        <h2 className="font-h2 text-h2 text-on-surface text-center mb-lg">
+                            {t('landing.painTitle', 'Sound familiar?')}
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
+                            {[
+                                { i: 'receipt_long', t: t('landing.pain1', 'Receipts disappear before they hit the books'), s: t('landing.pain1Sub', "Engineers stuff them in their pockets, then it rains, then it's payroll Friday.") },
+                                { i: 'description', t: t('landing.pain2', 'Excel sheets fight each other across phones'), s: t('landing.pain2Sub', 'Site has v3.xlsx, office has v5.xlsx, the bank has its own number.') },
+                                { i: 'forum', t: t('landing.pain3', 'Approvals take three WhatsApp messages and an angry call'), s: t('landing.pain3Sub', 'Who can approve 200,000 EGP? Nobody knows. Project stalls.') },
+                                { i: 'trending_down', t: t('landing.pain4', 'Profit on cost-plus jobs is a guess'), s: t('landing.pain4Sub', "You think the margin is 10%. Sometimes it's 4%. You find out months later.") }
+                            ].map((p, i) => (
+                                <div key={i} className="bg-surface-container-lowest border border-outline-variant rounded-xl p-lg flex flex-col gap-sm">
+                                    <Icon name={p.i} size={22} className="text-error" fill />
+                                    <h3 className="font-body-md text-body-md font-semibold text-on-surface">{p.t}</h3>
+                                    <p className="font-body-sm text-body-sm text-on-surface-variant">{p.s}</p>
                                 </div>
-                                {plan.priceEgp > 0 && (
-                                    <div style={{ color: '#6b7280', fontSize: 13, marginBottom: 16 }}>
-                                        / {t('billing.month', 'month')}
-                                    </div>
-                                )}
-                                <ul style={{ paddingInlineStart: 0, listStyle: 'none', marginTop: 16 }}>
-                                    {plan.features.map((f, i) => (
-                                        <li key={i} style={{ fontSize: 14, marginBottom: 8, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                                            <Check size={14} color="#10b981" style={{ flexShrink: 0, marginTop: 4 }} />
-                                            <span>{f}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <div style={{ marginTop: 20 }}>
-                                    <Link
-                                        to={user ? '/billing' : '/signup'}
-                                        style={{
-                                            ...btnStyle(plan.key === 'BASIC' ? 'primary' : 'ghost'),
-                                            display: 'block', textAlign: 'center', width: '100%'
-                                        }}
-                                    >
-                                        {plan.priceEgp === 0
-                                            ? t('landing.startFree', 'Start free')
-                                            : (user ? t('landing.upgradeNow', 'Upgrade now') : t('landing.choosePlan', 'Choose this plan'))}
-                                    </Link>
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                    <p style={{ textAlign: 'center', marginTop: 24, color: '#6b7280', fontSize: 14 }}>
-                        {t('landing.paymobNote', 'Cards, mobile wallets (Vodafone Cash, etc.), and Fawry — powered by Paymob.')}
-                    </p>
-                </div>
-            </section>
+                </section>
 
-            {/* Final CTA */}
-            <section style={{ background: '#111827', color: 'white', padding: '60px 24px', textAlign: 'center' }}>
-                <h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 12 }}>
-                    {t('landing.ctaTitle', 'Get your first project on board this week.')}
-                </h2>
-                <p style={{ fontSize: 16, opacity: 0.85, marginBottom: 24, maxWidth: 600, margin: '0 auto 24px' }}>
-                    {t('landing.ctaSub', 'Sign up takes 60 seconds. Free forever for 1 project. No credit card.')}
-                </p>
-                <Link to={primaryCta.to} style={{ ...btnStyle('primary'), padding: '14px 32px', fontSize: 16 }}>
-                    {primaryCta.label} <ArrowRight size={18} style={{ marginInlineStart: 6, verticalAlign: 'middle' }} />
-                </Link>
-            </section>
+                {/* ---------- Bento feature grid ---------- */}
+                <section id="features" className="w-full py-20 px-margin-desktop bg-surface-container-lowest border-t border-outline-variant">
+                    <div className="max-w-7xl mx-auto flex flex-col gap-xl">
+                        <div className="text-center max-w-2xl mx-auto flex flex-col gap-sm">
+                            <h2 className="font-h2 text-h2 text-on-surface">
+                                {t('landing.featuresTitle', 'Built for the Site, Powerful for the Office')}
+                            </h2>
+                            <p className="font-body-lg text-body-lg text-on-surface-variant">
+                                {t('landing.featuresSub', 'Bridges the gap between field execution and financial oversight.')}
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-lg mt-lg">
+                            {/* Feature 1 — wide AI Voice */}
+                            <div className="col-span-1 md:col-span-2 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col justify-between hover:shadow-sm transition-shadow">
+                                <div className="flex flex-col gap-md">
+                                    <div className="w-12 h-12 rounded bg-primary-container flex items-center justify-center">
+                                        <Icon name="mic" size={24} fill className="text-on-primary" />
+                                    </div>
+                                    <h3 className="font-h3 text-h3 text-on-surface">
+                                        {t('landing.f1', 'AI Voice & Receipt Capture')}
+                                    </h3>
+                                    <p className="font-body-md text-body-md text-on-surface-variant max-w-md">
+                                        {t('landing.f1Sub', 'Speak naturally or snap a photo of a receipt. Our AI extracts amounts, vendor names, and project codes — logged directly into your ledger as a draft you confirm in seconds.')}
+                                    </p>
+                                </div>
+                                <div className="mt-lg flex flex-wrap items-center gap-sm font-label-caps text-label-caps text-on-surface-variant">
+                                    <span className="bg-surface-container-high px-sm py-xs rounded">EGYPTIAN ARABIC</span>
+                                    <span className="bg-surface-container-high px-sm py-xs rounded">ENGLISH</span>
+                                    <span className="bg-surface-container-high px-sm py-xs rounded">RECEIPT OCR</span>
+                                    <span className="bg-surface-container-high px-sm py-xs rounded">VENDOR MATCH</span>
+                                </div>
+                            </div>
 
-            {/* Footer */}
-            <footer style={{
-                padding: '24px', textAlign: 'center',
-                color: '#6b7280', fontSize: 13, borderTop: '1px solid #e5e7eb'
-            }}>
-                © {new Date().getFullYear()} Engineers Management.
-                {' '}
-                <a href="https://github.com/8ofry/Engineers-Management" style={{ color: '#2563eb', textDecoration: 'none' }}>
+                            {/* Feature 2 — Arabic */}
+                            <div className="col-span-1 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col gap-md hover:shadow-sm transition-shadow">
+                                <div className="w-12 h-12 rounded bg-secondary-container flex items-center justify-center">
+                                    <Icon name="translate" size={24} className="text-on-secondary-container" />
+                                </div>
+                                <h3 className="font-h3 text-h3 text-on-surface">
+                                    {t('landing.f2', 'Full Arabic RTL Support')}
+                                </h3>
+                                <p className="font-body-md text-body-md text-on-surface-variant">
+                                    {t('landing.f2Sub', 'A truly native experience. Right-to-left layouts and construction-specific Arabic categories.')}
+                                </p>
+                            </div>
+
+                            {/* Feature 3 — Profit Engine */}
+                            <div className="col-span-1 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col gap-md hover:shadow-sm transition-shadow">
+                                <div className="w-12 h-12 rounded bg-tertiary-container flex items-center justify-center">
+                                    <Icon name="trending_up" size={24} className="text-on-tertiary-container" />
+                                </div>
+                                <h3 className="font-h3 text-h3 text-on-surface">
+                                    {t('landing.f3', 'V1.2 Profit-on-Expense Engine')}
+                                </h3>
+                                <p className="font-body-md text-body-md text-on-surface-variant">
+                                    {t('landing.f3Sub', 'Auto-transfers your management fee from project safe to office revenue when expenses approve. Real-time margin, not month-end surprises.')}
+                                </p>
+                            </div>
+
+                            {/* Feature 4 — wide Invoicing */}
+                            <div className="col-span-1 md:col-span-2 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col md:flex-row gap-lg hover:shadow-sm transition-shadow items-center justify-between">
+                                <div className="flex flex-col gap-md max-w-md">
+                                    <div className="w-12 h-12 rounded bg-surface-tint/10 flex items-center justify-center">
+                                        <Icon name="receipt_long" size={24} className="text-surface-tint" />
+                                    </div>
+                                    <h3 className="font-h3 text-h3 text-on-surface">
+                                        {t('landing.f4', 'Egyptian-VAT Invoicing')}
+                                    </h3>
+                                    <p className="font-body-md text-body-md text-on-surface-variant">
+                                        {t('landing.f4Sub', '14% VAT pre-filled. PDF auto-generated with your logo. Email to clients. Track partial payments to PAID.')}
+                                    </p>
+                                </div>
+                                <div className="w-full md:w-64 h-32 bg-surface-container-lowest border border-outline-variant rounded shadow-sm flex flex-col p-sm gap-sm relative overflow-hidden">
+                                    <div className="w-full h-3 bg-surface-variant rounded-sm"></div>
+                                    <div className="w-3/4 h-3 bg-surface-variant rounded-sm"></div>
+                                    <div className="w-1/2 h-3 bg-surface-variant rounded-sm"></div>
+                                    <div className="mt-auto flex justify-between items-end">
+                                        <div className="w-16 h-6 bg-surface-variant rounded-sm"></div>
+                                        <div className="w-24 h-8 bg-primary/20 rounded-sm flex items-center justify-center text-primary font-label-caps text-label-caps">
+                                            INV-2026-001
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Feature 5 — DSR */}
+                            <div className="col-span-1 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col gap-md hover:shadow-sm transition-shadow">
+                                <div className="w-12 h-12 rounded bg-primary-container flex items-center justify-center">
+                                    <Icon name="assignment" size={24} fill className="text-on-primary" />
+                                </div>
+                                <h3 className="font-h3 text-h3 text-on-surface">
+                                    {t('landing.f5', 'Daily Site Reports (mobile)')}
+                                </h3>
+                                <p className="font-body-md text-body-md text-on-surface-variant">
+                                    {t('landing.f5Sub', 'Engineers log weather, attendance, materials received, and GPS-tagged photos. Managers acknowledge from the office.')}
+                                </p>
+                            </div>
+
+                            {/* Feature 6 — Bank Reconciliation */}
+                            <div className="col-span-1 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col gap-md hover:shadow-sm transition-shadow">
+                                <div className="w-12 h-12 rounded bg-secondary-container flex items-center justify-center">
+                                    <Icon name="account_balance" size={24} className="text-on-secondary-container" />
+                                </div>
+                                <h3 className="font-h3 text-h3 text-on-surface">
+                                    {t('landing.f6', 'Bank Reconciliation')}
+                                </h3>
+                                <p className="font-body-md text-body-md text-on-surface-variant">
+                                    {t('landing.f6Sub', 'Upload your NBE / CIB / QNB statement CSV. AI matches each row to your transactions — you confirm.')}
+                                </p>
+                            </div>
+
+                            {/* Feature 7 — RBAC */}
+                            <div className="col-span-1 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col gap-md hover:shadow-sm transition-shadow">
+                                <div className="w-12 h-12 rounded bg-tertiary-container flex items-center justify-center">
+                                    <Icon name="shield_person" size={24} className="text-on-tertiary-container" />
+                                </div>
+                                <h3 className="font-h3 text-h3 text-on-surface">
+                                    {t('landing.f7', 'Multi-tier Approvals')}
+                                </h3>
+                                <p className="font-body-md text-body-md text-on-surface-variant">
+                                    {t('landing.f7Sub', 'Engineer up to 5,000 EGP, manager up to 50,000, admin above. Configure tiers per company.')}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* ---------- Mobility ---------- */}
+                <section className="w-full py-20 px-margin-desktop" style={{ background: 'linear-gradient(135deg, #003ea8 0%, #2563eb 100%)' }}>
+                    <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-xl items-center text-on-primary">
+                        <div className="flex flex-col gap-md">
+                            <Icon name="phone_android" size={32} fill className="opacity-90" />
+                            <h2 className="font-h2 text-on-primary" style={{ fontSize: '36px', lineHeight: 1.2, fontWeight: 800 }}>
+                                {t('landing.mobileTitle', 'On the site, in the office, on the go.')}
+                            </h2>
+                            <p className="font-body-lg text-body-lg opacity-90">
+                                {t('landing.mobileSub', 'Engineers capture from their phones. Managers review from the office. Same data, no Excel exchange. Native Android + iOS apps via Expo.')}
+                            </p>
+                            <div className="flex gap-md flex-wrap mt-sm">
+                                <div className="bg-white/10 border border-white/30 rounded px-md py-sm flex items-center gap-md">
+                                    <Icon name="android" size={28} fill />
+                                    <div>
+                                        <div className="font-label-caps text-label-caps opacity-80">GET IT ON</div>
+                                        <div className="font-body-md text-body-md font-bold">Google Play</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white/10 border border-white/30 rounded px-md py-sm flex items-center gap-md">
+                                    <Icon name="apple" size={28} fill />
+                                    <div>
+                                        <div className="font-label-caps text-label-caps opacity-80">{t('landing.downloadOn', 'DOWNLOAD ON THE')}</div>
+                                        <div className="font-body-md text-body-md font-bold">App Store</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="font-label-caps text-label-caps opacity-80 mt-sm">
+                                {t('landing.appsComing', 'Stores coming soon — beta available via Expo Go today')}
+                            </div>
+                        </div>
+
+                        {/* CSS-only phone mockup */}
+                        <div className="flex justify-center">
+                            <div
+                                className="rounded-[36px] p-md shadow-2xl"
+                                style={{
+                                    width: 280,
+                                    height: 540,
+                                    border: '8px solid #1f2937',
+                                    background: '#f9fafb'
+                                }}
+                            >
+                                <div className="bg-surface-container-lowest rounded-[24px] h-full p-md flex flex-col text-on-surface">
+                                    <div className="font-body-md text-body-md font-bold mb-sm">AI Drafts</div>
+                                    <div className="grid grid-cols-2 gap-xs mb-md">
+                                        <div className="bg-primary text-on-primary rounded p-sm text-center font-body-sm text-body-sm font-semibold">🎤 Voice</div>
+                                        <div className="bg-primary text-on-primary rounded p-sm text-center font-body-sm text-body-sm font-semibold">📷 Camera</div>
+                                    </div>
+                                    {[
+                                        { name: 'شركة القاهرة للأسمنت', amt: '٢٥٬٠٠٠ ج.م.', tag: 'Pending', tagBg: 'bg-yellow-100', tagFg: 'text-yellow-800' },
+                                        { name: 'مصنعية بناء — مبنى A', amt: '٨٬٥٠٠ ج.م.', tag: 'Pending', tagBg: 'bg-yellow-100', tagFg: 'text-yellow-800' },
+                                        { name: 'Steel rebar 12mm', amt: 'EGP 12,400', tag: 'Committed', tagBg: 'bg-green-100', tagFg: 'text-green-800' }
+                                    ].map((it, i) => (
+                                        <div key={i} className="bg-surface-container-low p-sm rounded mb-xs">
+                                            <div className="font-body-sm text-body-sm font-semibold mb-xs">{it.name}</div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-label-caps text-label-caps text-on-surface-variant">{it.amt}</span>
+                                                <span className={`font-label-caps text-label-caps px-xs py-[2px] rounded ${it.tagBg} ${it.tagFg}`}>{it.tag}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* ---------- Pricing ---------- */}
+                <section id="pricing" className="w-full py-20 px-margin-desktop bg-surface-container-lowest border-t border-outline-variant">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="text-center max-w-2xl mx-auto flex flex-col gap-sm mb-lg">
+                            <h2 className="font-h2 text-h2 text-on-surface">
+                                {t('landing.pricingTitle', 'Simple, fair pricing')}
+                            </h2>
+                            <p className="font-body-lg text-body-lg text-on-surface-variant">
+                                {t('landing.pricingSub', 'Start free, forever. Upgrade when your team and projects grow.')}
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-lg">
+                            {plans.length === 0 ? (
+                                <div className="md:col-span-3 text-center font-body-md text-body-md text-on-surface-variant py-xl">
+                                    {t('landing.pricingLoading', 'Loading pricing…')}
+                                </div>
+                            ) : plans.map(plan => {
+                                const isPopular = plan.key === 'BASIC';
+                                return (
+                                    <div
+                                        key={plan.key}
+                                        className={`relative bg-surface-container-low rounded-xl p-xl border flex flex-col gap-md transition-shadow hover:shadow-sm ${isPopular ? 'border-primary border-2' : 'border-outline-variant'}`}
+                                    >
+                                        {isPopular && (
+                                            <span className="absolute -top-md right-lg bg-primary text-on-primary font-label-caps text-label-caps px-md py-xs rounded-full">
+                                                {t('landing.popular', 'MOST POPULAR')}
+                                            </span>
+                                        )}
+                                        <h3 className="font-h3 text-h3 text-on-surface">{plan.name}</h3>
+                                        <div>
+                                            <span className="font-h1 text-h1 text-on-surface">
+                                                {plan.priceEgp > 0 ? currency(plan.priceEgp) : t('landing.free', 'Free')}
+                                            </span>
+                                            {plan.priceEgp > 0 && (
+                                                <span className="font-body-sm text-body-sm text-on-surface-variant ms-xs">
+                                                    / {t('billing.month', 'month')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <ul className="flex flex-col gap-sm mt-sm">
+                                            {plan.features.map((f, i) => (
+                                                <li key={i} className="flex items-start gap-sm font-body-md text-body-md text-on-surface-variant">
+                                                    <Icon name="check_circle" size={16} fill className="text-primary mt-[2px] flex-shrink-0" />
+                                                    <span>{f}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <Link
+                                            to={user ? '/billing' : '/signup'}
+                                            className={`mt-md block text-center px-lg py-md rounded font-body-md text-body-md font-semibold transition-opacity ${isPopular ? 'bg-primary text-on-primary hover:opacity-90' : 'bg-surface-container-lowest text-primary border border-outline-variant hover:bg-surface-variant'}`}
+                                        >
+                                            {plan.priceEgp === 0
+                                                ? t('landing.startFree', 'Start free')
+                                                : (user ? t('landing.upgradeNow', 'Upgrade now') : t('landing.choosePlan', 'Choose this plan'))}
+                                        </Link>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="text-center mt-lg font-body-sm text-body-sm text-on-surface-variant">
+                            {t('landing.paymobNote', 'Cards, mobile wallets (Vodafone Cash, etc.), and Fawry — powered by Paymob.')}
+                        </p>
+                    </div>
+                </section>
+
+                {/* ---------- Final CTA ---------- */}
+                <section className="w-full py-16 px-margin-desktop bg-inverse-surface text-inverse-on-surface text-center">
+                    <div className="max-w-3xl mx-auto flex flex-col gap-md items-center">
+                        <h2 className="font-h2 text-h2" style={{ fontSize: '36px', fontWeight: 800 }}>
+                            {t('landing.ctaTitle', 'Get your first project on board this week.')}
+                        </h2>
+                        <p className="font-body-lg text-body-lg opacity-85">
+                            {t('landing.ctaSub', 'Sign up takes 60 seconds. Free forever for 1 project. No credit card.')}
+                        </p>
+                        <Link
+                            to={ctaTo}
+                            className="bg-primary text-on-primary px-xl py-md rounded font-body-md text-body-md hover:opacity-90 transition-opacity flex items-center gap-sm shadow-sm mt-sm"
+                        >
+                            {ctaLabel}
+                            <Icon name="arrow_forward" size={18} />
+                        </Link>
+                    </div>
+                </section>
+            </main>
+
+            {/* ---------- Footer ---------- */}
+            <footer className="bg-surface-container-lowest border-t border-outline-variant py-lg px-margin-desktop text-center text-on-surface-variant font-body-sm text-body-sm">
+                © {new Date().getFullYear()} Engineers Management.{' '}
+                <a
+                    href="https://github.com/8ofry/Engineers-Management"
+                    className="text-primary hover:underline"
+                >
                     GitHub
                 </a>
             </footer>
         </div>
     );
 }
-
-// ---------- helpers ----------
-const btnStyle = (variant) => ({
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    gap: 6,
-    padding: '8px 16px',
-    borderRadius: 8,
-    fontWeight: 600,
-    fontSize: 14,
-    textDecoration: 'none',
-    cursor: 'pointer',
-    border: '1px solid transparent',
-    ...(variant === 'primary' && {
-        background: '#2563eb', color: 'white'
-    }),
-    ...(variant === 'ghost' && {
-        background: 'transparent', color: '#111827',
-        borderColor: '#e5e7eb'
-    })
-});
-
-const sectionTitle = {
-    fontSize: 'clamp(28px, 4vw, 40px)',
-    fontWeight: 800,
-    textAlign: 'center',
-    marginBottom: 8
-};
-
-const sectionSub = {
-    color: '#6b7280',
-    fontSize: 17,
-    textAlign: 'center',
-    marginBottom: 24
-};
-
-const painCardStyle = {
-    background: 'white',
-    border: '1px solid #e5e7eb',
-    borderRadius: 12,
-    padding: 20
-};
-
-const FeatureCard = ({ icon, title, desc, color }) => (
-    <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
-        <div style={{
-            width: 44, height: 44, borderRadius: 10,
-            background: `${color}15`, color: color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: 14
-        }}>
-            {icon}
-        </div>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6, marginTop: 0 }}>{title}</h3>
-        <p style={{ fontSize: 14, color: '#4b5563', margin: 0, lineHeight: 1.55 }}>{desc}</p>
-    </div>
-);
-
-const BadgeStub = ({ icon, topLine, botLine }) => (
-    <div style={{
-        background: 'rgba(255,255,255,0.1)',
-        border: '1px solid rgba(255,255,255,0.3)',
-        padding: '8px 16px', borderRadius: 8,
-        display: 'flex', alignItems: 'center', gap: 10, cursor: 'not-allowed'
-    }}>
-        <span style={{ fontSize: 22 }}>{icon || '🍎'}</span>
-        <div>
-            <div style={{ fontSize: 10, opacity: 0.8 }}>{topLine}</div>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>{botLine}</div>
-        </div>
-    </div>
-);

@@ -1,3 +1,15 @@
+/* Tailwind layers — preflight is OFF in tailwind.config.js so the legacy
+   utility classes below keep working. New screens use Tailwind classes;
+   existing screens stay on the custom utilities until migrated. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Material Symbols icon font — used by the new design system */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
 :root {
   /* Color Palette - Professional Navy Blue, White & Grey Theme */
   --color-primary: hsl(220, 80%, 45%);
