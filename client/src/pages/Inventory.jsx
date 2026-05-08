@@ -24,6 +24,7 @@ export default function Inventory() {
     const [editingMaterial, setEditingMaterial] = useState(null);
     const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
     const [usageProjectId, setUsageProjectId] = useState(null);
+    const [usageBatchId, setUsageBatchId] = useState(null);
 
     const openEditMaterial = (material) => {
         setEditingMaterial(material);
@@ -254,6 +255,7 @@ export default function Inventory() {
                                                     style={{ display: 'flex', justifyContent: 'center', padding: '8px' }}
                                                     onClick={() => {
                                                         setUsageProjectId(item.projectId);
+                                                        setUsageBatchId(item.id);
                                                         setIsUsageModalOpen(true);
                                                     }}
                                                 >
@@ -349,6 +351,7 @@ export default function Inventory() {
                 open={isUsageModalOpen}
                 onClose={() => setIsUsageModalOpen(false)}
                 projectId={usageProjectId}
+                preselectedBatchId={usageBatchId}
                 onSuccess={() => {
                     showAlert({ type: 'success', title: 'Success', message: 'Usage recorded successfully' });
                     loadData();

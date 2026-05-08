@@ -7,6 +7,7 @@ const InventoryUsageModal = ({
     open,
     onClose,
     projectId,
+    preselectedBatchId,
     onSuccess
 }) => {
     const { t, i18n } = useTranslation();
@@ -62,6 +63,13 @@ const InventoryUsageModal = ({
 
         fetchBatches();
     }, [projectId, open]);
+
+    // Auto-select batch if provided
+    useEffect(() => {
+        if (batches.length > 0 && preselectedBatchId && !formData.materialBatchId) {
+            handleChange({ target: { name: 'materialBatchId', value: preselectedBatchId } });
+        }
+    }, [batches, preselectedBatchId]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

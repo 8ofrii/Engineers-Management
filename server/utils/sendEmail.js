@@ -13,13 +13,13 @@ const sendEmail = async (options) => {
     const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-            user: process.env.SMTP_EMAIL,
-            pass: process.env.SMTP_PASSWORD
+            user: process.env.SMTP_EMAIL.trim(),
+            pass: process.env.SMTP_PASSWORD.trim()
         }
     });
 
     const mailOptions = {
-        from: `Civil Engine <${process.env.SMTP_EMAIL}>`,
+        from: `Civil Engine <${process.env.SMTP_EMAIL.trim()}>`,
         to: options.email,
         subject: options.subject,
         html: options.message,

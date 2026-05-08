@@ -63,7 +63,12 @@ const SYNONYMS = {
 
 const findHeader = (headers, candidates) => {
     for (const c of candidates) {
-        const idx = headers.findIndex(h => h === c.toLowerCase());
+        const cLower = c.toLowerCase().replace(/\s+/g, '');
+        const idx = headers.findIndex(h => {
+            const hClean = h.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+            const hCondensed = hClean.replace(/\s+/g, '');
+            return hCondensed === cLower || hClean.includes(c.toLowerCase());
+        });
         if (idx >= 0) return headers[idx];
     }
     return null;

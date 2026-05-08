@@ -33,7 +33,7 @@ export const verifyToken = async (token, secret) => {
     const trimmed = String(token).trim();
     if (!/^\d{6}$/.test(trimmed)) return false;
     try {
-        const result = await totpVerify({ token: trimmed, secret, window: WINDOW });
+        const result = await totpVerify({ token: trimmed, secret, epochTolerance: WINDOW });
         // otplib v13 returns { valid: boolean, delta?: number, ... }
         return result?.valid === true;
     } catch {
