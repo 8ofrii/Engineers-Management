@@ -1,6 +1,7 @@
 import express from 'express';
 import * as transactionController from '../controllers/transactionController.js';
 import * as transactionAiController from '../controllers/transactionAiController.js';
+import * as transactionApprovalController from '../controllers/transactionApprovalController.js';
 import { protect } from '../middleware/auth.js';
 import { verifyRole, verifyOwnership } from '../middleware/rbac.js';
 import { audioUpload, upload } from '../middleware/upload.js';
@@ -23,11 +24,11 @@ router.post(
 // Get unique cost centers
 router.get('/cost-centers', transactionController.getCostCenters);
 
-// Get pending approvals (Managers & Admins only)
+// Get pending approvals (Managers & Admins only) — handlers in transactionApprovalController
 router.get(
     '/pending',
     verifyRole(['PROJECT_MANAGER', 'ADMIN']),
-    transactionController.getPendingApprovals
+    transactionApprovalController.getPendingApprovals
 );
 
 // Record income (Admins & Accountants only)
@@ -60,26 +61,26 @@ router.post(
     transactionAiController.analyzeTransaction
 );
 
-// Submit transaction for approval
+// Submit transaction for approval — handlers in transactionApprovalController
 router.put(
     '/:id/submit',
     verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN']),
     verifyOwnership('transaction'),
-    transactionController.submitTransaction
+    transactionApprovalController.submitTransaction
 );
 
-// Approve transaction (Managers & Admins only)
+// Approve transaction (Managers & Admins only) — handlers in transactionApprovalController
 router.put(
     '/:id/approve',
     verifyRole(['PROJECT_MANAGER', 'ADMIN']),
-    transactionController.approveTransaction
+    transactionApprovalController.approveTransaction
 );
 
-// Reject transaction (Managers & Admins only)
+// Reject transaction (Managers & Admins only) — handlers in transactionApprovalController
 router.put(
     '/:id/reject',
     verifyRole(['PROJECT_MANAGER', 'ADMIN']),
-    transactionController.rejectTransaction
+    transactionApprovalController.rejectTransaction
 );
 
 // Create generic transaction
