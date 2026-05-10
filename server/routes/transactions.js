@@ -2,6 +2,7 @@ import express from 'express';
 import * as transactionController from '../controllers/transactionController.js';
 import * as transactionAiController from '../controllers/transactionAiController.js';
 import * as transactionApprovalController from '../controllers/transactionApprovalController.js';
+import * as transactionCreateController from '../controllers/transactionCreateController.js';
 import { protect } from '../middleware/auth.js';
 import { verifyRole, verifyOwnership } from '../middleware/rbac.js';
 import { audioUpload, upload } from '../middleware/upload.js';
@@ -83,8 +84,8 @@ router.put(
     transactionApprovalController.rejectTransaction
 );
 
-// Create generic transaction
-router.post('/', transactionController.createTransaction);
+// Create generic transaction — handler in transactionCreateController
+router.post('/', transactionCreateController.createTransaction);
 
 // Get all transactions (role-based filtering)
 router.get('/', transactionController.getTransactions);
