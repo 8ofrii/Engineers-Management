@@ -1,5 +1,6 @@
 import express from 'express';
 import * as transactionController from '../controllers/transactionController.js';
+import * as transactionAiController from '../controllers/transactionAiController.js';
 import { protect } from '../middleware/auth.js';
 import { verifyRole, verifyOwnership } from '../middleware/rbac.js';
 import { audioUpload, upload } from '../middleware/upload.js';
@@ -43,20 +44,20 @@ router.post(
     transactionController.createDraft
 );
 
-// AI Voice Parsing (Staging - No DB save)
+// AI Voice Parsing (Staging - No DB save) — handlers in transactionAiController
 router.post(
     '/ai-parse',
     verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN']),
     audioUpload.single('audio'),
-    transactionController.parseVoiceNote
+    transactionAiController.parseVoiceNote
 );
 
-// AI Voice Analysis (New Service Pattern)
+// AI Voice Analysis (New Service Pattern) — handlers in transactionAiController
 router.post(
     '/analyze',
     verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN']),
     audioUpload.single('audio'),
-    transactionController.analyzeTransaction
+    transactionAiController.analyzeTransaction
 );
 
 // Submit transaction for approval
