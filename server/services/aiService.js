@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import fs from 'fs';
+import logger from '../lib/logger.js';
 
 // Lazy initialization to ensure env vars are loaded
 let openai = null;
@@ -138,7 +139,7 @@ export const processVoiceNote = async (filePath) => {
     } catch (error) {
         // Re-throw so callers can introspect status/code (quota vs rate limit vs
         // input rejection) and produce a specific user-facing message.
-        console.error("AI Service Error:", error?.status, error?.code, error?.message);
+        logger.error({ err: error, status: error?.status, code: error?.code }, 'AI Service Error');
         throw error;
     }
 };

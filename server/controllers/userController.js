@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import sendEmail from '../utils/sendEmail.js';
 import crypto from 'crypto';
 import { auditFromReq } from '../lib/audit.js';
+import logger from '../lib/logger.js';
 
 // Get All Users
 export const getUsers = async (req, res) => {
@@ -23,7 +24,7 @@ export const getUsers = async (req, res) => {
         });
         res.json({ success: true, data: users });
     } catch (err) {
-        console.error(err);
+        logger.error({ err }, 'Failed to fetch users');
         res.status(500).json({ success: false, message: 'Failed to fetch users' });
     }
 };
@@ -134,7 +135,7 @@ export const inviteUser = async (req, res) => {
             });
 
         } catch (emailError) {
-            console.error('Failed to send invitation email:', emailError);
+            logger.error({ err: emailError }, 'Failed to send invitation email');
             // Return success even if email fails, but warn
             res.status(201).json({
                 success: true,
@@ -145,7 +146,7 @@ export const inviteUser = async (req, res) => {
             });
         }
     } catch (err) {
-        console.error(err);
+        logger.error({ err }, 'Failed to create user');
         res.status(500).json({ success: false, message: 'Failed to create user' });
     }
 };
@@ -208,7 +209,7 @@ export const updateUser = async (req, res) => {
 
         res.json({ success: true, data: user, message: 'User updated successfully' });
     } catch (err) {
-        console.error(err);
+        logger.error({ err }, 'Failed to update user');
         res.status(500).json({ success: false, message: 'Failed to update user' });
     }
 };
@@ -252,7 +253,7 @@ export const deleteUser = async (req, res) => {
 
         res.json({ success: true, message: 'User removed successfully' });
     } catch (err) {
-        console.error(err);
+        logger.error({ err }, 'Failed to delete user');
         res.status(500).json({ success: false, message: 'Failed to delete user' });
     }
 };

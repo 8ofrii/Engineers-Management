@@ -42,8 +42,16 @@ Thumbs.db
 uploads/
 server/uploads/
 
-# Prisma
-prisma/migrations/
-
 # Build artifacts
 *.tsbuildinfo
+
+# UAT media — keep bug reports (.md/.pdf/.txt) but never commit raw media
+UAT/*.jpeg
+UAT/*.jpg
+UAT/*.png
+UAT/*.gif
+UAT/*.ogg
+UAT/*.mp3
+UAT/*.mp4
+UAT/*.wav
+UAT/*.m4a

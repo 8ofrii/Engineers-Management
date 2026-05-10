@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import logger from '../lib/logger.js';
 
 // SMTP creds come from env only — never hardcoded. The previous fallback
 // (a Gmail app password literal) was committed to a public repo and had to
@@ -28,7 +29,7 @@ const sendEmail = async (options) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('Message sent: %s', info.messageId);
+    logger.info({ messageId: info.messageId }, 'Email sent');
 };
 
 export default sendEmail;

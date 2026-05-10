@@ -148,7 +148,7 @@ Toggle between light and dark modes:
 
 ```
 Engineers-Management/
-├── client/                 # React frontend
+├── client/                 # React frontend (Vite)
 │   ├── src/
 │   │   ├── components/    # Reusable components
 │   │   ├── pages/         # Page components
@@ -157,14 +157,26 @@ Engineers-Management/
 │   │   ├── locales/       # Translation files
 │   │   └── utils/         # Utility functions
 │   └── package.json
-├── server/                # Node.js backend
+├── server/                # Node.js backend (Express + Prisma)
 │   ├── controllers/       # Route controllers
 │   ├── routes/            # API routes
 │   ├── middleware/        # Express middleware
 │   ├── prisma/            # Prisma schema & migrations
 │   └── package.json
+├── mobile/                # React Native (Expo) client
+├── scripts/               # One-off ops & migration scripts
+├── docs/
+│   └── archive/           # Historical implementation notes & runbooks
+├── UAT/                   # User-acceptance test bug reports
+├── CHANGELOG.md
 └── README.md
 ```
+
+## 📚 Documentation
+
+- [`CHANGELOG.md`](CHANGELOG.md) — release notes going forward.
+- [`docs/archive/`](docs/archive/) — historical implementation guides, phase
+  notes, and one-off fix write-ups (V1, V1.2, RBAC, i18n, etc).
 
 ## 🔧 API Endpoints
 
