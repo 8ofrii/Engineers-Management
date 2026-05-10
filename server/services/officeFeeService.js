@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import logger from '../lib/logger.js';
 
 /**
  * Get office fee percentage for a transaction
@@ -45,7 +46,7 @@ export const getOfficeFeePercent = async (projectId, category) => {
         return 20;
 
     } catch (error) {
-        console.error('Error getting office fee percent:', error);
+        logger.error({ err: error }, 'Error getting office fee percent');
         return 20; // Fallback to default on error
     }
 };
@@ -90,7 +91,7 @@ export const calculateOfficeFee = async (projectId, category, amount) => {
         const fee = Number(amount) * (feePercent / 100);
         return Math.round(fee * 100) / 100; // Round to 2 decimal places
     } catch (error) {
-        console.error('Error calculating office fee:', error);
+        logger.error({ err: error }, 'Error calculating office fee');
         return 0;
     }
 };
@@ -126,7 +127,7 @@ export const getProjectOfficeFees = async (projectId) => {
             }))
         };
     } catch (error) {
-        console.error('Error getting project office fees:', error);
+        logger.error({ err: error }, 'Error getting project office fees');
         return {
             projectGeneralFee: null,
             projectCategoryFees: [],
@@ -164,7 +165,7 @@ export const setProjectCategoryFee = async (projectId, category, feePercent, ten
             }
         });
     } catch (error) {
-        console.error('Error setting project category fee:', error);
+        logger.error({ err: error }, 'Error setting project category fee');
         throw error;
     }
 };
@@ -193,7 +194,7 @@ export const setGlobalCategoryFee = async (category, defaultFeePercent, tenantId
             }
         });
     } catch (error) {
-        console.error('Error setting global category fee:', error);
+        logger.error({ err: error }, 'Error setting global category fee');
         throw error;
     }
 };
@@ -216,7 +217,7 @@ export const deleteProjectCategoryFee = async (projectId, category) => {
             }
         });
     } catch (error) {
-        console.error('Error deleting project category fee:', error);
+        logger.error({ err: error }, 'Error deleting project category fee');
         throw error;
     }
 };

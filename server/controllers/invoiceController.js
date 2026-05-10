@@ -2,6 +2,7 @@ import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
 import { generateInvoicePdf } from '../lib/invoicePdf.js';
 import sendEmail from '../utils/sendEmail.js';
+import logger from '../lib/logger.js';
 
 const D = (n) => Number(n || 0);
 
@@ -302,7 +303,7 @@ export const sendInvoice = async (req, res, next) => {
                 }]
             });
         } catch (emailErr) {
-            console.error('Invoice email send failed:', emailErr);
+            logger.error({ err: emailErr }, 'Invoice email send failed');
             return res.status(502).json({ success: false, message: 'Failed to send email; verify SMTP settings.' });
         }
 

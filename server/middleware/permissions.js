@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { DEFAULT_PERMISSIONS } from '../constants/permissions.js';
+import logger from '../lib/logger.js';
 
 /**
  * Dynamic Permission Checker Middleware
@@ -66,7 +67,7 @@ export const checkPermission = (requiredPermission) => {
 
             next();
         } catch (error) {
-            console.error('Permission check error:', error);
+            logger.error({ err: error }, 'Permission check error');
             return res.status(500).json({
                 success: false,
                 message: 'Error checking permissions'
@@ -134,7 +135,7 @@ export const checkAnyPermission = (requiredPermissions) => {
             req.userPermissions = permissions;
             next();
         } catch (error) {
-            console.error('Permission check error:', error);
+            logger.error({ err: error }, 'Permission check error');
             return res.status(500).json({
                 success: false,
                 message: 'Error checking permissions'
@@ -202,7 +203,7 @@ export const checkApprovalLimit = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('Approval limit check error:', error);
+        logger.error({ err: error }, 'Approval limit check error');
         return res.status(500).json({
             success: false,
             message: 'Error checking approval limit'
@@ -256,7 +257,7 @@ export const attachPermissions = async (req, res, next) => {
         req.userPermissions = permissions;
         next();
     } catch (error) {
-        console.error('Error attaching permissions:', error);
+        logger.error({ err: error }, 'Error attaching permissions');
         next(); // Don't block request if permission attachment fails
     }
 };

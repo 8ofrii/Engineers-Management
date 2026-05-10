@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import logger from '../lib/logger.js';
 import OpenAI from 'openai';
 
 // Lazy initialization to ensure env vars are loaded
@@ -123,7 +124,7 @@ export const parseVoiceNote = async (req, res, next) => {
                 // Cleanup uploaded file
                 fs.unlinkSync(audioFile.path);
             } catch (error) {
-                console.error('Whisper transcription failed:', error);
+                logger.error({ err: error }, 'Whisper transcription failed');
                 return res.status(500).json({
                     success: false,
                     message: 'Whisper transcription failed',
@@ -182,7 +183,7 @@ export const parseVoiceNote = async (req, res, next) => {
             });
 
         } catch (error) {
-            console.error('GPT Extraction Error:', error);
+            logger.error({ err: error }, 'GPT Extraction Error');
             return res.status(500).json({
                 success: false,
                 message: 'AI extraction failed',

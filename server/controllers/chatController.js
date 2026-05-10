@@ -247,7 +247,7 @@ LANGUAGE RULE — STRICT:
         });
 
     } catch (error) {
-        console.error('Chat Assistant Error:', error);
+        logger.error({ err: error }, 'Chat Assistant Error');
         next(error);
     }
 };

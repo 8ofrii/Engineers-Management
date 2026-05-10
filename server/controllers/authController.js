@@ -5,6 +5,7 @@ import sendEmail from '../utils/sendEmail.js';
 import crypto from 'crypto';
 import { generateSecret, verifyToken } from '../lib/totp.js';
 import { auditFromReq } from '../lib/audit.js';
+import logger from '../lib/logger.js';
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -178,7 +179,7 @@ export const registerCompany = async (req, res, next) => {
                 message
             });
         } catch (error) {
-            console.error('Email send error:', error);
+            logger.error({ err: error }, 'Email send error');
             // We return success true but maybe with a warning, or fail?
             // If we fail here, the user is created but can't verify.
             // Let's assume it works or they can resend (need resend endpoint?)
@@ -770,7 +771,7 @@ export const forgotPassword = async (req, res, next) => {
                 devResetUrl: isDev ? resetUrl : undefined // Expose link for dev testing testing without SMTP
             });
         } catch (err) {
-            console.error('Email sending failed:', err);
+            logger.error({ err }, 'Email sending failed');
 
             // Revert on failure
             await prisma.user.updateMany({
