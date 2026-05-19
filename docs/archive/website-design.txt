@@ -1,0 +1,2283 @@
+<!-- Admin Dashboard -->
+<!DOCTYPE html>
+
+<html class="light" dir="ltr" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Engineers Management - Admin Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&amp;family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#e0e3e5",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "surface-bright": "#f7f9fb",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#5e6e85",
+                        "primary-fixed": "#dbe1ff",
+                        "on-surface": "#191c1e",
+                        "surface-tint": "#0053db",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "on-secondary-container": "#5c647a",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#434655",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "error-container": "#ffdad6",
+                        "secondary": "#565e74",
+                        "on-secondary-fixed": "#131b2e",
+                        "surface-variant": "#e0e3e5",
+                        "tertiary": "#46566c",
+                        "outline": "#737686",
+                        "outline-variant": "#c3c6d7",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-container-low": "#f2f4f6",
+                        "primary-container": "#2563eb",
+                        "inverse-surface": "#2d3133",
+                        "tertiary-fixed": "#d3e4fe",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-dim": "#d8dadc",
+                        "surface": "#f7f9fb",
+                        "secondary-container": "#dae2fd",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed": "#dae2fd",
+                        "error": "#ba1a1a",
+                        "background": "#f7f9fb",
+                        "surface-container": "#eceef0",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-primary-container": "#eeefff",
+                        "on-tertiary-container": "#e9f0ff",
+                        "on-background": "#191c1e",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "primary": "#004ac6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "sm": "8px",
+                        "margin-desktop": "32px",
+                        "base": "8px",
+                        "gutter": "16px",
+                        "md": "16px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "arabic-body": ["Cairo"],
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "h2": ["Cairo"],
+                        "h1": ["Cairo"],
+                        "h3": ["Cairo"],
+                        "body-md": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "arabic-body": ["14px", { "lineHeight": "1.7", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-sm": ["13px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "h2": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "h1": ["32px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "h3": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-[calc(100%-16rem)] ml-64 z-40 bg-surface-container-lowest border-b border-outline-variant flex justify-between items-center px-margin-desktop py-sm h-16">
+<div class="flex items-center gap-4">
+<span class="font-h3 text-h3 font-semibold text-primary">Al-Binaa Engineering</span>
+</div>
+<div class="flex items-center gap-lg">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface border border-outline-variant rounded-md text-body-sm focus:border-primary focus:ring-1 focus:ring-primary w-64 transition-colors" placeholder="Search projects..." type="text"/>
+</div>
+<div class="flex items-center gap-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors active:opacity-70 font-label-caps text-label-caps">AR/EN</button>
+<button class="hover:text-primary transition-colors active:opacity-70 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="hover:text-primary transition-colors active:opacity-70">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="fixed h-full left-0 top-0 w-64 bg-surface-container-low shadow-sm z-50 flex flex-col p-md border-r border-outline-variant hidden md:flex">
+<div class="mb-xl flex flex-col items-start gap-sm">
+<img alt="Firm Logo" class="w-12 h-12 rounded-lg object-cover border border-outline-variant" data-alt="A clean, minimalist abstract logo design suitable for a modern engineering or construction firm, featuring geometric shapes in professional blue tones on a bright white background, symbolizing stability and structure." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoDWuLzaGysMz1GmXHghSrev3M7tgHHPXXRxJP9tGv46WCA7oULgHiyp7Q0dZc-OmDXnXdmASavoNi5_Pb8LM0acxZsIxKbUCcAjgKSbvXIIGNjBq5JBAkqG788L_4CCbqhQTWFXHp9irGqclPxZ2yFG-JB8_8Bpp_osKva-7IIlFivog4DiXqmjvNY-1RakHKReBpkoNPuIjXOOFlW5BjrVGFY3bFlQMB5A36_Ue1waezcR3p7wVGXCCosHeMW9d1erA5fQuNzaQ"/>
+<div>
+<h1 class="font-h2 text-h2 font-bold text-primary">Engineers Management</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Egyptian Construction ERP</p>
+</div>
+</div>
+<button class="mb-lg w-full bg-primary text-on-primary py-2 px-4 rounded-md font-body-md font-semibold hover:bg-on-primary-fixed-variant transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">add</span>
+            + New Transaction
+        </button>
+<ul class="flex-1 flex flex-col gap-sm">
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md bg-surface-variant text-primary font-bold border-r-4 border-primary transition-colors group" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-on-surface-variant hover:bg-surface-variant transition-colors active:scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined">architecture</span>
+                    Projects
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-on-surface-variant hover:bg-surface-variant transition-colors active:scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined">group</span>
+                    Clients
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-on-surface-variant hover:bg-surface-variant transition-colors active:scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+                    Suppliers
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-on-surface-variant hover:bg-surface-variant transition-colors active:scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined">payments</span>
+                    Finance
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-on-surface-variant hover:bg-surface-variant transition-colors active:scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined">assessment</span>
+                    Reports
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-on-surface-variant hover:bg-surface-variant transition-colors active:scale-95 duration-150 group" href="#">
+<span class="material-symbols-outlined">auto_awesome</span>
+                    AI Drafts
+                </a>
+</li>
+</ul>
+</nav>
+<!-- BottomNavBar (Mobile) -->
+<nav class="fixed bottom-0 w-full bg-surface-container-lowest shadow-lg border-t border-outline-variant z-50 rounded-t-xl flex justify-around items-center px-4 py-2 md:hidden">
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high rounded-xl px-4 py-1 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">foundation</span>
+<span class="font-label-caps text-label-caps mt-1">Projects</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high rounded-xl px-4 py-1 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-caps text-label-caps mt-1">Finance</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high rounded-xl px-4 py-1 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">menu</span>
+<span class="font-label-caps text-label-caps mt-1">More</span>
+</a>
+</nav>
+<!-- Main Content -->
+<main class="md:ml-64 pt-16 p-margin-mobile md:p-margin-desktop min-h-screen pb-24 md:pb-margin-desktop">
+<!-- Header Actions -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-xl gap-4">
+<div>
+<h2 class="font-h1 text-h1 text-on-surface mb-xs">Overview</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Welcome back, Admin. Here's what's happening today.</p>
+</div>
+<div class="flex flex-wrap gap-sm">
+<button class="bg-surface border border-outline-variant text-on-surface px-4 py-2 rounded-md font-body-sm hover:bg-surface-variant transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+                    Generate Invoice
+                </button>
+<button class="bg-surface border border-outline-variant text-on-surface px-4 py-2 rounded-md font-body-sm hover:bg-surface-variant transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">domain_add</span>
+                    Add Project
+                </button>
+</div>
+</div>
+<!-- KPI Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-lg mb-xl">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-md rounded-lg border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Total Active Projects</span>
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-1 rounded-md">architecture</span>
+</div>
+<div class="font-h2 text-h2 text-on-surface mb-xs">24</div>
+<div class="font-label-caps text-label-caps text-tertiary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> +3 this month
+                </div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-md rounded-lg border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Total Budget (EGP)</span>
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-1 rounded-md">account_balance</span>
+</div>
+<div class="font-h2 text-h2 text-on-surface mb-xs">14.2M</div>
+<div class="font-label-caps text-label-caps text-tertiary flex items-center gap-1">
+                    Across all projects
+                </div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-md rounded-lg border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Safe Balance</span>
+<span class="material-symbols-outlined text-primary bg-primary-fixed p-1 rounded-md">savings</span>
+</div>
+<div class="font-h2 text-h2 text-on-surface mb-xs">850K</div>
+<div class="font-label-caps text-label-caps text-[#166534] flex items-center gap-1 bg-[#dcfce7] inline-block px-2 py-0.5 rounded-full">
+                    Healthy
+                </div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-md rounded-lg border border-error shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="absolute top-0 right-0 w-1 h-full bg-error"></div>
+<div class="flex justify-between items-start mb-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Pending Approvals</span>
+<span class="material-symbols-outlined text-error bg-error-container p-1 rounded-md">warning</span>
+</div>
+<div class="font-h2 text-h2 text-on-surface mb-xs">12</div>
+<div class="font-label-caps text-label-caps text-error flex items-center gap-1">
+                    Requires attention
+                </div>
+</div>
+</div>
+<!-- Main Content Area: Charts & Widgets -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg mb-xl">
+<!-- Main Chart Area (Spans 2 columns) -->
+<div class="lg:col-span-2 flex flex-col gap-lg">
+<!-- Income vs Expenses Chart Placeholder -->
+<div class="bg-surface-container-lowest p-lg rounded-lg border border-outline-variant shadow-sm h-[300px] flex flex-col">
+<div class="flex justify-between items-center mb-md">
+<h3 class="font-h3 text-h3 text-on-surface">Income vs Expenses</h3>
+<select class="bg-surface border border-outline-variant rounded-md text-body-sm py-1 px-2 focus:border-primary">
+<option>This Year</option>
+<option>Last Year</option>
+</select>
+</div>
+<!-- Placeholder for Chart -->
+<div class="flex-1 flex items-end justify-around gap-2 pb-4 border-b border-outline-variant relative">
+<!-- Y-axis labels -->
+<div class="absolute left-0 top-0 h-full flex flex-col justify-between text-label-caps text-on-surface-variant pr-2">
+<span>5M</span><span>2.5M</span><span>0</span>
+</div>
+<div class="w-full flex justify-around items-end h-full pl-8">
+<div class="flex gap-1 items-end group h-full">
+<div class="w-8 bg-primary rounded-t-sm h-[60%] group-hover:opacity-80 transition-opacity"></div>
+<div class="w-8 bg-secondary rounded-t-sm h-[40%] group-hover:opacity-80 transition-opacity"></div>
+</div>
+<div class="flex gap-1 items-end group h-full">
+<div class="w-8 bg-primary rounded-t-sm h-[80%] group-hover:opacity-80 transition-opacity"></div>
+<div class="w-8 bg-secondary rounded-t-sm h-[50%] group-hover:opacity-80 transition-opacity"></div>
+</div>
+<div class="flex gap-1 items-end group h-full">
+<div class="w-8 bg-primary rounded-t-sm h-[40%] group-hover:opacity-80 transition-opacity"></div>
+<div class="w-8 bg-secondary rounded-t-sm h-[70%] group-hover:opacity-80 transition-opacity"></div>
+</div>
+<div class="flex gap-1 items-end group h-full">
+<div class="w-8 bg-primary rounded-t-sm h-[90%] group-hover:opacity-80 transition-opacity"></div>
+<div class="w-8 bg-secondary rounded-t-sm h-[60%] group-hover:opacity-80 transition-opacity"></div>
+</div>
+</div>
+</div>
+<div class="flex justify-around pl-8 mt-2 text-label-caps text-on-surface-variant">
+<span>Q1</span><span>Q2</span><span>Q3</span><span>Q4</span>
+</div>
+<div class="flex justify-center gap-4 mt-4 text-body-sm">
+<div class="flex items-center gap-1"><span class="w-3 h-3 bg-primary rounded-full"></span> Income</div>
+<div class="flex items-center gap-1"><span class="w-3 h-3 bg-secondary rounded-full"></span> Expenses</div>
+</div>
+</div>
+<!-- Recent Projects List -->
+<div class="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-sm overflow-hidden">
+<div class="p-md border-b border-outline-variant flex justify-between items-center bg-surface-bright">
+<h3 class="font-h3 text-h3 text-on-surface">Recent Projects</h3>
+<button class="text-primary font-body-sm hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant text-label-caps text-on-surface-variant bg-surface">
+<th class="py-3 px-md font-semibold">Project Name</th>
+<th class="py-3 px-md font-semibold">Status</th>
+<th class="py-3 px-md font-semibold">Budget (EGP)</th>
+<th class="py-3 px-md font-semibold">Progress</th>
+</tr>
+</thead>
+<tbody class="text-body-sm text-on-surface">
+<tr class="border-b border-outline-variant hover:bg-surface-variant transition-colors">
+<td class="py-3 px-md font-medium">Nile Tower Foundation</td>
+<td class="py-3 px-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#dcfce7] text-[#166534]">Active</span>
+</td>
+<td class="py-3 px-md">2,500,000</td>
+<td class="py-3 px-md">
+<div class="flex items-center gap-2">
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-primary h-1.5 rounded-full" style="width: 45%"></div>
+</div>
+<span class="text-xs text-on-surface-variant">45%</span>
+</div>
+</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-variant transition-colors">
+<td class="py-3 px-md font-medium">Alexandria Port Extension</td>
+<td class="py-3 px-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#dcfce7] text-[#166534]">Active</span>
+</td>
+<td class="py-3 px-md">8,200,000</td>
+<td class="py-3 px-md">
+<div class="flex items-center gap-2">
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-primary h-1.5 rounded-full" style="width: 78%"></div>
+</div>
+<span class="text-xs text-on-surface-variant">78%</span>
+</div>
+</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-variant transition-colors">
+<td class="py-3 px-md font-medium">Cairo Metro Line 4 Supply</td>
+<td class="py-3 px-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#fef9c3] text-[#854d0e]">Delayed</span>
+</td>
+<td class="py-3 px-md">1,150,000</td>
+<td class="py-3 px-md">
+<div class="flex items-center gap-2">
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-error h-1.5 rounded-full" style="width: 30%"></div>
+</div>
+<span class="text-xs text-on-surface-variant">30%</span>
+</div>
+</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-surface-variant transition-colors">
+<td class="py-3 px-md font-medium">New Capital Plaza Site B</td>
+<td class="py-3 px-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#dcfce7] text-[#166534]">Active</span>
+</td>
+<td class="py-3 px-md">4,800,000</td>
+<td class="py-3 px-md">
+<div class="flex items-center gap-2">
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-primary h-1.5 rounded-full" style="width: 12%"></div>
+</div>
+<span class="text-xs text-on-surface-variant">12%</span>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-surface-variant transition-colors">
+<td class="py-3 px-md font-medium">Giza Warehouse Renovation</td>
+<td class="py-3 px-md">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#f3f4f6] text-[#374151]">Completed</span>
+</td>
+<td class="py-3 px-md">450,000</td>
+<td class="py-3 px-md">
+<div class="flex items-center gap-2">
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-secondary h-1.5 rounded-full" style="width: 100%"></div>
+</div>
+<span class="text-xs text-on-surface-variant">100%</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Side Widgets (Spans 1 column) -->
+<div class="flex flex-col gap-lg">
+<!-- Expenses Donut Chart Placeholder -->
+<div class="bg-surface-container-lowest p-md rounded-lg border border-outline-variant shadow-sm flex flex-col h-[300px]">
+<h3 class="font-h3 text-h3 text-on-surface mb-md">Expenses by Category</h3>
+<div class="flex-1 flex items-center justify-center relative">
+<!-- CSS Donut representation -->
+<div class="w-40 h-40 rounded-full border-[16px] border-surface-container-high relative flex items-center justify-center">
+<!-- Simulated segments using conic-gradient for modern approach -->
+<div class="absolute inset-[-16px] rounded-full border-[16px] border-transparent" style="border-top-color: #004ac6; border-right-color: #004ac6; transform: rotate(45deg);"></div>
+<div class="absolute inset-[-16px] rounded-full border-[16px] border-transparent" style="border-left-color: #565e74; transform: rotate(15deg);"></div>
+<div class="absolute inset-[-16px] rounded-full border-[16px] border-transparent" style="border-bottom-color: #93000a; transform: rotate(-45deg);"></div>
+<div class="text-center">
+<div class="font-h3 text-h3 text-on-surface">6.8M</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">Total</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-4 text-body-sm">
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-primary rounded-full"></span> Concrete (45%)</div>
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-secondary rounded-full"></span> Labor (30%)</div>
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-error rounded-full"></span> Plumbing (15%)</div>
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-tertiary rounded-full"></span> Other (10%)</div>
+</div>
+</div>
+<!-- AI Drafts to Review Widget -->
+<div class="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-sm flex-1 flex flex-col">
+<div class="p-md border-b border-outline-variant flex justify-between items-center bg-surface-bright rounded-t-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">auto_awesome</span>
+<h3 class="font-h3 text-h3 text-on-surface">AI Drafts to Review</h3>
+</div>
+<span class="bg-error-container text-on-error-container text-xs font-bold px-2 py-1 rounded-full">3</span>
+</div>
+<div class="flex-1 flex flex-col divide-y divide-outline-variant p-md gap-4">
+<!-- Draft Item -->
+<div class="flex gap-3 group">
+<div class="bg-surface-variant p-2 rounded-md h-fit text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h4 class="font-body-sm font-semibold text-on-surface">Voice Note Parsing</h4>
+<span class="text-[10px] text-on-surface-variant">10m ago</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-2 line-clamp-2">"Bought 50 bags of cement from El-Sewedy for 15,000 EGP cash for the Nile Tower site."</p>
+<div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-[11px] bg-primary-container text-on-primary-container px-2 py-1 rounded border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors">Review</button>
+<button class="text-[11px] bg-surface text-on-surface border border-outline-variant px-2 py-1 rounded hover:bg-surface-variant transition-colors">Dismiss</button>
+</div>
+</div>
+</div>
+<!-- Draft Item -->
+<div class="flex gap-3 pt-4 group">
+<div class="bg-surface-variant p-2 rounded-md h-fit text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">receipt</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h4 class="font-body-sm font-semibold text-on-surface">Receipt Capture</h4>
+<span class="text-[10px] text-on-surface-variant">1h ago</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-2 line-clamp-1">Hardware supplies - 3,250 EGP</p>
+<div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-[11px] bg-primary-container text-on-primary-container px-2 py-1 rounded border border-primary/20 hover:bg-primary hover:text-on-primary transition-colors">Review</button>
+<button class="text-[11px] bg-surface text-on-surface border border-outline-variant px-2 py-1 rounded hover:bg-surface-variant transition-colors">Dismiss</button>
+</div>
+</div>
+</div>
+</div>
+<div class="p-3 border-t border-outline-variant text-center bg-surface-bright rounded-b-lg">
+<a class="text-primary font-body-sm hover:underline" href="#">Go to AI Drafts Center</a>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
+
+<!-- Marketing Landing Page -->
+<!DOCTYPE html>
+
+<html class="light" dir="ltr" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Engineers Management - Construction ERP</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&amp;family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-highest": "#e0e3e5",
+                      "secondary-fixed-dim": "#bec6e0",
+                      "surface-bright": "#f7f9fb",
+                      "on-secondary-fixed-variant": "#3f465c",
+                      "on-error-container": "#93000a",
+                      "tertiary-container": "#5e6e85",
+                      "primary-fixed": "#dbe1ff",
+                      "on-surface": "#191c1e",
+                      "surface-tint": "#0053db",
+                      "inverse-on-surface": "#eff1f3",
+                      "on-primary-fixed": "#00174b",
+                      "inverse-primary": "#b4c5ff",
+                      "on-secondary-container": "#5c647a",
+                      "on-tertiary": "#ffffff",
+                      "on-surface-variant": "#434655",
+                      "on-primary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "error-container": "#ffdad6",
+                      "secondary": "#565e74",
+                      "on-secondary-fixed": "#131b2e",
+                      "surface-variant": "#e0e3e5",
+                      "tertiary": "#46566c",
+                      "outline": "#737686",
+                      "outline-variant": "#c3c6d7",
+                      "tertiary-fixed-dim": "#b7c8e1",
+                      "surface-container-high": "#e6e8ea",
+                      "surface-container-low": "#f2f4f6",
+                      "primary-container": "#2563eb",
+                      "inverse-surface": "#2d3133",
+                      "tertiary-fixed": "#d3e4fe",
+                      "on-tertiary-fixed-variant": "#38485d",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-dim": "#d8dadc",
+                      "surface": "#f7f9fb",
+                      "secondary-container": "#dae2fd",
+                      "on-secondary": "#ffffff",
+                      "secondary-fixed": "#dae2fd",
+                      "error": "#ba1a1a",
+                      "background": "#f7f9fb",
+                      "surface-container": "#eceef0",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "on-primary-container": "#eeefff",
+                      "on-tertiary-container": "#e9f0ff",
+                      "on-background": "#191c1e",
+                      "on-tertiary-fixed": "#0b1c30",
+                      "primary": "#004ac6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "sm": "8px",
+                      "margin-desktop": "32px",
+                      "base": "8px",
+                      "gutter": "16px",
+                      "md": "16px",
+                      "xl": "32px",
+                      "lg": "24px",
+                      "xs": "4px"
+              },
+              "fontFamily": {
+                      "arabic-body": [
+                              "Cairo"
+                      ],
+                      "body-lg": [
+                              "inter"
+                      ],
+                      "body-sm": [
+                              "inter"
+                      ],
+                      "h2": [
+                              "Cairo"
+                      ],
+                      "h1": [
+                              "Cairo"
+                      ],
+                      "h3": [
+                              "Cairo"
+                      ],
+                      "body-md": [
+                              "inter"
+                      ],
+                      "label-caps": [
+                              "inter"
+                      ]
+              },
+              "fontSize": {
+                      "arabic-body": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.7",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "h2": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "h1": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "h3": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- Top Navigation (Marketing Version - Simplified) -->
+<header class="bg-surface-container-lowest border-b border-outline-variant w-full sticky top-0 z-50">
+<div class="max-w-7xl mx-auto flex justify-between items-center px-margin-desktop py-md">
+<div class="font-h3 text-h3 text-primary">Engineers Management</div>
+<div class="flex items-center gap-md">
+<button class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors">AR / EN</button>
+<button class="bg-primary text-on-primary px-lg py-sm rounded font-body-sm text-body-sm hover:opacity-90 transition-opacity">Start Your Free Pilot</button>
+</div>
+</div>
+</header>
+<main class="flex-grow flex flex-col">
+<!-- Hero Section -->
+<section class="w-full bg-surface-container-low py-20 px-margin-desktop flex flex-col md:flex-row items-center justify-center gap-xl max-w-7xl mx-auto">
+<div class="flex-1 flex flex-col gap-lg items-start max-w-2xl">
+<h1 class="font-h1 text-[48px] leading-[1.1] font-bold text-on-surface">Never Lose a Single Record Again.</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">The first AI-powered Construction ERP built specifically for Egyptian engineering firms. Say it, snap it, log it.</p>
+<div class="flex gap-md mt-sm">
+<button class="bg-primary text-on-primary px-xl py-md rounded font-body-md text-body-md hover:opacity-90 transition-opacity flex items-center gap-sm shadow-sm">
+                        Start Your Free Pilot
+                    </button>
+<button class="bg-surface-container-lowest text-primary border border-outline-variant px-xl py-md rounded font-body-md text-body-md hover:bg-surface-variant transition-colors flex items-center gap-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+                        Watch Demo
+                    </button>
+</div>
+<div class="mt-lg flex items-center gap-sm text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-primary">verified</span>
+                    Trusted by leading Egyptian contractors.
+                </div>
+</div>
+<div class="flex-1 w-full max-w-xl relative">
+<div class="aspect-[4/3] rounded-xl overflow-hidden shadow-lg border border-outline-variant bg-surface-container-lowest relative">
+<img alt="Hero Image" class="w-full h-full object-cover" data-alt="A high-quality, professional photograph of a rugged Egyptian construction site under bright, clear daylight. In the foreground, an engineer wearing a hard hat and safety vest is holding a modern smartphone, seemingly using a voice recording app. The UI on the phone screen shows a minimalist, clean interface with blue accents matching the brand palette. The overall mood is modern, efficient, and industrious, blending traditional construction elements with cutting-edge technology." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrItcFBkSidOO4u-EAcMLXnfHycG8mtXS8nyFmTEiXCvY1LsbTKaarUKEoRwFi8pwk1Dfdgi_liHLC4xHOxHah5nEx0-sVJOisvlnLDDho1bJ1-WuvQv8z8VwTKWQHynkIrnULcjghyHNsl9QQiBDkyayuWocGz4z8znWtZ8A2Cl3im9PBrz_vEQEo46SqySzTAgxA5sVH8L1iLvLFq_M11tjjQ8-a55IGUI9ZdjKRCxSoQBDNXEOVp6eyYa_hnnpPw8WuDVYYLlQ"/>
+<!-- Abstract UI Overlay -->
+<div class="absolute bottom-md right-md bg-surface-container-lowest/90 backdrop-blur-sm p-md rounded shadow-sm border border-outline-variant flex items-center gap-md">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container">mic</span>
+</div>
+<div>
+<div class="font-body-sm text-body-sm font-semibold text-on-surface">Voice Capture Active</div>
+<div class="font-label-caps text-label-caps text-on-surface-variant">Logging material receipt...</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Feature Grid (Bento Style) -->
+<section class="w-full py-20 px-margin-desktop bg-surface-container-lowest border-t border-outline-variant">
+<div class="max-w-7xl mx-auto flex flex-col gap-xl">
+<div class="text-center max-w-2xl mx-auto flex flex-col gap-sm">
+<h2 class="font-h2 text-h2 text-on-surface">Built for the Site, Powerful for the Office</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Our platform bridges the gap between field execution and financial oversight.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-lg mt-lg">
+<!-- Feature 1: AI Voice -->
+<div class="col-span-1 md:col-span-2 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col justify-between hover:shadow-sm transition-shadow">
+<div class="flex flex-col gap-md">
+<div class="w-12 h-12 rounded bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-[24px]" style="font-variation-settings: 'FILL' 1;">mic</span>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface">AI Voice &amp; Receipt Capture</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md">Speak naturally or snap a photo of a receipt. Our AI automatically extracts amounts, vendor names, and project codes, logging them directly into your ledger.</p>
+</div>
+</div>
+<!-- Feature 2: Arabic Support -->
+<div class="col-span-1 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col gap-md hover:shadow-sm transition-shadow">
+<div class="w-12 h-12 rounded bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary-container text-[24px]">translate</span>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface">Full Arabic RTL Support</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">A truly native experience. Perfect right-to-left layouts tailored for Arabic-speaking teams.</p>
+</div>
+<!-- Feature 3: Profit Engine -->
+<div class="col-span-1 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col gap-md hover:shadow-sm transition-shadow">
+<div class="w-12 h-12 rounded bg-tertiary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-tertiary-container text-[24px]">trending_up</span>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface">V1.2 Profit-on-Expense Engine</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Real-time visibility into project profitability as expenses are logged.</p>
+</div>
+<!-- Feature 4: Invoicing -->
+<div class="col-span-1 md:col-span-2 bg-surface-container-low rounded-xl p-xl border border-outline-variant flex flex-col md:flex-row gap-lg hover:shadow-sm transition-shadow items-center justify-between">
+<div class="flex flex-col gap-md max-w-md">
+<div class="w-12 h-12 rounded bg-surface-tint/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-surface-tint text-[24px]">receipt_long</span>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface">Automated Professional Invoicing</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Generate compliant, professional invoices instantly from approved project milestones.</p>
+</div>
+<div class="w-full md:w-64 h-32 bg-surface-container-lowest border border-outline-variant rounded shadow-sm flex flex-col p-sm gap-sm relative overflow-hidden">
+<div class="w-full h-4 bg-surface-variant rounded-sm"></div>
+<div class="w-3/4 h-4 bg-surface-variant rounded-sm"></div>
+<div class="mt-auto flex justify-between items-end">
+<div class="w-16 h-8 bg-surface-variant rounded-sm"></div>
+<div class="w-24 h-8 bg-primary/20 rounded-sm"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-lowest border-t border-outline-variant py-lg px-margin-desktop text-center text-on-surface-variant font-body-sm text-body-sm mt-auto">
+        © 2024 Engineers Management. The standard in construction ERP.
+    </footer>
+</body></html>
+
+<!-- Finance & Transactions List -->
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Finance &amp; Transactions - Engineers Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&amp;family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#e0e3e5",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "surface-bright": "#f7f9fb",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#5e6e85",
+                        "primary-fixed": "#dbe1ff",
+                        "on-surface": "#191c1e",
+                        "surface-tint": "#0053db",
+                        "inverse-on-surface": "#eff1f3",
+                        "on-primary-fixed": "#00174b",
+                        "inverse-primary": "#b4c5ff",
+                        "on-secondary-container": "#5c647a",
+                        "on-tertiary": "#ffffff",
+                        "on-surface-variant": "#434655",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "error-container": "#ffdad6",
+                        "secondary": "#565e74",
+                        "on-secondary-fixed": "#131b2e",
+                        "surface-variant": "#e0e3e5",
+                        "tertiary": "#46566c",
+                        "outline": "#737686",
+                        "outline-variant": "#c3c6d7",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-container-low": "#f2f4f6",
+                        "primary-container": "#2563eb",
+                        "inverse-surface": "#2d3133",
+                        "tertiary-fixed": "#d3e4fe",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-dim": "#d8dadc",
+                        "surface": "#f7f9fb",
+                        "secondary-container": "#dae2fd",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed": "#dae2fd",
+                        "error": "#ba1a1a",
+                        "background": "#f7f9fb",
+                        "surface-container": "#eceef0",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-primary-container": "#eeefff",
+                        "on-tertiary-container": "#e9f0ff",
+                        "on-background": "#191c1e",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "primary": "#004ac6",
+                        "success-bg": "#d1fae5",
+                        "success-text": "#065f46",
+                        "danger-bg": "#fee2e2",
+                        "danger-text": "#991b1b",
+                        "warning-bg": "#fef3c7",
+                        "warning-text": "#92400e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "sm": "8px",
+                        "margin-desktop": "32px",
+                        "base": "8px",
+                        "gutter": "16px",
+                        "md": "16px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "arabic-body": ["Cairo"],
+                        "body-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "h2": ["Cairo"],
+                        "h1": ["Cairo"],
+                        "h3": ["Cairo"],
+                        "body-md": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "arabic-body": ["14px", { "lineHeight": "1.7", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-sm": ["13px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "h2": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "h1": ["32px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "h3": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Custom Scrollbar for tables */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f7f9fb; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c3c6d7; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #737686; 
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased overflow-x-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen p-md bg-surface-container-low dark:bg-surface-dim shadow-sm fixed h-full left-0 top-0 w-64 z-20">
+<div class="flex items-center gap-3 mb-xl px-sm">
+<div class="w-10 h-10 rounded bg-primary flex items-center justify-center text-on-primary font-bold text-lg">
+                F
+            </div>
+<div>
+<h1 class="font-h2 text-h2 font-bold text-primary dark:text-primary-fixed leading-tight">Engineers Management</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Egyptian Construction ERP</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto space-y-1">
+<a class="flex items-center gap-3 px-sm py-2 rounded text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-on-secondary-fixed-variant transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-on-secondary-fixed-variant transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">architecture</span>
+<span>Projects</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-on-secondary-fixed-variant transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Clients</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-on-secondary-fixed-variant transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>Suppliers</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded text-primary dark:text-primary-fixed-dim font-bold border-r-4 border-primary bg-primary-container/10 active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined filled" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span>Finance</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-on-secondary-fixed-variant transition-colors active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span>Reports</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-variant dark:hover:bg-on-secondary-fixed-variant transition-colors active:scale-95 duration-150 mt-4 border border-outline-variant" href="#">
+<span class="material-symbols-outlined text-primary">auto_awesome</span>
+<span>AI Drafts</span>
+<span class="ml-auto bg-primary text-on-primary font-label-caps text-label-caps px-2 py-0.5 rounded-full">3</span>
+</a>
+</div>
+<div class="mt-auto pt-lg">
+<button class="w-full bg-primary text-on-primary hover:opacity-90 py-2 rounded font-body-md text-body-md transition-opacity shadow-sm flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                + New Transaction
+            </button>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="hidden md:flex justify-between items-center px-margin-desktop py-sm ml-64 w-[calc(100%-16rem)] bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant docked full-width top-0 z-10 sticky">
+<div class="flex items-center">
+<span class="font-h3 text-h3 font-semibold text-primary dark:text-primary-fixed">Al-Binaa Engineering</span>
+</div>
+<div class="flex-1 max-w-md mx-xl relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded focus:ring-2 focus:ring-primary font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant h-10" placeholder="Search transactions, projects..." type="text"/>
+</div>
+<div class="flex items-center gap-lg">
+<button class="text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed transition-colors font-body-sm text-body-sm font-semibold">AR/EN</button>
+<div class="flex items-center gap-sm">
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant transition-colors relative cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant transition-colors cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="fixed bottom-0 w-full flex justify-around items-center px-4 py-2 md:hidden bg-surface-container-lowest dark:bg-surface-container-high shadow-lg border-t border-outline-variant docked full-width bottom-0 z-50 rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high active:scale-90 duration-200 py-1 px-2 rounded" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-caps text-label-caps mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high active:scale-90 duration-200 py-1 px-2 rounded" href="#">
+<span class="material-symbols-outlined">foundation</span>
+<span class="font-label-caps text-label-caps mt-1">Projects</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined filled" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+<span class="font-label-caps text-label-caps mt-1">Finance</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high active:scale-90 duration-200 py-1 px-2 rounded" href="#">
+<span class="material-symbols-outlined">menu</span>
+<span class="font-label-caps text-label-caps mt-1">More</span>
+</a>
+</nav>
+<!-- Main Content Canvas -->
+<main class="md:ml-64 p-margin-mobile md:p-margin-desktop pb-24 md:pb-margin-desktop min-h-screen">
+<!-- Header & Actions -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-lg gap-4">
+<div>
+<h2 class="font-h1 text-h1 text-on-surface">Finance &amp; Transactions</h2>
+<p class="text-on-surface-variant font-body-sm text-body-sm mt-1">Manage general ledger, supplier payments, and project expenses.</p>
+</div>
+<div class="flex items-center gap-sm w-full md:w-auto">
+<button class="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-outline-variant bg-surface-container-lowest text-on-surface rounded hover:bg-surface-variant transition-colors shadow-sm text-sm font-semibold">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                    Export
+                </button>
+<button class="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-primary text-on-primary rounded hover:opacity-90 transition-opacity shadow-sm text-sm font-semibold">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    New Entry
+                </button>
+</div>
+</div>
+<!-- AI Drafts Banner -->
+<div class="mb-lg bg-tertiary-fixed text-on-tertiary-fixed-variant rounded-lg border border-tertiary-fixed-dim p-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+<div class="flex items-start gap-3">
+<div class="p-2 bg-on-tertiary text-primary rounded-full shadow-sm mt-1 md:mt-0">
+<span class="material-symbols-outlined">auto_awesome</span>
+</div>
+<div>
+<h3 class="font-h3 text-h3 text-on-tertiary-fixed text-base">3 Pending AI Drafts</h3>
+<p class="font-body-sm text-body-sm opacity-90">Voice memos and receipts processed automatically. Review required before ledger posting.</p>
+</div>
+</div>
+<button class="px-4 py-2 bg-on-tertiary text-primary font-semibold rounded shadow-sm text-sm hover:bg-surface-bright transition-colors whitespace-nowrap">
+                Review Drafts
+            </button>
+</div>
+<!-- Filters Bar -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-sm mb-md flex flex-wrap items-center gap-sm shadow-sm">
+<div class="relative min-w-[150px] flex-1 md:flex-none">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">calendar_month</span>
+<input class="w-full pl-8 pr-3 py-1.5 border border-outline-variant rounded text-sm bg-surface-bright focus:border-primary focus:ring-1 focus:ring-primary h-9" placeholder="This Month" type="text"/>
+</div>
+<div class="relative min-w-[150px] flex-1 md:flex-none">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">domain</span>
+<select class="w-full pl-8 pr-8 py-1.5 border border-outline-variant rounded text-sm bg-surface-bright focus:border-primary focus:ring-1 focus:ring-primary h-9 appearance-none text-on-surface">
+<option>All Projects</option>
+<option>Cairo Monorail</option>
+<option>New Capital Tower C</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">arrow_drop_down</span>
+</div>
+<div class="relative min-w-[150px] flex-1 md:flex-none">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">category</span>
+<select class="w-full pl-8 pr-8 py-1.5 border border-outline-variant rounded text-sm bg-surface-bright focus:border-primary focus:ring-1 focus:ring-primary h-9 appearance-none text-on-surface">
+<option>All Categories</option>
+<option>Materials</option>
+<option>Labor</option>
+<option>Equipment</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">arrow_drop_down</span>
+</div>
+<div class="w-px h-6 bg-outline-variant hidden md:block mx-2"></div>
+<div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto hide-scrollbar">
+<button class="px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-caps text-label-caps border border-transparent whitespace-nowrap">All</button>
+<button class="px-3 py-1 rounded-full bg-surface-bright text-on-surface-variant font-label-caps text-label-caps border border-outline-variant hover:bg-surface-variant transition-colors whitespace-nowrap">Pending</button>
+<button class="px-3 py-1 rounded-full bg-surface-bright text-on-surface-variant font-label-caps text-label-caps border border-outline-variant hover:bg-surface-variant transition-colors whitespace-nowrap">Approved</button>
+</div>
+</div>
+<!-- Data Table (Excel-like High Density) -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm overflow-hidden flex flex-col relative z-0">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[900px]">
+<thead class="bg-surface-container-low border-b border-outline-variant">
+<tr>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider sticky left-0 bg-surface-container-low z-10 w-24">Date</th>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider">Project</th>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider">Type</th>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider">Category</th>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider text-right">Amount (EGP)</th>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider">Supplier/Workman</th>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider text-center">Status</th>
+<th class="py-2 px-4 font-bold text-xs text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant text-sm font-body-sm text-on-surface bg-surface-container-lowest">
+<!-- Row 1: Expense (Pending) -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="py-2.5 px-4 sticky left-0 bg-surface-container-lowest group-hover:bg-surface-bright whitespace-nowrap">24 Oct, 2023</td>
+<td class="py-2.5 px-4 font-medium">New Capital Tower C</td>
+<td class="py-2.5 px-4">
+<span class="flex items-center text-danger-text text-xs font-semibold gap-1">
+<span class="material-symbols-outlined text-[16px]">arrow_downward</span> Expense
+                                </span>
+</td>
+<td class="py-2.5 px-4"><span class="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-xs border border-outline-variant">Materials - Steel</span></td>
+<td class="py-2.5 px-4 text-right font-mono font-medium text-danger-text">- 450,000.00</td>
+<td class="py-2.5 px-4 text-on-surface-variant truncate max-w-[150px]" title="Ezz Steel Corp.">Ezz Steel Corp.</td>
+<td class="py-2.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning-bg text-warning-text border border-warning-text/20">Pending</span>
+</td>
+<td class="py-2.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-success-text hover:bg-success-bg rounded transition-colors" title="Approve">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+</button>
+<button class="p-1 text-danger-text hover:bg-danger-bg rounded transition-colors" title="Reject">
+<span class="material-symbols-outlined text-[18px]">cancel</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:bg-surface-variant rounded transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2: Income (Approved) -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="py-2.5 px-4 sticky left-0 bg-surface-container-lowest group-hover:bg-surface-bright whitespace-nowrap">22 Oct, 2023</td>
+<td class="py-2.5 px-4 font-medium">Cairo Monorail</td>
+<td class="py-2.5 px-4">
+<span class="flex items-center text-success-text text-xs font-semibold gap-1">
+<span class="material-symbols-outlined text-[16px]">arrow_upward</span> Income
+                                </span>
+</td>
+<td class="py-2.5 px-4"><span class="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-xs border border-outline-variant">Milestone Payment</span></td>
+<td class="py-2.5 px-4 text-right font-mono font-medium text-success-text">+ 1,200,000.00</td>
+<td class="py-2.5 px-4 text-on-surface-variant truncate max-w-[150px]" title="Ministry of Transport">Ministry of Transport</td>
+<td class="py-2.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-bg text-success-text border border-success-text/20">Approved</span>
+</td>
+<td class="py-2.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-on-surface-variant hover:bg-surface-variant rounded transition-colors" title="View Details">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:bg-surface-variant rounded transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: Expense (Approved) -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="py-2.5 px-4 sticky left-0 bg-surface-container-lowest group-hover:bg-surface-bright whitespace-nowrap">20 Oct, 2023</td>
+<td class="py-2.5 px-4 font-medium">Alexandria Port Dev</td>
+<td class="py-2.5 px-4">
+<span class="flex items-center text-danger-text text-xs font-semibold gap-1">
+<span class="material-symbols-outlined text-[16px]">arrow_downward</span> Expense
+                                </span>
+</td>
+<td class="py-2.5 px-4"><span class="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-xs border border-outline-variant">Equipment Lease</span></td>
+<td class="py-2.5 px-4 text-right font-mono font-medium text-on-surface">- 85,500.00</td>
+<td class="py-2.5 px-4 text-on-surface-variant truncate max-w-[150px]" title="Heavy Mach Ltd.">Heavy Mach Ltd.</td>
+<td class="py-2.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-bg text-success-text border border-success-text/20">Approved</span>
+</td>
+<td class="py-2.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-on-surface-variant hover:bg-surface-variant rounded transition-colors" title="View Details">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:bg-surface-variant rounded transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: Expense (Pending) -->
+<tr class="hover:bg-surface-bright transition-colors group bg-surface-bright/50">
+<td class="py-2.5 px-4 sticky left-0 bg-surface-bright/50 group-hover:bg-surface-bright whitespace-nowrap">19 Oct, 2023</td>
+<td class="py-2.5 px-4 font-medium text-on-surface-variant">General Office</td>
+<td class="py-2.5 px-4">
+<span class="flex items-center text-danger-text text-xs font-semibold gap-1">
+<span class="material-symbols-outlined text-[16px]">arrow_downward</span> Expense
+                                </span>
+</td>
+<td class="py-2.5 px-4"><span class="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-xs border border-outline-variant">IT Licenses</span></td>
+<td class="py-2.5 px-4 text-right font-mono font-medium text-danger-text">- 12,400.00</td>
+<td class="py-2.5 px-4 text-on-surface-variant truncate max-w-[150px]" title="Microsoft MENA">Microsoft MENA</td>
+<td class="py-2.5 px-4 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning-bg text-warning-text border border-warning-text/20">Pending</span>
+</td>
+<td class="py-2.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-success-text hover:bg-success-bg rounded transition-colors" title="Approve">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+</button>
+<button class="p-1 text-danger-text hover:bg-danger-bg rounded transition-colors" title="Reject">
+<span class="material-symbols-outlined text-[18px]">cancel</span>
+</button>
+<button class="p-1 text-on-surface-variant hover:bg-surface-variant rounded transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+<tfoot class="bg-surface-container border-t border-outline-variant font-medium">
+<tr>
+<td class="py-2 px-4 text-right text-xs uppercase tracking-wider text-on-surface-variant" colspan="4">Page Totals:</td>
+<td class="py-2 px-4 text-right font-mono text-sm">+ 652,100.00</td>
+<td colspan="3"></td>
+</tr>
+</tfoot>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-4 py-3 border-t border-outline-variant bg-surface-container-lowest flex items-center justify-between">
+<div class="text-xs text-on-surface-variant font-body-sm">
+                    Showing <span class="font-medium text-on-surface">1</span> to <span class="font-medium text-on-surface">4</span> of <span class="font-medium text-on-surface">128</span> entries
+                </div>
+<div class="flex items-center gap-1">
+<button class="p-1 rounded text-on-surface-variant hover:bg-surface-variant disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-[20px]">chevron_left</span>
+</button>
+<button class="px-2.5 py-1 rounded bg-primary-container text-on-primary-container text-xs font-medium">1</button>
+<button class="px-2.5 py-1 rounded text-on-surface-variant hover:bg-surface-variant text-xs font-medium">2</button>
+<button class="px-2.5 py-1 rounded text-on-surface-variant hover:bg-surface-variant text-xs font-medium">3</button>
+<span class="px-1 text-on-surface-variant text-xs">...</span>
+<button class="p-1 rounded text-on-surface-variant hover:bg-surface-variant">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</body></html>
+
+<!-- DESIGN-BRIEF.md -->
+# Engineers Management — UI/UX Design Brief
+
+> **Document purpose**: comprehensive brief for a UI/UX designer to draft the visual + interaction design system and per-screen mockups across web and mobile. This is a working SaaS product — the designer will refresh the look and design upcoming screens, not start from scratch.
+
+**Project**: Engineers Management — Construction ERP for Egyptian engineering firms
+**Owner**: 8ofry
+**Repo**: https://github.com/8ofry/Engineers-Management
+**Last updated**: 2026-05-03
+
+---
+
+## 1. One-paragraph summary
+
+A **multi-tenant SaaS Construction ERP** for Egyptian engineering and construction firms. Each company gets its own isolated workspace covering projects, clients, suppliers, workmen, materials, transactions, daily site reports, invoices, and audit. The product replaces the Excel + WhatsApp + paper receipts workflow that small-to-mid Egyptian contractors currently use. It's already functional in production with a working web app, a React Native mobile companion, an AI voice/receipt assistant, multi-language (Arabic + English with full RTL), and a custom "Profit on Expense" financial engine specific to Egyptian construction practice. We need a professional design refresh of the existing screens plus designs for the upcoming AI capture, billing, and bank reconciliation surfaces.
+
+---
+
+## 2. Market & positioning
+
+### Who buys this
+- **Egyptian construction contractors and engineering offices**, 5–50 employees
+- Currently track jobs in Excel, receipts in WhatsApp, attendance on paper
+- Owner-operators who care about cash flow and profit margins per project
+
+### What makes us different from generic ERPs
+- **V1.2 Profit-on-Expense engine** — auto-transfers a configurable management fee from project safe balance to office revenue every time an expense is approved on cost-plus contracts. No competitor has this for the Egyptian market.
+- **Bilingual Arabic-first** with full RTL — competing products are English-only or poorly translated
+- **AI voice & receipt capture** — engineer says "اشتريت 100 شيكارة أسمنت بـ 18000 جنيه" or photographs a receipt; the system creates a draft transaction
+- **Daily Site Reports** — engineers log progress, weather, attendance, photos from mobile every day; managers acknowledge from web
+- **Native Egyptian conventions** — categories like خرسانات, مصنعية بناء, sand/cement/bricks, EGP currency, 14% VAT default, Egyptian holiday handling
+
+### Pricing model (planned)
+- Free trial / Free Pilot tier
+- Subscription billing via **Paymob** (Egypt's Stripe-equivalent). 3 tiers planned with feature gates around team size, AI capture quota, and integrations.
+
+---
+
+## 3. User personas
+
+### 👑 Company Admin (owner / managing director)
+**Mental model**: "What's my cash flow? Who's spending what? Are we profitable per project?"
+
+**Daily**:
+- Dashboard glance — total budget, safe balance, pending approvals count
+- Approve high-value transactions (default >50,000 EGP needs admin)
+- Review notifications
+
+**Weekly**:
+- Send invoices to clients
+- Fund engineers' custody wallets
+- Review audit log for unusual activity
+- Check project profit margins
+
+**Monthly**:
+- Subscription billing
+- Approval threshold config
+- Add/remove team members
+- Review reports + export to accountant
+
+**Pain points**: Hates digging for information. Wants high-density dashboards.
+
+### 👔 Project Manager
+**Mental model**: "What needs my decision today?"
+
+**Daily**:
+- Approve mid-tier expenses (5k–50k by default)
+- Acknowledge daily site reports submitted by engineers
+- Review project progress
+
+**Weekly**:
+- Project financials review
+- Workman attendance reconciliation
+- Material stock levels
+
+**Pain points**: Notification overload. Wants prioritized action queue.
+
+### 👷 Engineer (field-based)
+**Mental model**: "I'm on site. I just bought 100 cement bags. How do I log this in 30 seconds?"
+
+**Mobile-first** — almost never opens the web app.
+
+**Daily**:
+- Capture site expenses with photo or voice
+- Log workman attendance during the day
+- End of day: submit Daily Site Report with photos
+- Check own custody balance
+
+**Pain points**:
+- Dirty hands, gloves, tiny phone, sun glare
+- Slow 4G / spotty connection on remote sites
+- Doesn't want forms with 15 fields
+- Speaks Egyptian Arabic primarily
+
+### 💰 Accountant
+**Mental model**: "Match transactions, send invoices, file reports."
+
+**Daily**:
+- Review approved transactions for accuracy
+- Send invoices, record payments
+- Export ledger entries
+
+**Weekly**:
+- Bank reconciliation (Phase 6 — coming)
+- Monthly close support
+
+**Pain points**: Wants Excel-like density and easy export.
+
+---
+
+## 4. Brand, language, and locale
+
+### Bilingual Arabic-first
+- Default language depends on browser/device, but Egyptian users default to Arabic
+- **Full RTL flip** for layout when Arabic is active (sidebar moves to right, text-align flips, icons mirror where semantic)
+- All UI strings translated; transaction categories use real construction terminology in Arabic (خرسانات, مصنعية مباني, محارة, سباكة, etc.)
+- Currency: EGP (Egyptian Pound) only; numbers can format `1,234.56` or `١٬٢٣٤٫٥٦` based on locale
+- Dates: `DD/MM/YYYY` for Arabic, `DD/MM/YYYY` for English (consistent)
+
+### Tone
+- **Professional + trustworthy** — this is a financial app handling real money
+- **Accessible** — engineers use it daily, not just office staff
+- **Egyptian** — feels native, not a translated US product
+
+### Current color tokens (rough)
+```
+Primary blue:      #2563eb
+Success green:     #10b981
+Warning amber:     #f59e0b
+Danger red:        #ef4444
+Info blue tint:    #dbeafe
+Muted gray bg:     #f9fafb
+Card bg (light):   #ffffff
+Border (light):    #e5e7eb
+Text primary:      #111827
+Text secondary:    #6b7280
+Text tertiary:     #9ca3af
+```
+
+Status badge pairs (bg + fg) used everywhere:
+```
+PLANNING / DRAFT      → bg #f3f4f6, fg #374151
+IN_PROGRESS / SENT    → bg #d1fae5 / #dbeafe, fg #065f46 / #1e40af
+PENDING_APPROVAL      → bg #fef3c7, fg #92400e
+APPROVED / PAID       → bg #d1fae5, fg #065f46
+REJECTED / OVERDUE    → bg #fee2e2, fg #991b1b
+COMPLETED / CANCELLED → bg #e5e7eb, fg #374151 / #6b7280
+```
+
+### Logo & brand identity
+The current product uses a generic building icon. We want a real logomark + wordmark. Bilingual marks (Arabic and Latin) preferred.
+
+---
+
+## 5. Complete feature inventory (web + mobile)
+
+### 5.1 Authentication
+- **Login** with email + password
+- **2FA challenge step** if user has TOTP enabled (separate screen with 6-digit code input)
+- **Register Company** multi-step: company info → admin info → email OTP → activated tenant
+- **Forgot password** → email link → reset
+- **Verify invite** flow for engineers added by admin
+- **2FA enroll** with QR code scan + 6-digit verify
+- **2FA disable** requires current password + code
+
+### 5.2 Dashboard
+- KPI cards: total projects, active projects, total budget, total revenue
+- **Income vs Expenses** chart (bar)
+- **Expenses by Category** chart (donut/bar)
+- Recent projects list (5 most recent)
+- Pending approvals badge (for managers)
+- Quick action buttons (new project / new transaction / send invoice)
+
+### 5.3 Projects
+- **List**: filter by status, search by name/client. Status badges. Budget vs actual progress bar.
+- **Detail**: header with project name + status, financials grid (Budget / Actual Cost / Office Revenue / Safe Balance), info panel (client, engineer, dates, location, revenue model, mgmt fee %), tabbed sections for Transactions / Documents / DSRs / Cost Items / Workmanships
+- **Create / Edit** modal: name, description, client picker, project type, status, location, dates, budget, revenue model picker, management fee %, payment terms, total contract value
+- **Soft-delete** + admin **Restore** action
+
+### 5.4 Project Documents (Phase 3)
+- Per-project photo + document gallery
+- Upload with: photo from device, optional GPS tag (browser geolocation), category picker (9 categories: Site Progress / Receipt / Delivery / Issue / Contract / Permit / Drawing / Report / Other), display name, description
+- Grid view with category icon, uploader, timestamp, GPS coords
+- Click thumbnail → lightbox
+- Delete (uploader or admin)
+- Filter by category
+
+### 5.5 Clients
+- List with status (Active / Inactive / Pending)
+- Detail with associated projects
+- Create/edit form: name, company, email, phone, tax ID, contact person details, address (street/city/state/zip/country)
+- Status workflow
+- Soft-delete + restore
+
+### 5.6 Suppliers
+- Same shape as clients but with: category (14 supplier categories), payment terms, rating (1–5 stars), supplier-specific status
+- Used in transaction supplier picker
+
+### 5.7 Workmen (laborers / contractors)
+- List with trade (carpenter, mason, electrician, plumber, painter, foreman + 8 more)
+- Daily rate (EGP/day)
+- Total paid running balance
+- National ID + national-ID image upload
+- Phone, name in Arabic + English
+- Active flag
+
+### 5.8 Materials (raw inventory catalog)
+- Catalog of materials with name (AR + EN), unit (M3/TON/KG/M2/M/PIECE/LITER/BAG), unit price, supplier, current stock level, reorder threshold
+- Low-stock alert highlighting
+
+### 5.9 Inventory (Material Batches per project)
+- When an expense is logged with "Inventory Purchase" flag, a Material Batch is created with the purchase amount
+- Per-project view of all batches with remaining value
+- Record Usage form: pick batch, enter value or quantity consumed → triggers V1.2 profit recognition
+- Batch status: AVAILABLE → PARTIALLY_USED → CONSUMED
+
+### 5.10 Finance / Accounting
+- Transactions list
+- **Filter pills**: All / Pending / Mine
+- **Filter by**: project, type (Income/Expense), category (40+ categories including V1.2 Egyptian construction terms)
+- Color-coded: green for income, red for expense
+- Status badge per row
+- Inline **Approve ✓** / **Reject ✗** buttons for managers (visible only on PENDING_APPROVAL items)
+- **Multi-level approval threshold**: backend decides if user can auto-approve based on amount tier; UI shows when admin escalation is needed
+- "AI Drafts" pill button → goes to AI-generated drafts queue (Phase 7)
+- FAB / "+ New Transaction" button → form
+
+### 5.11 Add Transaction
+- Type toggle: Expense (red) / Income (green)
+- Project picker (modal)
+- Category picker (modal — searchable; 40+ Egyptian construction categories)
+- Amount input (numeric, EGP)
+- Description textarea
+- Payment method pills: Cash / Bank Transfer / Check / Custody Wallet / Other
+- Date picker
+- For expenses: "Inventory Purchase" toggle (creates a material batch)
+- Optional: receipt photo upload, supplier picker, workman picker
+
+### 5.12 AI Drafts (Phase 7) — *to be designed*
+- Queue view of drafts created by AI from voice notes or receipt photos
+- Confidence indicator per field (high/medium/low)
+- Source badge: 🎤 Voice / 📸 Receipt
+- Review form: edit any field before saving as a real transaction
+- Bulk approve / discard actions
+
+### 5.13 Reports
+- Bar chart: Income vs Expenses
+- Donut chart: Expenses by Category (filters out income + management fee transfers)
+- Period filter (this month / last month / quarter / year / custom)
+- **CSV export** with UTF-8 BOM (Excel-friendly Arabic)
+- Project profitability ranking (planned)
+
+### 5.14 Daily Site Reports (DSR) — Phase 4
+**Manager web review page (`/dsr`)**:
+- List with status badges (Draft / Submitted / Acknowledged) and project filter
+- Click row → detail modal with: stats grid (status, reporter, hours, weather + temp, submitted/acknowledged timestamps), Progress / Issues / Visitors notes, Workmen Attendance table, Materials Received list, Photos grid, Manager Acknowledge form (notes + button)
+
+**Mobile capture (engineer)**:
+- + FAB on DSR list opens create screen
+- Project picker modal
+- Date with "Today" quick-set
+- Weather chip grid (8 options with emoji)
+- Temperature + hours inputs
+- Progress / Issues / Visitors textareas
+- Workmen attendance multi-select with per-row hours
+- **Photo strip** with Camera and Library buttons (multi-select up to 10), each with thumbnail + delete chip
+- Save Draft / Save & Submit buttons
+
+### 5.15 Invoices (Phase 5)
+- Auto-numbered `INV-2026-NNNN` per tenant
+- 6-state machine: DRAFT → SENT → PARTIALLY_PAID → PAID → OVERDUE → CANCELLED
+- **List** table: invoice #, client, project, issue date, due date, total, paid, balance, status badge, action icons (View/PDF/Edit/Send/Payment/Cancel/Delete) gated by status + role
+- **Status filter pills** (All + 6 statuses)
+- **Create / Edit modal**: client picker, optional project, due date, default 14% Egyptian VAT (configurable), discount, line item editor (add/remove rows, auto-compute totals as user types), notes, terms (default "Payment due within 30 days")
+- **View modal**: stats grid + line items table + notes/terms + Download PDF button
+- **PDF generation**: A4 with company header (logo + address), bill-to + project box, status badge, line items table, totals box, notes + terms — *needs design polish*
+- **Send modal**: recipient email (defaults to client.email), custom message → emails PDF as attachment, flips DRAFT → SENT
+- **Payment modal**: shows outstanding balance, accepts partial payment input → PARTIALLY_PAID until full → PAID
+- **Cancel** any non-paid invoice → CANCELLED status (audit-trailed; not deleted)
+
+### 5.16 Custody management (engineer cash wallets)
+- Engineer's profile shows current custody balance + pending clearance + available
+- **Admin "Fund Engineer"**: pick engineer (with current balance shown), amount, description → adds to wallet, notifies engineer
+- **Engineer "Return Custody"**: amount, description → reduces wallet (overdraft-protected)
+- History list per engineer
+- **All Custody** view (admin/accountant): every engineer's balance + pending + available + tenant-wide totals
+
+### 5.17 Notifications
+- Bell icon with unread count badge in header
+- Notification types: Info / Alert / Success / Warning
+- Per-user; system events generate them (transaction approved, custody funded, low stock, DSR acknowledged, etc.)
+- Mark single as read on click; "Mark all read" action
+
+### 5.18 Activity Log / Audit (Phase 1+2) — admin only
+- Every meaningful mutation is logged with `before` / `after` snapshots (secrets sanitized)
+- Filter by entity (Project, Client, Transaction, User, Role, Custody, etc.) / action (CREATE / UPDATE / DELETE / RESTORE / APPROVE / REJECT / ROLE_CHANGE / FUND / RETURN / 2FA_ENABLE / SEND / PAYMENT / etc.) / user
+- Color-coded action badges
+- Expandable per-row JSON detail
+- Cursor pagination ("Load more")
+
+### 5.19 Two-Factor Authentication (Phase 2) — every user
+- Status banner (ON / OFF / pending enrollment)
+- **Enable flow**: server returns QR code data URI → user scans with Google Authenticator/Authy/1Password → enters 6-digit code → confirmed
+- Manual secret display + copy-to-clipboard fallback
+- **Disable flow**: requires current password + valid TOTP code
+- **Login flow change**: when 2FA is on, login returns a 5-minute challenge token + UI shows code prompt → enter code → full session
+
+### 5.20 Team Management — admin only
+- User list with role badges, status (active/inactive/verified)
+- Invite user form: name, email, phone, password, role picker
+- Edit user: change role (with SUPER_ADMIN guard), permissions matrix
+- Soft delete user
+
+### 5.21 Company Settings — admin only
+- Company info edit (name, address, phone, email)
+- Logo upload (S3-backed)
+- **Approval Thresholds config**: array of { maxAmount, minRole } tiers; defaults editable
+- Subscription / Billing (Phase 6 — coming) tied to Paymob
+
+### 5.22 Roles & Permissions — admin only
+- Beyond the 5 hard-coded roles (SUPER_ADMIN / ADMIN / PROJECT_MANAGER / ENGINEER / ACCOUNTANT) there's a custom **Role** model with a JSON permission matrix per tenant
+- UI: list of system + custom roles, edit form for permissions matrix (organized by resource × action grid)
+
+### 5.23 Chat Assistant
+- Conversational UI with bubbles
+- Voice input button → records → Whisper transcribes → AI responds
+- Tool-calling: AI can offer to "Record this transaction" with extracted fields, "Get financial summary"
+- Chat history persisted per user
+
+---
+
+## 6. Information Architecture
+
+### Web — Sidebar navigation (current order)
+1. **Dashboard** (home)
+2. **Projects**
+3. **Clients**
+4. **Suppliers**
+5. **Raw Materials**
+6. **Labor & Contractors** (workmen)
+7. **Inventory**
+8. **Finance / Accounting** (with AI Drafts sub-page)
+9. **Daily Reports** (DSR)
+10. **Invoices**
+11. **Reports**
+12. **Chat Assistant**
+13. **Activity Log** *(admin only)*
+14. **Two-Factor** (any user)
+15. **Team Management** *(admin only)*
+16. **Company Settings** *(admin only)*
+
+Header: logo (left) + tenant name + language toggle + theme toggle + notification bell + user avatar dropdown (with logout)
+
+### Mobile — Bottom tab bar (5 tabs)
+1. 📁 **Projects** → list → detail
+2. 💵 **Finance** → list with AI-Drafts pill → Add Transaction screen → Drafts list
+3. 📋 **DSR** (Daily Reports) → list → detail / create
+4. 🔔 **Notifications**
+5. 👤 **Profile** → custody balance, Fund Engineer (admin), directories (Clients/Suppliers/Workmen), language toggle, logout
+
+Header per screen: title + back button (if stack child)
+
+---
+
+## 7. Mobile companion app — what it has
+
+- **Built with**: React Native + Expo SDK 54, React 19.1, RN 0.81
+- **5 bottom tabs** as listed above
+- **14 screens** total
+- **Camera + photo library** access via `expo-image-picker` (DSR, voice — Phase 7 — receipt capture)
+- **GPS-tagged** photo capture
+- **Pull-to-refresh** on every list
+- **Offline-tolerant reads** — last-fetch cached in AsyncStorage
+- **AR/EN with full RTL** via `I18nManager`
+- **Auto-logout on 401** + token persistence
+
+What's *not* on mobile (intentional):
+- Settings / Company config — admin task, desktop-first
+- Reports / chart-heavy views
+- Full role/permission management
+- Invoice creation (will add view + send in Phase 8 maybe; creation stays desktop)
+
+---
+
+## 8. Visual & interaction conventions already in use
+
+These are the patterns we want the design system to formalize:
+
+### Layout
+- **Sidebar** + **content area** (web)
+- **Bottom tabs** + per-tab stack (mobile)
+- **Card** is the dominant container (rounded 8–12px, white bg in light mode, 1px border or subtle shadow)
+- **Section headers**: small uppercase + lighter weight + gray color
+- **Grid 2** / **Grid 3** layouts for stat cards
+
+### Components
+- **Status badges** — 9–12px rounded pill, bg+fg pair per status
+- **Filter pills** — rounded pill buttons, active state filled with primary
+- **Modals** — centered, max-width ~600px, backdrop dimmed
+- **Lightbox** — for image preview (full-screen, click backdrop to close)
+- **FAB** — circular button bottom-right (mobile)
+- **Stat card** — 3-line: small uppercase label, big value, small subtitle
+- **Empty states** — large icon + title + subtitle in muted gray
+- **Spinners** — circular for loads
+- **Inline action icons** — Lucide icons (web), Ionicons (mobile)
+
+### Patterns
+- **Pull-to-refresh** on list screens
+- **Confirm-before-destructive** via `window.confirm` or `Alert.alert`
+- **Toast / inline alerts** via custom AlertContext (no library)
+- **Two-step destructive** for "delete user / cancel invoice" type actions
+- **Real-time validation** on forms (Zod-backed; errors shown inline)
+
+### Accessibility (current)
+- Forms have labels
+- Buttons have icons + text (not icon-only except in tight rows)
+- Color is not the only signal (always pair with text label or icon)
+
+### What's *missing* visually (for the designer to address)
+- Inconsistent spacing/rhythm between pages
+- No real type scale — everything's free-form pixel sizes
+- No motion language — transitions are mostly default browser behavior
+- Tables are a bit dense and unstyled in some places
+- PDF invoice template is functional but plain
+- No real illustrations / brand voice in empty states
+- Mobile screens are stylistically inconsistent (different padding patterns, different card border-radii)
+
+---
+
+## 9. Roadmap — what we're designing for
+
+### Already shipped (need refresh)
+- Phases 1–5: Foundations / Quick UX wins / Photos & Documents / Daily Site Reports / Invoicing
+- Phase 6.1: Sentry error monitoring (no UI)
+- Phase 6.4: Paymob subscription billing (backend only — needs UI)
+
+### In progress (Phase 7)
+- **AI voice → draft transaction**: engineer records voice, Whisper transcribes, GPT-4o extracts amount/category/supplier → creates a DRAFT transaction with confidence score per field
+- **AI receipt OCR → draft transaction**: engineer photographs receipt, GPT-4o-vision extracts the same → DRAFT
+- **AI Drafts queue page** (web + mobile) — list of pending AI-extracted drafts with confidence indicators, review/edit form, approve to convert to a real transaction
+
+### Coming (Phase 6 remainder)
+- **Subscription billing UI** — pricing page (3 tiers), checkout flow via Paymob, plan badge in header, upgrade/downgrade flow, invoice history
+- **Bank reconciliation** — CSV import → match to existing transactions → unmatched queue → manual link
+- **Mobile invoice viewer** — view + send + payment-record on phone (creation stays desktop)
+
+### Next phases (designer should leave room)
+- **WhatsApp Business** invoice send
+- **Bill of Quantities (BoQ)** builder — line items per project with progress tracking
+- **S-curve forecasting** charts
+- **Multi-step approval workflows** with visual flow editor
+- **Document templates** for contracts/permits beyond simple PDF
+- **Project Gantt view**
+- **Budget alerts**
+
+---
+
+## 10. Deliverables we need from the designer
+
+### Phase A — Design System (foundation)
+1. **Logo & brand mark** — bilingual (Arabic + Latin), variations (full / mark-only / monochrome)
+2. **Color palette** — primary, secondary, semantic (success/warning/danger/info), neutrals, light + dark themes with token names
+3. **Typography scale** — heading sizes, body sizes, captions; Arabic font (Cairo or similar) + Latin font pairing
+4. **Spacing scale** — 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64 etc., named tokens
+5. **Component library** in Figma:
+   - Buttons (primary / secondary / tertiary / danger / icon-only) × sizes × states
+   - Inputs (text / textarea / select / date / numeric / currency / search) × states (default/focus/error/disabled)
+   - Cards (basic / stat / interactive)
+   - Status badges (12 status pairs)
+   - Filter pills + tab bars
+   - Modals + drawers + popovers
+   - Tables (with sort / filter / pagination)
+   - Toasts / alerts / banners
+   - Empty states + loading states + error states
+   - Avatars + role badges
+   - Sidebar nav (LTR + RTL versions)
+   - Bottom tab bar (mobile)
+6. **Iconography** — confirm Lucide for web, Ionicons for mobile, OR propose a custom set (preferred: stick with libraries to keep dev fast)
+
+### Phase B — Web screen designs
+Priority order (most important first):
+1. **Login + 2FA challenge + Signup** (first impression)
+2. **Dashboard** (stat density, charts, action cards)
+3. **Projects list + Project Detail** (with all tab sections)
+4. **Finance / Accounting list** (table density, AI Drafts integration)
+5. **AI Drafts review screen** *(new — Phase 7)*
+6. **Add Transaction modal** (multi-step? single?)
+7. **Invoices list + Create form + View modal**
+8. **PDF invoice template** (A4 layout for client-facing)
+9. **DSR review modal** (manager side)
+10. **Project Documents gallery + upload flow**
+11. **Reports** (charts, period selector, export)
+12. **Activity Log** (admin)
+13. **Settings + 2FA + Approval thresholds**
+14. **Team management**
+15. **Pricing / Subscription page** (Phase 6 — design from scratch)
+16. **Bank reconciliation page** (Phase 6 — new)
+17. **Marketing landing page** (optional but valuable for sales)
+
+### Phase C — Mobile screen designs
+1. **Login + 2FA challenge** (mobile-friendly OTP UX)
+2. **Dashboard / Projects tab**
+3. **Project Detail**
+4. **Finance tab + Add Transaction**
+5. **AI Drafts list + Receipt-capture flow + Voice-capture flow** *(new — Phase 7)*
+6. **DSR list + DSR detail + DSR Create** (camera-heavy, engineer flow)
+7. **Notifications**
+8. **Profile + Custody**
+9. **Fund Engineer (admin)**
+10. **Directories**
+
+### Phase D — Edge cases & polish
+- Empty states (every list has one)
+- Error states (network failure, 403, 404, 500)
+- Loading states (skeleton screens preferred over spinners for tables)
+- Onboarding flow for new tenant (after first login)
+- Permission-denied screens
+- Confirm-before-destructive dialogs
+
+### Phase E — Documentation
+- **Design tokens file** (JSON or Figma Variables) the dev team can import into the codebase
+- **Component spec sheet** — for each component, document: states, anatomy, do's and don'ts
+- **Localization notes** — RTL behavior per component, Arabic font sizing adjustments
+
+---
+
+## 11. Tech constraints (so designs are buildable)
+
+The designer should be aware of these so mockups translate cleanly to code:
+
+### Web stack
+- **React 18 + Vite**
+- **Recharts** for charts (constrains visual style of charts to library capabilities — pie/donut/bar/line/area)
+- **Lucide React** icon library (1000+ outline icons, consistent stroke)
+- **i18next** for translations (string-based)
+- **CSS** (no Tailwind currently; using vanilla CSS variables for theme tokens — designer can propose Tailwind migration if helpful)
+- No animation library shipping yet — keep transitions subtle (200-300ms ease)
+
+### Mobile stack
+- **React Native + Expo SDK 54**
+- **@expo/vector-icons** (Ionicons primarily)
+- No fancy animation libraries — Reanimated could be added if required for premium feel
+- Navigation handled by **React Navigation v7** (bottom tabs + native stacks)
+
+### Things that are hard to change
+- The bottom-tab-bar pattern on mobile (5 tabs is the constraint)
+- The sidebar on web (could become collapsible drawer; could not become bottom nav)
+- The `Card` is the universal container
+- Status badges as colored pills
+
+### Things easy to change
+- All color values
+- All spacing
+- All typography
+- Card border radius / shadow style
+- Button styles
+- Empty state illustrations
+
+### Image hosting
+- AWS S3 — designer-provided illustrations and brand assets will be uploaded there
+- We'll need: app icons (web favicon + mobile launcher icons), splash screens (iOS + Android), social-share images (Open Graph), invoice header assets
+
+### Fonts
+- Currently using system fonts — open to **Cairo** for Arabic + **Inter** or **DM Sans** for Latin (free, Google-hosted, optimized for both LTR and RTL contexts)
+- Whatever font system the designer chooses should ship as web fonts and be embeddable in the PDF generator (pdfkit)
+
+---
+
+## 12. Demo access
+
+We can give the designer a working demo:
+
+**Live system**: TBD (we'll spin up a hosted demo URL when needed)
+
+**Test accounts** (after seed data is loaded):
+| Role | Email | Password |
+|---|---|---|
+| Admin | admin@demo.local | Demo@1234 |
+| Project Manager | manager@demo.local | Demo@1234 |
+| Engineer | engineer@demo.local | Demo@1234 |
+| Accountant | accountant@demo.local | Demo@1234 |
+
+**Demo data populated**: 5 clients, 6 suppliers, 8 materials, 6 workmen, 3 projects across all statuses (in-progress / planning / completed), 17 transactions covering income / expense / inventory / management fees, 1 cement batch 50% consumed, 3 custody transfers, 4 cost items, 2 workmanship contracts, 3 notifications.
+
+The designer can log in, click around, see real-shaped data, and propose improvements grounded in actual content.
+
+---
+
+## 13. Things to avoid / out-of-scope
+
+- **No social features** (no team chat, no project comments thread, no activity feed for non-admins)
+- **No calendar / scheduling** — projects have dates but we're not building a calendar
+- **No CRM features** beyond Client management (no sales pipeline, no deal stages, no email tracking)
+- **Don't lose Arabic-first feel** — every screen must work as well in Arabic as in English; if a layout breaks in RTL, it's a bug
+- **Don't over-design for mobile-first on Pro features** — admins/accountants use desktop; engineers use mobile. Design accordingly per persona.
+- **Conservative financial UI** — no aggressive gamification, no badges/points, no celebratory animations on payment received. This is accounting; users want predictability.
+- **No multi-currency** — Egyptian SMEs operate in EGP only
+
+---
+
+## 14. Success criteria for the design system
+
+- [ ] An engineer can complete the daily-report flow on mobile in **< 2 minutes** with one hand
+- [ ] An accountant can scan the Finance list and identify pending approvals in **< 5 seconds**
+- [ ] An admin can answer "what's our cash position right now" from the dashboard in **< 10 seconds**
+- [ ] All screens work in both LTR (English) and RTL (Arabic) without bugs
+- [ ] Light + dark themes are equally usable
+- [ ] PDF invoice looks credible enough to send to enterprise clients
+- [ ] Mobile + web feel like the same product (consistent visual language)
+- [ ] Component library covers 90%+ of needed UI without custom code
+
+---
+
+## 15. Timeline suggestion (designer's call)
+
+- **Week 1–2**: Brand mark + design system foundation (colors, typography, spacing, key components)
+- **Week 3–4**: Top-priority web screens (Dashboard, Projects, Finance, Invoices) + mobile core (Tabs, DSR Create)
+- **Week 5–6**: Phase 7 AI screens (Drafts queue, Receipt capture, Voice capture) + remaining web screens
+- **Week 7**: Edge cases, empty states, error states, marketing/pricing pages
+- **Week 8**: Handoff package, design tokens export, component spec sheets
+
+---
+
+## 16. Communication & handoff
+
+- **Figma** preferred — we'll get a license for the dev team to inspect specs
+- **Design tokens** exported as JSON or Figma Variables — dev imports as CSS variables
+- **Walkthrough session** at end of each phase to keep dev unblocked
+- **Component naming conventions** matter — what the designer calls a "Button-Primary-Lg" should match what the dev calls it
+
+---
+
+## Appendix A — Existing screen list (with implementation status)
+
+| Screen | Web | Mobile | Notes |
+|---|---|---|---|
+| Login | ✅ | ✅ | Mobile shows API URL diagnostic |
+| Login + 2FA challenge | ✅ | ⚠️ stub | Mobile needs the 2FA prompt step |
+| Register Company | ✅ | — | Desktop only |
+| Forgot/Reset Password | ✅ | — | Desktop only |
+| Dashboard | ✅ | ✅ basic | Mobile is project list + stats |
+| Projects list | ✅ | ✅ | |
+| Project detail | ✅ | ✅ | Mobile has financials + transactions list |
+| Project Documents | ✅ | — | Web only currently |
+| Clients list | ✅ | ✅ read-only | Mobile is read-only list |
+| Suppliers list | ✅ | ✅ read-only | |
+| Workmen list | ✅ | ✅ read-only | Mobile shows stats |
+| Materials | ✅ | — | |
+| Inventory | ✅ | — | |
+| Finance / Transactions list | ✅ | ✅ | Mobile has filter pills + approve inline |
+| Add Transaction | ✅ | ✅ | |
+| AI Drafts list | ⚠️ | ⚠️ stub | Phase 7 — needs design |
+| AI Receipt capture | — | ⚠️ stub | Phase 7 — needs design |
+| AI Voice capture | — | ⚠️ stub | Phase 7 — needs design |
+| Reports | ✅ | — | Charts + CSV export |
+| Daily Site Report list | ✅ | ✅ | |
+| DSR detail | ✅ | ✅ | |
+| DSR Create | — | ✅ | Mobile-only with camera |
+| Invoices list | ✅ | — | |
+| Create / View / Send Invoice | ✅ | — | |
+| PDF Invoice template | ✅ functional | — | Needs design polish |
+| Notifications | — bell only | ✅ | Web is just dropdown; consider full page |
+| Profile | — modal only | ✅ | Mobile is dedicated tab |
+| Custody Fund | ✅ basic | ✅ | |
+| Activity Log (audit) | ✅ | — | Web admin only |
+| Two-Factor Settings | ✅ | — | Web only |
+| Team Management | ✅ | — | Web admin only |
+| Company Settings | ✅ | — | Web admin only |
+| Roles & Permissions | ✅ basic | — | Could use polish |
+| Chat Assistant | ✅ | — | Web only |
+| Subscription / Billing | ⚠️ Phase 6.4 | — | Backend done, UI pending — design from scratch |
+| Bank reconciliation | ⏭️ Phase 6 | — | New screen — design from scratch |
+| Pricing / Marketing | — | — | Could be valuable for sales — open question |
+
+Legend: ✅ shipped • ⚠️ partial / needs design • — not built • ⏭️ planned
+
+---
+
+## Appendix B — One-page summary (TL;DR for first-meeting)
+
+> Engineers Management is a multi-tenant SaaS Construction ERP for Egyptian engineering firms. Web app + React Native mobile companion. Bilingual Arabic-first with full RTL. Currently functional with Projects, Finance with V1.2 Profit-on-Expense, Daily Site Reports captured from mobile, Invoicing with PDF + email, AI voice/receipt capture (Phase 7 in progress), 2FA, audit log, soft-delete + restore, multi-tier approval workflows. We need: a design system (colors, typography, spacing, components), refreshed designs for ~15 web pages and ~10 mobile screens, designs for upcoming AI capture, billing, and bank reconciliation surfaces, plus brand identity work (logomark + bilingual wordmark). Tech: React 18 + Vite (web), React Native + Expo SDK 54 (mobile), Lucide/Ionicons, Recharts. Demo accounts available.
+
+---
+
+*This document is the canonical brief for the design engagement. Contact owner for live demo access, additional questions, or scope changes.*
+
+
+<!-- Project Detail View -->
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Project View - Engineers Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&amp;family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-highest": "#e0e3e5",
+                      "secondary-fixed-dim": "#bec6e0",
+                      "surface-bright": "#f7f9fb",
+                      "on-secondary-fixed-variant": "#3f465c",
+                      "on-error-container": "#93000a",
+                      "tertiary-container": "#5e6e85",
+                      "primary-fixed": "#dbe1ff",
+                      "on-surface": "#191c1e",
+                      "surface-tint": "#0053db",
+                      "inverse-on-surface": "#eff1f3",
+                      "on-primary-fixed": "#00174b",
+                      "inverse-primary": "#b4c5ff",
+                      "on-secondary-container": "#5c647a",
+                      "on-tertiary": "#ffffff",
+                      "on-surface-variant": "#434655",
+                      "on-primary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "primary-fixed-dim": "#b4c5ff",
+                      "error-container": "#ffdad6",
+                      "secondary": "#565e74",
+                      "on-secondary-fixed": "#131b2e",
+                      "surface-variant": "#e0e3e5",
+                      "tertiary": "#46566c",
+                      "outline": "#737686",
+                      "outline-variant": "#c3c6d7",
+                      "tertiary-fixed-dim": "#b7c8e1",
+                      "surface-container-high": "#e6e8ea",
+                      "surface-container-low": "#f2f4f6",
+                      "primary-container": "#2563eb",
+                      "inverse-surface": "#2d3133",
+                      "tertiary-fixed": "#d3e4fe",
+                      "on-tertiary-fixed-variant": "#38485d",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-dim": "#d8dadc",
+                      "surface": "#f7f9fb",
+                      "secondary-container": "#dae2fd",
+                      "on-secondary": "#ffffff",
+                      "secondary-fixed": "#dae2fd",
+                      "error": "#ba1a1a",
+                      "background": "#f7f9fb",
+                      "surface-container": "#eceef0",
+                      "on-primary-fixed-variant": "#003ea8",
+                      "on-primary-container": "#eeefff",
+                      "on-tertiary-container": "#e9f0ff",
+                      "on-background": "#191c1e",
+                      "on-tertiary-fixed": "#0b1c30",
+                      "primary": "#004ac6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "margin-mobile": "16px",
+                      "sm": "8px",
+                      "margin-desktop": "32px",
+                      "base": "8px",
+                      "gutter": "16px",
+                      "md": "16px",
+                      "xl": "32px",
+                      "lg": "24px",
+                      "xs": "4px"
+              },
+              "fontFamily": {
+                      "arabic-body": ["Cairo"],
+                      "body-lg": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "h2": ["Cairo"],
+                      "h1": ["Cairo"],
+                      "h3": ["Cairo"],
+                      "body-md": ["Inter"],
+                      "label-caps": ["Inter"]
+              },
+              "fontSize": {
+                      "arabic-body": ["14px", { "lineHeight": "1.7", "fontWeight": "400" }],
+                      "body-lg": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                      "body-sm": ["13px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                      "h2": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                      "h1": ["32px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                      "h3": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                      "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                      "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex">
+<!-- SideNavBar -->
+<nav class="fixed h-full left-0 top-0 w-64 bg-surface-container-low shadow-sm flex flex-col p-md hidden md:flex z-50">
+<div class="mb-lg">
+<h1 class="font-h2 text-h2 font-bold text-primary">Engineers Management</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Egyptian Construction ERP</p>
+</div>
+<ul class="flex flex-col gap-sm flex-1">
+<li>
+<a class="flex items-center gap-base p-sm rounded text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-base p-sm rounded text-primary font-bold border-r-4 border-primary bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-weight="fill">architecture</span>
+<span>Projects</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-base p-sm rounded text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Clients</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-base p-sm rounded text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>Suppliers</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-base p-sm rounded text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Finance</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-base p-sm rounded text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span>Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-base p-sm rounded text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined">auto_awesome</span>
+<span>AI Drafts</span>
+</a>
+</li>
+</ul>
+<button class="mt-auto bg-primary text-on-primary rounded-lg py-sm px-md font-body-md text-body-md flex items-center justify-center gap-base hover:opacity-90 active:scale-95 duration-150 transition-all">
+<span class="material-symbols-outlined">add</span>
+            + New Transaction
+        </button>
+</nav>
+<!-- TopNavBar -->
+<header class="hidden md:flex justify-between items-center px-margin-desktop py-sm ml-64 w-[calc(100%-16rem)] bg-surface-container-lowest docked full-width top-0 z-40">
+<div class="flex items-center gap-md">
+<h2 class="font-h3 text-h3 font-semibold text-primary">Al-Binaa Engineering</h2>
+</div>
+<div class="flex items-center gap-lg">
+<div class="flex items-center gap-base border border-outline-variant rounded-full px-md py-xs bg-surface-container-lowest">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<input class="border-none bg-transparent focus:ring-0 text-body-md p-0 w-64 text-on-surface" placeholder="Search projects..." type="text"/>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors font-label-caps text-label-caps">AR/EN</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70"><span class="material-symbols-outlined">notifications</span></button>
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-70"><span class="material-symbols-outlined">account_circle</span></button>
+</div>
+</header>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full flex justify-around items-center px-4 py-2 md:hidden bg-surface-container-lowest shadow-lg border-t border-outline-variant z-50 rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high p-sm rounded-xl active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-caps text-label-caps">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" data-weight="fill">foundation</span>
+<span class="font-label-caps text-label-caps mt-1">Projects</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high p-sm rounded-xl active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-caps text-label-caps">Finance</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container-high p-sm rounded-xl active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">menu</span>
+<span class="font-label-caps text-label-caps">More</span>
+</a>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 md:mt-[60px] p-margin-mobile md:p-margin-desktop mb-24 md:mb-0">
+<!-- Project Header Info -->
+<section class="mb-lg">
+<div class="flex flex-col md:flex-row md:items-start justify-between gap-md mb-md">
+<div>
+<div class="flex items-center gap-sm mb-xs">
+<h1 class="font-h1 text-h1 text-on-surface">New Cairo Compound Plaza</h1>
+<span class="bg-secondary-container text-on-secondary-container px-sm py-xs rounded font-label-caps text-label-caps inline-flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Active
+                        </span>
+</div>
+<p class="font-body-lg text-body-lg text-on-surface-variant flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">business</span> Client: Hassan Allam Holding
+                    </p>
+</div>
+<div class="bg-surface-container rounded-lg p-sm border border-outline-variant flex items-center gap-md">
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Mgmt Fee / Profit Rule</span>
+<span class="font-body-md text-body-md font-semibold text-primary">12% on Expenses</span>
+</div>
+<button class="p-xs text-tertiary hover:bg-surface-container-high rounded transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Financial Overview Bento -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-md mb-xl">
+<div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 p-sm opacity-20">
+<span class="material-symbols-outlined text-4xl">request_quote</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-xs">Total Contract Value</h3>
+<p class="font-h2 text-h2 text-on-surface">EGP 4,500,000</p>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 p-sm opacity-20">
+<span class="material-symbols-outlined text-4xl">payments</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-xs">Actual Cost (YTD)</h3>
+<p class="font-h2 text-h2 text-error">EGP 1,250,400</p>
+</div>
+<div class="bg-primary-container p-md rounded-xl border border-primary shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 p-sm opacity-20">
+<span class="material-symbols-outlined text-4xl text-on-primary-container">account_balance</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-primary-container mb-xs">Recognized Office Revenue</h3>
+<p class="font-h2 text-h2 text-on-primary-container flex items-baseline gap-xs">
+                    EGP 150,048
+                    <span class="font-body-sm text-body-sm opacity-80">(Transferred)</span>
+</p>
+<div class="mt-sm bg-surface-container-lowest/20 h-1 rounded-full overflow-hidden">
+<div class="bg-surface-container-lowest h-full w-[35%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant shadow-sm relative overflow-hidden">
+<div class="absolute top-0 right-0 p-sm opacity-20">
+<span class="material-symbols-outlined text-4xl">account_balance_wallet</span>
+</div>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-xs">Project Safe Balance</h3>
+<p class="font-h2 text-h2 text-tertiary">EGP 320,000</p>
+</div>
+</section>
+<!-- Tabs -->
+<section class="mb-lg border-b border-outline-variant flex overflow-x-auto no-scrollbar">
+<button class="px-md py-sm font-body-md text-body-md text-on-surface-variant hover:bg-surface-variant transition-colors whitespace-nowrap">Transactions</button>
+<button class="px-md py-sm font-body-md text-body-md font-bold text-primary border-b-2 border-primary bg-surface-container-lowest whitespace-nowrap">Documents Gallery</button>
+<button class="px-md py-sm font-body-md text-body-md text-on-surface-variant hover:bg-surface-variant transition-colors whitespace-nowrap">Site Reports</button>
+<button class="px-md py-sm font-body-md text-body-md text-on-surface-variant hover:bg-surface-variant transition-colors whitespace-nowrap">Cost Items</button>
+</section>
+<!-- Active Tab Content: Document Gallery -->
+<section>
+<div class="flex justify-between items-center mb-md">
+<h3 class="font-h3 text-h3 text-on-surface">Site Documentation</h3>
+<button class="bg-surface-container-lowest border border-outline-variant text-on-surface font-body-md text-body-md px-md py-sm rounded-lg shadow-sm hover:bg-surface-container-low transition-colors flex items-center gap-xs">
+<span class="material-symbols-outlined">add_photo_alternate</span> Upload Document
+                </button>
+</div>
+<!-- Gallery Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-md">
+<!-- Doc Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden group hover:shadow-[0px_4px_12px_rgba(0,0,0,0.05)] transition-shadow">
+<div class="h-40 bg-surface-container relative">
+<img alt="Construction site" class="w-full h-full object-cover" data-alt="A bright, high-contrast, modern photograph of an active Egyptian construction site showing exposed steel rebar and concrete foundations under a clear blue sky. The image has a professional, corporate modernism aesthetic, bathed in soft, natural daylight with crisp shadows. Deep greys of the concrete contrast with subtle blue tones in the sky, aligning with a sophisticated light-mode enterprise software look." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbeMlNs3AQqC5lVZP1YwozVAX2NHL2WKElPn-AtOir22gDYkTaA0MXJvSmW0nW-k_fIfHH5U-1NpV5Hmp1Gd_und3Fl4VE4T7re6yVpLdrMO1fL2VGCYhBL6dolDMDjuZ0G4jFXkX1dz9PIlvWb6xPAbjYY2UpyY-Dv0uMAh2zn_bXR_VbQ3lgdjp55brmN90--jElkKLgqyLSbTwEM8lFvN-WX1nyOCwbh0-pyTMWdGcPaLOZzuQp2nsYliCJidsB2T_7Nr5ZnOE"/>
+<div class="absolute top-sm right-sm bg-surface-container-lowest/90 backdrop-blur-[2px] px-sm py-xs rounded font-label-caps text-label-caps text-on-surface border border-outline-variant/50">
+                            Receipt
+                        </div>
+</div>
+<div class="p-sm">
+<p class="font-body-md text-body-md text-on-surface truncate font-semibold mb-xs">Steel Delivery Invoice #4402</p>
+<div class="flex items-center gap-xs text-on-surface-variant font-body-sm text-body-sm mb-sm">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+<span class="truncate">Gate 4, Plot 12, Compound Area</span>
+</div>
+<div class="flex justify-between items-center border-t border-surface-container-high pt-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Oct 24, 2023</span>
+<span class="font-body-sm text-body-sm font-semibold text-error">- EGP 145,000</span>
+</div>
+</div>
+</div>
+<!-- Doc Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden group hover:shadow-[0px_4px_12px_rgba(0,0,0,0.05)] transition-shadow">
+<div class="h-40 bg-surface-container relative">
+<img alt="Blueprint review" class="w-full h-full object-cover" data-alt="A clean, highly detailed top-down view of architectural blueprints spread across a clean white desk, illuminated by soft, high-key ambient light. A professional engineer's hand is visible making notes. The color palette is minimal, dominated by whites, slate greys, and the subtle blue ink of the blueprints, perfectly matching a sterile, corporate light-mode SaaS aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_vbLlE9juDg8MM7AxgVn8-h90GhUgCmKL7svH-szEczxKjMOUKjAJK3O0DROQNgw3_Z6c_NhuI2RiadcAkCZMkdb3HMCIAbZZLXXYKk5xyzP0NDcZwfd68HQ7rEB6e1xA8NiE42lEfH8C3rXIfAj9UKIDhxxRbQ0VtSFBm2Z6KXrxvlINLA1bh8dsiTAL6IDm0nfpeqyD0syZ6l8EcgR73V7g6m7-gzrskjqliA7JlATSZqcTU1iWZ3lVf0H-c56xFuTpmzjE5wQ"/>
+<div class="absolute top-sm right-sm bg-surface-container-lowest/90 backdrop-blur-[2px] px-sm py-xs rounded font-label-caps text-label-caps text-on-surface border border-outline-variant/50">
+                            Site Photo
+                        </div>
+</div>
+<div class="p-sm">
+<p class="font-body-md text-body-md text-on-surface truncate font-semibold mb-xs">Phase 1 Structural Approval</p>
+<div class="flex items-center gap-xs text-on-surface-variant font-body-sm text-body-sm mb-sm">
+<span class="material-symbols-outlined text-[16px]">person</span>
+<span class="truncate">Eng. Mahmoud Tariq</span>
+</div>
+<div class="flex justify-between items-center border-t border-surface-container-high pt-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Oct 22, 2023</span>
+</div>
+</div>
+</div>
+<!-- Doc Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden group hover:shadow-[0px_4px_12px_rgba(0,0,0,0.05)] transition-shadow">
+<div class="h-40 bg-surface-container flex items-center justify-center relative bg-surface-variant">
+<span class="material-symbols-outlined text-4xl text-tertiary">description</span>
+<div class="absolute top-sm right-sm bg-surface-container-lowest/90 backdrop-blur-[2px] px-sm py-xs rounded font-label-caps text-label-caps text-on-surface border border-outline-variant/50">
+                            Contract
+                        </div>
+</div>
+<div class="p-sm">
+<p class="font-body-md text-body-md text-on-surface truncate font-semibold mb-xs">Subcontractor Agreement - Plumbing</p>
+<div class="flex items-center gap-xs text-on-surface-variant font-body-sm text-body-sm mb-sm">
+<span class="material-symbols-outlined text-[16px]">folder</span>
+<span class="truncate">Legal Documents</span>
+</div>
+<div class="flex justify-between items-center border-t border-surface-container-high pt-sm">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Oct 15, 2023</span>
+<button class="text-primary hover:underline font-body-sm text-body-sm flex items-center gap-xs"><span class="material-symbols-outlined text-[16px]">download</span> PDF</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>
+
+<!-- Design System -->
+# Engineers Management - Web Screen Plan
+
+Based on the brief, I will generate the following core screens to launch the web experience:
+
+1. **Marketing Landing Page**: A high-conversion landing page targeting Egyptian construction firm owners. Highlights the "Never Lose a Record" value proposition and the AI-powered capture (voice/receipt).
+2. **Admin Dashboard**: The "Cash Flow at a Glance" view for Company Admins. Features KPI cards (Total Budget, Safe Balance), Income vs Expenses charts, and a pending approvals queue.
+3. **Finance & Transactions List**: A dense, Excel-like table of all project financials. Includes the new "AI Drafts" integration where voice and receipt captures appear for review.
+4. **Project Detail View**: A comprehensive look at a single project's health, including the "Profit-on-Expense" engine stats, transaction history, and document gallery.
+5. **Add Transaction / AI Capture Modal**: The core entry point for data. A multi-step or tabbed modal allowing manual entry, voice recording, or receipt upload.
+
+*Note: All screens will be designed to support full Arabic RTL flipping.*

@@ -1,0 +1,1103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                  String               @id @default(uuid())
+  name                String
+  slug                String               @unique
+  subscriptionPlan    String               @default("FREE_PILOT")
+  isActive            Boolean              @default(true)
+  logo                String?
+  address             String?
+  phone               String?
+  email               String?
+  /// Multi-level approval thresholds. Array of { maxAmount, minRole }.
+  /// First tier whose maxAmount >= transaction amount (or maxAmount=null
+  /// fallback) decides the minimum role required to approve. Null/undefined
+  /// → use built-in defaults from lib/approvalThresholds.js.
+  approvalThresholds  Json?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  chatMessages        ChatMessage[]
+  clients             Client[]
+  custodyTransfers    CustodyTransfer[]
+  documents           Document[]
+  materialBatches     MaterialBatch[]
+  materialUsage       MaterialUsage[]
+  materials           Material[]
+  notes               Note[]
+  notifications       Notification[]
+  projectCostItems    ProjectCostItem[]
+  projects            Project[]
+  roles               Role[]
+  suppliers           Supplier[]
+  transactions        Transaction[]
+  users               User[]
+  workmanships        Workmanship[]
+  workmen             Workman[]
+  globalCategoryFees  GlobalCategoryFee[]
+  projectCategoryFees ProjectCategoryFee[]
+  auditLogs           AuditLog[]
+  dailySiteReports    DailySiteReport[]
+  invoices            Invoice[]
+  transactionDrafts   TransactionDraft[]
+  bankStatements      BankStatement[]
+  subscriptions       Subscription[]
+  paymentAttempts     PaymentAttempt[]
+
+  @@map("tenants")
+}
+
+model User {
+  id                    String            @id @default(uuid())
+  email                 String
+  password              String
+  name                  String
+  role                  UserRole          @default(ENGINEER)
+  company               String?
+  phone                 String?
+  isActive              Boolean           @default(true)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  currentCustodyBalance Decimal           @default(0) @db.Decimal(15, 2)
+  pendingClearance      Decimal           @default(0) @db.Decimal(15, 2)
+  profilePicture        String?
+  tenantId              String?
+  isVerified            Boolean           @default(false)
+  verificationCode      String?
+  verificationExpires   DateTime?
+  mustChangePassword    Boolean           @default(false)
+  permissions           String[]          @default([])
+  resetPasswordExpire   DateTime?
+  resetPasswordToken    String?
+  totpSecret            String?           // base32 secret; nullable until enrolled
+  totpEnabled           Boolean           @default(false)
+  roleId                String?
+  chatMessages          ChatMessage[]
+  custodyTransfers      CustodyTransfer[]
+  materialBatches       MaterialBatch[]
+  materialUsage         MaterialUsage[]
+  notifications         Notification[]
+  projects              Project[]
+  approvedTransactions  Transaction[]     @relation("ApprovedBy")
+  transactions          Transaction[]
+  payerTransactions     Transaction[]     @relation("PayerOfTransaction")
+  receivedTransfers     Transaction[]     @relation("TransferToEngineer")
+  customRole            Role?             @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  tenant                Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workmanships          Workmanship[]
+  auditLogs             AuditLog[]
+  uploadedDocuments     Document[]
+  reportedDsrs          DailySiteReport[] @relation("DSRReporter")
+  acknowledgedDsrs      DailySiteReport[] @relation("DSRAcknowledger")
+  invoicesCreated       Invoice[]         @relation("InvoiceCreator")
+  transactionDrafts     TransactionDraft[]
+  bankStatements        BankStatement[]
+
+  @@unique([email, tenantId])
+  @@unique([phone, tenantId])
+  @@map("users")
+}
+
+/// Dynamic Role-Based Access Control (RBAC) Model
+model Role {
+  id          String  @id @default(uuid())
+  name        String // e.g., "Senior Engineer", "Site Clerk", "Junior Accountant"
+  description String?
+  isSystem    Boolean @default(false) // If true, cannot be deleted (e.g., Admin, Engineer)
+
+  /// The Permission Matrix: Stored as JSON for flexibility
+  /// Example: { "financials": { "view_operational_fund": true, "view_office_profit": false }, ... }
+  permissions Json
+
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users  User[]
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name]) // Role names must be unique per company
+  @@map("roles")
+}
+
+model Client {
+  id              String        @id @default(uuid())
+  name            String
+  email           String
+  phone           String
+  company         String?
+  taxId           String?
+  status          ClientStatus  @default(ACTIVE)
+  street          String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?
+  contactName     String?
+  contactPosition String?
+  contactPhone    String?
+  contactEmail    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+  tenantId        String?
+  tenant          Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects        Project[]
+  transactions    Transaction[]
+  invoices        Invoice[]
+
+  @@map("clients")
+}
+
+model Supplier {
+  id           String           @id @default(uuid())
+  name         String
+  email        String
+  phone        String
+  company      String?
+  category     SupplierCategory @default(OTHER)
+  customCategory String?
+  taxId        String?
+  paymentTerms String           @default("Net 30")
+  rating       Int              @default(3)
+  status       SupplierStatus   @default(ACTIVE)
+  street       String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String?
+  contactName  String?
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+  tenantId     String?
+  materials    Material[]
+  tenant       Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("suppliers")
+}
+
+model Project {
+  id                   String               @id @default(uuid())
+  name                 String
+  description          String?
+  status               ProjectStatus        @default(PLANNING)
+  projectType          ProjectType          @default(OTHER)
+  location             String?
+  startDate            DateTime
+  endDate              DateTime?
+  budget               Decimal              @db.Decimal(15, 2)
+  actualCost           Decimal              @default(0) @db.Decimal(15, 2)
+  clientId             String
+  engineerId           String
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  managementFeePercent Decimal?             @db.Decimal(5, 2)
+  officeRevenue        Decimal              @default(0) @db.Decimal(15, 2)
+  officeExpenses       Decimal              @default(0) @db.Decimal(15, 2)
+  operationalFund      Decimal              @default(0) @db.Decimal(15, 2)
+  projectSafeBalance   Decimal              @default(0) @db.Decimal(15, 2)
+  paymentTerms         String               @default("Net 30")
+  revenueModel         RevenueModel         @default(EXECUTION_COST_PLUS)
+  tenantId             String?
+  totalContractValue   Decimal?             @db.Decimal(15, 2)
+  deletedAt            DateTime?
+  documents            Document[]
+  materialBatches      MaterialBatch[]
+  materialUsage        MaterialUsage[]
+  notes                Note[]
+  projectCostItems     ProjectCostItem[]
+  categoryFees         ProjectCategoryFee[]
+  dailySiteReports     DailySiteReport[]
+  invoices             Invoice[]
+  client               Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  engineer             User                 @relation(fields: [engineerId], references: [id])
+  tenant               Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions         Transaction[]
+  workmanships         Workmanship[]
+
+  @@map("projects")
+}
+
+model ProjectCostItem {
+  id             String        @id @default(uuid())
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name           String
+  totalQuantity  Decimal?      @db.Decimal(15, 2)
+  unitOfMeasure  String?
+  unitPrice      Decimal?      @db.Decimal(15, 2)
+  estimatedTotal Decimal?      @db.Decimal(15, 2)
+  totalPaid      Decimal       @default(0) @db.Decimal(15, 2)
+  status         String        @default("OPEN")
+  category       String?
+  workmanId      String?
+  workman        Workman?      @relation(fields: [workmanId], references: [id], onDelete: SetNull)
+  transactions   Transaction[]
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("project_cost_items")
+}
+
+model Material {
+  id           String          @id @default(uuid())
+  name         String
+  nameAr       String?
+  description  String?
+  unit         MaterialUnit
+  stockLevel   Decimal         @default(0) @db.Decimal(10, 2)
+  unitPrice    Decimal         @db.Decimal(10, 2)
+  reorderLevel Decimal?        @db.Decimal(10, 2)
+  supplierId   String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  deletedAt    DateTime?
+  tenantId     String?
+  batches      MaterialBatch[]
+  usage        MaterialUsage[]
+  supplier     Supplier?       @relation(fields: [supplierId], references: [id])
+  tenant       Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("materials")
+}
+
+model MaterialUsage {
+  id         String   @id @default(uuid())
+  quantity   Decimal  @db.Decimal(10, 2)
+  notes      String?
+  usageDate  DateTime @default(now())
+  materialId String
+  projectId  String
+  recordedBy String
+  createdAt  DateTime @default(now())
+  tenantId   String?
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [recordedBy], references: [id])
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("material_usage")
+}
+
+model MaterialBatch {
+  id                String               @id @default(uuid())
+  description       String
+  descriptionAr     String?
+  initialValue      Decimal              @db.Decimal(15, 2)
+  remainingValue    Decimal              @db.Decimal(15, 2)
+  quantityUsed      Decimal?             @db.Decimal(15, 2)
+  officeFeeApplied  Decimal              @default(0) @db.Decimal(15, 2)
+  status            BatchStatus          @default(AVAILABLE)
+  category          TransactionCategory?
+  projectId         String
+  originalReceiptId String?
+  recordedBy        String
+  purchaseDate      DateTime             @default(now())
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  tenantId          String
+  materialId        String?
+  material          Material?            @relation(fields: [materialId], references: [id])
+  project           Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user              User                 @relation(fields: [recordedBy], references: [id])
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("material_batches")
+}
+
+model Workman {
+  id               String            @id @default(uuid())
+  name             String
+  nameAr           String?
+  trade            WorkmanTrade
+  customTrade      String?
+  dailyRate        Decimal           @db.Decimal(10, 2)
+  phone            String?
+  nationalId       String?
+  nationalIdImage  String?           @db.Text
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+  tenantId         String?
+  totalPaid        Decimal           @default(0) @db.Decimal(15, 2)
+  transactions     Transaction[]
+  workmanships     Workmanship[]
+  projectCostItems ProjectCostItem[]
+  tenant           Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("workmen")
+}
+
+model Workmanship {
+  id                String            @id @default(uuid())
+  description       String
+  descriptionAr     String?
+  agreedAmount      Decimal           @db.Decimal(10, 2)
+  paidAmount        Decimal           @default(0) @db.Decimal(10, 2)
+  outstandingAmount Decimal           @default(0) @db.Decimal(10, 2)
+  status            WorkmanshipStatus @default(PENDING)
+  startDate         DateTime?
+  completionDate    DateTime?
+  workmanId         String
+  projectId         String
+  managedBy         String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenantId          String?
+  manager           User              @relation(fields: [managedBy], references: [id])
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workman           Workman           @relation(fields: [workmanId], references: [id], onDelete: Cascade)
+
+  @@map("workmanships")
+}
+
+model Transaction {
+  id                String              @id @default(uuid())
+  type              TransactionType
+  category          TransactionCategory
+  amount            Decimal             @db.Decimal(15, 2)
+  description       String
+  descriptionAr     String?
+  debit             Decimal?            @db.Decimal(15, 2)
+  credit            Decimal?            @db.Decimal(15, 2)
+  transactionDate   DateTime            @default(now())
+  paymentMethod     PaymentMethod       @default(BANK_TRANSFER)
+  invoiceNumber     String?
+  status            TransactionStatus   @default(DRAFT)
+  isOfficeExpense   Boolean             @default(false)
+  notes             String?
+  projectId         String?
+  projectCostItemId String?
+  supplierId        String?
+  clientId          String?
+  createdBy         String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  aiExtractedData   Json?
+  aiRawText         String?
+  approvedAt        DateTime?
+  approvedBy        String?
+  custodyWalletId   String?
+  receiptPhotoUrl   String?
+  rejectionReason   String?
+  payerUserId       String?
+  payer             User?               @relation("PayerOfTransaction", fields: [payerUserId], references: [id])
+  toEngineerId      String?
+  toEngineer        User?               @relation("TransferToEngineer", fields: [toEngineerId], references: [id])
+  tenantId          String?
+  voiceNoteUrl      String?
+  workmanId         String?
+  approver          User?               @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  client            Client?             @relation(fields: [clientId], references: [id])
+  user              User                @relation(fields: [createdBy], references: [id])
+  project           Project?            @relation(fields: [projectId], references: [id])
+  projectCostItem   ProjectCostItem?    @relation(fields: [projectCostItemId], references: [id])
+  supplier          Supplier?           @relation(fields: [supplierId], references: [id])
+  tenant            Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workman           Workman?            @relation(fields: [workmanId], references: [id])
+  costCenter        String?
+  transactionTo     String?
+  transactionFrom   String?
+  physicalAccount   String?
+  draft             TransactionDraft?
+  // Phase 6.3 — set when this transaction was matched to a bank-statement row
+  reconciledAt      DateTime?
+  bankStatementRow  BankStatementRow?
+
+  @@index([projectId, transactionDate])
+  @@index([type, category])
+  @@index([status])
+  @@map("transactions")
+}
+
+model CustodyTransfer {
+  id                   String              @id @default(uuid())
+  type                 CustodyTransferType
+  amount               Decimal             @db.Decimal(15, 2)
+  description          String
+  engineerId           String
+  balanceBefore        Decimal             @db.Decimal(15, 2)
+  balanceAfter         Decimal             @db.Decimal(15, 2)
+  relatedTransactionId String?
+  tenantId             String?
+  createdAt            DateTime            @default(now())
+  engineer             User                @relation(fields: [engineerId], references: [id])
+  tenant               Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([engineerId, createdAt])
+  @@map("custody_transfers")
+}
+
+model ChatMessage {
+  id            String        @id @default(uuid())
+  messageType   MessageType   @default(TEXT)
+  content       String
+  audioUrl      String?
+  transcript    String?
+  intent        MessageIntent @default(GENERAL)
+  extractedData Json?
+  processed     Boolean       @default(false)
+  response      String?
+  userId        String
+  createdAt     DateTime      @default(now())
+  tenantId      String?
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  userId       String
+  tenantId     String?
+  type         NotificationType
+  title        String
+  message      String
+  resourceId   String?
+  resourceType String?
+  isRead       Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  tenant       Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+model Document {
+  id          String           @id @default(uuid())
+  name        String
+  url         String
+  fileType    String?
+  fileSize    Int?
+  /// Free-form category. Phase 3 conventions:
+  ///   "PHOTO_PROGRESS" | "PHOTO_RECEIPT" | "PHOTO_DELIVERY" | "PHOTO_ISSUE"
+  ///   "CONTRACT" | "PERMIT" | "DRAWING" | "REPORT" | "OTHER" (default)
+  category    DocumentCategory @default(OTHER)
+  description String?
+  /// Optional GPS coordinates captured by the mobile camera at the moment
+  /// of photo capture. Web uploads will leave these null.
+  latitude    Decimal?         @db.Decimal(10, 7)
+  longitude   Decimal?         @db.Decimal(10, 7)
+  /// EXIF-derived "photo taken at" if the client provides it; falls back
+  /// to uploadedAt when missing.
+  takenAt     DateTime?
+  uploadedBy  String?
+  uploader    User?            @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  projectId   String
+  uploadedAt  DateTime         @default(now())
+  tenantId    String?
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, uploadedAt])
+  @@index([category])
+  @@map("documents")
+}
+
+enum DocumentCategory {
+  PHOTO_PROGRESS
+  PHOTO_RECEIPT
+  PHOTO_DELIVERY
+  PHOTO_ISSUE
+  CONTRACT
+  PERMIT
+  DRAWING
+  REPORT
+  OTHER
+}
+
+/// Daily Site Report — engineer's daily log: weather, hours, attendance,
+/// progress notes, issues, photos. Submitted to manager who acknowledges.
+/// One report per project per day.
+model DailySiteReport {
+  id                String            @id @default(uuid())
+  projectId         String
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reportDate        DateTime          @db.Date
+  reportedBy        String
+  reporter          User              @relation("DSRReporter", fields: [reportedBy], references: [id])
+  weather           WeatherCondition?
+  temperatureC      Decimal?          @db.Decimal(4, 1)
+  hoursWorked       Decimal?          @db.Decimal(4, 1)
+  progressNotes     String?
+  issues            String?
+  visitorsNotes     String?
+  /// Array of objects: [{ workmanId, hoursPresent, role? }, ...]
+  workmenAttendance Json?
+  /// Array of objects: [{ name, quantity, unit, supplierId?, notes? }, ...]
+  materialsReceived Json?
+  /// Array of Document UUIDs uploaded for this DSR.
+  photoIds          Json?             @default("[]")
+  status            DSRStatus         @default(DRAFT)
+  submittedAt       DateTime?
+  acknowledgedBy    String?
+  acknowledger      User?             @relation("DSRAcknowledger", fields: [acknowledgedBy], references: [id])
+  acknowledgedAt    DateTime?
+  acknowledgeNotes  String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenantId          String?
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, reportDate])
+  @@index([tenantId, reportDate])
+  @@index([reportedBy, reportDate])
+  @@index([status])
+  @@map("daily_site_reports")
+}
+
+enum WeatherCondition {
+  SUNNY
+  CLOUDY
+  RAINY
+  WINDY
+  DUSTY
+  HOT
+  COLD
+  OTHER
+}
+
+enum DSRStatus {
+  DRAFT
+  SUBMITTED
+  ACKNOWLEDGED
+}
+
+/// Phase 5 — Client-facing invoice. Generated as PDF, sent via email/WhatsApp.
+/// Line items stored as JSON for flexibility (free-form lines, no FK).
+model Invoice {
+  id             String        @id @default(uuid())
+  /// INV-YYYY-NNNN format. Unique per tenant.
+  invoiceNumber  String
+  projectId      String?
+  project        Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  issueDate      DateTime      @default(now())
+  dueDate        DateTime?
+  status         InvoiceStatus @default(DRAFT)
+  /// [{ description, quantity, unitPrice, total }, ...]
+  lineItems      Json
+  subtotal       Decimal       @db.Decimal(15, 2)
+  taxRate        Decimal       @default(0) @db.Decimal(5, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(15, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(15, 2)
+  totalAmount    Decimal       @db.Decimal(15, 2)
+  paidAmount     Decimal       @default(0) @db.Decimal(15, 2)
+  currency       String        @default("EGP")
+  notes          String?
+  terms          String?
+  sentAt         DateTime?
+  sentToEmail    String?
+  paidAt         DateTime?
+  createdBy      String
+  creator        User          @relation("InvoiceCreator", fields: [createdBy], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([projectId, status])
+  @@index([clientId, status])
+  @@index([tenantId, issueDate])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String
+  projectId String
+  createdAt DateTime @default(now())
+  tenantId  String?
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("notes")
+}
+
+/// Immutable audit trail of every meaningful mutation. Never deleted.
+/// `before` / `after` hold sanitized snapshots — never include passwords
+/// or other secrets; the audit helper redacts those before persisting.
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String // CREATE, UPDATE, DELETE, APPROVE, REJECT, FUND, RETURN, ROLE_CHANGE, etc.
+  entity    String // Project, Client, Transaction, User, Role, Custody, ...
+  entityId  String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  before    Json?
+  after     Json?
+  metadata  Json? // Optional: { ip, userAgent, reason, ... }
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+enum UserRole {
+  ADMIN
+  ENGINEER
+  ACCOUNTANT
+  SUPER_ADMIN
+  PROJECT_MANAGER
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum SupplierCategory {
+  MATERIALS
+  EQUIPMENT
+  SERVICES
+  LABOR
+  OTHER
+  CONCRETE
+  STEEL
+  CEMENT
+  BRICKS
+  ELECTRICAL
+  PLUMBING
+  PAINT
+  WOOD
+  TOOLS
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  BLACKLISTED
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  INFRASTRUCTURE
+  INDUSTRIAL
+  OTHER
+}
+
+enum RevenueModel {
+  DESIGN_ONLY_AREA
+  EXECUTION_COST_PLUS
+  EXECUTION_LUMP_SUM
+}
+
+enum MaterialUnit {
+  M3
+  TON
+  KG
+  M2
+  M
+  PIECE
+  LITER
+  BAG
+}
+
+enum BatchStatus {
+  AVAILABLE
+  PARTIALLY_USED
+  CONSUMED
+}
+
+enum WorkmanTrade {
+  CARPENTER
+  MASON
+  ELECTRICIAN
+  PLUMBER
+  PAINTER
+  WELDER
+  LABORER
+  FOREMAN
+  OTHER
+  CONCRETE
+  PLASTERER
+  FLOORING
+  GYPSUM
+  ALUMINUM
+}
+
+enum WorkmanshipStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  PAID
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionCategory {
+  // Existing generic categories
+  MATERIALS
+  LABOR
+  EQUIPMENT
+  SERVICES
+  PAYMENT
+  OTHER
+  CUSTODY_TRANSFER
+  MANAGEMENT_FEE_TRANSFER
+
+  // V1.2 Specific Arabic Categories
+  CONCRETE
+  SITE_CLEANING
+  STOCKING
+  CEMENT
+  SAND
+  BRICKS
+  GENERAL_LABOR
+  MASONRY_LABOR
+  PLASTERING_MATERIALS
+  PLASTERING_LABOR
+  PLUMBING_MATERIALS
+  PLUMBING_LABOR
+  ELECTRICAL_MATERIALS
+  ELECTRICAL_LABOR
+  CERAMIC_MATERIALS
+  CERAMIC_LABOR
+  PAINTING_MATERIALS
+  PAINTING_LABOR
+  GYPSUM_MATERIALS
+  GYPSUM_LABOR
+  CARPENTRY_MATERIALS
+  CARPENTRY_LABOR
+  DECOR
+  DRAWINGS
+  TIPS
+  TRANSPORT
+  INSULATION_LABOR
+  HVAC_PREP
+  ALUMETAL
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  BANK_TRANSFER
+  CREDIT_CARD
+  OTHER
+  CUSTODY_WALLET
+}
+
+enum TransactionStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum CustodyTransferType {
+  FUNDING
+  CLEARANCE
+  RETURN
+}
+
+enum MessageType {
+  TEXT
+  AUDIO
+  COMMAND
+}
+
+enum MessageIntent {
+  ADD_TRANSACTION
+  ADD_PROJECT
+  ADD_CLIENT
+  ADD_SUPPLIER
+  ADD_MATERIAL
+  ADD_WORKMAN
+  QUERY
+  GENERAL
+}
+
+enum NotificationType {
+  ACTION_REQUIRED
+  INFO
+  ALERT
+}
+
+// Global default office fee percentages per category
+model GlobalCategoryFee {
+  id                String              @id @default(uuid())
+  category          TransactionCategory @unique
+  defaultFeePercent Decimal             @db.Decimal(5, 2)
+  tenantId          String
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@map("global_category_fees")
+}
+
+// Project-specific category fee overrides
+model ProjectCategoryFee {
+  id         String              @id @default(uuid())
+  projectId  String
+  category   TransactionCategory
+  feePercent Decimal             @db.Decimal(5, 2)
+  project    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([projectId, category])
+  @@map("project_category_fees")
+}
+
+/// Phase 7 — AI-assisted draft transaction.
+///
+/// Lifecycle:
+///   1. Engineer records voice / photographs receipt → upload endpoint stores the
+///      media on S3 (or local fallback) so user can replay/re-view it.
+///   2. AI extracts structured data → rawExtraction.
+///   3. Matching service resolves vendor/project/material/category against the
+///      tenant's existing records → matchedDraft (per-field { value, candidateId,
+///      confidence } shape). User reviews + edits in the UI.
+///   4. On commit, a real Transaction row is created and committedTransactionId
+///      is set; the draft is kept for audit but no longer surfaces in the queue.
+///   5. On discard, status flips and the draft drops out of the queue.
+///
+/// Multi-tenant: filter by tenantId in every query, like every other resource.
+/// Source media URL is preserved until the draft is hard-deleted by an admin.
+model TransactionDraft {
+  id                     String                @id @default(uuid())
+  tenantId               String
+  createdById            String
+  source                 DraftSource
+  status                 DraftStatus           @default(PENDING_REVIEW)
+
+  // Original media so the user can review their input before committing
+  originalMediaUrl       String?               // S3 URL or local path
+  originalMediaMime      String?
+  transcript             String?               // raw Whisper text (voice only)
+
+  // What the AI returned, untouched
+  rawExtraction          Json
+  // After DB matching: { type, amount, ..., vendorMatch:{ name, supplierId?, confidence }, ... }
+  matchedDraft           Json
+  // Overall extraction confidence reported by the AI (high|medium|low)
+  confidence             String?
+
+  // Set when promoted to a real Transaction
+  committedTransactionId String?               @unique
+  committedTransaction   Transaction?          @relation(fields: [committedTransactionId], references: [id], onDelete: SetNull)
+  committedAt            DateTime?
+  discardedAt            DateTime?
+
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy              User                  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([createdById, status])
+  @@map("transaction_drafts")
+}
+
+enum DraftSource {
+  VOICE
+  RECEIPT
+}
+
+enum DraftStatus {
+  PENDING_REVIEW
+  COMMITTED
+  DISCARDED
+}
+
+/// Phase 6.3 — Bank reconciliation.
+///
+/// One BankStatement row per CSV upload. Each statement parses into
+/// BankStatementRow rows; each row is auto-matched against unreconciled
+/// Transactions in the tenant by amount + date proximity, then reviewed
+/// + confirmed by the user. Confirming sets:
+///   row.matchedTransactionId
+///   row.status = MATCHED
+///   transaction.reconciledAt
+model BankStatement {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  uploadedById    String
+  originalName    String
+  status          BankStatementStatus     @default(PENDING)
+  totalRows       Int                     @default(0)
+  matchedRows     Int                     @default(0)
+  ignoredRows     Int                     @default(0)
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy      User                    @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  rows            BankStatementRow[]
+
+  @@index([tenantId, status])
+  @@map("bank_statements")
+}
+
+model BankStatementRow {
+  id                     String                @id @default(uuid())
+  statementId            String
+  tenantId               String
+  rowIndex               Int                   // original line number in the CSV (for ordering)
+  rawDate                String?               // raw text from CSV
+  parsedDate             DateTime?
+  amount                 Decimal               @db.Decimal(15, 2)
+  // Sign convention: positive = credit (money in), negative = debit (money out).
+  // Egyptian banks vary; the parser normalizes Debit → -, Credit → +.
+  description            String?
+  reference              String?
+  status                 BankStatementRowStatus @default(UNMATCHED)
+  matchedTransactionId   String?               @unique
+  matchedAt              DateTime?
+  // Cached top-N suggestion list as Json: [{ transactionId, score, reason }]
+  suggestions            Json?
+
+  statement              BankStatement         @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  matchedTransaction     Transaction?          @relation(fields: [matchedTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([statementId, status])
+  @@index([tenantId, status])
+  @@map("bank_statement_rows")
+}
+
+enum BankStatementStatus {
+  PENDING       // just uploaded, suggestions not yet generated
+  REVIEWING     // suggestions generated, awaiting user confirmation
+  COMPLETED     // all rows either matched or ignored
+  CANCELLED
+}
+
+enum BankStatementRowStatus {
+  UNMATCHED
+  SUGGESTED
+  MATCHED
+  IGNORED
+}
+
+/// Phase 6.4 — Subscription billing.
+///
+/// One Subscription row per tenant per period. New tenants start with a
+/// FREE_PILOT subscription auto-created at register-company time. Upgrades
+/// flow through Paymob: user clicks "Subscribe to BASIC", we create a
+/// PaymentAttempt + redirect to a Paymob iframe; on successful HMAC-verified
+/// webhook callback, the previous active sub is closed and a new one starts
+/// with status=ACTIVE + currentPeriodEnd = now + 30 days.
+///
+/// No auto-renewal in v1 — when currentPeriodEnd passes, status flips to
+/// EXPIRED via a daily cron (not yet shipped) or on next API call.
+/// Renewal is a manual re-checkout for now.
+model Subscription {
+  id                  String              @id @default(uuid())
+  tenantId            String
+  plan                String              // matches a key in lib/plans.js — flexible vs an enum because plan catalog evolves
+  status              SubscriptionStatus  @default(ACTIVE)
+  currentPeriodStart  DateTime            @default(now())
+  currentPeriodEnd    DateTime
+  amountEgp           Decimal             @db.Decimal(10, 2)
+  // Paymob references for support / refunds
+  paymobOrderId       String?
+  paymobTransactionId String?
+  // Set when admin manually cancels OR when the period ends without renewal
+  cancelledAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  paymentAttempts     PaymentAttempt[]
+
+  @@index([tenantId, status])
+  @@map("subscriptions")
+}
+
+/// Phase 6.4 — Audit trail of every checkout attempt, including failures.
+/// We need this to debug "I paid but my account didn't upgrade" — common
+/// on Egyptian payment flows where Fawry receipts can take minutes to
+/// reconcile.
+model PaymentAttempt {
+  id                  String                @id @default(uuid())
+  tenantId            String
+  subscriptionId      String?
+  plan                String
+  amountEgp           Decimal               @db.Decimal(10, 2)
+  status              PaymentAttemptStatus  @default(PENDING)
+  // Paymob references
+  paymobOrderId       String?
+  paymobPaymentKey    String?
+  paymobTransactionId String?
+  paymobIframeUrl     String?
+  failureReason       String?
+  // Raw webhook payload for forensics — tenantless when fingerprint matches but we can't find the tenant
+  rawWebhook          Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription        Subscription?         @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([paymobOrderId])
+  @@map("payment_attempts")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE      // payment failed but period not yet expired
+  CANCELLED     // admin or user cancelled
+  EXPIRED       // period ended without renewal
+}
+
+enum PaymentAttemptStatus {
+  PENDING       // checkout created, waiting for Paymob
+  SUCCESS       // webhook confirmed
+  FAILED        // webhook reported failure
+  EXPIRED       // user never completed checkout, abandoned
+}

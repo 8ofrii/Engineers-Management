@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/build
+/dist
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code workspace state
+.claude/
+
+# Uploads
+uploads/
+server/uploads/
+
+# Build artifacts
+*.tsbuildinfo
+
+# UAT media — keep bug reports (.md/.pdf/.txt) but never commit raw media
+UAT/*.jpeg
+UAT/*.jpg
+UAT/*.png
+UAT/*.gif
+UAT/*.ogg
+UAT/*.mp3
+UAT/*.mp4
+UAT/*.wav
+UAT/*.m4a

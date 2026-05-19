@@ -1,0 +1,27 @@
+import express from 'express';
+import * as chatController from '../controllers/chatController.js';
+import { protect } from '../middleware/auth.js';
+import { audioUpload } from '../middleware/upload.js';
+import { validate } from '../middleware/validate.js';
+import { sendMessageSchema } from '../schemas/chat.schema.js';
+
+const router = express.Router();
+
+// All routes require authentication
+router.use(protect);
+
+// Send message (text or voice)
+router.post(
+    '/message',
+    audioUpload.single('audio'), // Handle audio file upload
+    validate({ body: sendMessageSchema }),
+    chatController.sendMessage
+);
+
+// Get chat history
+router.get('/history', chatController.getChatHistory);
+
+// Clear chat history
+router.delete('/history', chatController.clearChatHistory);
+
+export default router;
