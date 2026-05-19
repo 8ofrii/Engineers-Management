@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon, Trash2, X } from 'lucide-react';
+=======
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon, Trash2 } from 'lucide-react';
+>>>>>>> main
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI } from '../services/api';
@@ -17,13 +23,17 @@ export default function Workforce() {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedWorkman, setSelectedWorkman] = useState(null);
     const [selectedTrades, setSelectedTrades] = useState([]); // Changed to array for multiple selection
+<<<<<<< HEAD
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
     const filterRef = useRef(null);
+=======
+>>>>>>> main
 
     useEffect(() => {
         loadWorkmen();
     }, []);
 
+<<<<<<< HEAD
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (filterRef.current && !filterRef.current.contains(event.target)) {
@@ -36,6 +46,8 @@ export default function Workforce() {
         };
     }, []);
 
+=======
+>>>>>>> main
     const loadWorkmen = async () => {
         try {
             const response = await workmenAPI.getAll();
@@ -100,6 +112,7 @@ export default function Workforce() {
         }
     };
 
+<<<<<<< HEAD
     // Calculate dynamic trades based on workmen data
     const baseTrades = ['CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER', 'WELDER', 'LABORER', 'FOREMAN', 'CONCRETE', 'PLASTERER', 'FLOORING', 'GYPSUM', 'ALUMINUM'];
     
@@ -121,6 +134,14 @@ export default function Workforce() {
             }
             return false;
         });
+=======
+    // Filter workmen based on selected trades
+    const filteredWorkmen = selectedTrades.length === 0
+        ? workmen
+        : workmen.filter(w => selectedTrades.includes(w.trade));
+
+    const trades = ['ALL', 'MASON', 'CONCRETE', 'PLASTERER', 'PAINTER', 'PLUMBER', 'ELECTRICIAN', 'FLOORING', 'CARPENTER', 'GYPSUM', 'ALUMINUM'];
+>>>>>>> main
 
     // Color mapping for each trade - High contrast and distinct
     const tradeColors = {
@@ -135,9 +156,12 @@ export default function Workforce() {
         'CARPENTER': { bg: '#2E7D32', text: 'white', border: '#2E7D32' }, // Green 800
         'GYPSUM': { bg: '#7B1FA2', text: 'white', border: '#7B1FA2' }, // Purple 700
         'ALUMINUM': { bg: '#546E7A', text: 'white', border: '#546E7A' }, // Blue Grey 600
+<<<<<<< HEAD
         'WELDER': { bg: '#F57C00', text: 'white', border: '#F57C00' }, // Orange 700
         'LABORER': { bg: '#795548', text: 'white', border: '#795548' }, // Brown 500
         'FOREMAN': { bg: '#303F9F', text: 'white', border: '#303F9F' }, // Indigo 700
+=======
+>>>>>>> main
         'OTHER': { bg: '#9E9E9E', text: 'white', border: '#9E9E9E' } // Grey 500
     };
 
@@ -168,6 +192,7 @@ export default function Workforce() {
                     </button>
                 </div>
 
+<<<<<<< HEAD
                 {/* Trade Filter Dropdown */}
                 <div className="mb-lg" style={{ position: 'relative', width: '300px' }} ref={filterRef}>
                     <div 
@@ -307,6 +332,54 @@ export default function Workforce() {
                             </div>
                         )}
                     </div>
+=======
+                {/* Trade Filter Buttons */}
+                <div className="mb-lg" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {trades.map(trade => {
+                        const isActive = trade === 'ALL'
+                            ? selectedTrades.length === 0
+                            : selectedTrades.includes(trade);
+                        // Fallback to OTHER color if trade not found in map
+                        const colors = tradeColors[trade] || tradeColors['OTHER'];
+
+                        return (
+                            <button
+                                key={trade}
+                                onClick={() => toggleTrade(trade)}
+                                style={{
+                                    cursor: 'pointer',
+                                    padding: '8px 16px',
+                                    fontSize: '13px',
+                                    fontWeight: isActive ? '600' : '500',
+                                    border: isActive ? `2px solid ${colors.border}` : '1px solid var(--border-color)',
+                                    borderRadius: 'var(--radius-md)',
+                                    background: isActive ? colors.bg : 'var(--bg-tertiary)',
+                                    color: isActive ? colors.text : 'var(--text-primary)',
+                                    transition: 'all 0.2s ease',
+                                    boxShadow: isActive ? 'var(--shadow-sm)' : 'none'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActive) {
+                                        e.target.style.background = colors.bg;
+                                        e.target.style.color = colors.text;
+                                        e.target.style.borderColor = colors.border;
+                                        e.target.style.opacity = '0.8';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActive) {
+                                        e.target.style.background = 'var(--bg-tertiary)';
+                                        e.target.style.color = 'var(--text-primary)';
+                                        e.target.style.borderColor = 'var(--border-color)';
+                                        e.target.style.opacity = '1';
+                                    }
+                                }}
+                            >
+                                {trade === 'ALL' ? t('common.all') : t(`labor.trades.${trade}`)}
+                            </button>
+                        );
+                    })}
+>>>>>>> main
                 </div>
 
                 {filteredWorkmen.length === 0 ? (

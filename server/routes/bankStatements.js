@@ -7,7 +7,11 @@ import { protect, authorize } from '../middleware/auth.js';
 // nothing to persist as a binary blob.
 const csvUpload = multer({
     storage: multer.memoryStorage(),
+<<<<<<< HEAD
     limits: { fileSize: 15 * 1024 * 1024 } // 15 MB ceiling
+=======
+    limits: { fileSize: 5 * 1024 * 1024 } // 5 MB ceiling
+>>>>>>> main
 });
 
 const router = express.Router();

@@ -24,11 +24,16 @@
     font-size: 14px;
 }
 
+<<<<<<< HEAD
 .chat-header-actions {
+=======
+.clear-btn {
+>>>>>>> main
     position: absolute;
     top: 24px;
     right: 24px;
     display: flex;
+<<<<<<< HEAD
     gap: 8px;
     align-items: center;
 }
@@ -40,6 +45,8 @@
 
 .clear-btn {
     display: flex;
+=======
+>>>>>>> main
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
@@ -391,17 +398,24 @@
         font-size: 22px;
     }
 
+<<<<<<< HEAD
     .chat-header-actions {
+=======
+    .clear-btn {
+>>>>>>> main
         position: static;
         margin-top: 12px;
         width: 100%;
         justify-content: center;
+<<<<<<< HEAD
         flex-direction: column;
     }
 
     .clear-btn {
         width: 100%;
         justify-content: center;
+=======
+>>>>>>> main
     }
 
     .chat-messages {

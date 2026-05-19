@@ -57,8 +57,12 @@ export const sendMessage = async (req, res, next) => {
                 userId,
                 tenantId: req.user.tenantId,
                 content: userMessage || "Voice Note",
+<<<<<<< HEAD
                 messageType: isAudio ? 'AUDIO' : 'TEXT',
                 processed: true // Mark as true to identify as User message
+=======
+                messageType: isAudio ? 'AUDIO' : 'TEXT'
+>>>>>>> main
             }
         });
 
@@ -267,10 +271,14 @@ export const getChatHistory = async (req, res, next) => {
         res.status(200).json({
             success: true,
             count: messages.length,
+<<<<<<< HEAD
             data: messages.map((msg, index) => ({
                 ...msg,
                 isUser: msg.processed === true || index % 2 === 0
             }))
+=======
+            data: messages
+>>>>>>> main
         });
 
     } catch (error) {

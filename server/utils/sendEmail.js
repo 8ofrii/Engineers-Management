@@ -11,6 +11,7 @@ const sendEmail = async (options) => {
         );
     }
 
+<<<<<<< HEAD
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
     const secure = port === 465;
@@ -19,6 +20,10 @@ const sendEmail = async (options) => {
         host,
         port,
         secure,
+=======
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+>>>>>>> main
         auth: {
             user: process.env.SMTP_EMAIL.trim(),
             pass: process.env.SMTP_PASSWORD.trim()

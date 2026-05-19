@@ -44,6 +44,7 @@ export const inviteUser = async (req, res) => {
         return res.status(403).json({ success: false, message: 'You are not authorized to assign the SUPER_ADMIN role' });
     }
 
+<<<<<<< HEAD
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     if (!passwordRegex.test(password)) {
         return res.status(400).json({
@@ -52,6 +53,8 @@ export const inviteUser = async (req, res) => {
         });
     }
 
+=======
+>>>>>>> main
     try {
         // Check if user exists in THIS tenant (email unique per tenant)
         const emailExists = await prisma.user.findFirst({
@@ -162,7 +165,11 @@ export const inviteUser = async (req, res) => {
 // Update User (Role/Details)
 export const updateUser = async (req, res) => {
     const { id } = req.params;
+<<<<<<< HEAD
     const { role, name, phone, permissions, password } = req.body;
+=======
+    const { role, name, phone, permissions } = req.body;
+>>>>>>> main
 
     // Only SUPER_ADMIN may grant SUPER_ADMIN. Also forbid demoting an existing
     // SUPER_ADMIN unless the caller is one — otherwise an ADMIN could lock out
@@ -200,6 +207,7 @@ export const updateUser = async (req, res) => {
             select: { id: true, name: true, email: true, role: true, phone: true, permissions: true, isActive: true }
         });
 
+<<<<<<< HEAD
         const updateData = { role, name, phone, permissions };
 
         if (password) {
@@ -217,6 +225,11 @@ export const updateUser = async (req, res) => {
         const user = await prisma.user.update({
             where: { id, tenantId: req.user.tenantId },
             data: updateData
+=======
+        const user = await prisma.user.update({
+            where: { id, tenantId: req.user.tenantId },
+            data: { role, name, phone, permissions }
+>>>>>>> main
         });
 
         const isRoleChange = role && before && role !== before.role;

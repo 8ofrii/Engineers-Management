@@ -91,13 +91,17 @@ export const findMatchesForRow = async ({ amount, parsedDate, description }, ten
 /**
  * Run matching for every UNMATCHED row in a statement, persist the
  * suggestions, and update statement status to REVIEWING.
+<<<<<<< HEAD
  * Optimized with a bulk query and fast in-memory matching to support large files.
+=======
+>>>>>>> main
  */
 export const generateSuggestionsForStatement = async (statementId, tenantId) => {
     const rows = await prisma.bankStatementRow.findMany({
         where: { statementId, tenantId, status: 'UNMATCHED' }
     });
 
+<<<<<<< HEAD
     if (rows.length === 0) {
         await prisma.bankStatement.update({
             where: { id: statementId },
@@ -216,6 +220,24 @@ export const generateSuggestionsForStatement = async (statementId, tenantId) => 
     for (let i = 0; i < updates.length; i += chunkSize) {
         const chunk = updates.slice(i, i + chunkSize);
         await prisma.$transaction(chunk);
+=======
+    for (const row of rows) {
+        const suggestions = await findMatchesForRow(
+            {
+                amount: Number(row.amount),
+                parsedDate: row.parsedDate,
+                description: row.description
+            },
+            tenantId
+        );
+        await prisma.bankStatementRow.update({
+            where: { id: row.id },
+            data: {
+                suggestions,
+                status: suggestions.length > 0 ? 'SUGGESTED' : 'UNMATCHED'
+            }
+        });
+>>>>>>> main
     }
 
     await prisma.bankStatement.update({
