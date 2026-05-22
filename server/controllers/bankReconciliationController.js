@@ -63,12 +63,19 @@ export const uploadStatement = async (req, res) => {
 
     // Run matching now. For a 500-row statement against ~10k transactions
     // this is a few seconds. Beyond that, push to a queue.
+<<<<<<< HEAD
+    // Run matching in the background so the upload is instant and doesn't timeout.
+    generateSuggestionsForStatement(statement.id, req.user.tenantId).catch(err => {
+        logger.error({ err, statementId: statement.id }, 'Suggestion generation failed in background');
+    });
+=======
     try {
         await generateSuggestionsForStatement(statement.id, req.user.tenantId);
     } catch (err) {
         logger.error({ err, statementId: statement.id }, 'Suggestion generation failed');
         // Statement is still useful with status=PENDING; user can retry.
     }
+>>>>>>> main
 
     auditFromReq(req, {
         action: 'CREATE',

@@ -1,6 +1,12 @@
+<<<<<<< HEAD
+import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon, Trash2, X } from 'lucide-react';
+=======
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon, Trash2 } from 'lucide-react';
+>>>>>>> main
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI } from '../services/api';
@@ -17,11 +23,31 @@ export default function Workforce() {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedWorkman, setSelectedWorkman] = useState(null);
     const [selectedTrades, setSelectedTrades] = useState([]); // Changed to array for multiple selection
+<<<<<<< HEAD
+    const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+    const filterRef = useRef(null);
+=======
+>>>>>>> main
 
     useEffect(() => {
         loadWorkmen();
     }, []);
 
+<<<<<<< HEAD
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (filterRef.current && !filterRef.current.contains(event.target)) {
+                setIsFilterDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+=======
+>>>>>>> main
     const loadWorkmen = async () => {
         try {
             const response = await workmenAPI.getAll();
@@ -86,12 +112,36 @@ export default function Workforce() {
         }
     };
 
+<<<<<<< HEAD
+    // Calculate dynamic trades based on workmen data
+    const baseTrades = ['CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER', 'WELDER', 'LABORER', 'FOREMAN', 'CONCRETE', 'PLASTERER', 'FLOORING', 'GYPSUM', 'ALUMINUM'];
+    
+    const customTrades = Array.from(new Set(
+        workmen
+            .filter(w => w.trade === 'OTHER' && w.customTrade)
+            .map(w => w.customTrade.trim().toUpperCase())
+    ));
+
+    const trades = ['ALL', ...baseTrades, ...customTrades];
+
+    // Filter workmen based on selected trades
+    const filteredWorkmen = selectedTrades.length === 0
+        ? workmen
+        : workmen.filter(w => {
+            if (selectedTrades.includes(w.trade)) return true;
+            if (w.trade === 'OTHER' && w.customTrade) {
+                return selectedTrades.includes(w.customTrade.trim().toUpperCase());
+            }
+            return false;
+        });
+=======
     // Filter workmen based on selected trades
     const filteredWorkmen = selectedTrades.length === 0
         ? workmen
         : workmen.filter(w => selectedTrades.includes(w.trade));
 
     const trades = ['ALL', 'MASON', 'CONCRETE', 'PLASTERER', 'PAINTER', 'PLUMBER', 'ELECTRICIAN', 'FLOORING', 'CARPENTER', 'GYPSUM', 'ALUMINUM'];
+>>>>>>> main
 
     // Color mapping for each trade - High contrast and distinct
     const tradeColors = {
@@ -106,6 +156,12 @@ export default function Workforce() {
         'CARPENTER': { bg: '#2E7D32', text: 'white', border: '#2E7D32' }, // Green 800
         'GYPSUM': { bg: '#7B1FA2', text: 'white', border: '#7B1FA2' }, // Purple 700
         'ALUMINUM': { bg: '#546E7A', text: 'white', border: '#546E7A' }, // Blue Grey 600
+<<<<<<< HEAD
+        'WELDER': { bg: '#F57C00', text: 'white', border: '#F57C00' }, // Orange 700
+        'LABORER': { bg: '#795548', text: 'white', border: '#795548' }, // Brown 500
+        'FOREMAN': { bg: '#303F9F', text: 'white', border: '#303F9F' }, // Indigo 700
+=======
+>>>>>>> main
         'OTHER': { bg: '#9E9E9E', text: 'white', border: '#9E9E9E' } // Grey 500
     };
 
@@ -136,6 +192,147 @@ export default function Workforce() {
                     </button>
                 </div>
 
+<<<<<<< HEAD
+                {/* Trade Filter Dropdown */}
+                <div className="mb-lg" style={{ position: 'relative', width: '300px' }} ref={filterRef}>
+                    <div 
+                        className="form-group" 
+                        style={{ marginBottom: 0, position: 'relative' }}
+                    >
+                        <div 
+                            style={{ 
+                                padding: '6px 12px', 
+                                border: '1px solid var(--border-color)', 
+                                borderRadius: 'var(--radius-md)', 
+                                background: 'var(--bg-tertiary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '6px',
+                                alignItems: 'center',
+                                minHeight: '42px'
+                            }}
+                            onClick={(e) => {
+                                // Only toggle if not clicking on a chip remove button
+                                if (!e.target.closest('.chip-remove')) {
+                                    setIsFilterDropdownOpen(!isFilterDropdownOpen);
+                                }
+                            }}
+                        >
+                            {selectedTrades.length === 0 ? (
+                                <span style={{ padding: '4px 4px', color: 'var(--text-secondary)' }}>
+                                    {t('common.all')}
+                                </span>
+                            ) : (
+                                selectedTrades.map(trade => (
+                                    <span 
+                                        key={trade}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            padding: '4px 10px',
+                                            background: 'var(--bg-secondary)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '16px',
+                                            fontSize: '13px'
+                                        }}
+                                    >
+                                        {baseTrades.includes(trade) ? t(`labor.trades.${trade}`) : trade}
+                                        <div 
+                                            className="chip-remove"
+                                            style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center',
+                                                cursor: 'pointer', 
+                                                opacity: 0.7,
+                                                background: 'var(--bg-tertiary)',
+                                                borderRadius: '50%',
+                                                padding: '2px',
+                                                marginLeft: '4px'
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleTrade(trade);
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
+                                        >
+                                            <X size={12} />
+                                        </div>
+                                    </span>
+                                ))
+                            )}
+                            <span style={{ marginLeft: 'auto', transform: isFilterDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', padding: '4px' }}>▼</span>
+                        </div>
+
+                        {isFilterDropdownOpen && (
+                            <div 
+                                style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    marginTop: '4px',
+                                    background: 'var(--bg-primary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: 'var(--radius-md)',
+                                    boxShadow: 'var(--shadow-md)',
+                                    zIndex: 100,
+                                    maxHeight: '300px',
+                                    overflowY: 'auto'
+                                }}
+                            >
+                                {trades.map(trade => {
+                                    const isActive = trade === 'ALL'
+                                        ? selectedTrades.length === 0
+                                        : selectedTrades.includes(trade);
+                                    
+                                    // Use 'OTHER' color for custom trades
+                                    const colors = tradeColors[trade] || tradeColors['OTHER'];
+                                    
+                                    return (
+                                        <div 
+                                            key={trade}
+                                            onClick={() => {
+                                                toggleTrade(trade);
+                                            }}
+                                            style={{
+                                                padding: '10px 16px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px',
+                                                borderBottom: '1px solid var(--border-color)',
+                                                background: isActive ? 'var(--bg-tertiary)' : 'transparent'
+                                            }}
+                                        >
+                                            <input 
+                                                type="checkbox" 
+                                                checked={isActive}
+                                                onChange={() => {}} // Handle click on parent div
+                                                style={{ pointerEvents: 'none' }}
+                                            />
+                                            <span style={{ 
+                                                display: 'inline-block',
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '50%',
+                                                backgroundColor: colors.bg
+                                            }}></span>
+                                            <span>
+                                                {trade === 'ALL' 
+                                                    ? t('common.all') 
+                                                    : (baseTrades.includes(trade) ? t(`labor.trades.${trade}`) : trade)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+=======
                 {/* Trade Filter Buttons */}
                 <div className="mb-lg" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {trades.map(trade => {
@@ -182,6 +379,7 @@ export default function Workforce() {
                             </button>
                         );
                     })}
+>>>>>>> main
                 </div>
 
                 {filteredWorkmen.length === 0 ? (

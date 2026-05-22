@@ -3,13 +3,21 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { useTranslation } from 'react-i18next';
+<<<<<<< HEAD
+import { Mic, Send, Trash2, StopCircle, Sparkles, ArrowRight, Globe } from 'lucide-react';
+=======
 import { Mic, Send, Trash2, StopCircle, Sparkles, ArrowRight } from 'lucide-react';
+>>>>>>> main
 import api, { aiExtractAPI } from '../services/api';
 import Layout from '../components/Layout';
 import './ChatAssistant.css';
 
 export default function ChatAssistant() {
+<<<<<<< HEAD
+    const { t, i18n } = useTranslation();
+=======
     const { t } = useTranslation();
+>>>>>>> main
     const { user } = useAuth();
     const { showAlert } = useAlert();
     const [messages, setMessages] = useState([]);
@@ -229,6 +237,28 @@ export default function ChatAssistant() {
         <Layout>
             <div className="chat-assistant">
                 <div className="chat-header">
+<<<<<<< HEAD
+                    <div>
+                        <h1>{t('chat.title')}</h1>
+                        <p>{t('chat.helpText')}</p>
+                    </div>
+                    <div className="chat-header-actions">
+                        <button 
+                            className="clear-btn" 
+                            style={{ position: 'static' }} 
+                            onClick={() => i18n.changeLanguage(i18n.language === 'en' ? 'ar' : 'en')}
+                        >
+                            <Globe size={16} />
+                            {i18n.language === 'en' ? 'عربي' : 'English'}
+                        </button>
+                        {messages.length > 0 && (
+                            <button className="clear-btn" style={{ position: 'static' }} onClick={clearHistory}>
+                                <Trash2 size={16} />
+                                {t('chat.clearHistory')}
+                            </button>
+                        )}
+                    </div>
+=======
                     <h1>{t('chat.title')}</h1>
                     <p>{t('chat.helpText')}</p>
                     {messages.length > 0 && (
@@ -237,6 +267,7 @@ export default function ChatAssistant() {
                             {t('chat.clearHistory')}
                         </button>
                     )}
+>>>>>>> main
                 </div>
 
                 <div className="chat-messages">

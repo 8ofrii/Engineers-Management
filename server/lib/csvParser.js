@@ -5,7 +5,42 @@
 // Returns { headers: string[], rows: object[] }. Each row is keyed by the
 // (lower-cased, trimmed) header so callers can do a case-insensitive lookup.
 
+<<<<<<< HEAD
+// Egyptian banks vary on column naming. We accept a list of synonyms per
+// canonical field and pick the first match present.
+export const SYNONYMS = {
+    date:        ['date', 'transaction date', 'value date', 'posting date', 'تاريخ', 'تاريخ المعاملة', 'التاريخ', 'تاريخ العملية'],
+    description: ['description', 'narrative', 'particulars', 'details', 'memo', 'الوصف', 'البيان', 'تفاصيل', 'بيان'],
+    debit:       ['debit', 'withdrawal', 'amount out', 'مدين', 'سحب', 'المسحوبات'],
+    credit:      ['credit', 'deposit', 'amount in', 'دائن', 'إيداع', 'الايداعات'],
+    amount:      ['amount', 'value', 'المبلغ', 'القيمة', 'مبلغ'],
+    reference:   ['reference', 'ref', 'transaction id', 'مرجع', 'رقم المرجع']
+};
+
+export const findHeader = (headers, candidates) => {
+    console.log('[CSV Parser] Extracted Headers:', headers);
+    for (const c of candidates) {
+        const cLower = c.toLowerCase().trim();
+        const idx = headers.findIndex(h => {
+            const hClean = String(h).toLowerCase().replace(/[\u200B-\u200D\uFEFF\r\n"']/g, '').trim();
+            const hCondensed = hClean.replace(/\s+/g, '');
+            const cCondensed = cLower.replace(/\s+/g, '');
+            return hCondensed === cCondensed || 
+                   hClean.includes(cLower) || 
+                   (hClean.length > 3 && cLower.includes(hClean));
+        });
+        if (idx >= 0) {
+            console.log(`[CSV Parser] Matched candidate '${c}' with header '${headers[idx]}'`);
+            return headers[idx];
+        }
+    }
+    return null;
+};
+
+const parseLine = (line, separator = ',') => {
+=======
 const parseLine = (line) => {
+>>>>>>> main
     const out = [];
     let cur = '';
     let inQuotes = false;
@@ -20,7 +55,11 @@ const parseLine = (line) => {
             }
         } else {
             if (ch === '"') inQuotes = true;
+<<<<<<< HEAD
+            else if (ch === separator) { out.push(cur); cur = ''; }
+=======
             else if (ch === ',') { out.push(cur); cur = ''; }
+>>>>>>> main
             else cur += ch;
         }
     }
@@ -28,6 +67,51 @@ const parseLine = (line) => {
     return out.map(s => s.trim());
 };
 
+<<<<<<< HEAD
+const detectSeparator = (lines) => {
+    let commaCount = 0;
+    let semiCount = 0;
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+        commaCount += (lines[i].match(/,/g) || []).length;
+        semiCount += (lines[i].match(/;/g) || []).length;
+    }
+    return semiCount > commaCount ? ';' : ',';
+};
+
+export const parseCsv = (text) => {
+    if (!text || typeof text !== 'string') return { headers: [], rows: [] };
+    // Normalize line endings; strip BOM that Excel-exported CSVs love to add.
+    const cleaned = text.replace(/^[\uFEFF\u200B]+/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = cleaned.split('\n').filter(l => l.trim().length > 0);
+    if (lines.length === 0) return { headers: [], rows: [] };
+
+    const separator = detectSeparator(lines);
+
+    let headerIdx = 0;
+    let headers = [];
+    
+    // Scan up to 20 lines to find the actual header row (some banks add metadata at the top)
+    for (let i = 0; i < Math.min(20, lines.length); i++) {
+        const potentialHeaders = parseLine(lines[i], separator).map(h => h.toLowerCase().trim());
+        const dateKey = findHeader(potentialHeaders, SYNONYMS.date);
+        const amountKey = findHeader(potentialHeaders, SYNONYMS.amount) || findHeader(potentialHeaders, SYNONYMS.credit) || findHeader(potentialHeaders, SYNONYMS.debit);
+        
+        if (dateKey && amountKey) {
+            headerIdx = i;
+            headers = potentialHeaders;
+            break;
+        }
+    }
+
+    // Fallback if not detected
+    if (headers.length === 0) {
+        headers = parseLine(lines[0], separator).map(h => h.toLowerCase().trim());
+    }
+
+    const rows = [];
+    for (let i = headerIdx + 1; i < lines.length; i++) {
+        const cells = parseLine(lines[i], separator);
+=======
 export const parseCsv = (text) => {
     if (!text || typeof text !== 'string') return { headers: [], rows: [] };
     // Normalize line endings; strip BOM that Excel-exported CSVs love to add.
@@ -39,6 +123,7 @@ export const parseCsv = (text) => {
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
         const cells = parseLine(lines[i]);
+>>>>>>> main
         if (cells.length === 1 && cells[0] === '') continue; // skip blank lines
         const row = {};
         for (let j = 0; j < headers.length; j++) {
@@ -50,6 +135,8 @@ export const parseCsv = (text) => {
     return { headers, rows };
 };
 
+<<<<<<< HEAD
+=======
 // Egyptian banks vary on column naming. We accept a list of synonyms per
 // canonical field and pick the first match present.
 const SYNONYMS = {
@@ -74,13 +161,18 @@ const findHeader = (headers, candidates) => {
     return null;
 };
 
+>>>>>>> main
 const parseDate = (raw) => {
     if (!raw) return null;
     // Try ISO-ish first
     const iso = new Date(raw);
     if (!isNaN(iso.getTime())) return iso;
     // DD/MM/YYYY (most common in Egypt)
+<<<<<<< HEAD
+    const m = String(raw).match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+=======
     const m = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+>>>>>>> main
     if (m) {
         const [, d, mo, y] = m;
         const year = y.length === 2 ? 2000 + Number(y) : Number(y);

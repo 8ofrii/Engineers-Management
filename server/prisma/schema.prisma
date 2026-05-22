@@ -164,6 +164,10 @@ model Supplier {
   phone        String
   company      String?
   category     SupplierCategory @default(OTHER)
+<<<<<<< HEAD
+  customCategory String?
+=======
+>>>>>>> main
   taxId        String?
   paymentTerms String           @default("Net 30")
   rating       Int              @default(3)
