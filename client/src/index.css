@@ -26,35 +26,35 @@
   --color-danger: hsl(0, 85%, 60%);
   --color-success: hsl(142, 71%, 45%);
 
-  /* Backgrounds - Dark Mode */
-  --bg-primary: hsl(220, 25%, 10%);
-  --bg-secondary: hsl(220, 22%, 14%);
-  --bg-tertiary: hsl(220, 20%, 18%);
-  --bg-elevated: hsl(220, 22%, 16%);
-  --bg-overlay: hsla(220, 25%, 10%, 0.95);
-  --bg-glass: hsla(220, 22%, 16%, 0.7);
+  /* Backgrounds - Dark Mode (Executive Mode) */
+  --bg-primary: #0B1B3D;
+  --bg-secondary: #060f22;
+  --bg-tertiary: #142a59;
+  --bg-elevated: #142a59;
+  --bg-overlay: rgba(11, 27, 61, 0.95);
+  --bg-glass: rgba(6, 15, 34, 0.7);
 
   /* Text Colors */
-  --text-primary: hsl(0, 0%, 98%);
-  --text-secondary: hsl(210, 10%, 75%);
-  --text-tertiary: hsl(210, 8%, 55%);
-  --text-disabled: hsl(210, 5%, 40%);
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0ABC0;
+  --text-tertiary: #718096;
+  --text-disabled: #4A5568;
 
   /* Borders */
-  --border-color: hsl(220, 18%, 22%);
-  --border-color-light: hsl(220, 16%, 28%);
-  --border-glass: hsla(220, 80%, 45%, 0.1);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-color-light: rgba(255, 255, 255, 0.15);
+  --border-glass: rgba(0, 240, 181, 0.1);
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px hsla(0, 0%, 0%, 0.2);
-  --shadow-md: 0 4px 16px hsla(0, 0%, 0%, 0.3);
-  --shadow-lg: 0 8px 32px hsla(0, 0%, 0%, 0.4);
-  --shadow-xl: 0 16px 48px hsla(0, 0%, 0%, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, hsl(220, 80%, 45%) 0%, hsl(220, 70%, 50%) 100%);
-  --gradient-success: linear-gradient(135deg, hsl(140, 70%, 55%) 0%, hsl(160, 80%, 50%) 100%);
-  --gradient-danger: linear-gradient(135deg, hsl(0, 85%, 60%) 0%, hsl(15, 85%, 55%) 100%);
+  --gradient-primary: linear-gradient(135deg, #0B1B3D 0%, #142a59 100%);
+  --gradient-success: linear-gradient(135deg, #00F0B5 0%, #00d6a1 100%);
+  --gradient-danger: linear-gradient(135deg, #FF5A36 0%, #e54c2a 100%);
 
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -95,28 +95,28 @@
   --z-toast: 1200;
 }
 
-/* Light Mode */
+/* Light Mode (Field Mode) */
 .light-mode {
-  --bg-primary: hsl(0, 0%, 100%);
-  --bg-secondary: hsl(210, 20%, 98%);
-  --bg-tertiary: hsl(210, 18%, 95%);
-  --bg-elevated: hsl(0, 0%, 100%);
-  --bg-overlay: hsla(0, 0%, 100%, 0.95);
-  --bg-glass: hsla(0, 0%, 100%, 0.7);
+  --bg-primary: #F4F6F8;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E2E8F0;
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(244, 246, 248, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.7);
 
-  --text-primary: hsl(220, 25%, 15%);
-  --text-secondary: hsl(220, 15%, 35%);
-  --text-tertiary: hsl(220, 10%, 50%);
-  --text-disabled: hsl(220, 5%, 65%);
+  --text-primary: #0B1B3D;
+  --text-secondary: #4A5568;
+  --text-tertiary: #718096;
+  --text-disabled: #A0ABC0;
 
-  --border-color: hsl(220, 16%, 88%);
-  --border-color-light: hsl(220, 16%, 92%);
-  --border-glass: hsla(220, 80%, 45%, 0.15);
+  --border-color: #CBD5E0;
+  --border-color-light: #E2E8F0;
+  --border-glass: rgba(11, 27, 61, 0.15);
 
-  --shadow-sm: 0 2px 8px hsla(220, 25%, 20%, 0.08);
-  --shadow-md: 0 4px 16px hsla(220, 25%, 20%, 0.12);
-  --shadow-lg: 0 8px 32px hsla(220, 25%, 20%, 0.16);
-  --shadow-xl: 0 16px 48px hsla(220, 25%, 20%, 0.2);
+  --shadow-sm: 0 2px 8px rgba(11, 27, 61, 0.08);
+  --shadow-md: 0 4px 16px rgba(11, 27, 61, 0.12);
+  --shadow-lg: 0 8px 32px rgba(11, 27, 61, 0.16);
+  --shadow-xl: 0 16px 48px rgba(11, 27, 61, 0.2);
 }
 
 /* Reset & Base Styles */

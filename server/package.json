@@ -13,7 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "seed-demo": "node scripts/setup-test-users.js"
   },
   "keywords": [
     "construction",

@@ -66,7 +66,15 @@ export default {
                 'on-tertiary-container': '#e9f0ff',
                 'on-background': '#191c1e',
                 'on-tertiary-fixed': '#0b1c30',
-                'primary': '#004ac6'
+                'primary': '#004ac6',
+                // Hesaby Theme Colors
+                'hesaby-navy': '#0B1B3D',
+                'hesaby-navy-light': '#142a59',
+                'hesaby-white': '#FFFFFF',
+                'hesaby-gray': '#F4F6F8',
+                'hesaby-teal': '#00F0B5',
+                'hesaby-orange': '#FF5A36',
+                'hesaby-dark': '#060f22'
             },
             borderRadius: {
                 DEFAULT: '0.25rem',
@@ -104,6 +112,36 @@ export default {
                 'h1':          ['32px', { lineHeight: '1.2', fontWeight: '700' }],
                 'h2':          ['24px', { lineHeight: '1.3', fontWeight: '600' }],
                 'h3':          ['20px', { lineHeight: '1.4', fontWeight: '600' }]
+            },
+            keyframes: {
+                'float': {
+                    '0%, 100%': { transform: 'translateY(0)' },
+                    '50%': { transform: 'translateY(-10px)' }
+                },
+                'pulse-glow': {
+                    '0%, 100%': { opacity: 0.8, filter: 'brightness(1)' },
+                    '50%': { opacity: 1, filter: 'brightness(1.2)' }
+                },
+                'fade-in-up': {
+                    '0%': { opacity: 0, transform: 'translateY(20px)' },
+                    '100%': { opacity: 1, transform: 'translateY(0)' }
+                },
+                'gradient-x': {
+                    '0%, 100%': {
+                        'background-size': '200% 200%',
+                        'background-position': 'left center'
+                    },
+                    '50%': {
+                        'background-size': '200% 200%',
+                        'background-position': 'right center'
+                    }
+                }
+            },
+            animation: {
+                'float': 'float 6s ease-in-out infinite',
+                'pulse-glow': 'pulse-glow 3s ease-in-out infinite',
+                'fade-in-up': 'fade-in-up 0.8s ease-out forwards',
+                'gradient-x': 'gradient-x 4s ease infinite'
             }
         }
     },

@@ -83,13 +83,14 @@ export default function DraftCaptureFAB() {
 
             <div style={{
                 position: 'fixed',
-                insetInlineEnd: 24,
-                bottom: 24,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                bottom: 32,
                 zIndex: 999,
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'flex-end',
-                gap: 12
+                alignItems: 'center',
+                gap: 16
             }}>
                 {/* Voice action — slides up when menu opens */}
                 {open && (
@@ -99,18 +100,20 @@ export default function DraftCaptureFAB() {
                         disabled={busy}
                         style={{
                             display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '12px 18px',
+                            padding: '14px 20px',
                             borderRadius: 999,
                             background: 'white',
-                            color: 'var(--color-primary, #2563eb)',
-                            border: '1px solid var(--border-color, #e5e7eb)',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-color)',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                             cursor: busy ? 'not-allowed' : 'pointer',
-                            fontWeight: 600
+                            fontWeight: 700,
+                            width: '180px',
+                            justifyContent: 'center'
                         }}
                         title={t('drafts.captureVoice', 'Voice Draft')}
                     >
-                        <Mic size={18} />
+                        <Mic size={20} className="text-hesaby-teal" />
                         <span>{t('drafts.captureVoice', 'Voice')}</span>
                     </button>
                 )}
@@ -120,18 +123,20 @@ export default function DraftCaptureFAB() {
                     <label
                         style={{
                             display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '12px 18px',
+                            padding: '14px 20px',
                             borderRadius: 999,
                             background: 'white',
-                            color: 'var(--color-primary, #2563eb)',
-                            border: '1px solid var(--border-color, #e5e7eb)',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-color)',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                             cursor: busy ? 'not-allowed' : 'pointer',
-                            fontWeight: 600
+                            fontWeight: 700,
+                            width: '180px',
+                            justifyContent: 'center'
                         }}
                         title={t('drafts.captureReceipt', 'Receipt Draft')}
                     >
-                        <Camera size={18} />
+                        <Camera size={20} className="text-hesaby-teal" />
                         <span>{t('drafts.captureReceipt', 'Receipt')}</span>
                         <input
                             type="file"
@@ -151,21 +156,21 @@ export default function DraftCaptureFAB() {
                     disabled={busy}
                     aria-label={t('drafts.fabLabel', 'Capture AI draft')}
                     style={{
-                        width: 60, height: 60,
+                        width: 72, height: 72,
                         borderRadius: '50%',
-                        background: 'var(--color-primary, #2563eb)',
+                        background: '#FF5A36', // Constructor Orange
                         color: 'white',
                         border: 'none',
-                        boxShadow: '0 6px 16px rgba(37, 99, 235, 0.35)',
+                        boxShadow: '0 10px 25px rgba(255, 90, 54, 0.4)',
                         cursor: busy ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        transition: 'transform 0.15s ease',
+                        transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         transform: open ? 'rotate(45deg)' : 'rotate(0)'
                     }}
                 >
-                    {busy ? <Loader2 size={26} className="spin" /> : (open ? <X size={26} /> : <Plus size={26} />)}
+                    {busy ? <Loader2 size={32} className="spin" /> : (open ? <X size={32} /> : <Plus size={32} />)}
                 </button>
             </div>
 
