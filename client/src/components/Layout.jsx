@@ -40,7 +40,6 @@ export default function Layout({ children }) {
     const { user, logout } = useAuth();
     const { t, i18n } = useTranslation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-<<<<<<< HEAD
     const [profileModalOpen, setProfileModalOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('theme') === 'dark';
@@ -54,17 +53,6 @@ export default function Layout({ children }) {
             document.body.classList.add('light-mode');
         }
     }, [darkMode]);
-=======
-    const [darkMode, setDarkMode] = useState(false);
-    const [profileModalOpen, setProfileModalOpen] = useState(false);
-
-    // Initial load - ensure light mode class is applied if it's default
-    useEffect(() => {
-        if (!darkMode) {
-            document.body.classList.add('light-mode');
-        }
-    }, []);
->>>>>>> main
 
     // Helper function to get full image URL
     const getImageUrl = (path) => {
@@ -87,14 +75,9 @@ export default function Layout({ children }) {
     };
 
     const toggleTheme = () => {
-<<<<<<< HEAD
         const newMode = !darkMode;
         setDarkMode(newMode);
         localStorage.setItem('theme', newMode ? 'dark' : 'light');
-=======
-        setDarkMode(!darkMode);
-        document.body.classList.toggle('light-mode');
->>>>>>> main
     };
 
     const toggleLanguage = () => {

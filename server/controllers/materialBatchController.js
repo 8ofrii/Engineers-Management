@@ -177,7 +177,6 @@ export const getAvailableStock = async (req, res, next) => {
 // @access  Private
 export const getAllBatches = async (req, res, next) => {
     try {
-<<<<<<< HEAD
         const { status, projectId } = req.query;
         
         let whereClause = {
@@ -196,12 +195,6 @@ export const getAllBatches = async (req, res, next) => {
 
         const batches = await prisma.materialBatch.findMany({
             where: whereClause,
-=======
-        const batches = await prisma.materialBatch.findMany({
-            where: {
-                tenantId: req.user.tenantId // Enforce Tenant Isolation
-            },
->>>>>>> main
             include: {
                 project: {
                     select: { name: true }

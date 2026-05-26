@@ -69,7 +69,6 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-<<<<<<< HEAD
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
@@ -102,12 +101,6 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                     }));
                 };
                 img.src = reader.result;
-=======
-                setFormData(prev => ({
-                    ...prev,
-                    nationalIdImage: reader.result
-                }));
->>>>>>> main
             };
             reader.readAsDataURL(file);
         }

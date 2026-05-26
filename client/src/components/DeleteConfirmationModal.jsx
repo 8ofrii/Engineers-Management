@@ -9,7 +9,6 @@ export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, it
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-<<<<<<< HEAD
             <div className="modal-container" style={{ maxWidth: '480px', padding: '32px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose} style={{ position: 'absolute', right: '24px', top: '24px' }}>
                     <X size={24} />
@@ -73,48 +72,6 @@ export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, it
                             {t('common.delete', 'Delete')}
                         </button>
                     </div>
-=======
-            <div className="modal-container" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2 style={{ color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <AlertTriangle size={24} />
-                        {title || t('common.deleteConfirmTitle')}
-                    </h2>
-                    <button className="modal-close" onClick={onClose}>
-                        <X size={24} />
-                    </button>
-                </div>
-
-                <div className="modal-body">
-                    <p style={{ fontSize: '16px', marginBottom: '8px' }}>
-                        {message || t('common.deleteConfirmMessage')}
-                    </p>
-                    {itemName && (
-                        <p style={{ fontWeight: 'bold', color: 'var(--text-primary)', textAlign: 'center', margin: '16px 0' }}>
-                            "{itemName}"
-                        </p>
-                    )}
-                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                        {t('common.deleteWarning')}
-                    </p>
-                </div>
-
-                <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={onClose}>
-                        {t('common.cancel')}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-danger"
-                        style={{ background: 'var(--color-danger)', color: 'white', border: 'none' }}
-                        onClick={() => {
-                            onConfirm();
-                            onClose();
-                        }}
-                    >
-                        {t('common.delete')}
-                    </button>
->>>>>>> main
                 </div>
             </div>
         </div>

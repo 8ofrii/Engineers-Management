@@ -10,10 +10,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
     const [formData, setFormData] = useState({
         name: '',
         category: 'OTHER',
-<<<<<<< HEAD
         customCategory: '',
-=======
->>>>>>> main
         contactName: '',
         email: '',
         phone: '',
@@ -28,10 +25,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             setFormData({
                 name: initialData.name || '',
                 category: initialData.category || 'OTHER',
-<<<<<<< HEAD
                 customCategory: initialData.customCategory || '',
-=======
->>>>>>> main
                 contactName: initialData.contactName || '',
                 email: initialData.email || '',
                 phone: initialData.phone || '',
@@ -42,10 +36,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             setFormData({
                 name: '',
                 category: 'OTHER',
-<<<<<<< HEAD
                 customCategory: '',
-=======
->>>>>>> main
                 contactName: '',
                 email: '',
                 phone: '',
@@ -83,13 +74,9 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             newErrors.phone = t('common.required');
         }
 
-<<<<<<< HEAD
         if (formData.category === 'OTHER' && !formData.customCategory?.trim()) {
             newErrors.customCategory = t('common.required');
         }
-
-=======
->>>>>>> main
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -173,7 +160,6 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                             </select>
                         </div>
 
-<<<<<<< HEAD
                         {formData.category === 'OTHER' && (
                             <div className="form-group">
                                 <label htmlFor="customCategory">
@@ -191,9 +177,6 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 {errors.customCategory && <span className="error-message">{errors.customCategory}</span>}
                             </div>
                         )}
-
-=======
->>>>>>> main
                         <div className="form-group">
                             <label htmlFor="phone">
                                 {t('suppliers.fields.phone')} <span className="required">*</span>
