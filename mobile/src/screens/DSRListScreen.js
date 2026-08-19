@@ -15,9 +15,9 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
 import { dsrApi } from '../services/api';
 
-import AICopilotHeaderButton from '../components/AICopilotHeaderButton';
-
 import { useFocusEffect } from '@react-navigation/native';
+import AICopilotHeaderButton from '../components/AICopilotHeaderButton';
+import GlassBackground from '../components/GlassBackground';
 
 const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 
@@ -70,9 +70,10 @@ export default function DSRListScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
-            {/* Header */}
-            <View style={[styles.header, { flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+        <GlassBackground>
+            <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+                {/* Header */}
+                <View style={[styles.header, { flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
                 <Text style={[styles.headerTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left', flex: 1 }]}>
                     {isArabic ? 'التقارير اليومية للموقع' : 'Daily Site Reports'}
                 </Text>
@@ -183,7 +184,8 @@ export default function DSRListScreen({ navigation }) {
             >
                 <Ionicons name="add" size={28} color={theme.isDark ? '#000000' : '#ffffff'} />
             </TouchableOpacity>
-        </SafeAreaView>
+            </SafeAreaView>
+        </GlassBackground>
     );
 }
 

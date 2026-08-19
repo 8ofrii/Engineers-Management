@@ -10,8 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../context/ThemeContext';
-
 import AICopilotHeaderButton from '../components/AICopilotHeaderButton';
+import GlassBackground from '../components/GlassBackground';
 
 export default function OperationsHubScreen({ navigation }) {
     const { i18n } = useTranslation();
@@ -70,8 +70,9 @@ export default function OperationsHubScreen({ navigation }) {
     ];
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
-            <View style={[styles.header, { backgroundColor: theme.bg }]}>
+        <GlassBackground>
+            <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+                <View style={[styles.header, { backgroundColor: 'transparent' }]}>
                 <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={[styles.headerTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left', flex: 1 }]}>
                         {isArabic ? 'مركز العمليات والموارد' : 'Operations & Hub'}
@@ -129,7 +130,8 @@ export default function OperationsHubScreen({ navigation }) {
                     ))}
                 </View>
             </ScrollView>
-        </SafeAreaView>
+            </SafeAreaView>
+        </GlassBackground>
     );
 }
 

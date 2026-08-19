@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { projectsApi, transactionsApi, dsrApi } from '../services/api';
 import DraftCaptureFAB from '../components/DraftCaptureFAB';
+import GlassBackground from '../components/GlassBackground';
 
 const STATUS_STYLES = {
     PLANNING:    { bg: 'rgba(59, 130, 246, 0.15)', fg: '#3b82f6', label: 'Planning', labelAr: 'تخطيط' },
@@ -99,7 +100,8 @@ export default function DashboardScreen({ navigation }) {
     const totalProfit = projects.reduce((s, p) => s + Number(p.officeRevenue || 0), 0);
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+        <GlassBackground>
+            <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
             {/* Header */}
             <View style={[styles.header, { flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center' }]}>
                 <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 10, flex: 1 }}>
@@ -303,7 +305,8 @@ export default function DashboardScreen({ navigation }) {
             </ScrollView>
 
             <DraftCaptureFAB navigation={navigation} />
-        </SafeAreaView>
+            </SafeAreaView>
+        </GlassBackground>
     );
 }
 

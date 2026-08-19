@@ -22,6 +22,7 @@ const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 
 import { useFocusEffect } from '@react-navigation/native';
 import AICopilotHeaderButton from '../components/AICopilotHeaderButton';
+import GlassBackground from '../components/GlassBackground';
 
 export default function FinanceScreen({ navigation }) {
     const { t, i18n } = useTranslation();
@@ -108,7 +109,8 @@ export default function FinanceScreen({ navigation }) {
         : transactions;
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+        <GlassBackground>
+            <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
             {/* Header */}
             <View style={[styles.header, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
                 <Text style={[styles.headerTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left', flex: 1 }]}>
@@ -226,7 +228,8 @@ export default function FinanceScreen({ navigation }) {
             >
                 <Ionicons name="add" size={28} color={theme.isDark ? '#000000' : '#ffffff'} />
             </TouchableOpacity>
-        </SafeAreaView>
+            </SafeAreaView>
+        </GlassBackground>
     );
 }
 

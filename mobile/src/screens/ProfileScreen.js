@@ -21,6 +21,7 @@ import { useFormat } from '../utils/format';
 
 import { useFocusEffect } from '@react-navigation/native';
 import AICopilotHeaderButton from '../components/AICopilotHeaderButton';
+import GlassBackground from '../components/GlassBackground';
 
 export default function ProfileScreen({ navigation }) {
     const { t, i18n } = useTranslation();
@@ -66,9 +67,10 @@ export default function ProfileScreen({ navigation }) {
     const currentThemeInfo = themes[themeKey] || themes.monochrome;
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
-            {/* Top Bar with AI Copilot Button */}
-            <View style={[styles.topBar, { flexDirection: isArabic ? 'row-reverse' : 'row', borderBottomColor: theme.border }]}>
+        <GlassBackground>
+            <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+                {/* Top Bar with AI Copilot Button */}
+                <View style={[styles.topBar, { flexDirection: isArabic ? 'row-reverse' : 'row', borderBottomColor: theme.border }]}>
                 <Text style={[styles.topBarTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left', flex: 1 }]}>
                     {isArabic ? 'الملف الشخصي والإعدادات' : 'Profile & Settings'}
                 </Text>
@@ -253,7 +255,8 @@ export default function ProfileScreen({ navigation }) {
                     </View>
                 </TouchableOpacity>
             </Modal>
-        </SafeAreaView>
+            </SafeAreaView>
+        </GlassBackground>
     );
 }
 
