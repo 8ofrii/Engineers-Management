@@ -171,10 +171,6 @@ const InventoryUsageModal = ({
                 : `Value exceeds available (${selectedBatch.remainingValue} EGP)`;
         }
 
-        if (!formData.description.trim()) {
-            newErrors.description = isArabic ? 'الوصف مطلوب' : 'Description is required';
-        }
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -186,6 +182,9 @@ const InventoryUsageModal = ({
         setLoading(true);
 
         try {
+            const fallbackDescription = formData.description?.trim() || 
+                (isArabic ? `صرف خامات: ${selectedBatch?.itemName || 'مخزون'}` : `Material usage: ${selectedBatch?.itemName || 'Inventory'}`);
+
             const API_URL = import.meta.env.VITE_API_URL || '/api';
             const response = await fetch(`${API_URL}/transactions/inventory-usage`, {
                 method: 'POST',
@@ -195,6 +194,7 @@ const InventoryUsageModal = ({
                 },
                 body: JSON.stringify({
                     ...formData,
+                    description: fallbackDescription,
                     projectId,
                     valueConsumed: parseFloat(formData.valueConsumed),
                     quantityConsumed: formData.quantityConsumed ? parseFloat(formData.quantityConsumed) : undefined
@@ -340,7 +340,7 @@ const InventoryUsageModal = ({
                     )}
 
                     <div className="form-group full-width mb-0">
-                        <label>{isArabic ? 'الوصف / الغرض من الاستخدام' : 'Description / Purpose'} <span className="required">*</span></label>
+                        <label>{isArabic ? 'الوصف / الغرض من الاستخدام (اختياري)' : 'Description / Purpose (Optional)'}</label>
                         <textarea
                             name="description"
                             value={formData.description}

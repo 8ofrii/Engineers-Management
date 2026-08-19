@@ -100,21 +100,23 @@ export default function DraftCaptureFAB() {
                         disabled={busy}
                         style={{
                             display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '14px 20px',
+                            padding: '14px 22px',
                             borderRadius: 999,
-                            background: 'white',
+                            background: 'var(--bg-tertiary)',
                             color: 'var(--text-primary)',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                            border: '1px solid var(--border-color-light)',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+                            backdropFilter: 'blur(10px)',
                             cursor: busy ? 'not-allowed' : 'pointer',
                             fontWeight: 700,
-                            width: '180px',
-                            justifyContent: 'center'
+                            width: '185px',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease'
                         }}
                         title={t('drafts.captureVoice', 'Voice Draft')}
                     >
-                        <Mic size={20} className="text-hesaby-teal" />
-                        <span>{t('drafts.captureVoice', 'Voice')}</span>
+                        <Mic size={20} style={{ color: 'var(--color-primary)' }} />
+                        <span style={{ color: 'var(--text-primary)' }}>{t('drafts.captureVoice', 'Voice')}</span>
                     </button>
                 )}
 
@@ -123,21 +125,23 @@ export default function DraftCaptureFAB() {
                     <label
                         style={{
                             display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '14px 20px',
+                            padding: '14px 22px',
                             borderRadius: 999,
-                            background: 'white',
+                            background: 'var(--bg-tertiary)',
                             color: 'var(--text-primary)',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                            border: '1px solid var(--border-color-light)',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+                            backdropFilter: 'blur(10px)',
                             cursor: busy ? 'not-allowed' : 'pointer',
                             fontWeight: 700,
-                            width: '180px',
-                            justifyContent: 'center'
+                            width: '185px',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease'
                         }}
                         title={t('drafts.captureReceipt', 'Receipt Draft')}
                     >
-                        <Camera size={20} className="text-hesaby-teal" />
-                        <span>{t('drafts.captureReceipt', 'Receipt')}</span>
+                        <Camera size={20} style={{ color: 'var(--color-primary)' }} />
+                        <span style={{ color: 'var(--text-primary)' }}>{t('drafts.captureReceipt', 'Receipt')}</span>
                         <input
                             type="file"
                             accept="image/*"

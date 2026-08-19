@@ -8,17 +8,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import api, { projectsApi, workmenApi, dsrApi } from '../services/api';
 
 const WEATHER_OPTIONS = [
-    { value: 'SUNNY',  icon: '☀️', label: 'Sunny' },
-    { value: 'CLOUDY', icon: '⛅', label: 'Cloudy' },
-    { value: 'RAINY',  icon: '🌧️', label: 'Rainy' },
-    { value: 'WINDY',  icon: '🌬️', label: 'Windy' },
-    { value: 'DUSTY',  icon: '🌫️', label: 'Dusty' },
-    { value: 'HOT',    icon: '🔥', label: 'Hot' },
-    { value: 'COLD',   icon: '❄️', label: 'Cold' },
-    { value: 'OTHER',  icon: '🌤️', label: 'Other' }
+    { value: 'SUNNY',  icon: '☀️', label: 'Sunny', labelAr: 'مشمس' },
+    { value: 'CLOUDY', icon: '⛅', label: 'Cloudy', labelAr: 'غائم' },
+    { value: 'RAINY',  icon: '🌧️', label: 'Rainy', labelAr: 'ممطر' },
+    { value: 'WINDY',  icon: '🌬️', label: 'Windy', labelAr: 'عاصف' },
+    { value: 'DUSTY',  icon: '🌫️', label: 'Dusty', labelAr: 'مغبر' },
+    { value: 'HOT',    icon: '🔥', label: 'Hot', labelAr: 'حار' },
+    { value: 'COLD',   icon: '❄️', label: 'Cold', labelAr: 'بارد' },
+    { value: 'OTHER',  icon: '🌤️', label: 'Other', labelAr: 'أخرى' }
 ];
 
 const todayISO = () => {
@@ -30,8 +31,10 @@ const todayISO = () => {
 };
 
 export default function DSRCreateScreen({ navigation, route }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { user } = useAuth();
+    const { theme } = useTheme();
     const presetProjectId = route?.params?.projectId;
     const presetProjectName = route?.params?.projectName;
 
@@ -147,10 +150,10 @@ export default function DSRCreateScreen({ navigation, route }) {
     };
 
     const validate = () => {
-        if (!projectId) return 'Pick a project';
-        if (!reportDate) return 'Pick a date';
+        if (!projectId) return isArabic ? 'يرجى اختيار المشروع' : 'Pick a project';
+        if (!reportDate) return isArabic ? 'يرجى اختيار التاريخ' : 'Pick a date';
         if (hoursWorked && (Number(hoursWorked) < 0 || Number(hoursWorked) > 24)) {
-            return 'Hours must be between 0 and 24';
+            return isArabic ? 'ساعات العمل يجب أن تكون بين 0 و 24' : 'Hours must be between 0 and 24';
         }
         return null;
     };
@@ -216,10 +219,10 @@ export default function DSRCreateScreen({ navigation, route }) {
             }
 
             Alert.alert(
-                alsoSubmit ? (t('dsr.submitted') || 'Submitted') : (t('dsr.savedDraft') || 'Saved'),
+                alsoSubmit ? (isArabic ? 'تم الإرسال' : 'Submitted') : (isArabic ? 'تم الحفظ' : 'Saved'),
                 alsoSubmit
-                    ? (t('dsr.submittedMsg') || 'Sent for manager review.')
-                    : (t('dsr.savedDraftMsg') || 'Saved as draft.'),
+                    ? (isArabic ? 'تم إرسال التقرير لمدير المشروع للمراجعة والاعتماد.' : 'Sent for manager review.')
+                    : (isArabic ? 'تم حفظ التقرير كمسودة.' : 'Saved as draft.'),
                 [{ text: 'OK', onPress: () => navigation.goBack() }]
             );
         } catch (errObj) {
@@ -233,80 +236,95 @@ export default function DSRCreateScreen({ navigation, route }) {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.back}>{'< '}{t('common.back') || 'Back'}</Text>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+            <View style={[styles.header, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('dsr.newReport') || 'New Daily Report'}</Text>
-                <View style={{ width: 60 }} />
+                <Text style={[styles.headerTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'تقرير يومي جديد' : 'New Daily Report'}</Text>
             </View>
 
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
-                <ScrollView contentContainerStyle={styles.form}>
+                <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
                     {/* Project */}
-                    <Text style={styles.label}>{t('dsr.project') || 'Project'} *</Text>
-                    <TouchableOpacity style={styles.selector} onPress={() => setShowProjectPicker(true)}>
-                        <Text style={projectName ? styles.selectorText : styles.selectorPlaceholder}>
-                            {projectName || (t('dsr.selectProject') || 'Pick a project')}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'المشروع' : 'Project'} *</Text>
+                    <TouchableOpacity
+                        style={[styles.selector, { backgroundColor: theme.card, borderColor: theme.borderStrong, flexDirection: isArabic ? 'row-reverse' : 'row' }]}
+                        onPress={() => setShowProjectPicker(true)}
+                    >
+                        <Text style={[styles.selectorText, { color: projectName ? theme.text : theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>
+                            {projectName || (isArabic ? 'اختر المشروع...' : 'Pick a project')}
                         </Text>
+                        <Ionicons name="chevron-down" size={18} color={theme.subtext} />
                     </TouchableOpacity>
 
                     {/* Date */}
-                    <Text style={styles.label}>{t('dsr.date') || 'Date'} *</Text>
-                    <View style={styles.dateRow}>
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'التاريخ' : 'Date'} *</Text>
+                    <View style={[styles.dateRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
                         <TextInput
-                            style={[styles.input, { flex: 1 }]}
+                            style={[styles.input, { flex: 1, backgroundColor: theme.card, borderColor: theme.borderStrong, color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}
                             placeholder="YYYY-MM-DD"
+                            placeholderTextColor={theme.subtext}
                             value={reportDate}
                             onChangeText={setReportDate}
                         />
                         <TouchableOpacity
-                            style={styles.todayBtn}
+                            style={[styles.todayBtn, { backgroundColor: theme.primary }]}
                             onPress={() => setReportDate(todayISO())}
                         >
-                            <Text style={styles.todayBtnText}>{t('dsr.today') || 'Today'}</Text>
+                            <Text style={[styles.todayBtnText, { color: theme.isDark ? '#000000' : '#ffffff' }]}>{isArabic ? 'اليوم' : 'Today'}</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Weather */}
-                    <Text style={styles.label}>{t('dsr.weather') || 'Weather'}</Text>
-                    <View style={styles.weatherGrid}>
-                        {WEATHER_OPTIONS.map(w => (
-                            <TouchableOpacity
-                                key={w.value}
-                                style={[styles.weatherChip, weather === w.value && styles.weatherChipActive]}
-                                onPress={() => setWeather(weather === w.value ? null : w.value)}
-                            >
-                                <Text style={styles.weatherIcon}>{w.icon}</Text>
-                                <Text style={[styles.weatherLabel, weather === w.value && { color: '#fff' }]}>
-                                    {w.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'حالة الطقس' : 'Weather'}</Text>
+                    <View style={[styles.weatherGrid, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                        {WEATHER_OPTIONS.map(w => {
+                            const active = weather === w.value;
+                            return (
+                                <TouchableOpacity
+                                    key={w.value}
+                                    style={[
+                                        styles.weatherChip,
+                                        {
+                                            backgroundColor: active ? theme.primary : theme.card,
+                                            borderColor: active ? theme.primary : theme.borderStrong
+                                        }
+                                    ]}
+                                    onPress={() => setWeather(weather === w.value ? null : w.value)}
+                                >
+                                    <Text style={styles.weatherIcon}>{w.icon}</Text>
+                                    <Text style={[styles.weatherLabel, { color: active ? (theme.isDark ? '#000000' : '#ffffff') : theme.text, fontWeight: active ? '700' : '500' }]}>
+                                        {isArabic ? w.labelAr : w.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
 
                     {/* Temp + Hours row */}
                     <View style={styles.row2}>
                         <View style={{ flex: 1, marginRight: 8 }}>
-                            <Text style={styles.label}>{t('dsr.temperature') || 'Temp (°C)'}</Text>
+                            <Text style={[styles.label, { color: theme.subtext }]}>{isArabic ? 'الحرارة (°C)' : 'Temp (°C)'}</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { backgroundColor: theme.card, borderColor: theme.borderStrong, color: theme.text }]}
                                 keyboardType="decimal-pad"
                                 placeholder="32"
+                                placeholderTextColor={theme.subtext}
                                 value={temperatureC}
                                 onChangeText={setTemperatureC}
                             />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.label}>{t('dsr.hours') || 'Hours worked'}</Text>
+                            <Text style={[styles.label, { color: theme.subtext }]}>{isArabic ? 'ساعات العمل' : 'Hours worked'}</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { backgroundColor: theme.card, borderColor: theme.borderStrong, color: theme.text }]}
                                 keyboardType="decimal-pad"
                                 placeholder="8"
+                                placeholderTextColor={theme.subtext}
                                 value={hoursWorked}
                                 onChangeText={setHoursWorked}
                             />
@@ -314,63 +332,57 @@ export default function DSRCreateScreen({ navigation, route }) {
                     </View>
 
                     {/* Progress notes */}
-                    <Text style={styles.label}>{t('dsr.progress') || 'Progress notes'}</Text>
+                    <Text style={[styles.label, { color: theme.subtext }]}>{isArabic ? 'الأعمال المنجزة اليوم' : 'Progress notes'}</Text>
                     <TextInput
-                        style={[styles.input, styles.textArea]}
+                        style={[styles.input, styles.textArea, { backgroundColor: theme.card, borderColor: theme.borderStrong, color: theme.text }]}
                         multiline
-                        placeholder={t('dsr.progressPlaceholder') || 'What was done today…'}
+                        placeholder={isArabic ? 'ما تم إنجازه في الموقع اليوم...' : 'What was done today…'}
+                        placeholderTextColor={theme.subtext}
                         value={progressNotes}
                         onChangeText={setProgressNotes}
                     />
 
                     {/* Issues */}
-                    <Text style={styles.label}>{t('dsr.issues') || 'Issues'}</Text>
+                    <Text style={[styles.label, { color: theme.subtext }]}>{isArabic ? 'المعوقات والمشاكل' : 'Issues / Safety'}</Text>
                     <TextInput
-                        style={[styles.input, styles.textArea]}
+                        style={[styles.input, styles.textArea, { backgroundColor: theme.card, borderColor: theme.borderStrong, color: theme.text }]}
                         multiline
-                        placeholder={t('dsr.issuesPlaceholder') || 'Anything blocking progress, defects, safety concerns…'}
+                        placeholder={isArabic ? 'معوقات العمل أو ملاحظات السلامة...' : 'Anything blocking progress, defects, safety concerns…'}
+                        placeholderTextColor={theme.subtext}
                         value={issues}
                         onChangeText={setIssues}
                     />
 
-                    {/* Visitors */}
-                    <Text style={styles.label}>{t('dsr.visitors') || 'Visitors'}</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder={t('dsr.visitorsPlaceholder') || 'Inspectors, client visits, etc.'}
-                        value={visitorsNotes}
-                        onChangeText={setVisitorsNotes}
-                    />
-
                     {/* Attendance */}
-                    <Text style={styles.label}>
-                        {t('dsr.attendance') || 'Workmen attendance'}{' '}
+                    <Text style={[styles.label, { color: theme.subtext }]}>
+                        {isArabic ? 'حضور العمال والصنايعية' : 'Workmen attendance'}{' '}
                         ({attendance.length})
                     </Text>
                     <TouchableOpacity
-                        style={styles.selector}
+                        style={[styles.selector, { backgroundColor: theme.card, borderColor: theme.borderStrong }]}
                         onPress={() => setShowAttendancePicker(true)}
                     >
-                        <Text style={styles.selectorText}>
+                        <Text style={[styles.selectorText, { color: attendance.length > 0 ? theme.primary : theme.subtext }]}>
                             {attendance.length > 0
-                                ? `${attendance.length} ${t('dsr.selected') || 'selected'} →`
-                                : (t('dsr.tapToAdd') || 'Tap to add workmen')}
+                                ? `${attendance.length} ${isArabic ? 'عمال محددين' : 'selected'} →`
+                                : (isArabic ? 'اضغط لتحديد العمال الحاضرين' : 'Tap to add workmen')}
                         </Text>
+                        <Ionicons name="people-outline" size={18} color={theme.subtext} />
                     </TouchableOpacity>
                     {attendance.length > 0 && (
                         <View style={styles.attendanceList}>
                             {attendance.map(a => (
-                                <View key={a.workmanId} style={styles.attendanceRow}>
-                                    <Text style={styles.attendanceName} numberOfLines={1}>
+                                <View key={a.workmanId} style={[styles.attendanceRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                                    <Text style={[styles.attendanceName, { color: theme.text }]} numberOfLines={1}>
                                         {a.name}
                                     </Text>
                                     <TextInput
-                                        style={styles.hoursInput}
+                                        style={[styles.hoursInput, { backgroundColor: theme.cardAlt, color: theme.text }]}
                                         keyboardType="decimal-pad"
                                         value={String(a.hoursPresent || '')}
                                         onChangeText={(h) => updateAttendanceHours(a.workmanId, h)}
                                     />
-                                    <Text style={styles.hoursSuffix}>h</Text>
+                                    <Text style={[styles.hoursSuffix, { color: theme.subtext }]}>h</Text>
                                     <TouchableOpacity onPress={() => removeAttendance(a.workmanId)}>
                                         <Ionicons name="close-circle" size={20} color="#ef4444" />
                                     </TouchableOpacity>
@@ -380,21 +392,27 @@ export default function DSRCreateScreen({ navigation, route }) {
                     )}
 
                     {/* Photos */}
-                    <Text style={styles.label}>
-                        {t('dsr.photos') || 'Photos'} ({photos.length})
+                    <Text style={[styles.label, { color: theme.subtext }]}>
+                        {isArabic ? 'صور الموقع' : 'Photos'} ({photos.length})
                     </Text>
                     <View style={styles.photoActions}>
-                        <TouchableOpacity style={styles.photoActionBtn} onPress={takePhoto}>
-                            <Ionicons name="camera-outline" size={18} color="#2563eb" />
-                            <Text style={styles.photoActionText}>{t('dsr.takePhoto') || 'Take photo'}</Text>
+                        <TouchableOpacity
+                            style={[styles.photoActionBtn, { backgroundColor: theme.primaryLight, borderColor: theme.primary }]}
+                            onPress={takePhoto}
+                        >
+                            <Ionicons name="camera" size={18} color={theme.primary} />
+                            <Text style={[styles.photoActionText, { color: theme.primary }]}>{isArabic ? 'التقاط بالكاميرا' : 'Take photo'}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.photoActionBtn} onPress={pickPhotos}>
-                            <Ionicons name="image-outline" size={18} color="#2563eb" />
-                            <Text style={styles.photoActionText}>{t('dsr.pickPhoto') || 'From library'}</Text>
+                        <TouchableOpacity
+                            style={[styles.photoActionBtn, { backgroundColor: theme.card, borderColor: theme.borderStrong }]}
+                            onPress={pickPhotos}
+                        >
+                            <Ionicons name="image-outline" size={18} color={theme.text} />
+                            <Text style={[styles.photoActionText, { color: theme.text }]}>{isArabic ? 'من المعرض' : 'From library'}</Text>
                         </TouchableOpacity>
                     </View>
                     {photos.length > 0 && (
-                        <ScrollView horizontal style={styles.photoStrip}>
+                        <ScrollView horizontal style={styles.photoStrip} showsHorizontalScrollIndicator={false}>
                             {photos.map((p, i) => (
                                 <View key={i} style={styles.photoThumb}>
                                     <Image source={{ uri: p.uri }} style={styles.photoImg} />
@@ -412,52 +430,52 @@ export default function DSRCreateScreen({ navigation, route }) {
                     {/* Submit buttons */}
                     <View style={styles.buttonRow}>
                         <TouchableOpacity
-                            style={[styles.saveBtn, submitting && { opacity: 0.5 }]}
+                            style={[styles.saveBtn, { backgroundColor: theme.card, borderColor: theme.borderStrong }, submitting && { opacity: 0.5 }]}
                             onPress={() => onSave(false)}
                             disabled={submitting}
                         >
-                            {submitting ? <ActivityIndicator color="#374151" /> : (
-                                <Text style={styles.saveBtnText}>{t('dsr.saveDraft') || 'Save draft'}</Text>
+                            {submitting ? <ActivityIndicator color={theme.text} /> : (
+                                <Text style={[styles.saveBtnText, { color: theme.text }]}>{isArabic ? 'حفظ كمسودة' : 'Save draft'}</Text>
                             )}
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={[styles.submitBtn, submitting && { opacity: 0.5 }]}
+                            style={[styles.submitBtn, { backgroundColor: theme.primary }, submitting && { opacity: 0.5 }]}
                             onPress={() => onSave(true)}
                             disabled={submitting}
                         >
                             {submitting ? <ActivityIndicator color="#fff" /> : (
-                                <Text style={styles.submitBtnText}>{t('dsr.saveAndSubmit') || 'Save & submit'}</Text>
+                                <Text style={styles.submitBtnText}>{isArabic ? 'حفظ وإرسال للاعتماد' : 'Save & submit'}</Text>
                             )}
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
 
-            {/* Project picker */}
+            {/* Project picker modal */}
             <Modal visible={showProjectPicker} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>{t('dsr.selectProject') || 'Pick a project'}</Text>
+                    <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                            <Text style={[styles.modalTitle, { color: theme.text }]}>{isArabic ? 'اختر المشروع' : 'Pick a project'}</Text>
                             <TouchableOpacity onPress={() => setShowProjectPicker(false)}>
-                                <Ionicons name="close" size={22} color="#6b7280" />
+                                <Ionicons name="close" size={22} color={theme.subtext} />
                             </TouchableOpacity>
                         </View>
                         <ScrollView>
                             {projects.length === 0 ? (
-                                <Text style={styles.emptyModal}>{t('common.empty') || 'No projects'}</Text>
+                                <Text style={[styles.emptyModal, { color: theme.subtext }]}>{isArabic ? 'لا توجد مشاريع' : 'No projects'}</Text>
                             ) : projects.map(p => (
                                 <TouchableOpacity
                                     key={p.id}
-                                    style={styles.modalItem}
+                                    style={[styles.modalItem, { borderBottomColor: theme.border }]}
                                     onPress={() => {
                                         setProjectId(p.id);
                                         setProjectName(p.name);
                                         setShowProjectPicker(false);
                                     }}
                                 >
-                                    <Text style={styles.modalItemText}>{p.name}</Text>
-                                    <Text style={styles.modalItemMeta}>
+                                    <Text style={[styles.modalItemText, { color: theme.text }]}>{p.name}</Text>
+                                    <Text style={[styles.modalItemMeta, { color: theme.subtext }]}>
                                         {p.client?.name || ''} · {p.status}
                                     </Text>
                                 </TouchableOpacity>
@@ -467,39 +485,39 @@ export default function DSRCreateScreen({ navigation, route }) {
                 </View>
             </Modal>
 
-            {/* Attendance picker */}
+            {/* Attendance picker modal */}
             <Modal visible={showAttendancePicker} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>
-                                {t('dsr.selectWorkmen') || 'Pick workmen present today'}
+                    <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+                            <Text style={[styles.modalTitle, { color: theme.text }]}>
+                                {isArabic ? 'تحديد العمال الحاضرين' : 'Pick workmen present today'}
                             </Text>
                             <TouchableOpacity onPress={() => setShowAttendancePicker(false)}>
-                                <Text style={{ color: '#2563eb', fontWeight: '600' }}>
-                                    {t('common.done') || 'Done'}
+                                <Text style={{ color: theme.primary, fontWeight: '700' }}>
+                                    {isArabic ? 'تم' : 'Done'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
                         <ScrollView>
                             {workmen.length === 0 ? (
-                                <Text style={styles.emptyModal}>{t('common.empty') || 'No active workmen'}</Text>
+                                <Text style={[styles.emptyModal, { color: theme.subtext }]}>{isArabic ? 'لا يوجد عمال مسجلين' : 'No active workmen'}</Text>
                             ) : workmen.map(w => {
                                 const isSelected = attendance.some(a => a.workmanId === w.id);
                                 return (
                                     <TouchableOpacity
                                         key={w.id}
-                                        style={[styles.modalItem, isSelected && { backgroundColor: '#eff6ff' }]}
+                                        style={[styles.modalItem, { borderBottomColor: theme.border }, isSelected && { backgroundColor: theme.primaryLight }]}
                                         onPress={() => toggleAttendance(w)}
                                     >
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.modalItemText}>{w.nameAr || w.name}</Text>
-                                            <Text style={styles.modalItemMeta}>{w.trade}</Text>
+                                            <Text style={[styles.modalItemText, { color: theme.text }]}>{w.nameAr || w.name}</Text>
+                                            <Text style={[styles.modalItemMeta, { color: theme.subtext }]}>{w.trade}</Text>
                                         </View>
                                         {isSelected ? (
-                                            <Ionicons name="checkmark-circle" size={22} color="#2563eb" />
+                                            <Ionicons name="checkmark-circle" size={22} color={theme.primary} />
                                         ) : (
-                                            <Ionicons name="ellipse-outline" size={22} color="#9ca3af" />
+                                            <Ionicons name="ellipse-outline" size={22} color={theme.subtext} />
                                         )}
                                     </TouchableOpacity>
                                 );
@@ -513,110 +531,147 @@ export default function DSRCreateScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f9fafb' },
+    container: { flex: 1 },
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        padding: 14, paddingTop: 50, backgroundColor: '#fff',
-        borderBottomWidth: 1, borderBottomColor: '#e5e7eb'
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 12 : 36,
+        paddingBottom: 14,
+        gap: 12
     },
-    back: { color: '#2563eb', fontSize: 14, fontWeight: '600', width: 60 },
-    headerTitle: { fontSize: 16, fontWeight: '600', color: '#111827', flex: 1, textAlign: 'center' },
-
+    backBtn: { padding: 6 },
+    headerTitle: { fontSize: 20, fontWeight: '800' },
     form: { padding: 16, paddingBottom: 40 },
-    label: { fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 6 },
-
+    label: { fontSize: 13, fontWeight: '700', marginTop: 14, marginBottom: 6 },
     selector: {
-        backgroundColor: '#fff', padding: 14, borderRadius: 10,
-        borderWidth: 1, borderColor: '#e5e7eb'
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1
     },
-    selectorText: { fontSize: 14, color: '#111827' },
-    selectorPlaceholder: { fontSize: 14, color: '#9ca3af' },
-
+    selectorText: { fontSize: 14, fontWeight: '600' },
     input: {
-        backgroundColor: '#fff', padding: 14, borderRadius: 10,
-        borderWidth: 1, borderColor: '#e5e7eb', fontSize: 14
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        fontSize: 14
     },
     textArea: { minHeight: 80, textAlignVertical: 'top' },
-
     dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     todayBtn: {
-        backgroundColor: '#2563eb', paddingHorizontal: 14, paddingVertical: 12,
-        borderRadius: 10, justifyContent: 'center'
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderRadius: 10,
+        justifyContent: 'center'
     },
-    todayBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-
+    todayBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
     weatherGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     weatherChip: {
-        flexDirection: 'row', alignItems: 'center', gap: 4,
-        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18,
-        backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb'
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 18,
+        borderWidth: 1
     },
-    weatherChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
     weatherIcon: { fontSize: 16 },
-    weatherLabel: { fontSize: 12, color: '#374151' },
-
+    weatherLabel: { fontSize: 12 },
     row2: { flexDirection: 'row' },
-
     attendanceList: { marginTop: 8 },
     attendanceRow: {
-        flexDirection: 'row', alignItems: 'center',
-        backgroundColor: '#fff', padding: 10, borderRadius: 8,
-        borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 6, gap: 8
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        marginBottom: 6,
+        gap: 8
     },
-    attendanceName: { flex: 1, fontSize: 13, color: '#111827' },
+    attendanceName: { flex: 1, fontSize: 13, fontWeight: '600' },
     hoursInput: {
-        width: 50, fontSize: 13, padding: 6,
-        backgroundColor: '#f9fafb', borderRadius: 6, textAlign: 'center'
+        width: 50,
+        fontSize: 13,
+        padding: 6,
+        borderRadius: 6,
+        textAlign: 'center',
+        fontWeight: '700'
     },
-    hoursSuffix: { fontSize: 12, color: '#6b7280' },
-
+    hoursSuffix: { fontSize: 12, fontWeight: '600' },
     photoActions: { flexDirection: 'row', gap: 8, marginBottom: 10 },
     photoActionBtn: {
-        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-        paddingVertical: 10, borderRadius: 8,
-        backgroundColor: '#eff6ff', borderWidth: 1, borderColor: '#bfdbfe'
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: 10,
+        borderWidth: 1
     },
-    photoActionText: { color: '#2563eb', fontSize: 13, fontWeight: '600' },
+    photoActionText: { fontSize: 13, fontWeight: '700' },
     photoStrip: { marginTop: 4 },
     photoThumb: {
-        width: 80, height: 80, marginRight: 8, borderRadius: 8, overflow: 'hidden',
+        width: 80,
+        height: 80,
+        marginRight: 8,
+        borderRadius: 10,
+        overflow: 'hidden',
         position: 'relative'
     },
     photoImg: { width: '100%', height: '100%' },
     photoDelete: {
-        position: 'absolute', top: 4, right: 4,
-        width: 22, height: 22, borderRadius: 11,
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
         backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'center', alignItems: 'center'
+        justifyContent: 'center',
+        alignItems: 'center'
     },
-
     buttonRow: { flexDirection: 'row', gap: 8, marginTop: 24 },
     saveBtn: {
-        flex: 1, padding: 14, borderRadius: 10, alignItems: 'center',
-        backgroundColor: '#fff', borderWidth: 1, borderColor: '#d1d5db'
+        flex: 1,
+        padding: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        borderWidth: 1
     },
-    saveBtnText: { color: '#374151', fontWeight: '600' },
+    saveBtnText: { fontWeight: '700' },
     submitBtn: {
-        flex: 1, padding: 14, borderRadius: 10, alignItems: 'center',
-        backgroundColor: '#2563eb'
+        flex: 1,
+        padding: 14,
+        borderRadius: 12,
+        alignItems: 'center'
     },
-    submitBtnText: { color: '#fff', fontWeight: '700' },
-
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    submitBtnText: { color: '#fff', fontWeight: '800' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
     modalContent: {
-        backgroundColor: '#fff', maxHeight: '75%',
-        borderTopLeftRadius: 16, borderTopRightRadius: 16
+        maxHeight: '75%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: 30
     },
     modalHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb'
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1
     },
-    modalTitle: { fontSize: 16, fontWeight: '700', color: '#111827', flex: 1 },
+    modalTitle: { fontSize: 17, fontWeight: '800', flex: 1 },
     modalItem: {
-        flexDirection: 'row', alignItems: 'center', padding: 14,
-        borderBottomWidth: 1, borderBottomColor: '#f3f4f6'
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderBottomWidth: 1
     },
-    modalItemText: { fontSize: 14, color: '#111827', fontWeight: '500' },
-    modalItemMeta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-    emptyModal: { textAlign: 'center', color: '#9ca3af', padding: 40 }
+    modalItemText: { fontSize: 14, fontWeight: '600' },
+    modalItemMeta: { fontSize: 12, marginTop: 2 },
+    emptyModal: { textAlign: 'center', padding: 40 }
 });

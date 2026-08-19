@@ -634,7 +634,8 @@ export const updateTransaction = async (req, res, next) => {
             // Extended fields
             itemName, unit, quantity, unitPrice,
             transactionFrom, transactionTo, costCenter,
-            invoiceNumber
+            invoiceNumber, payerUserId, projectCostItemId,
+            clientId, supplierId, workmanId
         } = req.body;
 
         let transaction = await prisma.transaction.findFirst({

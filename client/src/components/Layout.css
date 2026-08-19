@@ -1,3 +1,8 @@
+@keyframes pulse-badge {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 2px var(--bg-primary); }
+    50% { transform: scale(1.15); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4); }
+}
+
 .layout {
     display: flex;
     min-height: 100vh;
@@ -16,7 +21,16 @@
     bottom: 0;
     z-index: 100;
     transform: translateX(0);
-    transition: transform var(--transition-base);
+    transition: transform var(--transition-base), width var(--transition-base);
+}
+
+/* Collapsed Sidebar State */
+.sidebar.sidebar-collapsed {
+    transform: translateX(-100%);
+}
+
+.layout-collapsed .main-content {
+    margin-left: 0 !important;
 }
 
 .sidebar-header {
@@ -26,6 +40,53 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: relative;
+}
+
+/* Collapse button at the bottom-right of the header area */
+.sidebar-collapse-btn {
+    position: absolute;
+    right: 12px;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.sidebar-collapse-btn:hover {
+    background: var(--bg-elevated);
+    color: #60a5fa;
+    border-color: #60a5fa;
+    transform: scale(1.05);
+}
+
+.expand-sidebar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.expand-sidebar-btn:hover {
+    background: var(--bg-elevated);
+    color: #60a5fa;
+    border-color: #60a5fa;
+    transform: scale(1.05);
 }
 
 .sidebar-logo {
@@ -343,7 +404,22 @@
 
 [dir="rtl"] .main-content {
     margin-left: 0;
-    margin-right: 280px;
+    margin-right: 260px;
+}
+
+[dir="rtl"] .sidebar.sidebar-collapsed {
+    transform: translateX(100%);
+}
+
+[dir="rtl"].layout-collapsed .main-content,
+[dir="rtl"] .layout-collapsed .main-content {
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+}
+
+[dir="rtl"] .sidebar-collapse-btn {
+    right: auto;
+    left: 12px;
 }
 
 [dir="rtl"] .notification-dropdown {

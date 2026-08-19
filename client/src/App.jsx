@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AlertProvider } from './context/AlertContext';
+import { CopilotProvider } from './context/CopilotContext';
 import { PrivateRoute } from './components/PrivateRoute';
 
 // Pages
@@ -36,8 +37,9 @@ function App() {
     return (
         <AuthProvider>
             <AlertProvider>
-                <BrowserRouter>
-                    <Routes>
+                <CopilotProvider>
+                    <BrowserRouter>
+                        <Routes>
                         {/* Public Routes */}
                         <Route path="/login" element={<Login />} />
                         <Route path="/signup" element={<RegisterCompany />} />
@@ -231,6 +233,7 @@ function App() {
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </BrowserRouter>
+                </CopilotProvider>
             </AlertProvider>
         </AuthProvider>
     );

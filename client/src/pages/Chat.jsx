@@ -200,10 +200,10 @@ export default function Chat() {
                                             <p>{message.content}</p>
 
                                             {/* Action Card for AI Commands */}
-                                            {message.extractedData && !message.isActionCompleted && (
+                                            {message.extractedData?.params && !message.isActionCompleted && (
                                                 <div className="action-card">
                                                     <div className="action-header">
-                                                        {message.extractedData.action === 'CREATE_TRANSACTION' ? (t('chat.confirmExpense') || 'تأكيد تسجيل مصروف') : (t('chat.proposedAction') || 'إجراء مقترح')}
+                                                        {message.extractedData?.action === 'CREATE_TRANSACTION' ? (t('chat.confirmExpense') || 'تأكيد تسجيل مصروف') : (t('chat.proposedAction') || 'إجراء مقترح')}
                                                     </div>
                                                     <div className="action-details">
                                                         {message.extractedData.params.itemName && (

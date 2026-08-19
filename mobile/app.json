@@ -1,20 +1,48 @@
 {
   "expo": {
-    "name": "Engineers Management",
-    "slug": "engineers-management",
+    "name": "Hesaby ERP",
+    "slug": "hesaby-erp",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0f19"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.eightofrii.engineersmanagement"
+      "bundleIdentifier": "com.hesaby.erp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Hesaby needs camera access to photograph receipts and site progress.",
+        "NSPhotoLibraryUsageDescription": "Hesaby needs photo library access to attach receipts and site photos.",
+        "NSMicrophoneUsageDescription": "Hesaby needs microphone access to record voice notes for AI transaction drafting."
+      }
     },
     "android": {
-      "package": "com.eightofrii.engineersmanagement"
+      "package": "com.hesaby.erp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b0f19"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiUrl": "http://10.0.2.2:5000/api"
+      "eas": {
+        "projectId": ""
+      }
     }
   }
 }

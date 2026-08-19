@@ -172,13 +172,38 @@ const server = app.listen(PORT, () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV }, 'Server ready');
 });
 
+// Graceful shutdown handling
+const gracefulShutdown = async (signal) => {
+    logger.info({ signal }, 'Graceful shutdown signal received — closing connections');
+    try {
+        server.close();
+        await prisma.$disconnect();
+        logger.info('Database connections closed cleanly');
+    } catch (err) {
+        logger.error({ err }, 'Error during database disconnect');
+    }
+    process.exit(0);
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.once('SIGUSR2', async () => {
+    // Nodemon restart signal
+    try {
+        await prisma.$disconnect();
+    } catch {}
+    process.kill(process.pid, 'SIGUSR2');
+});
+
 // Crash hard on unhandled rejections — better than zombie state.
-process.on('unhandledRejection', (err) => {
+process.on('unhandledRejection', async (err) => {
     logger.fatal({ err }, 'Unhandled promise rejection — shutting down');
+    try { await prisma.$disconnect(); } catch {}
     server.close(() => process.exit(1));
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', async (err) => {
     logger.fatal({ err }, 'Uncaught exception — shutting down');
+    try { await prisma.$disconnect(); } catch {}
     process.exit(1);
 });

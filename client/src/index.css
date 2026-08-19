@@ -11,50 +11,52 @@
 }
 
 :root {
-  /* Color Palette - Professional Navy Blue, White & Grey Theme */
-  --color-primary: hsl(220, 80%, 45%);
-  /* Navy Blue */
-  --color-primary-dark: hsl(220, 85%, 35%);
-  --color-primary-light: hsl(220, 75%, 55%);
+  /* Color Palette - Modern Executive Theme */
+  --color-primary: #3b82f6;
+  /* Balanced Royal Blue */
+  --color-primary-dark: #2563eb;
+  --color-primary-light: #60a5fa;
 
-  --color-secondary: hsl(210, 15%, 50%);
-  /* Professional Grey */
-  --color-accent: hsl(220, 70%, 50%);
-  /* Accent Blue */
-  --color-warning: hsl(45, 100%, 51%);
-  /* Warning Yellow */
-  --color-danger: hsl(0, 85%, 60%);
-  --color-success: hsl(142, 71%, 45%);
+  --color-secondary: #64748b;
+  /* Slate Grey */
+  --color-accent: #38bdf8;
+  /* Soft Sky Accent */
+  --color-warning: #f59e0b;
+  /* Warm Amber */
+  --color-danger: #ef4444;
+  /* Clean Coral Red */
+  --color-success: #10b981;
+  /* Emerald Green */
 
-  /* Backgrounds - Dark Mode (Executive Mode) */
-  --bg-primary: #0B1B3D;
-  --bg-secondary: #060f22;
-  --bg-tertiary: #142a59;
-  --bg-elevated: #142a59;
-  --bg-overlay: rgba(11, 27, 61, 0.95);
-  --bg-glass: rgba(6, 15, 34, 0.7);
+  /* Backgrounds - Dark Mode (Soft Premium Charcoal / Deep Slate) */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-elevated: #243248;
+  --bg-overlay: rgba(15, 23, 42, 0.95);
+  --bg-glass: rgba(30, 41, 59, 0.85);
 
   /* Text Colors */
-  --text-primary: #FFFFFF;
-  --text-secondary: #A0ABC0;
-  --text-tertiary: #718096;
-  --text-disabled: #4A5568;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --text-disabled: #475569;
 
   /* Borders */
-  --border-color: rgba(255, 255, 255, 0.1);
-  --border-color-light: rgba(255, 255, 255, 0.15);
-  --border-glass: rgba(0, 240, 181, 0.1);
+  --border-color: #334155;
+  --border-color-light: #475569;
+  --border-glass: rgba(255, 255, 255, 0.08);
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.55);
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #0B1B3D 0%, #142a59 100%);
-  --gradient-success: linear-gradient(135deg, #00F0B5 0%, #00d6a1 100%);
-  --gradient-danger: linear-gradient(135deg, #FF5A36 0%, #e54c2a 100%);
+  --gradient-primary: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 
   /* Spacing */
   --spacing-xs: 0.25rem;
@@ -95,28 +97,153 @@
   --z-toast: 1200;
 }
 
+/* =========================================================
+   CHILL THEME PRESETS
+   ========================================================= */
+
+/* 1. Monochrome Minimalist (Default Chill - Neutral Charcoal & Off-White) */
+body[data-theme='monochrome'],
+body:not([data-theme]):not(.light-mode) {
+  --color-primary: #e4e4e7;
+  --color-primary-dark: #d4d4d8;
+  --color-primary-light: #ffffff;
+  --color-secondary: #71717a;
+  --color-accent: #a1a1aa;
+  --color-warning: #eab308;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+
+  --bg-primary: #141414;
+  --bg-secondary: #1c1c1c;
+  --bg-tertiary: #262626;
+  --bg-elevated: #303030;
+  --bg-overlay: rgba(20, 20, 20, 0.95);
+  --bg-glass: rgba(28, 28, 28, 0.85);
+
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #737373;
+  --text-disabled: #525252;
+
+  --border-color: #2b2b2b;
+  --border-color-light: #404040;
+  --border-glass: rgba(255, 255, 255, 0.05);
+
+  --gradient-primary: linear-gradient(135deg, #1c1c1c 0%, #262626 100%);
+}
+
+/* 2. Obsidian & Emerald (Onyx / Vercel Black with cool mint accents) */
+body[data-theme='obsidian-emerald'] {
+  --color-primary: #10b981;
+  --color-primary-dark: #059669;
+  --color-primary-light: #34d399;
+  --color-secondary: #64748b;
+  --color-accent: #2dd4bf;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-success: #10b981;
+
+  --bg-primary: #0a0a0c;
+  --bg-secondary: #121215;
+  --bg-tertiary: #1a1a20;
+  --bg-elevated: #22222a;
+  --bg-overlay: rgba(10, 10, 12, 0.95);
+  --bg-glass: rgba(18, 18, 21, 0.85);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --text-disabled: #475569;
+
+  --border-color: #22222c;
+  --border-color-light: #2e2e3a;
+  --border-glass: rgba(16, 185, 129, 0.08);
+
+  --gradient-primary: linear-gradient(135deg, #121215 0%, #1a1a20 100%);
+}
+
+/* 3. Nordic Frost (Deep arctic navy-grey with soft ice blue) */
+body[data-theme='nordic-frost'] {
+  --color-primary: #38bdf8;
+  --color-primary-dark: #0284c7;
+  --color-primary-light: #7dd3fc;
+  --color-secondary: #64748b;
+  --color-accent: #22d3ee;
+  --color-warning: #facc15;
+  --color-danger: #f87171;
+  --color-success: #2dd4bf;
+
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-elevated: #29303a;
+  --bg-overlay: rgba(13, 17, 23, 0.95);
+  --bg-glass: rgba(22, 27, 34, 0.85);
+
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-tertiary: #6e7681;
+  --text-disabled: #484f58;
+
+  --border-color: #30363d;
+  --border-color-light: #484f58;
+  --border-glass: rgba(56, 189, 248, 0.08);
+
+  --gradient-primary: linear-gradient(135deg, #161b22 0%, #21262d 100%);
+}
+
+/* 4. Monochrome Minimalist (Pure neutral charcoal & off-white) */
+body[data-theme='monochrome'] {
+  --color-primary: #e4e4e7;
+  --color-primary-dark: #d4d4d8;
+  --color-primary-light: #ffffff;
+  --color-secondary: #71717a;
+  --color-accent: #a1a1aa;
+  --color-warning: #eab308;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+
+  --bg-primary: #141414;
+  --bg-secondary: #1c1c1c;
+  --bg-tertiary: #262626;
+  --bg-elevated: #303030;
+  --bg-overlay: rgba(20, 20, 20, 0.95);
+  --bg-glass: rgba(28, 28, 28, 0.85);
+
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #737373;
+  --text-disabled: #525252;
+
+  --border-color: #2b2b2b;
+  --border-color-light: #404040;
+  --border-glass: rgba(255, 255, 255, 0.05);
+
+  --gradient-primary: linear-gradient(135deg, #1c1c1c 0%, #262626 100%);
+}
+
 /* Light Mode (Field Mode) */
 .light-mode {
-  --bg-primary: #F4F6F8;
+  --bg-primary: #F8FAFC;
   --bg-secondary: #FFFFFF;
-  --bg-tertiary: #E2E8F0;
+  --bg-tertiary: #F1F5F9;
   --bg-elevated: #FFFFFF;
-  --bg-overlay: rgba(244, 246, 248, 0.95);
-  --bg-glass: rgba(255, 255, 255, 0.7);
+  --bg-overlay: rgba(248, 250, 252, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.85);
 
-  --text-primary: #0B1B3D;
-  --text-secondary: #4A5568;
-  --text-tertiary: #718096;
-  --text-disabled: #A0ABC0;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-tertiary: #64748B;
+  --text-disabled: #94A3B8;
 
-  --border-color: #CBD5E0;
-  --border-color-light: #E2E8F0;
-  --border-glass: rgba(11, 27, 61, 0.15);
+  --border-color: #E2E8F0;
+  --border-color-light: #CBD5E1;
+  --border-glass: rgba(15, 23, 42, 0.08);
 
-  --shadow-sm: 0 2px 8px rgba(11, 27, 61, 0.08);
-  --shadow-md: 0 4px 16px rgba(11, 27, 61, 0.12);
-  --shadow-lg: 0 8px 32px rgba(11, 27, 61, 0.16);
-  --shadow-xl: 0 16px 48px rgba(11, 27, 61, 0.2);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 16px 36px rgba(0, 0, 0, 0.12);
 }
 
 /* Reset & Base Styles */
@@ -124,6 +251,17 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* Remove ugly up/down arrows (spinners) from number inputs globally */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 html {

@@ -88,55 +88,83 @@ export const sendMessage = async (req, res, next) => {
                 confidence: 1.0
             };
         } else {
-            // Step 3: Regular Chat with Tools for Text Input
-            const tools = [
-                {
-                    type: "function",
-                    function: {
-                        name: "record_transaction",
-                        description: "Record a financial transaction (expense or income) for a project.",
-                        parameters: {
-                            type: "object",
-                            properties: {
-                                type: { type: "string", enum: ["EXPENSE", "INCOME"] },
-                                amount: { type: "number" },
-                                category: { type: "string", enum: ["MATERIALS", "LABOR", "EQUIPMENT", "SERVICES", "OTHER"] },
-                                description: { type: "string" },
-                                projectName: { type: "string", description: "Name of the project" }
-                            },
-                            required: ["type", "amount", "category", "description"]
-                        }
+            // Step 3: Check if Micromind Agent is configured
+            if (process.env.MICROMIND_API_URL) {
+                try {
+                    // Fetch tenant name for context
+                    const tenant = await prisma.tenant.findUnique({
+                        where: { id: req.user.tenantId },
+                        select: { name: true }
+                    });
+
+                    const contextualPrompt = `[Context: Company/Tenant="${tenant?.name || 'Hesaby'}", TenantID="${req.user.tenantId}", User="${req.user.name}", Role="${req.user.role}"]\n${userMessage}`;
+
+                    const micromindRes = await fetch(process.env.MICROMIND_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            question: contextualPrompt
+                        })
+                    });
+
+                    const micromindData = await micromindRes.json();
+
+                    if (micromindData && (micromindData.text || micromindData.response)) {
+                        aiResponse = micromindData.text || micromindData.response;
                     }
-                },
-                {
-                    type: "function",
-                    function: {
-                        name: "get_financial_summary",
-                        description: "Get a summary of projects, income, or expenses.",
-                        parameters: {
-                            type: "object",
-                            properties: {
-                                scope: { type: "string", enum: ["ALL", "PROJECT"], default: "ALL" },
-                                projectName: { type: "string" }
+                } catch (microErr) {
+                    logger.error({ err: microErr }, 'Micromind Agent error, falling back to local chat tools');
+                }
+            }
+
+            // Fallback to OpenAI tools if Micromind did not produce a response
+            if (!aiResponse) {
+                try {
+                    const tools = [
+                        {
+                            type: "function",
+                            function: {
+                                name: "record_transaction",
+                                description: "Record a financial transaction (expense or income) for a project.",
+                                parameters: {
+                                    type: "object",
+                                    properties: {
+                                        type: { type: "string", enum: ["EXPENSE", "INCOME"] },
+                                        amount: { type: "number" },
+                                        category: { type: "string", enum: ["MATERIALS", "LABOR", "EQUIPMENT", "SERVICES", "OTHER"] },
+                                        description: { type: "string" },
+                                        projectName: { type: "string", description: "Name of the project" }
+                                    },
+                                    required: ["type", "amount", "category", "description"]
+                                }
+                            }
+                        },
+                        {
+                            type: "function",
+                            function: {
+                                name: "get_financial_summary",
+                                description: "Get a summary of projects, income, or expenses.",
+                                parameters: {
+                                    type: "object",
+                                    properties: {
+                                        scope: { type: "string", enum: ["ALL", "PROJECT"], default: "ALL" },
+                                        projectName: { type: "string" }
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            ];
+                    ];
 
-            const client = getOpenAI();
-            // Optional rolling history from the FE so the model remembers
-            // earlier turns ("yes that one", "show last week's instead"). Empty
-            // array ⇒ stateless behavior, same as before.
-            const priorTurns = Array.isArray(history)
-                ? history.filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content).slice(-12)
-                : [];
-            const completion = await client.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    {
-                        role: "system",
-                        content: `You are a professional construction assistant in Egypt.
+                    const client = getOpenAI();
+                    const priorTurns = Array.isArray(history)
+                        ? history.filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content).slice(-12)
+                        : [];
+                    const completion = await client.chat.completions.create({
+                        model: "gpt-4o-mini",
+                        messages: [
+                            {
+                                role: "system",
+                                content: `You are a professional construction assistant in Egypt.
 You help engineers manage sites — process transactions and answer project questions.
 
 LANGUAGE RULE — STRICT:
@@ -144,71 +172,198 @@ LANGUAGE RULE — STRICT:
 - If the user's most recent message is written in Arabic (any dialect), reply in Egyptian Arabic.
 - If the user mixes both, reply in the language of the majority of their words.
 - Never switch languages mid-conversation unless the user does first.`
-                    },
-                    ...priorTurns,
-                    { role: "user", content: userMessage }
-                ],
-                tools,
-                tool_choice: "auto"
-            });
+                            },
+                            ...priorTurns,
+                            { role: "user", content: userMessage }
+                        ],
+                        tools,
+                        tool_choice: "auto"
+                    });
 
-            const responseMessage = completion.choices[0].message;
-            aiResponse = responseMessage.content;
+                    const responseMessage = completion.choices[0].message;
+                    aiResponse = responseMessage.content;
 
-            if (responseMessage.tool_calls) {
-                for (const toolCall of responseMessage.tool_calls) {
-                    const args = JSON.parse(toolCall.function.arguments);
+                    if (responseMessage.tool_calls) {
+                        for (const toolCall of responseMessage.tool_calls) {
+                            const args = JSON.parse(toolCall.function.arguments);
 
-                    if (toolCall.function.name === 'record_transaction') {
-                        let projectId = null;
-                        if (args.projectName) {
-                            const project = await prisma.project.findFirst({
-                                where: {
-                                    tenantId: req.user.tenantId,
-                                    name: { contains: args.projectName, mode: 'insensitive' }
+                            if (toolCall.function.name === 'record_transaction') {
+                                let projectId = null;
+                                if (args.projectName) {
+                                    const project = await prisma.project.findFirst({
+                                        where: {
+                                            tenantId: req.user.tenantId,
+                                            name: { contains: args.projectName, mode: 'insensitive' }
+                                        }
+                                    });
+                                    projectId = project?.id;
                                 }
-                            });
-                            projectId = project?.id;
+
+                                toolData = {
+                                    action: 'CREATE_TRANSACTION',
+                                    params: { ...args, projectId },
+                                    confidence: 0.95
+                                };
+                                aiResponse = `تمام، أنا جهزت تفاصيل المصروف: ${args.amount} ج.م لبند ${args.category}. اضغط مراجعة وتسجيل المعاملة لحفظها.`;
+                            }
+
+                            if (toolCall.function.name === 'get_financial_summary') {
+                                let summaryText = "";
+                                if (args.projectName) {
+                                    const project = await prisma.project.findFirst({
+                                        where: {
+                                            tenantId: req.user.tenantId,
+                                            name: { contains: args.projectName, mode: 'insensitive' }
+                                        },
+                                        include: { transactions: { where: { status: 'APPROVED' } } }
+                                    });
+
+                                    if (project) {
+                                        const totalSpent = project.transactions.filter(t => t.type === 'EXPENSE').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                                        const totalRevenue = project.transactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                                        summaryText = `بخصوص مشروع ${project.name}:\n- الميزانية: ${project.budget} ج.م\n- إجمالي المصاريف: ${totalSpent} ج.م\n- الدفعات المستلمة: ${totalRevenue} ج.م\n- المتبقي في الميزانية: ${Number(project.budget) - totalSpent} ج.م`;
+                                    } else {
+                                        summaryText = "لم أجد مشروعاً بهذا الاسم، يرجى التأكد من اسم المشروع.";
+                                    }
+                                } else {
+                                    const stats = await prisma.transaction.groupBy({
+                                        by: ['type'],
+                                        where: { tenantId: req.user.tenantId, status: 'APPROVED' },
+                                        _sum: { amount: true }
+                                    });
+                                    const income = stats.find(s => s.type === 'INCOME')?._sum.amount || 0;
+                                    const expense = stats.find(s => s.type === 'EXPENSE')?._sum.amount || 0;
+                                    summaryText = `إجمالي العمليات المالية:\n- إجمالي الإيرادات: ${income} ج.م\n- إجمالي المصاريف: ${expense} ج.م\n- الرصيد الصافي: ${Number(income) - Number(expense)} ج.م`;
+                                }
+                                aiResponse = summaryText;
+                                toolData = { action: 'FETCH_SUMMARY', params: args, data: summaryText };
+                            }
                         }
+                    }
+                } catch (openaiErr) {
+                    logger.warn({ err: openaiErr }, 'OpenAI error, activating database-backed assistant fallback');
+                    const rawMsg = (userMessage || '').trim();
+                    const lower = rawMsg.toLowerCase();
+                    const isEnglish = (rawMsg.match(/[a-zA-Z]/g) || []).length >= (rawMsg.match(/[\u0600-\u06FF]/g) || []).length && (rawMsg.match(/[a-zA-Z]/g) || []).length > 0;
+
+                    // 1. Navigation Intent: Reports / DSR
+                    if (lower.includes('report') || lower.includes('dsr') || lower.includes('تقارير') || lower.includes('تقرير') || lower.includes('الموقع')) {
+                        if (lower.includes('new') || lower.includes('create') || lower.includes('add') || lower.includes('جديد') || lower.includes('سجل') || lower.includes('انشئ')) {
+                            toolData = { action: 'NAVIGATE', target: 'CREATE_DSR' };
+                            aiResponse = isEnglish
+                                ? 'Opening Daily Site Report Creator...'
+                                : 'تمام، جاري فتح نموذج تسجيل تقرير موقع جديد...';
+                        } else {
+                            toolData = { action: 'NAVIGATE', target: 'DSR' };
+                            aiResponse = isEnglish
+                                ? 'Navigating to Daily Site Reports (DSR)...'
+                                : 'تمام، جاري نقلك إلى شاشة التقارير اليومية (DSR)...';
+                        }
+                    }
+                    // 2. Navigation Intent: Finance & Expenses
+                    else if (lower.includes('finance') || lower.includes('transaction') || lower.includes('accounting') || lower.includes('مالية') || lower.includes('الماليه') || lower.includes('معاملات') || (lower.includes('مصاريف') && !lower.match(/\d+/))) {
+                        toolData = { action: 'NAVIGATE', target: 'FINANCE' };
+                        aiResponse = isEnglish
+                            ? 'Opening Finance & Transactions screen...'
+                            : 'تمام، جاري نقلك إلى شاشة المالية والمعاملات...';
+                    }
+                    // 3. Navigation Intent: Projects & Dashboard
+                    else if (lower.includes('project') || lower.includes('dashboard') || lower.includes('مشاريع') || lower.includes('مشروع') || lower.includes('الرئيسية') || lower.includes('داشبورد')) {
+                        if (lower.includes('summary') || lower.includes('ملخص') || lower.includes('ميزانية') || lower.includes('budget')) {
+                            const projects = await prisma.project.findMany({
+                                where: { tenantId: req.user.tenantId },
+                                take: 5,
+                                select: { name: true, budget: true, status: true }
+                            });
+                            const list = projects.map(p => `• ${p.name} (${isEnglish ? 'Budget' : 'الميزانية'}: ${Number(p.budget || 0).toLocaleString()} EGP - ${p.status})`).join('\n');
+                            aiResponse = isEnglish
+                                ? `🏢 Active Projects:\n${list || 'No projects currently recorded.'}`
+                                : `🏢 قائمة المشاريع النشطة:\n${list || 'لا توجد مشاريع مسجلة حالياً.'}`;
+                            toolData = { action: 'FETCH_SUMMARY', data: aiResponse };
+                        } else {
+                            toolData = { action: 'NAVIGATE', target: 'PROJECTS' };
+                            aiResponse = isEnglish
+                                ? 'Opening Projects Overview...'
+                                : 'تمام، جاري نقلك إلى شاشة المشاريع...';
+                        }
+                    }
+                    // 4. Navigation Intent: Inventory & Stock
+                    else if (lower.includes('inventory') || lower.includes('stock') || lower.includes('material') || lower.includes('مخزن') || lower.includes('مخازن') || lower.includes('خامات') || lower.includes('بضاعة')) {
+                        toolData = { action: 'NAVIGATE', target: 'INVENTORY' };
+                        aiResponse = isEnglish
+                            ? 'Opening Inventory & Materials management...'
+                            : 'تمام، جاري نقلك إلى إدارة المخازن والخامات...';
+                    }
+                    // 5. Navigation Intent: Workforce & Labor
+                    else if (lower.includes('workforce') || lower.includes('labor') || lower.includes('worker') || lower.includes('عمالة') || lower.includes('عمال') || lower.includes('صنايعية') || lower.includes('يوميات')) {
+                        toolData = { action: 'NAVIGATE', target: 'WORKMEN' };
+                        aiResponse = isEnglish
+                            ? 'Opening Workforce & Labor directory...'
+                            : 'تمام، جاري نقلك إلى سجل العمالة والمقاولين...';
+                    }
+                    // 6. Navigation Intent: Invoices
+                    else if (lower.includes('invoice') || lower.includes('bill') || lower.includes('فاتورة') || lower.includes('فواتير') || lower.includes('مطالبات')) {
+                        toolData = { action: 'NAVIGATE', target: 'INVOICES' };
+                        aiResponse = isEnglish
+                            ? 'Opening Invoices & Billing...'
+                            : 'تمام، جاري نقلك إلى شاشة الفواتير والمطالبات...';
+                    }
+                    // 7. Transaction creation (Expense / Income)
+                    else if (lower.includes('سجل') || lower.includes('أضف') || lower.includes('اضف') || lower.includes('record') || lower.includes('add') || lower.includes('صرف') || lower.includes('expense')) {
+                        const amountMatch = userMessage.match(/\d+([.,]\d+)?/);
+                        const amount = amountMatch ? parseFloat(amountMatch[0].replace(',', '.')) : 0;
+                        
+                        let category = 'MATERIALS';
+                        if (lower.includes('عمال') || lower.includes('يومية') || lower.includes('صنايعي') || lower.includes('بناء') || lower.includes('labor') || lower.includes('wage')) {
+                            category = 'LABOR';
+                        } else if (lower.includes('معدة') || lower.includes('حفار') || lower.includes('لودر') || lower.includes('خلاطة') || lower.includes('equipment')) {
+                            category = 'EQUIPMENT';
+                        } else if (lower.includes('نقل') || lower.includes('تشوين') || lower.includes('خدمات') || lower.includes('service') || lower.includes('transport')) {
+                            category = 'SERVICES';
+                        }
+
+                        const project = await prisma.project.findFirst({
+                            where: { tenantId: req.user.tenantId }
+                        });
 
                         toolData = {
                             action: 'CREATE_TRANSACTION',
-                            params: { ...args, projectId },
-                            confidence: 0.95
-                        };
-                        aiResponse = `تمام، أنا جهزت تفاصيل المصروف: ${args.amount} ج.م لبند ${args.category}. دوس تأكيد عشان نسجلها.`;
-                    }
-
-                    if (toolCall.function.name === 'get_financial_summary') {
-                        let summaryText = "";
-                        if (args.projectName) {
-                            const project = await prisma.project.findFirst({
-                                where: {
-                                    tenantId: req.user.tenantId,
-                                    name: { contains: args.projectName, mode: 'insensitive' }
-                                },
-                                include: { transactions: { where: { status: 'APPROVED' } } }
-                            });
-
-                            if (project) {
-                                const totalSpent = project.transactions.filter(t => t.type === 'EXPENSE').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-                                const totalRevenue = project.transactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-                                summaryText = `بخصوص مشروع ${project.name}:\n- الميزانية: ${project.budget} ج.م\n- إجمالي المصاريف: ${totalSpent} ج.م\n- الدفعات المستلمة: ${totalRevenue} ج.م\n- المتبقي في الميزانية: ${Number(project.budget) - totalSpent} ج.م`;
-                            } else {
-                                summaryText = "ملقتش مشروع بالاسم ده، ممكن تتأكد من الاسم؟";
+                            params: {
+                                type: lower.includes('إيراد') || lower.includes('ايراد') || lower.includes('income') || lower.includes('revenue') ? 'INCOME' : 'EXPENSE',
+                                amount,
+                                category,
+                                description: userMessage,
+                                projectId: project?.id
                             }
-                        } else {
-                            const stats = await prisma.transaction.groupBy({
+                        };
+                        aiResponse = isEnglish
+                            ? `Prepared transaction draft: ${amount.toLocaleString()} EGP for (${category}). Tap the button below to review and confirm.`
+                            : `تمام، قمت بتجهيز تفاصيل المعاملة بمبلغ ${amount.toLocaleString()} ج.م لبند (${category}). اضغط الزر أدناه لمراجعة وحفظ المعاملة فوراً.`;
+                    }
+                    // 8. Financial Summary
+                    else if (lower.includes('ملخص') || lower.includes('summary') || lower.includes('total') || lower.includes('balance') || lower.includes('رصيد')) {
+                        const [stats, projectsCount] = await Promise.all([
+                            prisma.transaction.groupBy({
                                 by: ['type'],
                                 where: { tenantId: req.user.tenantId, status: 'APPROVED' },
                                 _sum: { amount: true }
-                            });
-                            const income = stats.find(s => s.type === 'INCOME')?._sum.amount || 0;
-                            const expense = stats.find(s => s.type === 'EXPENSE')?._sum.amount || 0;
-                            summaryText = `إجمالي الشغل عندك حالياً:\n- إجمالي الإيرادات: ${income} ج.م\n- إجمالي المصاريف: ${expense} ج.م\n- الرصيد الصافي: ${Number(income) - Number(expense)} ج.م`;
-                        }
-                        aiResponse = summaryText;
-                        toolData = { action: 'FETCH_SUMMARY', params: args, data: summaryText };
+                            }),
+                            prisma.project.count({ where: { tenantId: req.user.tenantId } })
+                        ]);
+                        const income = stats.find(s => s.type === 'INCOME')?._sum.amount || 0;
+                        const expense = stats.find(s => s.type === 'EXPENSE')?._sum.amount || 0;
+                        const net = Number(income) - Number(expense);
+                        
+                        aiResponse = isEnglish
+                            ? `📊 Financial Overview:\n- Total Income: ${Number(income).toLocaleString()} EGP\n- Total Expenses: ${Number(expense).toLocaleString()} EGP\n- Net Cashflow: ${net.toLocaleString()} EGP\n- Active Projects: ${projectsCount}`
+                            : `📊 الملخص المالي للنظام:\n- إجمالي الإيرادات: ${Number(income).toLocaleString()} ج.م\n- إجمالي المصروفات: ${Number(expense).toLocaleString()} ج.م\n- الرصيد الصافي: ${net.toLocaleString()} ج.م\n- عدد المشاريع: ${projectsCount} مشاريع.`;
+                        toolData = { action: 'FETCH_SUMMARY', data: aiResponse };
+                    }
+                    // 9. Greeting / Help
+                    else {
+                        aiResponse = isEnglish
+                            ? "Hello! I am your Hesaby ERP AI Copilot. You can tell me to open screens (e.g. 'take me to reports', 'open projects'), check financial summaries, or record expenses via text or voice (e.g. 'record expense 500 EGP for sand')."
+                            : "أهلاً بك! أنا المساعد الذكي لنظام حسابي ERP. يمكنك أن تطلب مني الانتقال لأي شاشة (مثل 'وديني التقارير' أو 'افتح المشاريع')، الاستفسار عن ملخص المصروفات، أو تسجيل المعاملات بالأوامر النصية والصوتية.";
                     }
                 }
             }
@@ -267,9 +422,9 @@ export const getChatHistory = async (req, res, next) => {
         res.status(200).json({
             success: true,
             count: messages.length,
-            data: messages.map((msg, index) => ({
+            data: messages.map((msg) => ({
                 ...msg,
-                isUser: msg.processed === true || index % 2 === 0
+                isUser: msg.processed === true
             }))
         });
 

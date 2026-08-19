@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { projectsAPI, transactionsAPI, clientsAPI, suppliersAPI } from '../services/api';
+import { projectsAPI, transactionsAPI, clientsAPI, suppliersAPI, dsrAPI } from '../services/api';
 import {
     LayoutDashboard,
     FolderKanban,
@@ -13,7 +13,10 @@ import {
     Building2,
     Package,
     ArrowUpRight,
-    ArrowDownRight
+    ArrowDownRight,
+    Calendar,
+    ClipboardList,
+    Clock
 } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
@@ -23,7 +26,8 @@ import './Dashboard.css';
 
 export default function Dashboard() {
     const { user } = useAuth();
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const { currency: formatCurrency } = useFormat();
     const [loading, setLoading] = useState(true);
@@ -35,6 +39,7 @@ export default function Dashboard() {
     });
     const [recentProjects, setRecentProjects] = useState([]);
     const [transactionStats, setTransactionStats] = useState(null);
+    const [todaySummary, setTodaySummary] = useState({ dsrCount: 0, todayIncome: 0, todayExpense: 0, activeProjects: 0 });
 
     useEffect(() => {
         loadDashboardData();
@@ -53,14 +58,14 @@ export default function Dashboard() {
             const projects = projectsRes.data.data;
             const transactions = transactionsRes.data.data;
 
-            // Calculate stats
+            // Calculate stats (handle both uppercase and lowercase enum values and approved status)
             const income = transactions
-                .filter(t => t.type === 'income')
-                .reduce((sum, t) => sum + t.amount, 0);
+                .filter(t => (t.type === 'INCOME' || t.type === 'income') && (t.status === 'APPROVED' || !t.status))
+                .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
             const expense = transactions
-                .filter(t => t.type === 'expense')
-                .reduce((sum, t) => sum + t.amount, 0);
+                .filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && (t.status === 'APPROVED' || !t.status))
+                .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
             setStats({
                 projects: {
@@ -78,6 +83,26 @@ export default function Dashboard() {
 
             setRecentProjects(projects.slice(0, 5));
             setTransactionStats(statsRes.data.data);
+
+            // Today's summary
+            const today = new Date().toISOString().slice(0, 10);
+            const todayTxs = transactions.filter(tx => {
+                const txDate = (tx.transactionDate || tx.createdAt || '').slice(0, 10);
+                return txDate === today;
+            });
+            const todayIncome = todayTxs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount || 0), 0);
+            const todayExpense = todayTxs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount || 0), 0);
+            const activeProjects = projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'in-progress').length;
+
+            // Try to get today's DSRs
+            let dsrCount = 0;
+            try {
+                const dsrRes = await dsrAPI.list({ date: today });
+                const allDsr = dsrRes.data?.data || [];
+                dsrCount = allDsr.filter(r => (r.reportDate || r.createdAt || '').slice(0, 10) === today).length;
+            } catch (e) { /* DSR not critical */ }
+
+            setTodaySummary({ dsrCount, todayIncome, todayExpense, activeProjects });
         } catch (error) {
             console.error('Failed to load dashboard data:', error);
             showAlert({ type: 'error', title: t('common.error'), message: t('common.error') });
@@ -108,6 +133,46 @@ export default function Dashboard() {
                             {t('dashboard.title')}
                         </h1>
                         <p>{t('dashboard.welcome', { name: user?.name })}</p>
+                    </div>
+                </div>
+
+                {/* Today's Summary Widget (#2) */}
+                <div className="card mb-xl" style={{
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)'
+                }}>
+                    <div className="card-body">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                            <Calendar size={20} style={{ color: 'var(--color-primary)' }} />
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>
+                                {isArabic ? 'ملخص اليوم' : "Today's Summary"} —{' '}
+                                <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: '0.875rem' }}>
+                                    {new Date().toLocaleDateString(isArabic ? 'ar-EG' : undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </span>
+                            </h3>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                                <FolderKanban size={20} style={{ color: 'var(--color-primary)', marginBottom: 6 }} />
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{todaySummary.activeProjects}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'مشاريع نشطة' : 'Active Projects'}</div>
+                            </div>
+                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                                <ClipboardList size={20} style={{ color: '#8b5cf6', marginBottom: 6 }} />
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{todaySummary.dsrCount}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'تقارير اليوم' : 'DSRs Today'}</div>
+                            </div>
+                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                                <TrendingUp size={20} style={{ color: '#10b981', marginBottom: 6 }} />
+                                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981' }}>{formatCurrency(todaySummary.todayIncome)}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'إيرادات اليوم' : "Today's Income"}</div>
+                            </div>
+                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                                <TrendingDown size={20} style={{ color: '#ef4444', marginBottom: 6 }} />
+                                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ef4444' }}>{formatCurrency(todaySummary.todayExpense)}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'مصروفات اليوم' : "Today's Expenses"}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

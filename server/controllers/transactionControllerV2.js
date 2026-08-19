@@ -142,19 +142,19 @@ export const createTransactionV2 = async (req, res, next) => {
             actualPayer = payerUserId;
         }
 
-        // Multi-level approval: a transaction is auto-approved only if the
-        // creator's role rank is at or above the role required for this
-        // amount tier. The tenant's `approvalThresholds` config drives this;
-        // if not configured, sensible defaults (5k / 50k / unlimited) apply.
-        const tenantConfig = await prisma.tenant.findUnique({
-            where: { id: req.user.tenantId },
-            select: { approvalThresholds: true }
-        });
-
+        // Income is money coming IN to the company/project from clients — auto-approved immediately.
+        // Expenses require approval thresholds based on creator role and amount.
         const callerRole = req.user.role;
-        const initialStatus = canAutoApprove(callerRole, amount, tenantConfig)
-            ? 'APPROVED'
-            : 'PENDING_APPROVAL';
+        let initialStatus = 'APPROVED';
+        if (type === 'EXPENSE') {
+            const tenantConfig = await prisma.tenant.findUnique({
+                where: { id: req.user.tenantId },
+                select: { approvalThresholds: true }
+            });
+            initialStatus = canAutoApprove(callerRole, amount, tenantConfig)
+                ? 'APPROVED'
+                : 'PENDING_APPROVAL';
+        }
 
         const result = await prisma.$transaction(async (tx) => {
             let profitInfo = null;
@@ -404,13 +404,34 @@ export const recordInventoryUsage = async (req, res, next) => {
                 }
             });
 
+            // Resolve materialId: if batch doesn't have materialId linked, find or create default material
+            let effectiveMaterialId = batch.materialId;
+            if (!effectiveMaterialId) {
+                const defaultMaterial = await tx.material.findFirst({
+                    where: { tenantId: req.user.tenantId, deletedAt: null }
+                });
+                if (defaultMaterial) {
+                    effectiveMaterialId = defaultMaterial.id;
+                } else {
+                    const newMat = await tx.material.create({
+                        data: {
+                            name: batch.description || 'General Material',
+                            unit: 'PIECE',
+                            unitPrice: Number(valueConsumed) || 0,
+                            tenantId: req.user.tenantId
+                        }
+                    });
+                    effectiveMaterialId = newMat.id;
+                }
+            }
+
             // Create usage record
             const usage = await tx.materialUsage.create({
                 data: {
-                    materialId: batch.materialId,
+                    materialId: effectiveMaterialId,
                     projectId: projectId || batch.projectId,
                     quantity: quantityConsumed && Number(quantityConsumed) > 0 ? Number(quantityConsumed) : 1,
-                    notes: description,
+                    notes: description || 'Material Usage',
                     recordedBy: req.user.id,
                     tenantId: req.user.tenantId
                 }

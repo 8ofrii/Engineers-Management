@@ -1,156 +1,434 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    SafeAreaView, Alert, RefreshControl
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    ScrollView,
+    SafeAreaView,
+    Alert,
+    RefreshControl,
+    Platform,
+    Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { setLanguage } from '../i18n';
 import { custodyApi } from '../services/api';
 import { useFormat } from '../utils/format';
 
+import { useFocusEffect } from '@react-navigation/native';
+import AICopilotHeaderButton from '../components/AICopilotHeaderButton';
+
 export default function ProfileScreen({ navigation }) {
     const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { user, logout } = useAuth();
+    const { theme, themeKey, setThemeKey, themes } = useTheme();
     const { currency } = useFormat();
     const [custody, setCustody] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [themeModalVisible, setThemeModalVisible] = useState(false);
 
     const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
-    const showCustody = user && (user.role === 'ENGINEER' || user.role === 'PROJECT_MANAGER');
+    const showCustody = user && (user.role === 'ENGINEER' || user.role === 'PROJECT_MANAGER' || user.role === 'ADMIN');
 
     const loadCustody = useCallback(async () => {
-        if (!showCustody || !user?.id) return;
+        if (!user?.id) return;
         try {
             const res = await custodyApi.balance(user.id);
             setCustody(res.data?.data || null);
-        } catch { setCustody(null); }
-        finally { setRefreshing(false); }
-    }, [showCustody, user?.id]);
+        } catch {
+            setCustody(null);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [user?.id]);
 
     useEffect(() => { loadCustody(); }, [loadCustody]);
+    useFocusEffect(useCallback(() => { loadCustody(); }, [loadCustody]));
 
     const onLogout = () => {
-        Alert.alert(t('profile.logoutConfirm'), '', [
-            { text: t('common.cancel'), style: 'cancel' },
-            { text: t('profile.logout'), style: 'destructive', onPress: logout }
-        ]);
+        Alert.alert(
+            isArabic ? 'تسجيل الخروج' : 'Sign Out',
+            isArabic ? 'هل أنت متأكد من تسجيل الخروج من التطبيق؟' : 'Are you sure you want to sign out?',
+            [
+                { text: isArabic ? 'إلغاء' : 'Cancel', style: 'cancel' },
+                { text: isArabic ? 'خروج' : 'Sign Out', style: 'destructive', onPress: logout }
+            ]
+        );
     };
 
-    const initials = (user?.name || '?').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
+    const initials = (user?.name || 'U').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
 
-    const Item = ({ icon, label, onPress, value, danger, accent }) => (
-        <TouchableOpacity style={styles.row} onPress={onPress}>
-            <Ionicons
-                name={icon}
-                size={20}
-                color={danger ? '#ef4444' : accent ? '#10b981' : '#374151'}
-                style={{ marginRight: 12 }}
-            />
-            <Text style={[
-                styles.rowLabel,
-                danger && { color: '#ef4444' },
-                accent && { color: '#10b981' }
-            ]}>{label}</Text>
-            {value ? <Text style={styles.rowValue}>{value} ▸</Text> : <Text style={styles.rowChevron}>▸</Text>}
-        </TouchableOpacity>
-    );
+    const currentThemeInfo = themes[themeKey] || themes.monochrome;
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+            {/* Top Bar with AI Copilot Button */}
+            <View style={[styles.topBar, { flexDirection: isArabic ? 'row-reverse' : 'row', borderBottomColor: theme.border }]}>
+                <Text style={[styles.topBarTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left', flex: 1 }]}>
+                    {isArabic ? 'الملف الشخصي والإعدادات' : 'Profile & Settings'}
+                </Text>
+                <AICopilotHeaderButton navigation={navigation} compact />
+            </View>
+
             <ScrollView
                 contentContainerStyle={styles.scroll}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadCustody(); }} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadCustody(); }} tintColor={theme.primary} />}
+                showsVerticalScrollIndicator={false}
             >
+                {/* Profile Header Block */}
                 <View style={styles.profileBlock}>
-                    <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
-                    <Text style={styles.name}>{user?.name || ''}</Text>
-                    <Text style={styles.email}>{user?.email || ''}</Text>
-                    <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{user?.role?.replace(/_/g, ' ') || ''}</Text></View>
+                    <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
+                        <Text style={styles.avatarText}>{initials}</Text>
+                    </View>
+                    <Text style={[styles.name, { color: theme.text }]}>{user?.name || (isArabic ? 'مستخدم النظام' : 'User')}</Text>
+                    <Text style={[styles.email, { color: theme.subtext }]}>{user?.email || ''}</Text>
+                    <View style={[styles.roleBadge, { backgroundColor: theme.primaryLight, borderColor: theme.primary }]}>
+                        <Text style={[styles.roleBadgeText, { color: theme.primary }]}>
+                            {user?.role?.replace(/_/g, ' ') || 'ENGINEER'}
+                        </Text>
+                    </View>
                 </View>
 
-                {showCustody && custody && (
+                {/* Custody Wallet Card */}
+                {showCustody && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>{t('profile.custody')}</Text>
-                        <View style={styles.custodyCard}>
-                            <Row label={t('profile.currentBalance')} value={currency(custody.currentCustodyBalance)} primary />
-                            <Row label={t('profile.pendingClearance')} value={currency(custody.pendingClearance)} />
-                            <Row label={t('profile.available')} value={currency(custody.availableBalance)} accent />
+                        <Text style={[styles.sectionTitle, { color: theme.subtext }]}>{isArabic ? 'عهدة المهندس المالية' : 'My Custody Wallet'}</Text>
+                        <View style={[styles.custodyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                            <View style={[styles.custodyRow, { borderBottomColor: theme.borderStrong }]}>
+                                <Text style={[styles.custodyLabel, { color: theme.subtext }]}>{isArabic ? 'رصيد العهدة الحالي' : 'Current Balance'}</Text>
+                                <Text style={[styles.custodyValue, { color: theme.primary, fontSize: 18, fontWeight: '800' }]}>
+                                    {currency(custody?.currentCustodyBalance || 0)}
+                                </Text>
+                            </View>
+                            <View style={[styles.custodyRow, { borderBottomColor: theme.borderStrong }]}>
+                                <Text style={[styles.custodyLabel, { color: theme.subtext }]}>{isArabic ? 'معلق تحت التصفية' : 'Pending Clearance'}</Text>
+                                <Text style={[styles.custodyValue, { color: theme.text }]}>
+                                    {currency(custody?.pendingClearance || 0)}
+                                </Text>
+                            </View>
+                            <View style={[styles.custodyRow, { borderBottomWidth: 0 }]}>
+                                <Text style={[styles.custodyLabel, { color: theme.subtext }]}>{isArabic ? 'المتاح للصرف' : 'Available to Spend'}</Text>
+                                <Text style={[styles.custodyValue, { color: theme.success, fontWeight: '800' }]}>
+                                    {currency(custody?.availableBalance || 0)}
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 )}
 
+                {/* Admin Management Actions */}
                 {isAdmin && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>{t('profile.management')}</Text>
-                        <Item icon="cash-outline" label={t('profile.fundEngineer')} onPress={() => navigation.navigate('FundEngineer')} accent />
+                        <Text style={[styles.sectionTitle, { color: theme.subtext }]}>{isArabic ? 'إدارة النقدية والعهد' : 'Admin Controls'}</Text>
+                        <TouchableOpacity
+                            style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
+                            onPress={() => navigation.navigate('FundEngineer')}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.itemIconBox, { backgroundColor: theme.successLight }]}>
+                                <Ionicons name="cash-outline" size={20} color={theme.success} />
+                            </View>
+                            <Text style={[styles.rowLabel, { color: theme.text }]}>{isArabic ? 'صرف عهدة لمهندس موقع' : 'Fund Site Engineer Custody'}</Text>
+                            <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.subtext} />
+                        </TouchableOpacity>
                     </View>
                 )}
 
+                {/* App Preferences */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{t('profile.directory')}</Text>
-                    <Item icon="people-outline" label={t('directory.clients')} onPress={() => navigation.navigate('Clients')} />
-                    <Item icon="business-outline" label={t('directory.suppliers')} onPress={() => navigation.navigate('Suppliers')} />
-                    <Item icon="construct-outline" label={t('directory.workmen')} onPress={() => navigation.navigate('Workmen')} />
+                    <Text style={[styles.sectionTitle, { color: theme.subtext }]}>{isArabic ? 'الإعدادات والمظهر' : 'Preferences & Appearance'}</Text>
+                    
+                    {/* Theme Switcher Row */}
+                    <TouchableOpacity
+                        style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
+                        onPress={() => setThemeModalVisible(true)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={[styles.itemIconBox, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="color-palette-outline" size={20} color={theme.primary} />
+                        </View>
+                        <Text style={[styles.rowLabel, { color: theme.text }]}>{isArabic ? 'مظهر وتصميم التطبيق' : 'Color Theme'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: currentThemeInfo.dot }} />
+                            <Text style={[styles.rowValue, { color: theme.subtext }]}>
+                                {isArabic ? currentThemeInfo.nameAr : currentThemeInfo.name}
+                            </Text>
+                        </View>
+                        <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.subtext} />
+                    </TouchableOpacity>
+
+                    {/* Language Switcher Row */}
+                    <TouchableOpacity
+                        style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
+                        onPress={() => setLanguage(isArabic ? 'en' : 'ar')}
+                        activeOpacity={0.7}
+                    >
+                        <View style={[styles.itemIconBox, { backgroundColor: theme.primaryLight }]}>
+                            <Ionicons name="language-outline" size={20} color={theme.primary} />
+                        </View>
+                        <Text style={[styles.rowLabel, { color: theme.text }]}>{isArabic ? 'لغة التطبيق' : 'App Language'}</Text>
+                        <Text style={[styles.rowValue, { color: theme.subtext }]}>{isArabic ? 'العربية' : 'English'}</Text>
+                        <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.subtext} />
+                    </TouchableOpacity>
                 </View>
 
+                {/* Account & Logout */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{t('profile.preferences')}</Text>
-                    <Item
-                        icon="language-outline"
-                        label={t('profile.language')}
-                        value={i18n.language === 'ar' ? 'العربية' : 'English'}
-                        onPress={() => setLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
-                    />
+                    <Text style={[styles.sectionTitle, { color: theme.subtext }]}>{isArabic ? 'الحساب' : 'Account'}</Text>
+                    <TouchableOpacity
+                        style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
+                        onPress={onLogout}
+                        activeOpacity={0.7}
+                    >
+                        <View style={[styles.itemIconBox, { backgroundColor: theme.dangerLight }]}>
+                            <Ionicons name="log-out-outline" size={20} color={theme.danger} />
+                        </View>
+                        <Text style={[styles.rowLabel, { color: theme.danger }]}>{isArabic ? 'تسجيل الخروج' : 'Sign Out'}</Text>
+                        <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.subtext} />
+                    </TouchableOpacity>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>{t('profile.account')}</Text>
-                    <Item icon="log-out-outline" label={t('profile.logout')} onPress={onLogout} danger />
-                </View>
-
-                <Text style={styles.footer}>Engineers Management v1.0.0</Text>
+                <Text style={[styles.footer, { color: theme.subtext }]}>Hesaby ERP Mobile v2.0</Text>
             </ScrollView>
+
+            {/* Theme Selector Modal */}
+            <Modal
+                visible={themeModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setThemeModalVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setThemeModalVisible(false)}
+                >
+                    <View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: theme.text }]}>
+                                {isArabic ? 'اختر مظهر التطبيق' : 'Select Theme Preset'}
+                            </Text>
+                            <TouchableOpacity onPress={() => setThemeModalVisible(false)}>
+                                <Ionicons name="close-circle" size={24} color={theme.subtext} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {Object.values(themes).map((tPreset) => {
+                            const isSelected = themeKey === tPreset.id;
+                            return (
+                                <TouchableOpacity
+                                    key={tPreset.id}
+                                    style={[
+                                        styles.themeOption,
+                                        { backgroundColor: isSelected ? theme.primaryLight : theme.cardAlt, borderColor: isSelected ? theme.primary : theme.borderStrong }
+                                    ]}
+                                    activeOpacity={0.7}
+                                    onPress={() => {
+                                        setThemeKey(tPreset.id);
+                                        setThemeModalVisible(false);
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <View style={[styles.themeDot, { backgroundColor: tPreset.dot }]} />
+                                        <View>
+                                            <Text style={[styles.themeName, { color: theme.text }]}>
+                                                {isArabic ? tPreset.nameAr : tPreset.name}
+                                            </Text>
+                                            <Text style={[styles.themeDesc, { color: theme.subtext }]}>
+                                                {isArabic ? tPreset.descAr : tPreset.desc}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    {isSelected && (
+                                        <Ionicons name="checkmark-circle" size={22} color={theme.primary} />
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 }
 
-const Row = ({ label, value, primary, accent }) => (
-    <View style={styles.custodyRow}>
-        <Text style={styles.custodyLabel}>{label}</Text>
-        <Text style={[
-            styles.custodyValue,
-            primary && { color: '#0ea5e9', fontSize: 18, fontWeight: '700' },
-            accent && { color: '#10b981', fontWeight: '700' }
-        ]}>{value}</Text>
-    </View>
-);
-
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f9fafb' },
-    scroll: { padding: 16, paddingTop: 50, paddingBottom: 40 },
-
-    profileBlock: { alignItems: 'center', paddingVertical: 24 },
-    avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#2563eb', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-    avatarText: { color: '#fff', fontSize: 28, fontWeight: '700' },
-    name: { fontSize: 20, fontWeight: '700', color: '#111827' },
-    email: { fontSize: 13, color: '#6b7280', marginTop: 4 },
-    roleBadge: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, backgroundColor: '#dbeafe' },
-    roleBadgeText: { color: '#1e40af', fontSize: 12, fontWeight: '600' },
-
-    section: { marginTop: 16 },
-    sectionTitle: { fontSize: 12, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginLeft: 4 },
-
-    custodyCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e5e7eb' },
-    custodyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
-    custodyLabel: { fontSize: 13, color: '#6b7280' },
-    custodyValue: { fontSize: 14, color: '#111827', fontWeight: '500' },
-
-    row: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 14, borderRadius: 10, marginBottom: 6, borderWidth: 1, borderColor: '#e5e7eb' },
-    rowLabel: { fontSize: 14, color: '#111827', fontWeight: '500', flex: 1 },
-    rowValue: { fontSize: 13, color: '#6b7280' },
-    rowChevron: { fontSize: 14, color: '#9ca3af' },
-
-    footer: { textAlign: 'center', color: '#9ca3af', fontSize: 11, marginTop: 32 }
+    container: {
+        flex: 1
+    },
+    scroll: {
+        padding: 16,
+        paddingTop: Platform.OS === 'ios' ? 12 : 36,
+        paddingBottom: 90
+    },
+    profileBlock: {
+        alignItems: 'center',
+        paddingVertical: 20
+    },
+    avatar: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 6
+    },
+    avatarText: {
+        color: '#ffffff',
+        fontSize: 26,
+        fontWeight: '800'
+    },
+    name: {
+        fontSize: 20,
+        fontWeight: '800'
+    },
+    email: {
+        fontSize: 13,
+        marginTop: 4
+    },
+    roleBadge: {
+        marginTop: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1
+    },
+    roleBadgeText: {
+        fontSize: 11,
+        fontWeight: '700'
+    },
+    section: {
+        marginTop: 18
+    },
+    sectionTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 8,
+        marginLeft: 4
+    },
+    custodyCard: {
+        borderRadius: 14,
+        padding: 14,
+        borderWidth: 1
+    },
+    custodyRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderBottomWidth: 1
+    },
+    custodyLabel: {
+        fontSize: 13
+    },
+    custodyValue: {
+        fontSize: 14,
+        fontWeight: '600'
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderRadius: 12,
+        marginBottom: 8,
+        borderWidth: 1
+    },
+    itemIconBox: {
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12
+    },
+    rowLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        flex: 1
+    },
+    rowValue: {
+        fontSize: 13,
+        marginRight: 6
+    },
+    footer: {
+        textAlign: 'center',
+        fontSize: 11,
+        marginTop: 28
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20
+    },
+    modalContent: {
+        width: '100%',
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.4,
+        shadowRadius: 20,
+        elevation: 10
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '800'
+    },
+    themeOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 14,
+        borderRadius: 14,
+        marginBottom: 10,
+        borderWidth: 1.5
+    },
+    themeDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 7
+    },
+    themeName: {
+        fontSize: 15,
+        fontWeight: '700'
+    },
+    themeDesc: {
+        fontSize: 12,
+        marginTop: 2
+    },
+    topBar: {
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 10 : 32,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        gap: 10
+    },
+    topBarTitle: {
+        fontSize: 17,
+        fontWeight: '800'
+    }
 });
+
+

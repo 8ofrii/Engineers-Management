@@ -20,9 +20,18 @@ const STATUS_STYLES = {
 const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 
 export default function BankReconciliation() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const { currency } = useFormat();
+
+    const STATUS_MAP = {
+        PENDING:   t('reconcile.statusPending', 'Pending'),
+        REVIEWING: t('reconcile.statusReviewing', 'Reviewing'),
+        COMPLETED: t('reconcile.statusCompleted', 'Completed'),
+        CANCELLED: t('reconcile.statusCancelled', 'Cancelled')
+    };
+
     const [statements, setStatements] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -54,15 +63,15 @@ export default function BankReconciliation() {
             const r = await bankStatementsAPI.upload(file);
             showAlert({
                 type: 'success',
-                title: t('common.success', 'Uploaded'),
-                message: t('reconcile.uploadedHint', `${r.data.data.totalRows} rows imported. Review the matches below.`)
+                title: isArabic ? 'تم الرفع' : t('common.success', 'Uploaded'),
+                message: isArabic ? `تم استيراد ${r.data.data.totalRows} حركة بنكية بنجاح.` : t('reconcile.uploadedHint', `${r.data.data.totalRows} rows imported. Review the matches below.`)
             });
             load();
         } catch (err) {
             showAlert({
                 type: 'error',
                 title: t('common.error', 'Error'),
-                message: err.response?.data?.message || 'Upload failed'
+                message: err.response?.data?.message || (isArabic ? 'فشل رفع الملف' : 'Upload failed')
             });
         } finally {
             setUploading(false);
@@ -88,7 +97,7 @@ export default function BankReconciliation() {
                         style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}
                     >
                         {uploading ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
-                        {t('reconcile.upload', 'Upload CSV')}
+                        {uploading ? t('reconcile.uploading', 'Uploading...') : t('reconcile.upload', 'Upload CSV')}
                         <input
                             ref={fileRef}
                             type="file"
@@ -131,6 +140,7 @@ export default function BankReconciliation() {
                             <tbody>
                                 {statements.map(s => {
                                     const sty = STATUS_STYLES[s.status] || STATUS_STYLES.PENDING;
+                                    const statusLabel = STATUS_MAP[s.status] || sty.label;
                                     const remaining = s.totalRows - s.matchedRows - s.ignoredRows;
                                     return (
                                         <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color, #f3f4f6)' }}>
@@ -144,16 +154,46 @@ export default function BankReconciliation() {
                                                 {s.periodStart ? `${fmtDate(s.periodStart)} → ${fmtDate(s.periodEnd)}` : '—'}
                                             </td>
                                             <td style={{ padding: 12 }}>
-                                                <div>{s.matchedRows} matched · {s.ignoredRows} ignored · {remaining} remaining</div>
-                                                <div style={{
-                                                    width: 160, height: 6, background: '#e5e7eb',
-                                                    borderRadius: 3, overflow: 'hidden', marginTop: 4
-                                                }}>
-                                                    <div style={{
-                                                        width: `${Math.min(100, ((s.matchedRows + s.ignoredRows) / Math.max(1, s.totalRows)) * 100)}%`,
-                                                        height: '100%', background: '#2563eb'
-                                                    }} />
-                                                </div>
+                                                {/* Reconciled % badge (#10) */}
+                                                {(() => {
+                                                    const reconciledPct = Math.round(((s.matchedRows + s.ignoredRows) / Math.max(1, s.totalRows)) * 100);
+                                                    return (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                            <div>
+                                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                                    {isArabic ? (
+                                                                        `${s.matchedRows} مطابق · ${s.ignoredRows} تجاهل · ${remaining} متبقي`
+                                                                    ) : (
+                                                                        `${s.matchedRows} matched · ${s.ignoredRows} ignored · ${remaining} remaining`
+                                                                    )}
+                                                                </div>
+                                                                <div style={{
+                                                                    width: 120, height: 6, background: '#e5e7eb',
+                                                                    borderRadius: 3, overflow: 'hidden', marginTop: 4
+                                                                }}>
+                                                                    <div style={{
+                                                                        width: `${reconciledPct}%`,
+                                                                        height: '100%',
+                                                                        background: reconciledPct === 100 ? '#10b981' : '#2563eb',
+                                                                        transition: 'width 0.5s ease'
+                                                                    }} />
+                                                                </div>
+                                                            </div>
+                                                            <span style={{
+                                                                background: reconciledPct === 100 ? '#d1fae5' : '#dbeafe',
+                                                                color: reconciledPct === 100 ? '#065f46' : '#1e40af',
+                                                                border: `1px solid ${reconciledPct === 100 ? '#6ee7b7' : '#bfdbfe'}`,
+                                                                borderRadius: 8,
+                                                                padding: '4px 10px',
+                                                                fontSize: '0.8rem',
+                                                                fontWeight: 800,
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                {reconciledPct}%
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             <td style={{ padding: 12 }}>{s.uploadedBy?.name || '—'}</td>
                                             <td style={{ padding: 12 }}>
@@ -161,7 +201,7 @@ export default function BankReconciliation() {
                                                     background: sty.bg, color: sty.fg,
                                                     padding: '4px 10px', borderRadius: 12,
                                                     fontSize: '0.75rem', fontWeight: 600
-                                                }}>{sty.label}</span>
+                                                }}>{statusLabel}</span>
                                             </td>
                                             <td style={{ padding: 12, textAlign: 'end' }}>
                                                 <Link to={`/reconcile/${s.id}`} className="btn btn-secondary btn-sm">

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon, Trash2, X } from 'lucide-react';
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
-import { workmenAPI } from '../services/api';
+import { workmenAPI, projectsAPI, transactionsAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { apiErrorMessage } from '../utils/apiError';
 import { useFormat } from '../utils/format';
@@ -18,10 +18,14 @@ export default function Workforce() {
     const [selectedWorkman, setSelectedWorkman] = useState(null);
     const [selectedTrades, setSelectedTrades] = useState([]); // Changed to array for multiple selection
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+    const [filterProjectId, setFilterProjectId] = useState('ALL');
+    const [projects, setProjects] = useState([]);
+    const [workmanProjectMap, setWorkmanProjectMap] = useState({}); // workmanId -> Set of projectIds
     const filterRef = useRef(null);
 
     useEffect(() => {
         loadWorkmen();
+        loadProjects();
     }, []);
 
     useEffect(() => {
@@ -45,6 +49,25 @@ export default function Workforce() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const loadProjects = async () => {
+        try {
+            const [projRes, txRes] = await Promise.all([
+                projectsAPI.getAll(),
+                transactionsAPI.getAll()
+            ]);
+            setProjects(projRes.data.data || []);
+            // Build a map: workmanId -> [projectId]
+            const map = {};
+            (txRes.data.data || []).forEach(tx => {
+                if (tx.workmanId && tx.projectId) {
+                    if (!map[tx.workmanId]) map[tx.workmanId] = new Set();
+                    map[tx.workmanId].add(tx.projectId);
+                }
+            });
+            setWorkmanProjectMap(map);
+        } catch (e) { /* not critical */ }
     };
 
     const handleSaveWorkman = async (workmanData) => {
@@ -110,16 +133,16 @@ export default function Workforce() {
 
     const trades = ['ALL', ...baseTrades, ...customTrades];
 
-    // Filter workmen based on selected trades
-    const filteredWorkmen = selectedTrades.length === 0
-        ? workmen
-        : workmen.filter(w => {
-            if (selectedTrades.includes(w.trade)) return true;
-            if (w.trade === 'OTHER' && w.customTrade) {
-                return selectedTrades.includes(w.customTrade.trim().toUpperCase());
-            }
-            return false;
-        });
+    // Filter workmen based on selected trades AND selected project
+    const filteredWorkmen = workmen.filter(w => {
+        // Trade filter
+        const tradeMatch = selectedTrades.length === 0 || selectedTrades.includes(w.trade) ||
+            (w.trade === 'OTHER' && w.customTrade && selectedTrades.includes(w.customTrade.trim().toUpperCase()));
+        // Project filter
+        const projMatch = filterProjectId === 'ALL' ||
+            (workmanProjectMap[w.id] && workmanProjectMap[w.id].has(filterProjectId));
+        return tradeMatch && projMatch;
+    });
 
     // Color mapping for each trade - High contrast and distinct
     const tradeColors = {
@@ -167,7 +190,26 @@ export default function Workforce() {
                     </button>
                 </div>
 
-                {/* Trade Filter Dropdown */}
+                {/* Trade Filter Dropdown + Project Filter */}
+                <div className="mb-lg flex gap-md flex-wrap" style={{ alignItems: 'flex-start' }}>
+                    {/* Project filter (#9) */}
+                    <select
+                        value={filterProjectId}
+                        onChange={e => setFilterProjectId(e.target.value)}
+                        style={{
+                            padding: '8px 12px',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--bg-tertiary)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.9rem',
+                            minWidth: 180
+                        }}
+                    >
+                        <option value="ALL">{t('common.allProjects') || 'All Projects'}</option>
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+
                 <div className="mb-lg" style={{ position: 'relative', width: '300px' }} ref={filterRef}>
                     <div 
                         className="form-group" 
@@ -307,6 +349,7 @@ export default function Workforce() {
                         )}
                     </div>
                 </div>
+                </div>{/* close outer flex wrapper */}
 
                 {filteredWorkmen.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
@@ -422,9 +465,18 @@ export default function Workforce() {
                                             <span>{t('labor.viewId')}</span>
                                         </div>
                                     )}
-                                    <div className="flex gap-sm" style={{ color: 'var(--color-success)', fontWeight: '600' }}>
-                                        <DollarSign size={16} />
-                                        <span>{t('labor.totalPaid')}: {formatCurrency(workman.totalPaid)}</span>
+                                    <div className="flex gap-sm" style={{
+                                        background: 'hsla(140, 70%, 45%, 0.12)',
+                                        border: '1px solid hsla(140, 70%, 45%, 0.25)',
+                                        borderRadius: 'var(--radius-md)',
+                                        padding: '8px 12px',
+                                        marginTop: 8
+                                    }}>
+                                        <DollarSign size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                                        <div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>{t('labor.totalPaid')}</div>
+                                            <div style={{ fontWeight: 800, color: '#10b981', fontSize: '1.05rem' }}>{formatCurrency(workman.totalPaid || 0)}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

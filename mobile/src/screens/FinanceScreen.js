@@ -8,27 +8,26 @@ import {
     ActivityIndicator,
     RefreshControl,
     SafeAreaView,
-    Alert
+    Alert,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { transactionsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useFormat } from '../utils/format';
 
 const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 
-const STATUS_COLORS = {
-    DRAFT:            { bg: '#f3f4f6', fg: '#374151' },
-    PENDING_APPROVAL: { bg: '#fef3c7', fg: '#92400e' },
-    APPROVED:         { bg: '#d1fae5', fg: '#065f46' },
-    REJECTED:         { bg: '#fee2e2', fg: '#991b1b' },
-    CANCELLED:        { bg: '#e5e7eb', fg: '#6b7280' }
-};
+import { useFocusEffect } from '@react-navigation/native';
+import AICopilotHeaderButton from '../components/AICopilotHeaderButton';
 
 export default function FinanceScreen({ navigation }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { user } = useAuth();
+    const { theme } = useTheme();
     const { currency } = useFormat();
     const [filter, setFilter] = useState('ALL');  // ALL / PENDING / MINE
     const [transactions, setTransactions] = useState([]);
@@ -53,120 +52,164 @@ export default function FinanceScreen({ navigation }) {
     }, [filter]);
 
     useEffect(() => { load(); }, [load]);
+    useFocusEffect(useCallback(() => { load(); }, [load]));
 
     const onApprove = async (id) => {
         try {
             await transactionsApi.approve(id);
-            Alert.alert(t('finance.approved'), t('finance.approvedMsg'));
+            Alert.alert(isArabic ? 'تم الاعتماد' : 'Approved', isArabic ? 'تم اعتماد المعاملة وإدراجها بالدفاتر' : 'Transaction approved successfully');
             load();
         } catch (err) {
-            Alert.alert(t('common.error'), err.response?.data?.message || err.message);
+            Alert.alert(isArabic ? 'خطأ' : 'Error', err.response?.data?.message || err.message);
         }
     };
 
     const onReject = async (id) => {
-        Alert.prompt
-            ? Alert.prompt(t('finance.rejectTitle'), t('finance.rejectReason'), async (reason) => {
-                try {
-                    await transactionsApi.reject(id, reason || 'Rejected via mobile');
-                    load();
-                } catch (err) {
-                    Alert.alert(t('common.error'), err.response?.data?.message || err.message);
-                }
-            })
-            : (async () => {
-                try {
-                    await transactionsApi.reject(id, 'Rejected via mobile');
-                    load();
-                } catch (err) {
-                    Alert.alert(t('common.error'), err.response?.data?.message || err.message);
-                }
-            })();
+        try {
+            await transactionsApi.reject(id, 'Rejected via mobile');
+            load();
+        } catch (err) {
+            Alert.alert(isArabic ? 'خطأ' : 'Error', err.response?.data?.message || err.message);
+        }
+    };
+
+    const getCategoryLabel = (cat) => {
+        const c = (cat || '').toUpperCase();
+        const map = {
+            'SAND': 'رمل',
+            'CEMENT': 'أسمنت',
+            'STEEL': 'حديد تسليح',
+            'CONCRETE': 'خرسانة جاهزة',
+            'BRICKS': 'طوب',
+            'MATERIALS': 'مواد بناء وتوريدات',
+            'MANAGEMENT_FEE_TRANSFER': 'تحويل أرباح إدارة',
+            'LABOR': 'أجور عمالة',
+            'EQUIPMENT': 'إيجار معدات',
+            'TRANSPORT': 'نقل ومشال',
+            'PETTY_CASH': 'مصاريف نثرية',
+            'SUBCONTRACTOR': 'مستخلص مقاول باطن',
+            'EXPENSE': 'مصروف',
+            'INCOME': 'إيراد / دفعة'
+        };
+        if (isArabic && map[c]) return map[c];
+        return cat ? cat.replace(/_/g, ' ') : (isArabic ? 'مصروف عام' : 'General');
+    };
+
+    const getStatusLabel = (status) => {
+        const s = (status || '').toUpperCase();
+        if (s === 'APPROVED') return isArabic ? 'معتمد' : 'Approved';
+        if (s === 'PENDING_APPROVAL' || s === 'PENDING') return isArabic ? 'تحت الاعتماد' : 'Pending';
+        if (s === 'REJECTED') return isArabic ? 'مرفوض' : 'Rejected';
+        return status;
     };
 
     const filtered = filter === 'MINE'
-        ? transactions.filter(t => t.createdBy === user?.id)
+        ? transactions.filter(tx => tx.createdBy === user?.id)
         : transactions;
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={[styles.header, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-                <Text style={styles.title}>{t('finance.title')}</Text>
-                <TouchableOpacity
-                    onPress={() => navigation.navigate('DraftsList')}
-                    style={{
-                        flexDirection: 'row', alignItems: 'center', gap: 6,
-                        paddingHorizontal: 12, paddingVertical: 8,
-                        backgroundColor: '#dbeafe', borderRadius: 20
-                    }}
-                >
-                    <Ionicons name="sparkles" size={16} color="#1e40af" />
-                    <Text style={{ color: '#1e40af', fontWeight: '600', fontSize: 12 }}>AI Drafts</Text>
-                </TouchableOpacity>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+            {/* Header */}
+            <View style={[styles.header, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                <Text style={[styles.headerTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left', flex: 1 }]}>
+                    {isArabic ? 'الحسابات والمالية' : 'Finance & Ledger'}
+                </Text>
+                <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                    <AICopilotHeaderButton navigation={navigation} compact />
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('DraftsList')}
+                        style={[styles.aiDraftsBtn, { backgroundColor: theme.primaryLight, borderColor: theme.primary, flexDirection: isArabic ? 'row-reverse' : 'row' }]}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="sparkles" size={14} color={theme.primary} />
+                        <Text style={[styles.aiDraftsText, { color: theme.primary }]}>{isArabic ? 'المسودات' : 'Drafts'}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
-            <View style={styles.filterRow}>
-                {['ALL', 'PENDING', 'MINE'].map(f => (
-                    <TouchableOpacity
-                        key={f}
-                        onPress={() => setFilter(f)}
-                        style={[styles.pill, filter === f && styles.pillActive]}
-                    >
-                        <Text style={[styles.pillText, filter === f && styles.pillTextActive]}>
-                            {t(`finance.filter.${f}`)}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Filter Pills */}
+            <View style={[styles.filterRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                {[
+                    { key: 'ALL', label: isArabic ? 'الكل' : 'All' },
+                    { key: 'PENDING', label: isArabic ? 'معلق للاعتماد' : 'Pending' },
+                    { key: 'MINE', label: isArabic ? 'معاملاتي' : 'Mine' }
+                ].map(f => {
+                    const active = filter === f.key;
+                    return (
+                        <TouchableOpacity
+                            key={f.key}
+                            onPress={() => setFilter(f.key)}
+                            style={[
+                                styles.pill,
+                                { backgroundColor: active ? theme.primary : theme.card, borderColor: active ? theme.primary : theme.borderStrong }
+                            ]}
+                        >
+                            <Text style={[styles.pillText, { color: active ? (theme.isDark ? '#000000' : '#ffffff') : theme.subtext, fontWeight: active ? '700' : '500' }]}>
+                                {f.label}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
             </View>
 
             <ScrollView
                 contentContainerStyle={styles.scrollContent}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.primary} />}
+                showsVerticalScrollIndicator={false}
             >
                 {loading ? (
-                    <ActivityIndicator size="large" style={{ marginTop: 40 }} />
+                    <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
                 ) : filtered.length === 0 ? (
-                    <Text style={styles.empty}>{t('finance.noTransactions')}</Text>
+                    <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <Ionicons name="wallet-outline" size={48} color={theme.subtext} />
+                        <Text style={[styles.emptyText, { color: theme.subtext }]}>{isArabic ? 'لا توجد معاملات مسجلة' : 'No transactions recorded'}</Text>
+                    </View>
                 ) : (
                     filtered.map(tx => {
-                        const sc = STATUS_COLORS[tx.status] || STATUS_COLORS.DRAFT;
-                        const isExpense = tx.type === 'EXPENSE';
-                        const showApprove = canApprove && tx.status === 'PENDING_APPROVAL';
+                        const isExpense = tx.type === 'EXPENSE' || tx.type === 'expense';
+                        const showApprove = canApprove && (tx.status === 'PENDING_APPROVAL' || tx.status === 'pending');
+                        const isApproved = tx.status === 'APPROVED' || tx.status === 'approved';
+
                         return (
-                            <View key={tx.id} style={styles.card}>
-                                <View style={styles.txHeader}>
-                                    <Text style={[styles.amount, { color: isExpense ? '#ef4444' : '#10b981' }]}>
+                            <View key={tx.id} style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                                <View style={[styles.txHeader, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                                    <Text style={[styles.amount, { color: isExpense ? '#f87171' : '#34d399' }]}>
                                         {isExpense ? '-' : '+'}{currency(tx.amount)}
                                     </Text>
-                                    <View style={[styles.badge, { backgroundColor: sc.bg }]}>
-                                        <Text style={[styles.badgeText, { color: sc.fg }]}>
-                                            {t(`txStatus.${tx.status}`)}
+                                    <View style={[styles.badge, { backgroundColor: isApproved ? theme.successLight : theme.warningLight }]}>
+                                        <Text style={[styles.badgeText, { color: isApproved ? theme.success : theme.warning }]}>
+                                            {getStatusLabel(tx.status)}
                                         </Text>
                                     </View>
                                 </View>
-                                <Text style={styles.category}>{tx.category?.replace(/_/g, ' ')}</Text>
+
+                                <Text style={[styles.category, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>
+                                    {getCategoryLabel(tx.category)}
+                                </Text>
                                 {tx.description ? (
-                                    <Text style={styles.description} numberOfLines={2}>{tx.description}</Text>
+                                    <Text style={[styles.description, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]} numberOfLines={2}>{tx.description}</Text>
                                 ) : null}
-                                <View style={styles.metaRow}>
-                                    <Text style={styles.meta}>{fmtDate(tx.transactionDate || tx.createdAt)}</Text>
+
+                                <View style={[styles.metaRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                                    <Text style={[styles.meta, { color: theme.subtext }]}>{fmtDate(tx.transactionDate || tx.createdAt)}</Text>
                                     {tx.project?.name ? (
-                                        <Text style={styles.meta} numberOfLines={1}> · {tx.project.name}</Text>
+                                        <Text style={[styles.meta, { color: theme.primary }]} numberOfLines={1}> · {tx.project.name}</Text>
                                     ) : null}
                                 </View>
+
                                 {showApprove && (
-                                    <View style={styles.approveRow}>
+                                    <View style={[styles.approveRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
                                         <TouchableOpacity
-                                            style={[styles.actionBtn, styles.actionApprove]}
+                                            style={[styles.actionBtn, { backgroundColor: theme.success }]}
                                             onPress={() => onApprove(tx.id)}
                                         >
-                                            <Text style={styles.actionApproveText}>✓ {t('finance.approve')}</Text>
+                                            <Text style={styles.actionApproveText}>✓ {isArabic ? 'اعتماد' : 'Approve'}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
-                                            style={[styles.actionBtn, styles.actionReject]}
+                                            style={[styles.actionBtn, { backgroundColor: 'transparent', borderColor: theme.danger, borderWidth: 1 }]}
                                             onPress={() => onReject(tx.id)}
                                         >
-                                            <Text style={styles.actionRejectText}>✕ {t('finance.reject')}</Text>
+                                            <Text style={[styles.actionRejectText, { color: theme.danger }]}>✕ {isArabic ? 'رفض' : 'Reject'}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}
@@ -177,66 +220,149 @@ export default function FinanceScreen({ navigation }) {
             </ScrollView>
 
             <TouchableOpacity
-                style={styles.fab}
+                style={[styles.fab, { backgroundColor: theme.primary }]}
                 onPress={() => navigation.navigate('AddTransaction')}
+                activeOpacity={0.8}
             >
-                <Ionicons name="add" size={28} color="#fff" />
+                <Ionicons name="add" size={28} color={theme.isDark ? '#000000' : '#ffffff'} />
             </TouchableOpacity>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f9fafb' },
-    header: {
-        padding: 16, paddingTop: 50, backgroundColor: '#fff',
-        borderBottomWidth: 1, borderBottomColor: '#e5e7eb'
+    container: {
+        flex: 1
     },
-    title: { fontSize: 22, fontWeight: '700', color: '#111827' },
-
+    header: {
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 12 : 36,
+        paddingBottom: 14
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '800'
+    },
+    aiDraftsBtn: {
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1
+    },
+    aiDraftsText: {
+        fontSize: 12,
+        fontWeight: '700'
+    },
     filterRow: {
-        flexDirection: 'row', padding: 12, gap: 8,
-        backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb'
+        paddingHorizontal: 16,
+        gap: 8,
+        marginBottom: 12
     },
     pill: {
-        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-        backgroundColor: '#f3f4f6'
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 20,
+        borderWidth: 1
     },
-    pillActive: { backgroundColor: '#2563eb' },
-    pillText: { fontSize: 13, color: '#374151', fontWeight: '500' },
-    pillTextActive: { color: '#fff' },
-
-    scrollContent: { padding: 16, paddingBottom: 90 },
-
+    pillText: {
+        fontSize: 12
+    },
+    scrollContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 90,
+        gap: 10
+    },
     card: {
-        backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10,
-        borderWidth: 1, borderColor: '#e5e7eb'
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1
     },
-    txHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    amount: { fontSize: 18, fontWeight: '700' },
-    badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-    badgeText: { fontSize: 10, fontWeight: '600' },
-    category: { fontSize: 13, color: '#374151', marginTop: 6, fontWeight: '500' },
-    description: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-    metaRow: { flexDirection: 'row', marginTop: 6 },
-    meta: { fontSize: 11, color: '#9ca3af' },
-
-    approveRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    txHeader: {
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8
+    },
+    amount: {
+        fontSize: 18,
+        fontWeight: '800'
+    },
+    badge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6
+    },
+    badgeText: {
+        fontSize: 11,
+        fontWeight: '800'
+    },
+    category: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 4
+    },
+    description: {
+        fontSize: 12,
+        lineHeight: 18,
+        marginBottom: 8
+    },
+    metaRow: {
+        alignItems: 'center'
+    },
+    meta: {
+        fontSize: 11
+    },
+    approveRow: {
+        gap: 8,
+        marginTop: 12,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.05)'
+    },
     actionBtn: {
-        flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center'
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center'
     },
-    actionApprove: { backgroundColor: '#10b981' },
-    actionApproveText: { color: '#fff', fontWeight: '600' },
-    actionReject: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ef4444' },
-    actionRejectText: { color: '#ef4444', fontWeight: '600' },
-
-    empty: { textAlign: 'center', color: '#9ca3af', marginTop: 40 },
-
+    actionApproveText: {
+        color: '#ffffff',
+        fontSize: 12,
+        fontWeight: '700'
+    },
+    actionRejectText: {
+        fontSize: 12,
+        fontWeight: '700'
+    },
     fab: {
-        position: 'absolute', right: 20, bottom: 20,
-        width: 56, height: 56, borderRadius: 28,
-        backgroundColor: '#2563eb', justifyContent: 'center', alignItems: 'center',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25, shadowRadius: 4, elevation: 5
+        position: 'absolute',
+        bottom: 24,
+        right: 20,
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 6
+    },
+    emptyCard: {
+        borderRadius: 16,
+        padding: 40,
+        alignItems: 'center',
+        borderWidth: 1,
+        marginTop: 20
+    },
+    emptyText: {
+        fontSize: 14,
+        marginTop: 12
     }
 });
+

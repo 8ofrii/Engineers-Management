@@ -211,6 +211,7 @@ model Project {
   revenueModel         RevenueModel         @default(EXECUTION_COST_PLUS)
   tenantId             String?
   totalContractValue   Decimal?             @db.Decimal(15, 2)
+  completionPercent    Int                  @default(0)
   deletedAt            DateTime?
   documents            Document[]
   materialBatches      MaterialBatch[]

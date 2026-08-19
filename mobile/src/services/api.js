@@ -116,11 +116,34 @@ export const draftsApi = {
 export const dsrApi = {
     list: (params) => api.get('/dsr', { params }),
     get: (id) => api.get(`/dsr/${id}`),
-    create: (data) => api.post('/dsr', data),
     update: (id, data) => api.put(`/dsr/${id}`, data),
     submit: (id) => api.put(`/dsr/${id}/submit`),
     acknowledge: (id, acknowledgeNotes) =>
         api.put(`/dsr/${id}/acknowledge`, { acknowledgeNotes })
 };
 
+export const materialsApi = {
+    list: () => api.get('/materials'),
+    batches: () => api.get('/material-batches')
+};
+
+export const invoicesApi = {
+    list: (params) => api.get('/invoices', { params }),
+    get: (id) => api.get(`/invoices/${id}`)
+};
+
+export const aiChatApi = {
+    send: (messageOrFormData, history = [], isAudio = false) => {
+        if (isAudio) {
+            return api.post('/chat/message', messageOrFormData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+        }
+        return api.post('/chat/message', { message: messageOrFormData, history });
+    },
+    history: () => api.get('/chat/history'),
+    clear: () => api.delete('/chat/history')
+};
+
 export default api;
+

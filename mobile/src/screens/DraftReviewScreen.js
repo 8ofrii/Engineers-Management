@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    ActivityIndicator, SafeAreaView, TextInput, Alert, Image
+    ActivityIndicator, SafeAreaView, TextInput, Alert, Image,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import { useTranslation } from 'react-i18next';
 import { draftsApi, projectsApi, suppliersApi, transactionsApi } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 import { useFormat } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
 
 const CATEGORIES = ['MATERIALS', 'LABOR', 'EQUIPMENT', 'SERVICES', 'OTHER'];
 
 export default function DraftReviewScreen({ route, navigation }) {
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
+    const { theme } = useTheme();
     const { id } = route.params || {};
     const { currency } = useFormat();
     const [draft, setDraft] = useState(null);
@@ -54,16 +60,14 @@ export default function DraftReviewScreen({ route, navigation }) {
                 transactionDate: md.transactionDate || new Date().toISOString().slice(0, 10)
             });
         } catch (err) {
-            Alert.alert('Failed to load draft', apiErrorMessage(err, 'Please retry.'));
+            Alert.alert(isArabic ? 'فشل تحميل المسودة' : 'Failed to load draft', apiErrorMessage(err, 'Please retry.'));
             navigation.goBack();
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
-
-    // Cleanup audio on unmount
+    useEffect(() => { load(); }, [id]);
     useEffect(() => () => { sound?.unloadAsync().catch(() => { }); }, [sound]);
 
     const togglePlayback = async () => {
@@ -99,24 +103,24 @@ export default function DraftReviewScreen({ route, navigation }) {
             }));
             setDraft(r.data.data);
         } catch (err) {
-            Alert.alert('Re-match failed', apiErrorMessage(err, 'Please retry.'));
+            Alert.alert(isArabic ? 'فشل إعادة المطابقة' : 'Re-match failed', apiErrorMessage(err, 'Please retry.'));
         } finally {
             setRematching(false);
         }
     };
 
     const handleDiscard = () => {
-        Alert.alert('Discard draft?', 'This cannot be undone.', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(isArabic ? 'حذف المسودة؟' : 'Discard draft?', isArabic ? 'لا يمكن التراجع عن هذا الإجراء.' : 'This cannot be undone.', [
+            { text: isArabic ? 'إلغاء' : 'Cancel', style: 'cancel' },
             {
-                text: 'Discard',
+                text: isArabic ? 'حذف' : 'Discard',
                 style: 'destructive',
                 onPress: async () => {
                     try {
                         await draftsApi.discard(id);
                         navigation.goBack();
                     } catch (err) {
-                        Alert.alert('Discard failed', apiErrorMessage(err, 'Please retry.'));
+                        Alert.alert(isArabic ? 'فشل الحذف' : 'Discard failed', apiErrorMessage(err, 'Please retry.'));
                     }
                 }
             }
@@ -125,10 +129,10 @@ export default function DraftReviewScreen({ route, navigation }) {
 
     const handleCommit = async () => {
         if (!form.amount || Number(form.amount) <= 0) {
-            return Alert.alert('Missing amount', 'Please set the amount before saving.');
+            return Alert.alert(isArabic ? 'المبلغ مطلوب' : 'Missing amount', isArabic ? 'يرجى تحديد المبلغ قبل الحفظ.' : 'Please set amount.');
         }
         if (!form.projectId) {
-            return Alert.alert('Missing project', 'Please choose the project this transaction belongs to.');
+            return Alert.alert(isArabic ? 'المشروع مطلوب' : 'Missing project', isArabic ? 'يرجى تحديد المشروع التابع له هذه المعاملة.' : 'Please choose project.');
         }
 
         try {
@@ -144,10 +148,10 @@ export default function DraftReviewScreen({ route, navigation }) {
             });
             const newTx = txRes.data.data;
             await draftsApi.commit(id, newTx.id);
-            Alert.alert('Saved', 'Draft committed as a new transaction.');
+            Alert.alert(isArabic ? 'تم الحفظ' : 'Saved', isArabic ? 'تم تحويل المسودة إلى معاملة مالية معتمدة.' : 'Draft committed as a new transaction.');
             navigation.goBack();
         } catch (err) {
-            Alert.alert('Save failed', apiErrorMessage(err, 'Please retry.'));
+            Alert.alert(isArabic ? 'فشل الحفظ' : 'Save failed', apiErrorMessage(err, 'Please retry.'));
         } finally {
             setSaving(false);
         }
@@ -155,8 +159,8 @@ export default function DraftReviewScreen({ route, navigation }) {
 
     if (loading || !draft) {
         return (
-            <SafeAreaView style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator color="#2563eb" />
+            <SafeAreaView style={[s.container, { backgroundColor: theme.bg, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator color={theme.primary} />
             </SafeAreaView>
         );
     }
@@ -165,25 +169,46 @@ export default function DraftReviewScreen({ route, navigation }) {
     const matches = draft.matches || {};
     const isReadOnly = draft.status !== 'PENDING_REVIEW';
 
+    const getCatLabel = (cat) => {
+        if (!isArabic) return cat;
+        const map = {
+            'MATERIALS': 'مواد بناء',
+            'LABOR': 'عمالة',
+            'EQUIPMENT': 'معدات',
+            'SERVICES': 'خدمات',
+            'OTHER': 'أخرى'
+        };
+        return map[cat] || cat;
+    };
+
     return (
-        <SafeAreaView style={s.container}>
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
-                <View style={s.header}>
-                    <Ionicons name="sparkles" size={20} color="#2563eb" />
-                    <Text style={s.title}>Review AI draft</Text>
+        <SafeAreaView style={[s.container, { backgroundColor: theme.bg }]}>
+            <View style={[s.topNav, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+                    <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.text} />
+                </TouchableOpacity>
+                <Text style={[s.topNavTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'مراجعة مسودة الذكاء الاصطناعي' : 'Review AI Draft'}</Text>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }} showsVerticalScrollIndicator={false}>
+                <View style={[s.header, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="sparkles" size={20} color={theme.primary} />
+                        <Text style={[s.title, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'مسودة مستخرجة بالذكاء الاصطناعي' : 'AI Extracted Draft'}</Text>
+                    </View>
+                    <Text style={[s.metaLine, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>
+                        {draft.source} · {draft.confidence || 'high'} confidence · {draft.status}
+                    </Text>
                 </View>
-                <Text style={s.metaLine}>
-                    {draft.source} · {draft.confidence || 'medium'} confidence · {draft.status}
-                </Text>
 
                 {/* Original media */}
-                <View style={s.card}>
-                    <Text style={s.cardTitle}>Your input</Text>
+                <View style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <Text style={[s.cardTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'المدخلات الأصلية' : 'Your Input'}</Text>
                     {draft.source === 'VOICE' && draft.originalMediaUrl && (
-                        <TouchableOpacity style={s.audioRow} onPress={togglePlayback}>
-                            <Ionicons name={playing ? 'pause-circle' : 'play-circle'} size={36} color="#2563eb" />
-                            <Text style={{ color: '#374151', fontSize: 16 }}>
-                                {playing ? 'Playing…' : 'Tap to play recording'}
+                        <TouchableOpacity style={[s.audioRow, { backgroundColor: theme.cardAlt, flexDirection: isArabic ? 'row-reverse' : 'row' }]} onPress={togglePlayback}>
+                            <Ionicons name={playing ? 'pause-circle' : 'play-circle'} size={36} color={theme.primary} />
+                            <Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>
+                                {playing ? (isArabic ? 'جارِ التشغيل...' : 'Playing…') : (isArabic ? 'اضغط لسماع التسجيل الصوتي' : 'Tap to play recording')}
                             </Text>
                         </TouchableOpacity>
                     )}
@@ -195,110 +220,84 @@ export default function DraftReviewScreen({ route, navigation }) {
                         />
                     )}
                     {draft.transcript ? (
-                        <View style={s.transcriptBox}>
-                            <Text style={s.cardTitle}>Transcript</Text>
-                            <Text style={s.transcript}>{draft.transcript}</Text>
+                        <View style={[s.transcriptBox, { backgroundColor: theme.cardAlt }]}>
+                            <Text style={[s.cardTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'النص المفرغ من الصوت' : 'Transcript'}</Text>
+                            <Text style={[s.transcript, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{draft.transcript}</Text>
                         </View>
                     ) : null}
-                    {Array.isArray(md.items) && md.items.length > 0 && (
-                        <View style={{ marginTop: 12 }}>
-                            <Text style={s.cardTitle}>Items detected</Text>
-                            {md.items.map((it, i) => (
-                                <Text key={i} style={s.itemLine}>
-                                    • {it.name}
-                                    {it.quantity != null ? ` — ${it.quantity}` : ''}
-                                    {it.unit ? ` ${it.unit}` : ''}
-                                    {it.materialMatch ? ` → ${it.materialMatch.name} (${Math.round((it.materialMatch.confidence || 0) * 100)}%)` : ''}
-                                </Text>
-                            ))}
-                        </View>
-                    )}
                 </View>
 
                 {/* Editable form */}
-                <View style={s.card}>
-                    <Text style={s.cardTitle}>Matched fields</Text>
+                <View style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <Text style={[s.cardTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'البيانات المستخرجة' : 'Extracted Details'}</Text>
 
-                    {isReadOnly && (
-                        <View style={s.warnBox}>
-                            <Text style={s.warnText}>
-                                {draft.status === 'COMMITTED' ? 'Already committed.' : 'Already discarded.'}
-                            </Text>
-                        </View>
-                    )}
-
-                    <FieldLabel label="Amount (EGP)" />
+                    <FieldLabel label={isArabic ? 'المبلغ (جنيه)' : 'Amount (EGP)'} match={matches.amount} theme={theme} isArabic={isArabic} />
                     <TextInput
-                        style={s.input}
+                        style={[s.input, { backgroundColor: theme.cardAlt, borderColor: theme.borderStrong, color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}
                         keyboardType="decimal-pad"
                         value={form.amount}
                         onChangeText={(v) => setForm(p => ({ ...p, amount: v }))}
                         editable={!isReadOnly}
                     />
 
-                    <FieldLabel label="Category" />
-                    <View style={s.chipRow}>
-                        {CATEGORIES.map(c => (
-                            <TouchableOpacity
-                                key={c}
-                                onPress={() => !isReadOnly && setForm(p => ({ ...p, category: c }))}
-                                style={[s.chip, form.category === c && s.chipActive]}
-                                disabled={isReadOnly}
-                            >
-                                <Text style={[s.chipText, form.category === c && s.chipTextActive]}>{c}</Text>
-                            </TouchableOpacity>
-                        ))}
+                    <FieldLabel label={isArabic ? 'البند' : 'Category'} match={matches.category} theme={theme} isArabic={isArabic} />
+                    <View style={[s.chipRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                        {CATEGORIES.map(cat => {
+                            const active = form.category === cat;
+                            return (
+                                <TouchableOpacity
+                                    key={cat}
+                                    onPress={() => !isReadOnly && setForm(prev => ({ ...prev, category: cat }))}
+                                    style={[
+                                        s.chip,
+                                        {
+                                            backgroundColor: active ? theme.primary : theme.cardAlt,
+                                            borderColor: active ? theme.primary : theme.borderStrong
+                                        }
+                                    ]}
+                                    disabled={isReadOnly}
+                                >
+                                    <Text style={[s.chipText, { color: active ? (theme.isDark ? '#000000' : '#ffffff') : theme.text, fontWeight: active ? '700' : '500' }]}>{getCatLabel(cat)}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
 
-                    <FieldLabel label="Project" match={matches.project} />
+                    <FieldLabel label={isArabic ? 'المشروع' : 'Project'} match={matches.project} theme={theme} isArabic={isArabic} />
                     <View style={s.selectGroup}>
-                        {projects.length === 0 ? (
-                            <Text style={s.emptyHint}>No projects loaded</Text>
-                        ) : projects.map(p => (
-                            <TouchableOpacity
-                                key={p.id}
-                                onPress={() => !isReadOnly && setForm(prev => ({ ...prev, projectId: p.id }))}
-                                style={[s.selectItem, form.projectId === p.id && s.selectItemActive]}
-                                disabled={isReadOnly}
-                            >
-                                <Text style={[s.selectItemText, form.projectId === p.id && { color: 'white' }]}>{p.name}</Text>
-                            </TouchableOpacity>
-                        ))}
+                        {projects.slice(0, 8).map(p => {
+                            const active = form.projectId === p.id;
+                            return (
+                                <TouchableOpacity
+                                    key={p.id}
+                                    onPress={() => !isReadOnly && setForm(prev => ({ ...prev, projectId: p.id }))}
+                                    style={[
+                                        s.selectItem,
+                                        {
+                                            backgroundColor: active ? theme.primaryLight : theme.cardAlt,
+                                            borderColor: active ? theme.primary : theme.borderStrong
+                                        }
+                                    ]}
+                                    disabled={isReadOnly}
+                                >
+                                    <Text style={[s.selectItemText, { color: active ? theme.primary : theme.text, fontWeight: active ? '700' : '500', textAlign: isArabic ? 'right' : 'left' }]}>{p.name}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
 
-                    <FieldLabel label="Supplier (optional)" match={matches.vendor} />
-                    <View style={s.selectGroup}>
-                        <TouchableOpacity
-                            onPress={() => !isReadOnly && setForm(prev => ({ ...prev, supplierId: '' }))}
-                            style={[s.selectItem, !form.supplierId && s.selectItemActive]}
-                            disabled={isReadOnly}
-                        >
-                            <Text style={[s.selectItemText, !form.supplierId && { color: 'white' }]}>— none —</Text>
-                        </TouchableOpacity>
-                        {suppliers.map(sup => (
-                            <TouchableOpacity
-                                key={sup.id}
-                                onPress={() => !isReadOnly && setForm(prev => ({ ...prev, supplierId: sup.id }))}
-                                style={[s.selectItem, form.supplierId === sup.id && s.selectItemActive]}
-                                disabled={isReadOnly}
-                            >
-                                <Text style={[s.selectItemText, form.supplierId === sup.id && { color: 'white' }]}>{sup.name}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-
-                    <FieldLabel label="Description" />
+                    <FieldLabel label={isArabic ? 'البيان / ملاحظات' : 'Description'} theme={theme} isArabic={isArabic} />
                     <TextInput
-                        style={[s.input, { height: 60 }]}
+                        style={[s.input, { height: 60, backgroundColor: theme.cardAlt, borderColor: theme.borderStrong, color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}
                         multiline
                         value={form.description}
                         onChangeText={(v) => setForm(p => ({ ...p, description: v }))}
                         editable={!isReadOnly}
                     />
 
-                    <FieldLabel label="Date (YYYY-MM-DD)" />
+                    <FieldLabel label={isArabic ? 'التاريخ' : 'Date (YYYY-MM-DD)'} theme={theme} isArabic={isArabic} />
                     <TextInput
-                        style={s.input}
+                        style={[s.input, { backgroundColor: theme.cardAlt, borderColor: theme.borderStrong, color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}
                         value={form.transactionDate}
                         onChangeText={(v) => setForm(p => ({ ...p, transactionDate: v }))}
                         editable={!isReadOnly}
@@ -306,20 +305,20 @@ export default function DraftReviewScreen({ route, navigation }) {
                 </View>
 
                 {!isReadOnly && (
-                    <View style={s.actionRow}>
-                        <TouchableOpacity style={s.secondaryBtn} onPress={handleRematch} disabled={rematching}>
+                    <View style={[s.actionRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                        <TouchableOpacity style={[s.secondaryBtn, { borderColor: theme.primary, backgroundColor: theme.card, flexDirection: isArabic ? 'row-reverse' : 'row' }]} onPress={handleRematch} disabled={rematching}>
                             {rematching
-                                ? <ActivityIndicator color="#2563eb" />
-                                : <><Ionicons name="refresh" size={16} color="#2563eb" /><Text style={s.secondaryBtnText}>Re-match</Text></>}
+                                ? <ActivityIndicator color={theme.primary} />
+                                : <><Ionicons name="refresh" size={16} color={theme.primary} /><Text style={[s.secondaryBtnText, { color: theme.primary }]}>{isArabic ? 'إعادة مطابقة' : 'Re-match'}</Text></>}
                         </TouchableOpacity>
-                        <TouchableOpacity style={[s.secondaryBtn, { borderColor: '#dc2626' }]} onPress={handleDiscard}>
-                            <Ionicons name="trash" size={16} color="#dc2626" />
-                            <Text style={[s.secondaryBtnText, { color: '#dc2626' }]}>Discard</Text>
+                        <TouchableOpacity style={[s.secondaryBtn, { borderColor: '#ef4444', backgroundColor: theme.card, flexDirection: isArabic ? 'row-reverse' : 'row' }]} onPress={handleDiscard}>
+                            <Ionicons name="trash" size={16} color="#ef4444" />
+                            <Text style={[s.secondaryBtnText, { color: '#ef4444' }]}>{isArabic ? 'حذف' : 'Discard'}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={s.primaryBtn} onPress={handleCommit} disabled={saving}>
+                        <TouchableOpacity style={[s.primaryBtn, { backgroundColor: theme.primary, flexDirection: isArabic ? 'row-reverse' : 'row' }]} onPress={handleCommit} disabled={saving}>
                             {saving
-                                ? <ActivityIndicator color="white" />
-                                : <><Ionicons name="save" size={18} color="white" /><Text style={s.primaryBtnText}>Save transaction</Text></>}
+                                ? <ActivityIndicator color={theme.isDark ? '#000000' : '#ffffff'} />
+                                : <><Ionicons name="save" size={18} color={theme.isDark ? '#000000' : '#ffffff'} /><Text style={[s.primaryBtnText, { color: theme.isDark ? '#000000' : '#ffffff' }]}>{isArabic ? 'حفظ المعاملة' : 'Save Transaction'}</Text></>}
                         </TouchableOpacity>
                     </View>
                 )}
@@ -328,87 +327,90 @@ export default function DraftReviewScreen({ route, navigation }) {
     );
 }
 
-function FieldLabel({ label, match }) {
-    if (!match) return <Text style={s.label}>{label}</Text>;
+function FieldLabel({ label, match, theme, isArabic }) {
+    if (!match) return <Text style={[s.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{label}</Text>;
     if (match.matched) {
         return (
-            <View style={s.labelRow}>
-                <Text style={s.label}>{label}</Text>
-                <View style={[s.matchPill, { backgroundColor: '#dbeafe' }]}>
-                    <Text style={[s.matchPillText, { color: '#1e40af' }]}>
-                        AI matched · {Math.round((match.matched.confidence || 0) * 100)}%
+            <View style={[s.labelRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                <Text style={[s.label, { color: theme.subtext }]}>{label}</Text>
+                <View style={[s.matchPill, { backgroundColor: theme.primaryLight }]}>
+                    <Text style={[s.matchPillText, { color: theme.primary }]}>
+                        {isArabic ? 'مطابقة AI' : 'AI matched'} · {Math.round((match.matched.confidence || 0) * 100)}%
                     </Text>
                 </View>
             </View>
         );
     }
-    if (match.raw) {
-        return (
-            <View style={s.labelRow}>
-                <Text style={s.label}>{label}</Text>
-                <View style={[s.matchPill, { backgroundColor: '#fef3c7' }]}>
-                    <Text style={[s.matchPillText, { color: '#92400e' }]} numberOfLines={1}>
-                        AI heard "{match.raw}"
-                    </Text>
-                </View>
-            </View>
-        );
-    }
-    return <Text style={s.label}>{label}</Text>;
+    return <Text style={[s.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{label}</Text>;
 }
 
 const s = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f9fafb' },
-    header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    title: { fontSize: 20, fontWeight: '700', color: '#111827' },
-    metaLine: { color: '#6b7280', fontSize: 12, marginTop: 4, marginBottom: 12 },
+    container: { flex: 1 },
+    topNav: {
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 12 : 36,
+        paddingBottom: 12,
+        gap: 12
+    },
+    backBtn: { padding: 6 },
+    topNavTitle: { fontSize: 18, fontWeight: '800', flex: 1 },
+    header: { padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 12 },
+    title: { fontSize: 16, fontWeight: '800' },
+    metaLine: { fontSize: 12, marginTop: 4 },
     card: {
-        backgroundColor: 'white', borderRadius: 12, padding: 16,
-        marginBottom: 12, borderWidth: 1, borderColor: '#e5e7eb'
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1
     },
-    cardTitle: { fontWeight: '600', color: '#111827', marginBottom: 8 },
-    audioRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
-    receiptImg: { width: '100%', height: 280, backgroundColor: '#f3f4f6', borderRadius: 8 },
-    transcriptBox: { marginTop: 12, padding: 12, backgroundColor: '#f9fafb', borderRadius: 8 },
-    transcript: { color: '#374151' },
-    itemLine: { color: '#374151', fontSize: 13, marginVertical: 2 },
-    label: { fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 6 },
-    labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
+    cardTitle: { fontWeight: '700', fontSize: 15, marginBottom: 10 },
+    audioRow: { alignItems: 'center', gap: 12, padding: 12, borderRadius: 10 },
+    receiptImg: { width: '100%', height: 280, borderRadius: 10 },
+    transcriptBox: { marginTop: 12, padding: 12, borderRadius: 10 },
+    transcript: { lineHeight: 20 },
+    label: { fontWeight: '700', fontSize: 13, marginTop: 12, marginBottom: 6 },
+    labelRow: { alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
     matchPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, maxWidth: '60%' },
-    matchPillText: { fontSize: 10, fontWeight: '600' },
+    matchPillText: { fontSize: 10, fontWeight: '700' },
     input: {
-        borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8,
-        padding: 10, color: '#111827', backgroundColor: 'white'
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 12,
+        fontSize: 14
     },
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    chipRow: { flexWrap: 'wrap', gap: 6 },
     chip: {
-        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
-        borderWidth: 1, borderColor: '#d1d5db', backgroundColor: 'white'
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        borderWidth: 1
     },
-    chipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-    chipText: { color: '#374151', fontSize: 12, fontWeight: '600' },
-    chipTextActive: { color: 'white' },
-    selectGroup: { gap: 4 },
+    chipText: { fontSize: 12 },
+    selectGroup: { gap: 6 },
     selectItem: {
-        padding: 10, borderRadius: 8, borderWidth: 1, borderColor: '#d1d5db', backgroundColor: 'white'
+        padding: 12,
+        borderRadius: 10,
+        borderWidth: 1
     },
-    selectItemActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-    selectItemText: { color: '#111827' },
-    emptyHint: { color: '#9ca3af', fontStyle: 'italic' },
-    actionRow: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
+    selectItemText: { fontSize: 14 },
+    actionRow: { gap: 8, marginTop: 8, flexWrap: 'wrap' },
     primaryBtn: {
-        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        gap: 6, backgroundColor: '#2563eb', padding: 14, borderRadius: 10
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        padding: 14,
+        borderRadius: 12
     },
-    primaryBtnText: { color: 'white', fontWeight: '700' },
+    primaryBtnText: { fontWeight: '800' },
     secondaryBtn: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        paddingVertical: 12, paddingHorizontal: 16,
-        borderWidth: 1, borderColor: '#2563eb', borderRadius: 10, backgroundColor: 'white'
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderWidth: 1,
+        borderRadius: 12
     },
-    secondaryBtnText: { color: '#2563eb', fontWeight: '600' },
-    warnBox: {
-        backgroundColor: '#fef3c7', padding: 10, borderRadius: 8, marginBottom: 10
-    },
-    warnText: { color: '#92400e' }
+    secondaryBtnText: { fontWeight: '700' }
 });

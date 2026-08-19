@@ -217,6 +217,14 @@ export default function Inventory() {
                                                         <span className={`badge ${item.status === 'AVAILABLE' ? 'badge-success' : 'badge-warning'}`}>
                                                             {t(`inventory.status.${item.status.toLowerCase()}`) || item.status}
                                                         </span>
+                                                        {/* Low remaining value warning badge (#7) */}
+                                                        {item.initialValue > 0 && (item.remainingValue / item.initialValue) < 0.15 && (
+                                                            <span style={{
+                                                                background: '#fef2f2', color: '#ef4444',
+                                                                border: '1px solid #fecaca', borderRadius: 6,
+                                                                padding: '2px 7px', fontSize: 11, fontWeight: 700
+                                                            }}>⚠️ {t('inventory.lowStock', 'Low')}</span>
+                                                        )}
                                                         <button
                                                             className="btn btn-secondary"
                                                             onClick={() => handleDeleteBatch(item.id, item.description)}
@@ -278,10 +286,21 @@ export default function Inventory() {
                         ) : (
                             <div className="grid grid-4 gap-md">
                                 {filteredMaterials.map(material => (
-                                    <div key={material.id} className="card material-card">
+                                    <div key={material.id} className="card material-card" style={{
+                                        borderLeft: Number(material.stockLevel) <= Number(material.reorderLevel) ? '3px solid #ef4444' : undefined
+                                    }}>
                                         <div className="flex-between mb-xs" style={{ alignItems: 'flex-start', gap: 8 }}>
                                             <h4 style={{ margin: 0, flex: 1, minWidth: 0 }}>{material.nameAr || material.name}</h4>
                                             <div className="flex gap-xs" style={{ flexShrink: 0 }}>
+                                                {/* Low stock badge (#7) */}
+                                                {Number(material.stockLevel) <= Number(material.reorderLevel) && (
+                                                    <span style={{
+                                                        background: '#ef4444', color: 'white',
+                                                        borderRadius: 6, padding: '2px 8px',
+                                                        fontSize: 10, fontWeight: 700,
+                                                        animation: 'pulse-badge 1.8s infinite'
+                                                    }}>⚠️ {t('inventory.lowStock', 'LOW')}</span>
+                                                )}
                                                 <button
                                                     type="button"
                                                     className="btn btn-secondary btn-sm"

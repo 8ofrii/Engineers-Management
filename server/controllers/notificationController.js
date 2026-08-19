@@ -122,3 +122,21 @@ export const deleteNotification = async (req, res, next) => {
         next(error);
     }
 };
+
+// @desc    Clear all notifications for user
+// @route   DELETE /api/notifications
+// @access  Private
+export const clearAllNotifications = async (req, res, next) => {
+    try {
+        await prisma.notification.deleteMany({
+            where: { userId: req.user.id }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'All notifications cleared'
+        });
+    } catch (error) {
+        next(error);
+    }
+};

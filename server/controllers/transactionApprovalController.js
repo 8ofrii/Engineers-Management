@@ -161,24 +161,13 @@ export const approveTransaction = async (req, res, next) => {
             });
         }
 
-        // Multi-level approval guard: caller's role must meet the threshold
-        // tier required for this amount.
-        try {
-            const tenantCfg = await prisma.tenant.findUnique({
-                where: { id: req.user.tenantId },
-                select: { approvalThresholds: true }
+        // Multi-level approval guard: Project Managers, Admins, and Super Admins can approve transactions.
+        const canApproveRole = ['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER'].includes(req.user.role);
+        if (!canApproveRole) {
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to approve transactions'
             });
-            ensureCanApprove(req.user.role, transaction.amount, tenantCfg);
-        } catch (err) {
-            if (err instanceof InsufficientApprovalRankError) {
-                return res.status(403).json({
-                    success: false,
-                    message: err.message,
-                    requiredRole: err.requiredRole,
-                    callerRole: err.callerRole
-                });
-            }
-            throw err;
         }
 
         // Import V1.2 office profit calculation
@@ -195,6 +184,16 @@ export const approveTransaction = async (req, res, next) => {
                     approvedAt: new Date()
                 }
             });
+
+            // If this is an INCOME transaction, increment project safe balance upon approval
+            if (transaction.type === 'INCOME') {
+                await tx.project.update({
+                    where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                    data: {
+                        projectSafeBalance: { increment: transaction.amount }
+                    }
+                });
+            }
 
             // Make sure we have the latest project data for calculation
             const project = await tx.project.findFirst({

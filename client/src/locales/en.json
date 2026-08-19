@@ -115,7 +115,11 @@
         "viewAll": "View All",
         "recentProjects": "Recent Projects",
         "expensesByCategory": "Expenses by Category",
-        "incomeVsExpenses": "Income vs Expenses"
+        "incomeVsExpenses": "Income vs Expenses",
+        "todaySummary": "Today's Summary",
+        "dsrToday": "DSRs Today",
+        "incomeToday": "Today's Income",
+        "expenseToday": "Today's Expenses"
     },
     "projects": {
         "title": "Projects",
@@ -126,6 +130,12 @@
         "budget": "Budget",
         "spent": "Spent",
         "remaining": "Remaining",
+        "budgetUsed": "Budget Used",
+        "budgetHealthy": "Healthy",
+        "budgetWarning": "Warning",
+        "budgetCritical": "Critical",
+        "completion": "Completion",
+        "complete": "complete",
         "safeBalance": "Project Safe",
         "officeProfit": "Office Profit",
         "negativeBalanceAlert": "Negative Safe Balance",
@@ -147,6 +157,7 @@
             "sections": {
                 "basic": "Basic Information",
                 "timeline": "Timeline",
+                "completion": "Project Completion",
                 "financial": "Financial Details"
             },
             "fields": {
@@ -156,6 +167,7 @@
                 "location": "Location",
                 "type": "Project Type",
                 "status": "Status",
+                "engineer": "Assigned Engineer",
                 "startDate": "Start Date",
                 "endDate": "End Date",
                 "revenueModel": "Revenue Model",
@@ -172,6 +184,7 @@
                 "contractValue": "Total agreed contract amount"
             },
             "options": {
+                "selectEngineer": "Select Assigned Engineer",
                 "designOnly": "Design Only (Area × Rate)",
                 "costPlus": "Execution (Cost + Fee %)",
                 "lumpSum": "Execution (Lump Sum)",
@@ -324,6 +337,12 @@
     "finance": {
         "title": "Accounting",
         "subtitle": "Financial management and ledger",
+        "pendingApprovals": "Pending Approvals",
+        "approvedSuccess": "Transaction approved successfully",
+        "rejectedSuccess": "Transaction rejected successfully",
+        "myLedger": "My Ledger",
+        "project": "Project",
+        "createdBy": "Created By",
         "filteringBy": "Filtering by Project",
         "newTransaction": "New Transaction",
         "recordExpense": "Record Expense",
@@ -449,6 +468,9 @@
     "chat": {
         "title": "Chat Assistant",
         "subtitle": "Add data using text or voice commands",
+        "assistantRole": "Engineering & Finance Copilot",
+        "inputPlaceholder": "Ask or record a transaction...",
+        "newChat": "New Conversation",
         "startConversation": "Start a Conversation",
         "helpText": "I can help you add transactions, projects, clients, and suppliers. Just type or speak your request!",
         "typeMessage": "Type your message or use voice...",
@@ -527,8 +549,13 @@
         "nameAr": "Arabic Name",
         "required": "This field is required",
         "error": "An error occurred",
+        "success": "Success",
         "date": "Date",
+        "from": "From",
+        "to": "To",
         "actions": "Actions",
+        "approve": "Approve",
+        "reject": "Reject",
         "status": "Status",
         "type": "Type",
         "deleteFailed": "Failed to delete",
@@ -538,6 +565,23 @@
         "notes": "Notes / Details",
         "select": "Select",
         "add_new": "Add New"
+    },
+    "notifications": {
+        "title": "Notifications",
+        "allNotifications": "All Notifications",
+        "markAllRead": "Mark all read",
+        "clearAll": "Clear All",
+        "clearConfirm": "Are you sure you want to clear all notifications?",
+        "noNotifications": "No notifications",
+        "noNotificationsDesc": "You are all caught up!",
+        "all": "All",
+        "unread": "Unread",
+        "read": "Read",
+        "delete": "Delete",
+        "maximize": "Expand View",
+        "minimize": "Close View",
+        "justNow": "Just now",
+        "ago": "ago"
     },
     "teamManagement": {
         "title": "Team Management",
@@ -690,6 +734,114 @@
             "passwordMismatch": "Passwords do not match",
             "invalidImage": "Please upload a valid image file",
             "imageTooLarge": "Image size must be less than 5MB"
+        }
+    },
+    "dsr": {
+        "title": "Daily Site Reports",
+        "subtitle": "Engineer's daily log of progress, attendance, weather, and issues — submitted to managers for review.",
+        "newReport": "New Daily Report",
+        "allProjects": "All Projects",
+        "statusAll": "All",
+        "statusDraft": "Draft",
+        "statusSubmitted": "Submitted (pending review)",
+        "statusAcknowledged": "Acknowledged",
+        "empty": "No daily site reports yet",
+        "emptyHint": "Engineers create DSRs and managers review them here.",
+        "loggedHours": "Hours Logged",
+        "workCompleted": "Work Completed",
+        "issues": "Issues & Delays",
+        "visitors": "Visitors & Consultant Notes",
+        "weather": "Weather",
+        "temperature": "Temperature",
+        "project": "Project",
+        "reportDate": "Report Date",
+        "acknowledge": "Acknowledge Report",
+        "acknowledgeNotes": "Manager Notes (optional)",
+        "submitForReview": "Submit for review",
+        "managerNote": "Manager note",
+        "saveReport": "Save Daily Report",
+        "cancel": "Cancel",
+        "sunny": "Sunny",
+        "cloudy": "Cloudy",
+        "rainy": "Rainy",
+        "windy": "Windy",
+        "hot": "Hot",
+        "cold": "Cold"
+    },
+    "invoices": {
+        "title": "Invoices",
+        "subtitle": "Generate professional PDF invoices, send to clients, track payments.",
+        "newInvoice": "New Invoice",
+        "status": {
+            "all": "All",
+            "draft": "Draft",
+            "sent": "Sent",
+            "partiallyPaid": "Partially Paid",
+            "paid": "Paid",
+            "overdue": "Overdue",
+            "cancelled": "Cancelled"
+        },
+        "empty": "No invoices yet",
+        "emptyHint": "Create your first invoice from a project's line items.",
+        "table": {
+            "number": "Invoice #",
+            "client": "Client",
+            "project": "Project",
+            "issued": "Issued",
+            "due": "Due",
+            "total": "Total",
+            "paid": "Paid",
+            "status": "Status",
+            "actions": "Actions",
+            "balance": "Balance"
+        },
+        "form": {
+            "titleNew": "New Invoice",
+            "titleEdit": "Edit Invoice",
+            "selectClient": "Select Client...",
+            "selectProject": "Select Project...",
+            "invoiceNumber": "Invoice Number",
+            "taxRate": "Tax Rate %",
+            "notes": "Notes & Terms",
+            "itemDescription": "Item Description",
+            "quantity": "Qty",
+            "unitPrice": "Unit Price",
+            "total": "Total",
+            "addItem": "Add Line Item",
+            "subtotal": "Subtotal",
+            "taxAmount": "Tax Amount",
+            "saveDraft": "Save Draft",
+            "saveChanges": "Save Changes"
+        },
+        "pay": {
+            "title": "Record Payment",
+            "amount": "Payment Amount",
+            "record": "Record Payment"
+        },
+        "send": {
+            "title": "Send Invoice by Email",
+            "to": "To (Email)",
+            "message": "Message",
+            "sendBtn": "Send Invoice"
+        }
+    },
+    "reconcile": {
+        "title": "Bank Reconciliation",
+        "subtitle": "Upload bank statement CSV and match transactions automatically with AI.",
+        "uploadStatement": "Upload Bank Statement",
+        "chooseFile": "Choose CSV Statement",
+        "uploading": "Uploading & matching...",
+        "empty": "No bank statements yet",
+        "emptyHint": "Upload your first bank statement CSV to start matching transactions.",
+        "table": {
+            "bank": "Bank",
+            "accountNumber": "Account Number",
+            "period": "Period",
+            "rows": "Rows",
+            "matched": "Matched",
+            "unmatched": "Unmatched",
+            "status": "Status",
+            "actions": "Review"
         }
     }
 }

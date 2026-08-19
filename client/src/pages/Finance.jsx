@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
 import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock } from 'lucide-react';
@@ -10,7 +10,8 @@ import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import { useFormat } from '../utils/format';
 
 export default function Finance() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const { currency: fmtCurrency } = useFormat();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -32,6 +33,8 @@ export default function Finance() {
     const [workmen, setWorkmen] = useState([]);
     const [projects, setProjects] = useState([]);
     const [filterWorkmanId, setFilterWorkmanId] = useState('ALL');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
 
     // Handle URL params for project filtering
     useEffect(() => {
@@ -47,7 +50,7 @@ export default function Finance() {
         loadTransactions();
         loadWorkmen();
         loadProjects();
-    }, [filterType, filterProjectId, filterWorkmanId]);
+    }, [filterType, filterProjectId, filterWorkmanId, dateFrom, dateTo]);
 
     const loadTransactions = async () => {
         try {
@@ -75,14 +78,14 @@ export default function Finance() {
                 allTx = allTx.filter(tx => tx.workmanId === filterWorkmanId);
             }
 
-            // Show approved or incomes in standard views by default, EXCEPT for MY_LEDGER where we want to see all
-            if (filterType !== 'MY_LEDGER') {
-                setTransactions(allTx.filter(tx => tx.status === 'APPROVED' || tx.type === 'INCOME'));
-            } else {
-                setTransactions(allTx);
-            }
+            // Filter by date range
+            if (dateFrom) allTx = allTx.filter(tx => (tx.transactionDate || tx.createdAt || '') >= dateFrom);
+            if (dateTo)   allTx = allTx.filter(tx => (tx.transactionDate || tx.createdAt || '').slice(0, 10) <= dateTo);
 
-            // If manager/admin, load pending separately
+            // Show all transactions in the table (approved, pending, income, expense) with their real status badge
+            setTransactions(allTx);
+
+            // If manager/admin, load pending separately for quick action banner
             if (user.role === 'PROJECT_MANAGER' || user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
                 const pendingRes = await transactionsAPI.getPending();
                 setPendingTransactions(pendingRes?.data?.data || []);
@@ -248,7 +251,7 @@ export default function Finance() {
                     <div className="flex gap-lg items-center flex-wrap" style={{ justifyContent: 'flex-end', width: '100%' }}>
 
                         {/* Dropdowns Filter */}
-                        <div className="flex gap-md items-center" style={{ flexGrow: 1 }}>
+                        <div className="flex gap-md items-center" style={{ flexGrow: 1, flexWrap: 'wrap' }}>
                             <select
                                 value={filterProjectId || 'ALL'}
                                 onChange={(e) => {
@@ -291,6 +294,48 @@ export default function Finance() {
                                     <option key={w.id} value={w.id}>{w.name}</option>
                                 ))}
                             </select>
+
+                            {/* Date range picker (#11) */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                    {isArabic ? 'من' : t('common.from', 'From')}:
+                                </span>
+                                <input
+                                    type="date"
+                                    value={dateFrom}
+                                    onChange={e => setDateFrom(e.target.value)}
+                                    style={{
+                                        padding: '5px 8px', borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-tertiary)', color: 'var(--text-primary)',
+                                        fontSize: '0.8rem'
+                                    }}
+                                />
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                    {isArabic ? 'إلى' : t('common.to', 'To')}:
+                                </span>
+                                <input
+                                    type="date"
+                                    value={dateTo}
+                                    onChange={e => setDateTo(e.target.value)}
+                                    style={{
+                                        padding: '5px 8px', borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-tertiary)', color: 'var(--text-primary)',
+                                        fontSize: '0.8rem'
+                                    }}
+                                />
+                                {(dateFrom || dateTo) && (
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                        style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                                        title={isArabic ? 'مسح التواريخ' : 'Clear dates'}
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* Type Filter */}
@@ -375,23 +420,24 @@ export default function Finance() {
                                     margin-bottom: var(--spacing-2xl);
                                 }
                                 .project-header {
-                                    background: linear-gradient(135deg, var(--color-primary) 0%, hsl(220, 70%, 50%) 100%);
+                                    background: var(--bg-tertiary);
+                                    border-bottom: 1px solid var(--border-color);
                                     padding: 16px 24px;
                                     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
                                     display: flex;
                                     justify-content: space-between;
                                     align-items: center;
-                                    box-shadow: 0 2px 8px hsla(220, 80%, 45%, 0.2);
+                                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
                                 }
                                 .project-title {
                                     margin: 0;
                                     font-size: 1.125rem;
                                     font-weight: 700;
-                                    color: white;
+                                    color: var(--text-primary);
                                 }
                                 .project-summary {
                                     font-size: 0.875rem;
-                                    color: rgba(255, 255, 255, 0.95);
+                                    color: var(--text-secondary);
                                     font-weight: 600;
                                 }
                                 .transaction-table {
@@ -552,7 +598,22 @@ export default function Finance() {
                                 return (
                                     <div key={projectName} className="project-group" style={{ overflow: 'hidden' }}>
                                         <div className="project-header">
-                                            <h3 className="project-title">{projectName}</h3>
+                                            <h3 className="project-title">
+                                                {/* #14 — Clickable project name link */}
+                                                {txs[0]?.project?.id ? (
+                                                    <Link
+                                                        to={`/projects/${txs[0].project.id}`}
+                                                        style={{
+                                                            color: 'var(--color-primary)',
+                                                            textDecoration: 'none',
+                                                            borderBottom: '1px dashed var(--color-primary)',
+                                                            paddingBottom: 2
+                                                        }}
+                                                        title={`Go to project: ${projectName}`}
+                                                    >
+                                                        {projectName}
+                                                    </Link>
+                                                ) : projectName}</h3>
                                             <div className="project-summary">
                                                 {filterType === 'MY_LEDGER' ? (t('finance.myNetCustody') || 'صافي العهدة') : (t('finance.projectNet') || 'صافي المشروع')}:
                                                 <span style={{

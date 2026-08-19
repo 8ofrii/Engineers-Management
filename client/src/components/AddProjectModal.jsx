@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Plus } from 'lucide-react';
-import { clientsAPI } from '../services/api';
+import { clientsAPI, userAPI } from '../services/api';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 import AddClientModal from './AddClientModal';
@@ -11,6 +11,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
     const { t } = useTranslation();
     const { showAlert } = useAlert();
     const [clients, setClients] = useState([]);
+    const [engineers, setEngineers] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -24,7 +25,9 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
         managementFeePercent: '20',
         totalContractValue: '',
         paymentTerms: 'Net 30',
-        clientId: ''
+        clientId: '',
+        engineerId: '',
+        completionPercent: 0
     });
 
     const [errors, setErrors] = useState({});
@@ -33,6 +36,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
     useEffect(() => {
         if (isOpen) {
             loadClients();
+            loadEngineers();
             if (initialData) {
                 setFormData({
                     name: initialData.name || '',
@@ -47,7 +51,9 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     managementFeePercent: initialData.managementFeePercent || '20',
                     totalContractValue: initialData.totalContractValue || '',
                     paymentTerms: initialData.paymentTerms || 'Net 30',
-                    clientId: initialData.clientId || initialData.client?.id || ''
+                    clientId: initialData.clientId || initialData.client?.id || '',
+                    engineerId: initialData.engineerId || initialData.engineer?.id || '',
+                    completionPercent: initialData.completionPercent ?? 0
                 });
             } else {
                 setFormData({
@@ -63,7 +69,8 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     managementFeePercent: '20',
                     totalContractValue: '',
                     paymentTerms: 'Net 30',
-                    clientId: ''
+                    clientId: '',
+                    engineerId: ''
                 });
             }
         }
@@ -75,6 +82,15 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
             setClients(response.data.data);
         } catch (error) {
             console.error('Failed to load clients:', error);
+        }
+    };
+
+    const loadEngineers = async () => {
+        try {
+            const response = await userAPI.getAll();
+            setEngineers(response.data.data || []);
+        } catch (error) {
+            console.error('Failed to load team members:', error);
         }
     };
 
@@ -241,6 +257,23 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                                     <option value="CANCELLED">{t('projects.status.cancelled')}</option>
                                 </select>
                             </div>
+
+                            <div className="form-group">
+                                <label htmlFor="engineerId">{t('projects.modal.fields.engineer') || 'Assigned Engineer'}</label>
+                                <select
+                                    id="engineerId"
+                                    name="engineerId"
+                                    value={formData.engineerId}
+                                    onChange={handleChange}
+                                >
+                                    <option value="">{t('projects.modal.options.selectEngineer') || 'Select Engineer (Optional)'}</option>
+                                    {engineers.map((eng) => (
+                                        <option key={eng.id} value={eng.id}>
+                                            {eng.name} ({eng.role || 'Member'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <div className="form-group full-width mt-md">
@@ -288,6 +321,39 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                         </div>
                     </div>
 
+                    {/* Completion % Slider (#8) */}
+                    <div className="form-section">
+                        <h3 className="section-title">{t('projects.modal.sections.completion') || 'Project Completion'}</h3>
+                        <div className="form-group full-width">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <label htmlFor="completionPercent" style={{ marginBottom: 0 }}>
+                                    {t('projects.completion') || 'Completion'}
+                                </label>
+                                <span style={{
+                                    fontWeight: 700,
+                                    fontSize: '1.1rem',
+                                    color: Number(formData.completionPercent) >= 100 ? '#10b981' : Number(formData.completionPercent) >= 50 ? '#3b82f6' : '#f59e0b'
+                                }}>
+                                    {formData.completionPercent}%
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                id="completionPercent"
+                                name="completionPercent"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={formData.completionPercent}
+                                onChange={handleChange}
+                                style={{ width: '100%', accentColor: '#3b82f6' }}
+                            />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                                <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Financial Details */}
                     <div className="form-section">
                         <h3 className="section-title">{t('projects.modal.sections.financial')}</h3>
@@ -308,7 +374,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
 
                             {formData.revenueModel === 'EXECUTION_COST_PLUS' && (
                                 <div className="form-group">
-                                    <label htmlFor="managementFeePercent">{t('projects.modal.fields.managementFee')} (%) <span className="required">*</span></label>
+                                    <label htmlFor="managementFeePercent">{t('projects.modal.fields.managementFee')} <span className="required">*</span></label>
                                     <input
                                         type="number"
                                         id="managementFeePercent"

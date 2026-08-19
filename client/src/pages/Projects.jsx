@@ -9,7 +9,8 @@ import AddProjectModal from '../components/AddProjectModal';
 import { useFormat } from '../utils/format';
 
 export default function Projects() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const navigate = useNavigate();
     const [projects, setProjects] = useState([]);
@@ -153,7 +154,13 @@ export default function Projects() {
                     </div>
                 ) : (
                     <div className="grid grid-2">
-                        {projects.map((project) => (
+                        {projects.map((project) => {
+                            const budgetPct = project.budget > 0
+                                ? Math.min(100, Math.round((Number(project.actualCost) / Number(project.budget)) * 100))
+                                : 0;
+                            const budgetBarColor = budgetPct >= 90 ? '#ef4444' : budgetPct >= 70 ? '#f59e0b' : '#10b981';
+                            const completionPct = Math.min(100, Math.max(0, Number(project.completionPercent || 0)));
+                            return (
                             <div key={project.id} className="card" style={{
                                 padding: 'var(--spacing-lg)',
                                 background: 'var(--bg-secondary)',
@@ -170,7 +177,22 @@ export default function Projects() {
                                             </span>
                                         )}
                                     </div>
-                                    <div className="flex gap-sm">
+                                    <div className="flex gap-sm" style={{ alignItems: 'center' }}>
+                                        {/* Completion % ring */}
+                                        <div title={`${completionPct}% ${isArabic ? 'مكتمل' : (t('projects.complete', 'complete'))}`} style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+                                            <svg width="40" height="40" style={{ transform: 'rotate(-90deg)' }}>
+                                                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--bg-tertiary)" strokeWidth="4" />
+                                                <circle cx="20" cy="20" r="16" fill="none"
+                                                    stroke={completionPct >= 100 ? '#10b981' : completionPct >= 50 ? '#3b82f6' : '#f59e0b'}
+                                                    strokeWidth="4"
+                                                    strokeDasharray={`${(completionPct / 100) * 100.5} 100.5`}
+                                                    strokeLinecap="round"
+                                                />
+                                            </svg>
+                                            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                                {completionPct}%
+                                            </span>
+                                        </div>
                                         <span className={`badge badge-${getStatusColor(project.status.toLowerCase())}`}>
                                             {t(`projects.status.${project.status.toLowerCase()}`)}
                                         </span>
@@ -194,27 +216,57 @@ export default function Projects() {
                                 </div>
                                 <p className="text-secondary mb-md">{project.description || t('common.noData')}</p>
                                 <div className="grid grid-2 gap-md mb-md">
-                                    <div className="p-sm bg-tertiary rounded">
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                    <div className="p-sm rounded" style={{
+                                        background: '#1e293b',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}>
+                                        <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '2px' }}>
                                             {t('projects.safeBalance') || 'خزينة المشروع'}
                                         </div>
                                         <div style={{
-                                            fontSize: '1rem',
+                                            fontSize: '1.1rem',
                                             fontWeight: 700,
-                                            color: project.projectSafeBalance < 0 ? '#ef4444' : 'var(--color-success)'
+                                            color: project.projectSafeBalance < 0 ? '#f87171' : '#34d399'
                                         }}>
                                             {formatCurrency(project.projectSafeBalance)}
                                         </div>
                                     </div>
-                                    <div className="p-sm bg-tertiary rounded">
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                    <div className="p-sm rounded" style={{
+                                        background: '#1e293b',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                                    }}>
+                                        <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '2px' }}>
                                             {t('projects.officeProfit') || 'أرباح المكتب'}
                                         </div>
-                                        <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-secondary)' }}>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#60a5fa' }}>
                                             {formatCurrency(project.officeRevenue)}
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Budget progress bar (#1) */}
+                                <div style={{ marginBottom: 'var(--spacing-md)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
+                                        <span>{isArabic ? 'المستخدم من الميزانية' : t('projects.budgetUsed', 'Budget Used')}: {budgetPct}%</span>
+                                        <span style={{ color: budgetBarColor, fontWeight: 700 }}>
+                                            {budgetPct >= 90
+                                                ? (isArabic ? '🔴 حرج' : `🔴 ${t('projects.budgetCritical', 'Critical')}`)
+                                                : budgetPct >= 70
+                                                    ? (isArabic ? '🟡 تحذير' : `🟡 ${t('projects.budgetWarning', 'Warning')}`)
+                                                    : (isArabic ? '🟢 ممتاز' : `🟢 ${t('projects.budgetHealthy', 'Healthy')}`)}
+                                        </span>
+                                    </div>
+                                    <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
+                                        <div style={{
+                                            height: '100%',
+                                            width: `${budgetPct}%`,
+                                            background: budgetBarColor,
+                                            borderRadius: 4,
+                                            transition: 'width 0.4s ease'
+                                        }} />
+                                    </div>
+                                </div>
+
                                 <div className="flex-between">
                                     <div>
                                         <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
@@ -263,7 +315,8 @@ export default function Projects() {
                                     {t('projects.viewTransactions')}
                                 </button>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

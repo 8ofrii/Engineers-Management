@@ -16,6 +16,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { projectsApi, transactionsApi } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
 
 const CATEGORIES_EXPENSE = [
     'CONCRETE', 'CEMENT', 'SAND', 'BRICKS',
@@ -37,7 +38,9 @@ const CATEGORIES_INCOME = ['PAYMENT', 'OTHER'];
 const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHECK', 'CUSTODY_WALLET', 'OTHER'];
 
 export default function AddTransactionScreen({ navigation, route }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
+    const { theme } = useTheme();
     const preset = route?.params || {};
     const [type, setType] = useState(preset.type || 'EXPENSE');
     const [projectId, setProjectId] = useState(preset.projectId || null);
@@ -52,6 +55,62 @@ export default function AddTransactionScreen({ navigation, route }) {
     const [showCategoryPicker, setShowCategoryPicker] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    const getCategoryLabel = (cat) => {
+        if (!cat) return '';
+        if (!isArabic) return cat.replace(/_/g, ' ');
+        const map = {
+            'CONCRETE': 'خرسانة جاهزة',
+            'CEMENT': 'أسمنت ومواد لاصقة',
+            'SAND': 'رمل وهالك',
+            'BRICKS': 'طوب وبناء',
+            'SITE_CLEANING': 'نظافة وتشوين موقع',
+            'STOCKING': 'تشوين وعتالة',
+            'GENERAL_LABOR': 'عمالة مساعدة وعادية',
+            'MASONRY_LABOR': 'مصنعية بناء',
+            'PLASTERING_MATERIALS': 'خامات محارة ومصيص',
+            'PLASTERING_LABOR': 'مصنعية محارة',
+            'PLUMBING_MATERIALS': 'خامات سباكة وتأسيس',
+            'PLUMBING_LABOR': 'مصنعية سباكة',
+            'ELECTRICAL_MATERIALS': 'خامات كهرباء وأسلاك',
+            'ELECTRICAL_LABOR': 'مصنعية كهرباء',
+            'CERAMIC_MATERIALS': 'سيراميك وبورسلين ومواد',
+            'CERAMIC_LABOR': 'مصنعية تركيب سيراميك',
+            'PAINTING_MATERIALS': 'خامات دهانات ومعجون',
+            'PAINTING_LABOR': 'مصنعية دهانات',
+            'GYPSUM_MATERIALS': 'جبسوم بورد وإكسسوارات',
+            'GYPSUM_LABOR': 'مصنعية جبسوم بورد',
+            'CARPENTRY_MATERIALS': 'أخشاب ونجارة باب وشباك',
+            'CARPENTRY_LABOR': 'مصنعية نجارة',
+            'TRANSPORT': 'نقل ومشال ونقليات',
+            'TIPS': 'إكراميات ومصروفات نثرية',
+            'DECOR': 'ديكورات وتكسيات',
+            'DRAWINGS': 'رسومات وتراخيص هندسية',
+            'INSULATION_LABOR': 'مصنعية وخامات عزل',
+            'HVAC_PREP': 'تجهيزات وتمديدات تكييف',
+            'ALUMETAL': 'ألوميتال وواجهات',
+            'MATERIALS': 'مواد بناء وتوريدات عامة',
+            'LABOR': 'أجور عمالة',
+            'EQUIPMENT': 'إيجار معدات وآلات',
+            'SERVICES': 'خدمات واستشارات',
+            'PAYMENT': 'دفعة من العميل',
+            'OTHER': 'أخرى'
+        };
+        return map[cat] || cat.replace(/_/g, ' ');
+    };
+
+    const getPMLabel = (pm) => {
+        if (!pm) return '';
+        if (!isArabic) return pm.replace(/_/g, ' ');
+        const map = {
+            'CASH': 'نقدي (كاش)',
+            'BANK_TRANSFER': 'تحويل بنكي',
+            'CHECK': 'شيك بنكي',
+            'CUSTODY_WALLET': 'عهدة / محفظة',
+            'OTHER': 'أخرى'
+        };
+        return map[pm] || pm.replace(/_/g, ' ');
+    };
+
     useEffect(() => {
         projectsApi.list()
             .then(r => setProjects((r.data?.data || []).filter(p => p.status !== 'CANCELLED')))
@@ -59,9 +118,9 @@ export default function AddTransactionScreen({ navigation, route }) {
     }, []);
 
     const onSubmit = async () => {
-        if (!projectId) return Alert.alert(t('common.error'), t('addTx.selectProject'));
-        if (!category) return Alert.alert(t('common.error'), t('addTx.selectCategory'));
-        if (!amount || Number(amount) <= 0) return Alert.alert(t('common.error'), t('addTx.invalidAmount'));
+        if (!projectId) return Alert.alert(isArabic ? 'تنبيه' : 'Error', isArabic ? 'برجاء اختيار المشروع أولاً' : 'Please select a project');
+        if (!category) return Alert.alert(isArabic ? 'تنبيه' : 'Error', isArabic ? 'برجاء اختيار بند المصروف / الإيراد' : 'Please select a category');
+        if (!amount || Number(amount) <= 0) return Alert.alert(isArabic ? 'تنبيه' : 'Error', isArabic ? 'برجاء كتابة مبلغ صحيح' : 'Please enter a valid amount');
 
         setSubmitting(true);
         try {
@@ -76,14 +135,16 @@ export default function AddTransactionScreen({ navigation, route }) {
                 createBatch: type === 'EXPENSE' ? createBatch : false
             };
             await transactionsApi.create(payload);
-            Alert.alert(t('addTx.success'), t('addTx.successMsg'), [
-                { text: 'OK', onPress: () => navigation.goBack() }
-            ]);
+            Alert.alert(
+                isArabic ? 'تم الحفظ بنجاح' : 'Success',
+                isArabic ? 'تم تسجيل المعاملة بنجاح وإرسالها للمراجعة' : 'Transaction created successfully',
+                [{ text: 'OK', onPress: () => navigation.goBack() }]
+            );
         } catch (err) {
             const msg = err.response?.data?.message ||
                 err.response?.data?.errors?.map(e => e.message).join(', ') ||
                 err.message;
-            Alert.alert(t('common.error'), msg);
+            Alert.alert(isArabic ? 'خطأ' : 'Error', msg);
         } finally {
             setSubmitting(false);
         }
@@ -92,127 +153,150 @@ export default function AddTransactionScreen({ navigation, route }) {
     const categories = type === 'INCOME' ? CATEGORIES_INCOME : CATEGORIES_EXPENSE;
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.backLink}>{'< '}{t('common.back')}</Text>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.bg }]}>
+            {/* Header */}
+            <View style={[styles.header, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <Ionicons name={isArabic ? 'arrow-forward' : 'arrow-back'} size={24} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('addTx.title')}</Text>
-                <View style={{ width: 50 }} />
+                <Text style={[styles.headerTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>
+                    {isArabic ? 'تسجيل معاملة مالية' : 'New Transaction'}
+                </Text>
             </View>
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
             >
-                <ScrollView contentContainerStyle={styles.form}>
-                    {/* AI capture entry — opens DraftsList where the engineer
-                        can record a voice note or photograph a receipt. The
-                        AI builds a pre-filled draft they review before saving. */}
+                <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+                    {/* AI capture shortcut banner */}
                     <TouchableOpacity
-                        style={aiBoxStyle.box}
+                        style={[styles.aiBox, { backgroundColor: theme.primaryLight, borderColor: theme.primary, flexDirection: isArabic ? 'row-reverse' : 'row' }]}
                         onPress={() => navigation.navigate('DraftsList')}
+                        activeOpacity={0.8}
                     >
-                        <Ionicons name="sparkles" size={22} color="#2563eb" />
+                        <Ionicons name="sparkles" size={22} color={theme.primary} />
                         <View style={{ flex: 1 }}>
-                            <Text style={aiBoxStyle.title}>Use AI to capture</Text>
-                            <Text style={aiBoxStyle.subtitle}>Record voice or photograph a receipt — AI fills the form</Text>
+                            <Text style={[styles.aiTitle, { color: theme.primary, textAlign: isArabic ? 'right' : 'left' }]}>
+                                {isArabic ? 'التسجيل الذكي بالذكاء الاصطناعي' : 'Use AI to Capture'}
+                            </Text>
+                            <Text style={[styles.aiSubtitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>
+                                {isArabic ? 'سجل ملاحظة صوتية أو التقط صورة للإيصال وسيقوم المساعد بملء البيانات فوراً' : 'Record voice or take a receipt photo — AI drafts it'}
+                            </Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color="#2563eb" />
+                        <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={18} color={theme.primary} />
                     </TouchableOpacity>
 
-                    <Text style={styles.label}>{t('addTx.type')}</Text>
-                    <View style={styles.typeRow}>
-                        {['EXPENSE', 'INCOME'].map(opt => (
-                            <TouchableOpacity
-                                key={opt}
-                                style={[
-                                    styles.typeBtn,
-                                    type === opt && (opt === 'EXPENSE' ? styles.typeExpenseActive : styles.typeIncomeActive)
-                                ]}
-                                onPress={() => { setType(opt); setCategory(null); }}
-                            >
-                                <Text style={[
-                                    styles.typeText,
-                                    type === opt && { color: '#fff' }
-                                ]}>
-                                    {t(`addTx.${opt.toLowerCase()}`)}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                    {/* Transaction Type Toggle */}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'نوع المعاملة' : 'Transaction Type'}</Text>
+                    <View style={[styles.typeRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                        {[
+                            { key: 'EXPENSE', label: isArabic ? 'مصروف (-)' : 'Expense' },
+                            { key: 'INCOME', label: isArabic ? 'دفعة / إيراد (+)' : 'Income' }
+                        ].map(opt => {
+                            const active = type === opt.key;
+                            return (
+                                <TouchableOpacity
+                                    key={opt.key}
+                                    style={[
+                                        styles.typeBtn,
+                                        {
+                                            backgroundColor: active ? (opt.key === 'EXPENSE' ? '#ef4444' : '#10b981') : theme.card,
+                                            borderColor: active ? (opt.key === 'EXPENSE' ? '#ef4444' : '#10b981') : theme.borderStrong
+                                        }
+                                    ]}
+                                    onPress={() => { setType(opt.key); setCategory(null); }}
+                                >
+                                    <Text style={[styles.typeText, { color: active ? '#ffffff' : theme.text, fontWeight: active ? '700' : '600' }]}>
+                                        {opt.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
 
-                    <Text style={styles.label}>{t('addTx.project')} *</Text>
-                    <TouchableOpacity style={styles.selector} onPress={() => setShowProjectPicker(true)}>
-                        <Text style={projectName ? styles.selectorText : styles.selectorPlaceholder}>
-                            {projectName || t('addTx.selectProject')}
+                    {/* Project Selector */}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'المشروع' : 'Project'} *</Text>
+                    <TouchableOpacity
+                        style={[styles.selector, { backgroundColor: theme.card, borderColor: theme.borderStrong, flexDirection: isArabic ? 'row-reverse' : 'row' }]}
+                        onPress={() => setShowProjectPicker(true)}
+                    >
+                        <Text style={[styles.selectorText, { color: projectName ? theme.text : theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>
+                            {projectName || (isArabic ? 'اختر المشروع...' : 'Select project...')}
                         </Text>
+                        <Ionicons name="chevron-down" size={18} color={theme.subtext} />
                     </TouchableOpacity>
 
-                    <Text style={styles.label}>{t('addTx.category')} *</Text>
-                    <TouchableOpacity style={styles.selector} onPress={() => setShowCategoryPicker(true)}>
-                        <Text style={category ? styles.selectorText : styles.selectorPlaceholder}>
-                            {category ? category.replace(/_/g, ' ') : t('addTx.selectCategory')}
+                    {/* Category Selector */}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'البند / الفئة' : 'Category'} *</Text>
+                    <TouchableOpacity
+                        style={[styles.selector, { backgroundColor: theme.card, borderColor: theme.borderStrong, flexDirection: isArabic ? 'row-reverse' : 'row' }]}
+                        onPress={() => setShowCategoryPicker(true)}
+                    >
+                        <Text style={[styles.selectorText, { color: category ? theme.text : theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>
+                            {category ? getCategoryLabel(category) : (isArabic ? 'اختر بند المصروف...' : 'Select category...')}
                         </Text>
+                        <Ionicons name="chevron-down" size={18} color={theme.subtext} />
                     </TouchableOpacity>
 
-                    <Text style={styles.label}>{t('addTx.amount')} (EGP) *</Text>
+                    {/* Amount */}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'المبلغ (جنيه مصري)' : 'Amount (EGP)'} *</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, { backgroundColor: theme.card, borderColor: theme.borderStrong, color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}
                         keyboardType="decimal-pad"
                         value={amount}
                         onChangeText={setAmount}
-                        placeholder="0"
+                        placeholder="0.00"
+                        placeholderTextColor={theme.subtext}
                     />
 
-                    <Text style={styles.label}>{t('addTx.description')}</Text>
+                    {/* Description */}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'البيان / ملاحظات' : 'Description / Notes'}</Text>
                     <TextInput
-                        style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]}
+                        style={[styles.input, { backgroundColor: theme.card, borderColor: theme.borderStrong, color: theme.text, minHeight: 70, textAlignVertical: 'top', textAlign: isArabic ? 'right' : 'left' }]}
                         value={description}
                         onChangeText={setDescription}
-                        placeholder={t('addTx.descriptionPlaceholder')}
+                        placeholder={isArabic ? 'تفاصيل الفاتورة أو المشتريات...' : 'Invoice details, vendor notes...'}
+                        placeholderTextColor={theme.subtext}
                         multiline
                     />
 
-                    <Text style={styles.label}>{t('addTx.paymentMethod')}</Text>
-                    <View style={styles.paymentRow}>
-                        {PAYMENT_METHODS.map(pm => (
-                            <TouchableOpacity
-                                key={pm}
-                                style={[styles.pmPill, paymentMethod === pm && styles.pmPillActive]}
-                                onPress={() => setPaymentMethod(pm)}
-                            >
-                                <Text style={[styles.pmText, paymentMethod === pm && styles.pmTextActive]}>
-                                    {pm.replace(/_/g, ' ')}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                    {/* Payment Method */}
+                    <Text style={[styles.label, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'طريقة الدفع' : 'Payment Method'}</Text>
+                    <View style={[styles.paymentRow, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                        {PAYMENT_METHODS.map(pm => {
+                            const active = paymentMethod === pm;
+                            return (
+                                <TouchableOpacity
+                                    key={pm}
+                                    style={[
+                                        styles.pmPill,
+                                        {
+                                            backgroundColor: active ? theme.primary : theme.card,
+                                            borderColor: active ? theme.primary : theme.borderStrong
+                                        }
+                                    ]}
+                                    onPress={() => setPaymentMethod(pm)}
+                                >
+                                    <Text style={[styles.pmText, { color: active ? (theme.isDark ? '#000000' : '#ffffff') : theme.text, fontWeight: active ? '700' : '500' }]}>
+                                        {getPMLabel(pm)}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
 
-                    {type === 'EXPENSE' && (
-                        <TouchableOpacity
-                            style={styles.toggleRow}
-                            onPress={() => setCreateBatch(!createBatch)}
-                        >
-                            <View style={[styles.checkbox, createBatch && styles.checkboxActive]}>
-                                {createBatch && <Text style={{ color: '#fff', fontSize: 14 }}>✓</Text>}
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.toggleLabel}>{t('addTx.inventoryPurchase')}</Text>
-                                <Text style={styles.toggleHint}>{t('addTx.inventoryHint')}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    )}
-
+                    {/* Submit Button */}
                     <TouchableOpacity
-                        style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+                        style={[styles.submitBtn, { backgroundColor: theme.primary }, submitting && { opacity: 0.6 }]}
                         onPress={onSubmit}
                         disabled={submitting}
+                        activeOpacity={0.8}
                     >
                         {submitting ? (
-                            <ActivityIndicator color="#fff" />
+                            <ActivityIndicator color={theme.isDark ? '#000000' : '#ffffff'} />
                         ) : (
-                            <Text style={styles.submitText}>{t('addTx.submit')}</Text>
+                            <Text style={[styles.submitText, { color: theme.isDark ? '#000000' : '#ffffff' }]}>{isArabic ? 'حفظ المعاملة' : 'Save Transaction'}</Text>
                         )}
                     </TouchableOpacity>
                 </ScrollView>
@@ -221,26 +305,26 @@ export default function AddTransactionScreen({ navigation, route }) {
             {/* Project Picker Modal */}
             <Modal visible={showProjectPicker} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>{t('addTx.selectProject')}</Text>
+                    <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                            <Text style={[styles.modalTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'اختر المشروع' : 'Select Project'}</Text>
                             <TouchableOpacity onPress={() => setShowProjectPicker(false)}>
-                                <Text style={styles.modalClose}>✕</Text>
+                                <Ionicons name="close" size={24} color={theme.subtext} />
                             </TouchableOpacity>
                         </View>
                         <ScrollView>
                             {projects.map(p => (
                                 <TouchableOpacity
                                     key={p.id}
-                                    style={styles.modalItem}
+                                    style={[styles.modalItem, { borderBottomColor: theme.border }]}
                                     onPress={() => {
                                         setProjectId(p.id);
                                         setProjectName(p.name);
                                         setShowProjectPicker(false);
                                     }}
                                 >
-                                    <Text style={styles.modalItemText}>{p.name}</Text>
-                                    <Text style={styles.modalItemMeta}>
+                                    <Text style={[styles.modalItemText, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{p.name}</Text>
+                                    <Text style={[styles.modalItemMeta, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>
                                         {p.client?.name} · {p.status}
                                     </Text>
                                 </TouchableOpacity>
@@ -253,24 +337,24 @@ export default function AddTransactionScreen({ navigation, route }) {
             {/* Category Picker Modal */}
             <Modal visible={showCategoryPicker} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>{t('addTx.selectCategory')}</Text>
+                    <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+                        <View style={[styles.modalHeader, { borderBottomColor: theme.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                            <Text style={[styles.modalTitle, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{isArabic ? 'اختر البند' : 'Select Category'}</Text>
                             <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
-                                <Text style={styles.modalClose}>✕</Text>
+                                <Ionicons name="close" size={24} color={theme.subtext} />
                             </TouchableOpacity>
                         </View>
                         <ScrollView>
                             {categories.map(c => (
                                 <TouchableOpacity
                                     key={c}
-                                    style={styles.modalItem}
+                                    style={[styles.modalItem, { borderBottomColor: theme.border }]}
                                     onPress={() => {
                                         setCategory(c);
                                         setShowCategoryPicker(false);
                                     }}
                                 >
-                                    <Text style={styles.modalItemText}>{c.replace(/_/g, ' ')}</Text>
+                                    <Text style={[styles.modalItemText, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}>{getCategoryLabel(c)}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
@@ -281,97 +365,142 @@ export default function AddTransactionScreen({ navigation, route }) {
     );
 }
 
-const aiBoxStyle = StyleSheet.create({
-    box: {
-        flexDirection: 'row', alignItems: 'center', gap: 12,
-        padding: 14, marginBottom: 16,
-        backgroundColor: '#dbeafe',
-        borderRadius: 12,
-        borderWidth: 1, borderColor: '#bfdbfe'
-    },
-    title: { fontWeight: '700', color: '#1e3a8a', fontSize: 14 },
-    subtitle: { color: '#1e40af', fontSize: 12, marginTop: 2 }
-});
-
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f9fafb' },
-    header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        padding: 14, paddingTop: 50, backgroundColor: '#fff',
-        borderBottomWidth: 1, borderBottomColor: '#e5e7eb'
+    container: {
+        flex: 1
     },
-    backLink: { color: '#2563eb', fontSize: 14, fontWeight: '600', width: 60 },
-    headerTitle: { fontSize: 16, fontWeight: '600', color: '#111827', flex: 1, textAlign: 'center' },
-
-    form: { padding: 16, paddingBottom: 40 },
-
-    label: { fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 16, marginBottom: 6 },
-
-    typeRow: { flexDirection: 'row', gap: 8 },
+    header: {
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingTop: Platform.OS === 'ios' ? 12 : 36,
+        paddingBottom: 14,
+        gap: 12
+    },
+    backBtn: {
+        padding: 6
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        flex: 1
+    },
+    form: {
+        padding: 16,
+        paddingBottom: 90
+    },
+    aiBox: {
+        alignItems: 'center',
+        gap: 12,
+        padding: 14,
+        marginBottom: 16,
+        borderRadius: 14,
+        borderWidth: 1
+    },
+    aiTitle: {
+        fontWeight: '800',
+        fontSize: 14
+    },
+    aiSubtitle: {
+        fontSize: 12,
+        marginTop: 2,
+        lineHeight: 16
+    },
+    label: {
+        fontSize: 13,
+        fontWeight: '700',
+        marginTop: 14,
+        marginBottom: 6
+    },
+    typeRow: {
+        flexDirection: 'row',
+        gap: 8
+    },
     typeBtn: {
-        flex: 1, padding: 14, borderRadius: 10,
-        backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb',
+        flex: 1,
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
         alignItems: 'center'
     },
-    typeIncomeActive: { backgroundColor: '#10b981', borderColor: '#10b981' },
-    typeExpenseActive: { backgroundColor: '#ef4444', borderColor: '#ef4444' },
-    typeText: { fontSize: 14, fontWeight: '600', color: '#374151' },
-
+    typeText: {
+        fontSize: 14
+    },
     selector: {
-        backgroundColor: '#fff', padding: 14, borderRadius: 10,
-        borderWidth: 1, borderColor: '#e5e7eb'
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1
     },
-    selectorText: { fontSize: 14, color: '#111827' },
-    selectorPlaceholder: { fontSize: 14, color: '#9ca3af' },
-
+    selectorText: {
+        fontSize: 14,
+        fontWeight: '600'
+    },
     input: {
-        backgroundColor: '#fff', padding: 14, borderRadius: 10,
-        borderWidth: 1, borderColor: '#e5e7eb', fontSize: 14
+        padding: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        fontSize: 15
     },
-
-    paymentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    paymentRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8
+    },
     pmPill: {
-        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-        backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb'
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1
     },
-    pmPillActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-    pmText: { fontSize: 12, color: '#374151' },
-    pmTextActive: { color: '#fff' },
-
-    toggleRow: {
-        flexDirection: 'row', alignItems: 'center', marginTop: 16,
-        backgroundColor: '#fff', padding: 12, borderRadius: 10,
-        borderWidth: 1, borderColor: '#e5e7eb'
+    pmText: {
+        fontSize: 12
     },
-    checkbox: {
-        width: 22, height: 22, borderRadius: 5,
-        borderWidth: 2, borderColor: '#9ca3af', marginRight: 10,
-        justifyContent: 'center', alignItems: 'center'
-    },
-    checkboxActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-    toggleLabel: { fontSize: 14, fontWeight: '600', color: '#111827' },
-    toggleHint: { fontSize: 11, color: '#6b7280', marginTop: 2 },
-
     submitBtn: {
-        backgroundColor: '#2563eb', padding: 16, borderRadius: 10,
-        alignItems: 'center', marginTop: 24
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginTop: 24
     },
-    submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    submitText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '800'
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.65)',
+        justifyContent: 'flex-end'
+    },
     modalContent: {
-        backgroundColor: '#fff', maxHeight: '70%',
-        borderTopLeftRadius: 16, borderTopRightRadius: 16
+        maxHeight: '75%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingBottom: 30
     },
     modalHeader: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb'
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1
     },
-    modalTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-    modalClose: { fontSize: 22, color: '#6b7280' },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '800'
+    },
     modalItem: {
-        padding: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6'
+        padding: 16,
+        borderBottomWidth: 1
     },
-    modalItemText: { fontSize: 14, color: '#111827', fontWeight: '500' },
-    modalItemMeta: { fontSize: 12, color: '#6b7280', marginTop: 2 }
+    modalItemText: {
+        fontSize: 15,
+        fontWeight: '600'
+    },
+    modalItemMeta: {
+        fontSize: 12,
+        marginTop: 3
+    }
 });
+

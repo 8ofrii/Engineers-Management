@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    FileText, Plus, Download, Send, X, Trash2, Ban, DollarSign, Eye, Edit3
+    FileText, Plus, Download, Send, X, Trash2, Ban, DollarSign, Eye, Edit3, Printer
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
@@ -38,9 +38,20 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 const emptyLine = () => ({ description: '', quantity: 1, unitPrice: 0, total: 0 });
 
 export default function Invoices() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { user } = useAuth();
     const { showAlert } = useAlert();
+
+    const STATUS_MAP = {
+        '':               t('invoices.status.all', 'All'),
+        'DRAFT':          t('invoices.status.draft', 'Draft'),
+        'SENT':           t('invoices.status.sent', 'Sent'),
+        'PARTIALLY_PAID': t('invoices.status.partiallyPaid', 'Partially Paid'),
+        'PAID':           t('invoices.status.paid', 'Paid'),
+        'OVERDUE':        t('invoices.status.overdue', 'Overdue'),
+        'CANCELLED':      t('invoices.status.cancelled', 'Cancelled')
+    };
 
     const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -82,7 +93,7 @@ export default function Invoices() {
     const onCreate = async (form) => {
         try {
             await invoicesAPI.create(form);
-            showAlert({ type: 'success', title: 'Created', message: 'Invoice draft created.' });
+            showAlert({ type: 'success', title: isArabic ? 'تم الإنشاء' : 'Created', message: isArabic ? 'تم حفظ مسودة الفاتورة بنجاح.' : 'Invoice draft created.' });
             setCreating(false);
             load();
         } catch (err) {
@@ -93,7 +104,7 @@ export default function Invoices() {
     const onUpdate = async (id, form) => {
         try {
             await invoicesAPI.update(id, form);
-            showAlert({ type: 'success', title: 'Updated', message: 'Invoice updated.' });
+            showAlert({ type: 'success', title: isArabic ? 'تم التعديل' : 'Updated', message: isArabic ? 'تم تحديث الفاتورة.' : 'Invoice updated.' });
             setEditing(null);
             load();
         } catch (err) {
@@ -121,7 +132,7 @@ export default function Invoices() {
         if (!sending) return;
         try {
             await invoicesAPI.send(sending.id, { to: sendTo || undefined, message: sendMessage || undefined });
-            showAlert({ type: 'success', title: 'Sent', message: `Invoice emailed.` });
+            showAlert({ type: 'success', title: isArabic ? 'تم الإرسال' : 'Sent', message: isArabic ? 'تم إرسال الفاتورة بالبريد الإلكتروني.' : `Invoice emailed.` });
             setSending(null);
             setSendTo('');
             setSendMessage('');
@@ -135,7 +146,7 @@ export default function Invoices() {
         if (!paying || !paymentAmount) return;
         try {
             await invoicesAPI.recordPayment(paying.id, Number(paymentAmount));
-            showAlert({ type: 'success', title: 'Recorded', message: 'Payment recorded.' });
+            showAlert({ type: 'success', title: isArabic ? 'تم التسجيل' : 'Recorded', message: isArabic ? 'تم تسجيل الدفعة بنجاح.' : 'Payment recorded.' });
             setPaying(null);
             setPaymentAmount('');
             load();
@@ -145,7 +156,7 @@ export default function Invoices() {
     };
 
     const onCancel = async (inv) => {
-        if (!window.confirm(`Cancel invoice ${inv.invoiceNumber}? This cannot be undone.`)) return;
+        if (!window.confirm(isArabic ? `هل أنت متأكد من إلغاء الفاتورة ${inv.invoiceNumber}؟` : `Cancel invoice ${inv.invoiceNumber}? This cannot be undone.`)) return;
         try {
             await invoicesAPI.cancel(inv.id);
             load();
@@ -155,7 +166,7 @@ export default function Invoices() {
     };
 
     const onDelete = async (inv) => {
-        if (!window.confirm(`Delete draft ${inv.invoiceNumber}?`)) return;
+        if (!window.confirm(isArabic ? `هل تريد حذف مسودة الفاتورة ${inv.invoiceNumber}؟` : `Delete draft ${inv.invoiceNumber}?`)) return;
         try {
             await invoicesAPI.remove(inv.id);
             load();
@@ -168,12 +179,12 @@ export default function Invoices() {
         <Layout>
             <div className="flex-between mb-xl">
                 <div>
-                    <h1 className="flex gap-md"><FileText size={32} /> Invoices</h1>
-                    <p className="text-secondary">Generate professional PDF invoices, send to clients, track payments.</p>
+                    <h1 className="flex gap-md"><FileText size={32} /> {t('invoices.title', 'Invoices')}</h1>
+                    <p className="text-secondary">{t('invoices.subtitle', 'Generate professional PDF invoices, send to clients, track payments.')}</p>
                 </div>
                 {canManage && (
                     <button className="btn btn-primary btn-lg" onClick={() => setCreating(true)}>
-                        <Plus size={18} /> New Invoice
+                        <Plus size={18} /> {t('invoices.newInvoice', 'New Invoice')}
                     </button>
                 )}
             </div>
@@ -187,7 +198,7 @@ export default function Invoices() {
                         onClick={() => setFilter({ status: s })}
                         style={{ padding: '6px 14px' }}
                     >
-                        {s || 'All'}
+                        {STATUS_MAP[s] || s}
                     </button>
                 ))}
             </div>
@@ -197,42 +208,55 @@ export default function Invoices() {
             ) : invoices.length === 0 ? (
                 <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
                     <FileText size={48} style={{ margin: '0 auto var(--spacing-md)', color: 'var(--text-tertiary)' }} />
-                    <h3>No invoices yet</h3>
-                    <p className="text-secondary">Create your first invoice from a project's line items.</p>
+                    <h3>{t('invoices.empty', 'No invoices yet')}</h3>
+                    <p className="text-secondary">{t('invoices.emptyHint', "Create your first invoice from a project's line items.")}</p>
                 </div>
             ) : (
                 <div className="card">
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                <Th>#</Th>
-                                <Th>Client</Th>
-                                <Th>Project</Th>
-                                <Th>Issued</Th>
-                                <Th>Due</Th>
-                                <Th align="right">Total</Th>
-                                <Th align="right">Paid</Th>
-                                <Th>Status</Th>
-                                <Th>Actions</Th>
+                                <Th>{t('invoices.table.number', '#')}</Th>
+                                <Th>{t('invoices.table.client', 'Client')}</Th>
+                                <Th>{t('invoices.table.project', 'Project')}</Th>
+                                <Th>{t('invoices.table.issued', 'Issued')}</Th>
+                                <Th>{t('invoices.table.due', 'Due')}</Th>
+                                <Th align="right">{t('invoices.table.total', 'Total')}</Th>
+                                <Th align="right">{t('invoices.table.paid', 'Paid')}</Th>
+                                <Th>{t('invoices.table.status', 'Status')}</Th>
+                                <Th>{t('invoices.table.actions', 'Actions')}</Th>
                             </tr>
                         </thead>
                         <tbody>
                             {invoices.map(inv => {
                                 const sc = STATUS_COLORS[inv.status] || STATUS_COLORS.DRAFT;
+                                const statusLabel = STATUS_MAP[inv.status] || inv.status;
                                 const balance = Number(inv.totalAmount) - Number(inv.paidAmount);
+                                const isOverdue = inv.status === 'OVERDUE';
+                                const isDueSoon = inv.dueDate && inv.status !== 'PAID' && inv.status !== 'CANCELLED' &&
+                                    new Date(inv.dueDate) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) &&
+                                    new Date(inv.dueDate) > new Date();
                                 return (
-                                    <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                    <tr key={inv.id} style={{
+                                        borderBottom: '1px solid var(--border-color)',
+                                        background: isOverdue ? 'rgba(239,68,68,0.07)' : 'transparent',
+                                        borderLeft: isOverdue ? '3px solid #ef4444' : isDueSoon ? '3px solid #f59e0b' : '3px solid transparent',
+                                        transition: 'background 0.2s'
+                                    }}>
                                         <Td><strong>{inv.invoiceNumber}</strong></Td>
                                         <Td>{inv.client?.name || '-'}</Td>
                                         <Td>{inv.project?.name || '—'}</Td>
                                         <Td>{fmtDate(inv.issueDate)}</Td>
-                                        <Td>{fmtDate(inv.dueDate)}</Td>
+                                        <Td style={{ color: isOverdue ? '#ef4444' : isDueSoon ? '#f59e0b' : undefined, fontWeight: (isOverdue || isDueSoon) ? 700 : undefined }}>
+                                            {fmtDate(inv.dueDate)}
+                                            {isOverdue && <span style={{ fontSize: 10, marginLeft: 4 }}>⚠️</span>}
+                                        </Td>
                                         <Td align="right">{fmtMoney(inv.totalAmount, inv.currency)}</Td>
                                         <Td align="right">
                                             {fmtMoney(inv.paidAmount, inv.currency)}
                                             {balance > 0.01 && (
                                                 <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                                                    bal: {fmtMoney(balance, inv.currency)}
+                                                    {t('invoices.table.balance', 'bal')}: {fmtMoney(balance, inv.currency)}
                                                 </div>
                                             )}
                                         </Td>
@@ -241,12 +265,36 @@ export default function Invoices() {
                                                 padding: '3px 8px', borderRadius: 6,
                                                 background: sc.bg, color: sc.fg,
                                                 fontSize: 11, fontWeight: 700
-                                            }}>{inv.status.replace('_', ' ')}</span>
+                                            }}>{statusLabel}</span>
                                         </Td>
                                         <Td>
                                             <div className="flex gap-sm">
-                                                <button className="btn" onClick={() => setViewing(inv)} title="View"><Eye size={14} /></button>
+                                                <button className="btn" onClick={() => setViewing(inv)} title={isArabic ? 'معاينة' : 'View'}><Eye size={14} /></button>
                                                 <button className="btn" onClick={() => onDownloadPdf(inv)} title="PDF"><Download size={14} /></button>
+                                                <button className="btn" title={isArabic ? 'طباعة' : 'Print'} onClick={() => {
+                                                    // Open a print-friendly tab with invoice details
+                                                    const w = window.open('', '_blank');
+                                                    w.document.write(`<html><head><title>${inv.invoiceNumber}</title><style>
+                                                        body{font-family:sans-serif;padding:40px;color:#111}
+                                                        h1{margin:0 0 4px}h2{margin:0 0 20px;color:#666;font-weight:400}
+                                                        table{width:100%;border-collapse:collapse;margin:20px 0}
+                                                        th{text-align:left;border-bottom:2px solid #ddd;padding:8px}
+                                                        td{padding:8px;border-bottom:1px solid #eee}
+                                                        .total{font-size:1.2rem;font-weight:bold;text-align:right;margin-top:20px}
+                                                        @media print{button{display:none}}
+                                                    </style></head><body>
+                                                        <h1>${inv.invoiceNumber}</h1>
+                                                        <h2>${inv.client?.name || ''} &mdash; ${inv.project?.name || ''}</h2>
+                                                        <p>Issue Date: ${fmtDate(inv.issueDate)} | Due: ${fmtDate(inv.dueDate)} | Status: ${inv.status}</p>
+                                                        <table><thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                                                        <tbody>${(inv.lineItems || []).map(li => `<tr><td>${li.description}</td><td>${li.quantity}</td><td>${fmtMoney(li.unitPrice, inv.currency)}</td><td>${fmtMoney(li.total, inv.currency)}</td></tr>`).join('')}</tbody>
+                                                        </table>
+                                                        <div class="total">Total: ${fmtMoney(inv.totalAmount, inv.currency)}</div>
+                                                        <div class="total" style="font-size:1rem;color:#10b981">Paid: ${fmtMoney(inv.paidAmount, inv.currency)}</div>
+                                                        <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:1rem;cursor:pointer">🖨️ Print</button>
+                                                    </body></html>`);
+                                                    w.document.close();
+                                                }}><Printer size={14} /></button>
                                                 {inv.status === 'DRAFT' && canManage && (
                                                     <button className="btn" onClick={() => setEditing(inv)} title="Edit"><Edit3 size={14} /></button>
                                                 )}
@@ -259,10 +307,10 @@ export default function Invoices() {
                                                         <Send size={14} color="#2563eb" />
                                                     </button>
                                                 )}
-                                                {!['PAID', 'CANCELLED', 'DRAFT'].includes(inv.status) && canManage && (
+                                                {!['PAID', 'CANCELLED'].includes(inv.status) && canManage && (
                                                     <button className="btn" onClick={() => setPaying(inv)} title="Record payment"><DollarSign size={14} color="#10b981" /></button>
                                                 )}
-                                                {inv.status !== 'CANCELLED' && inv.status !== 'PAID' && inv.status !== 'DRAFT' && canManage && (
+                                                {inv.status !== 'CANCELLED' && inv.status !== 'PAID' && canManage && (
                                                     <button className="btn" onClick={() => onCancel(inv)} title="Cancel"><Ban size={14} color="#ef4444" /></button>
                                                 )}
                                                 {inv.status === 'DRAFT' && canManage && (
@@ -518,10 +566,10 @@ const InvoiceForm = ({ invoice, clients, projects, onSubmit, onClose }) => {
 
             <h4 style={{ marginTop: 16 }}>Line items</h4>
             {items.map((item, i) => (
-                <div key={i} className="grid" style={{ gridTemplateColumns: '4fr 1fr 1.2fr 1.2fr auto', gap: 6, marginBottom: 6 }}>
+                <div key={i} className="grid" style={{ gridTemplateColumns: '3fr 1.2fr 1.5fr 1.5fr auto', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                     <input
                         className="input"
-                        placeholder="Description"
+                        placeholder="Description (e.g. Concrete Pouring)"
                         value={item.description}
                         onChange={(e) => updateItem(i, 'description', e.target.value)}
                     />
@@ -531,23 +579,25 @@ const InvoiceForm = ({ invoice, clients, projects, onSubmit, onClose }) => {
                         placeholder="Qty"
                         value={item.quantity}
                         onChange={(e) => updateItem(i, 'quantity', e.target.value)}
+                        style={{ textAlign: 'center' }}
                     />
                     <input
                         type="number"
                         step="0.01"
                         className="input"
-                        placeholder="Unit price"
+                        placeholder="Unit price (EGP)"
                         value={item.unitPrice}
                         onChange={(e) => updateItem(i, 'unitPrice', e.target.value)}
+                        style={{ textAlign: 'right' }}
                     />
                     <input
                         className="input"
                         readOnly
                         value={fmtMoney(item.total)}
-                        style={{ background: 'var(--bg-elevated)' }}
+                        style={{ background: 'var(--bg-elevated)', textAlign: 'right', fontWeight: 600 }}
                     />
-                    <button className="btn" onClick={() => removeLine(i)} style={{ color: '#ef4444' }}>
-                        <Trash2 size={14} />
+                    <button className="btn" onClick={() => removeLine(i)} style={{ color: '#ef4444', padding: '8px' }}>
+                        <Trash2 size={16} />
                     </button>
                 </div>
             ))}

@@ -490,10 +490,6 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
         if (mode === 'EXPENSE') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
-            // Removed constraint that prevented negative custody balances based on client request
-
-            if (!formData.description) newErrors.description = t('common.required');
-
             // Category is always required
             if (!formData.category) newErrors.category = t('common.required');
         }
@@ -511,7 +507,6 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         else if (mode === 'TRANSFER') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
             if (!formData.toEngineerId) newErrors.toEngineerId = t('common.required');
-            if (!formData.description) newErrors.description = t('common.required');
         }
 
         setErrors(newErrors);
@@ -536,7 +531,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     payerUserId: formData.payerUserId || user?.id,
                     workmanId: formData.workmanId || undefined,
                     createBatch: isStockPurchase,
-                    description: formData.description,
+                    description: formData.description?.trim() || formData.itemName || t(`finance.categories.${formData.category?.toLowerCase()}`) || formData.category || 'Site Expense',
                     transactionDate: formData.transactionDate,
                     paymentMethod: formData.paymentMethod,
                     itemName: (costItemMode === 'NEW' || isStockPurchase) ? formData.itemName : undefined,
@@ -556,7 +551,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     projectId: selectedProjectId,
                     projectCostItemId: formData.projectCostItemId || undefined,
                     payerUserId: formData.payerUserId || user?.id,
-                    description: formData.description || t('finance.categories.payment'),
+                    description: formData.description?.trim() || t('finance.categories.payment') || 'Client Payment',
                     transactionDate: formData.transactionDate,
                     clientId: selectedProject?.client?.id,
                     paymentMethod: formData.paymentMethod,
@@ -571,7 +566,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     materialBatchId: selectedBatchId,
                     valueConsumed: Number(formData.amount),
                     projectId: selectedProjectId,
-                    description: formData.description || t('inventory.recordUsage'),
+                    description: formData.description?.trim() || t('inventory.recordUsage') || 'Material Usage',
                     category: formData.category
                 };
             }
@@ -581,7 +576,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     amount: Number(formData.amount),
                     fromEngineerId: user?.id,
                     toEngineerId: formData.toEngineerId,
-                    description: formData.description
+                    description: formData.description?.trim() || 'Custody Transfer'
                 };
             }
 

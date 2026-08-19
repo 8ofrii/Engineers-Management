@@ -1,14 +1,31 @@
 # Dependencies
 node_modules/
+**/node_modules/
 /.pnp
 .pnp.js
 
 # Testing
 /coverage
+**/coverage/
 
-# Production
+# Production & Bundles
 /build
 /dist
+client/dist/
+mobile/dist/
+*.apk
+*.aab
+*.ipa
+
+# Expo & Mobile
+.expo/
+mobile/.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
 
 # Environment variables
 .env
@@ -16,6 +33,7 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+mobile/.env
 
 # Logs
 npm-debug.log*
@@ -28,14 +46,13 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE & Tooling
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Claude Code workspace state
+.gemini/
 .claude/
 
 # Uploads
@@ -45,7 +62,7 @@ server/uploads/
 # Build artifacts
 *.tsbuildinfo
 
-# UAT media — keep bug reports (.md/.pdf/.txt) but never commit raw media
+# UAT media
 UAT/*.jpeg
 UAT/*.jpg
 UAT/*.png
@@ -55,3 +72,5 @@ UAT/*.mp3
 UAT/*.mp4
 UAT/*.wav
 UAT/*.m4a
+
+temp_pdf_reader/

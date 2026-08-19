@@ -113,11 +113,18 @@ export const createProject = async (req, res, next) => {
                 totalContractValue: req.body.totalContractValue ? parseFloat(req.body.totalContractValue) : 0,
                 paymentTerms: req.body.paymentTerms,
                 clientId: req.body.clientId,
-                engineerId: req.user.id,
+                engineerId: req.body.engineerId || req.user.id,
                 tenantId: req.user.tenantId // Critical: Assign to Tenant
             },
             include: {
-                client: true
+                client: true,
+                engineer: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
             }
         });
 
@@ -157,8 +164,12 @@ export const updateProject = async (req, res, next) => {
             });
         }
 
-        // Check ownership
-        if (project.engineerId !== req.user.id && req.user.role !== 'ADMIN') {
+        // Check ownership or managerial authorization
+        const isAuthorized =
+            project.engineerId === req.user.id ||
+            ['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER'].includes(req.user.role);
+
+        if (!isAuthorized) {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to update this project'
@@ -285,8 +296,12 @@ export const deleteProject = async (req, res, next) => {
             });
         }
 
-        // Check ownership
-        if (project.engineerId !== req.user.id && req.user.role !== 'ADMIN') {
+        // Check ownership or managerial authorization
+        const isAuthorized =
+            project.engineerId === req.user.id ||
+            ['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER'].includes(req.user.role);
+
+        if (!isAuthorized) {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to delete this project'

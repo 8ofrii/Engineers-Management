@@ -64,7 +64,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
 
     const validate = () => {
         const newErrors = {};
-        if (!formData.name) newErrors.name = t('common.required');
+        if (!formData.name?.trim()) newErrors.name = t('common.required');
         if (!formData.unit) newErrors.unit = t('common.required');
         if (!formData.unitPrice || Number(formData.unitPrice) <= 0) newErrors.unitPrice = t('common.required');
 
@@ -75,7 +75,16 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (validate()) {
-            onSave(formData);
+            const payload = {
+                name: formData.name.trim(),
+                nameAr: formData.nameAr?.trim() || null,
+                description: formData.description?.trim() || null,
+                unit: formData.unit,
+                unitPrice: parseFloat(formData.unitPrice),
+                reorderLevel: formData.reorderLevel !== '' && formData.reorderLevel !== null ? parseFloat(formData.reorderLevel) : 0,
+                supplierId: formData.supplierId || null
+            };
+            onSave(payload);
         }
     };
 
