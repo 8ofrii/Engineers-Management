@@ -87,27 +87,27 @@ export function BentoCard({
       variants={{ idle: {}, active: {} }}
       data-dark={dark ? "true" : undefined}
       className={clsx(
-        className,
         "group relative flex flex-col overflow-hidden rounded-2xl",
-        "bg-[#0d121f]/90 transform-gpu border border-white/10 [box-shadow:0_-20px_80px_-20px_rgba(249,115,22,0.12)_inset] shadow-2xl ring-1 ring-white/10 transition-all duration-300 hover:border-white/20 hover:ring-white/20",
-        "data-[dark]:bg-gray-900 data-[dark]:ring-white/15"
+        "bg-[#131b2e] transform-gpu border border-white/20 ring-1 ring-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.18)] transition-all duration-300 hover:border-orange-500/50 hover:ring-orange-500/30 hover:shadow-[0_20px_50px_rgba(249,115,22,0.18),inset_0_1px_0_rgba(255,255,255,0.25)] hover:-translate-y-1",
+        "data-[dark]:bg-gray-900 data-[dark]:ring-white/20",
+        className
       )}
     >
-      <div className="relative h-[24rem] sm:h-[29rem] shrink-0 overflow-hidden">
+      <div className="relative h-[19rem] sm:h-[22rem] shrink-0 overflow-hidden bg-slate-950/80 border-b border-white/10">
         {graphic}
         {fade.includes("top") && (
-          <div className="absolute inset-0 bg-gradient-to-b from-[#090d16] to-transparent opacity-60 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#131b2e]/60 to-transparent opacity-60 pointer-events-none" />
         )}
         {fade.includes("bottom") && (
-          <div className="absolute inset-0 bg-gradient-to-t from-[#090d16] to-transparent opacity-70 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#131b2e]/90 to-transparent opacity-80 pointer-events-none" />
         )}
       </div>
-      <div className="relative p-6 sm:p-10 z-20 isolate -mt-24 sm:-mt-28 min-h-[12rem] sm:h-[14rem] backdrop-blur-2xl bg-gradient-to-t from-[#090d16]/95 via-[#090d16]/80 to-transparent text-white border-t border-white/5">
-        <div className="mb-1">{eyebrow}</div>
-        <h3 className="mt-1 text-xl sm:text-2xl font-semibold tracking-tight text-white group-hover:text-orange-300 transition-colors duration-300">
+      <div className="relative p-6 sm:p-8 z-20 isolate bg-gradient-to-b from-[#131b2e] to-[#0c1220] text-white">
+        <div className="mb-2">{eyebrow}</div>
+        <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-orange-300 transition-colors duration-300">
           {title}
         </h3>
-        <p className="mt-2 max-w-[600px] text-xs sm:text-sm leading-relaxed text-slate-300">
+        <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-300">
           {description}
         </p>
       </div>

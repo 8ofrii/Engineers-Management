@@ -775,106 +775,114 @@ export default function Landing() {
                         </h2>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto mt-10">
-                        <BentoCard
-                            eyebrow={
-                                <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-rose-400 font-semibold">
-                                    <Receipt className="w-3.5 h-3.5" />
-                                    {isRTL ? 'المستندات الورقية' : 'Paper Invoices'}
-                                </span>
-                            }
-                            title={t('landing.pain.p1Title', 'Lost & Ruined Paper Receipts')}
-                            description={t('landing.pain.p1Desc', 'Paper invoices get destroyed in dusty site pockets before Friday payroll. With Hesaby, snap a photo or upload a PDF; AI extracts vendor and items immediately.')}
-                            graphic={
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-rose-950/40 p-6 flex items-center justify-center">
-                                    <div className="w-full max-w-xs bg-slate-900/90 border border-rose-500/20 rounded-xl p-4 shadow-xl backdrop-blur-md">
-                                        <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                            <span className="text-xs font-mono text-rose-300 flex items-center gap-1">
-                                                <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> {isRTL ? 'فاتورة تالفة في الجيب' : 'Damaged Receipt'}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 font-mono">SITE POCKET #4</span>
-                                        </div>
-                                        <p className="text-[11px] text-slate-400 font-mono">{isRTL ? '14,200 ج.م حديد مشرشر غير مقيد قبل تصفية الجمعة' : '14,200 EGP unrecorded rebar before Friday cutoff'}</p>
-                                    </div>
-                                </div>
-                            }
-                            fade={["bottom"]}
-                            className="rounded-2xl"
-                        />
+                    {/* Elevated Glass Tray Container Behind All Cards */}
+                    <div className="max-w-6xl mx-auto mt-10 rounded-3xl p-5 sm:p-8 bg-slate-900/60 border border-white/15 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.1)] relative overflow-hidden">
+                        {/* Ambient diffuse backlights */}
+                        <div className="absolute -top-20 -left-20 w-80 h-80 bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute top-1/3 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute -bottom-20 left-1/4 w-80 h-80 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
 
-                        <BentoCard
-                            eyebrow={
-                                <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-amber-400 font-semibold">
-                                    <FileSpreadsheet className="w-3.5 h-3.5" />
-                                    {isRTL ? 'تضارب الشيتات' : 'Spreadsheet Drift'}
-                                </span>
-                            }
-                            title={t('landing.pain.p2Title', 'Excel Spreadsheet Chaos')}
-                            description={t('landing.pain.p2Desc', 'Site engineers use v3.xlsx while the office uses v5.xlsx and the bank statement matches neither. Hesaby unifies everything in real-time.')}
-                            graphic={
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/40 p-6 flex items-center justify-center">
-                                    <div className="w-full max-w-xs bg-slate-900/90 border border-amber-500/20 rounded-xl p-4 shadow-xl backdrop-blur-md">
-                                        <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                            <span className="text-xs font-mono text-amber-300">v3_final_revised.xlsx</span>
-                                            <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold">OUT OF SYNC</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                            <BentoCard
+                                eyebrow={
+                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-rose-400 font-semibold">
+                                        <Receipt className="w-3.5 h-3.5" />
+                                        {isRTL ? 'المستندات الورقية' : 'Paper Invoices'}
+                                    </span>
+                                }
+                                title={t('landing.pain.p1Title', 'Lost & Ruined Paper Receipts')}
+                                description={t('landing.pain.p1Desc', 'Paper invoices get destroyed in dusty site pockets before Friday payroll. With Hesaby, snap a photo or upload a PDF; AI extracts vendor and items immediately.')}
+                                graphic={
+                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-rose-950/50 p-6 flex items-center justify-center">
+                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-rose-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
+                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                                                <span className="text-xs font-mono text-rose-300 flex items-center gap-1 font-semibold">
+                                                    <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> {isRTL ? 'فاتورة تالفة في الجيب' : 'Damaged Receipt'}
+                                                </span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">SITE POCKET #4</span>
+                                            </div>
+                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? '14,200 ج.م حديد مشرشر غير مقيد قبل تصفية الجمعة' : '14,200 EGP unrecorded rebar before Friday cutoff'}</p>
                                         </div>
-                                        <p className="text-[11px] text-slate-400 font-mono">{isRTL ? 'فرق 230,000 ج.م بين الموقع وخزينة المكتب' : '230,000 EGP discrepancy vs Office Safe'}</p>
                                     </div>
-                                </div>
-                            }
-                            fade={["bottom"]}
-                            className="rounded-2xl"
-                        />
+                                }
+                                fade={["bottom"]}
+                                className="border-rose-500/30 hover:border-rose-400/80 shadow-[0_12px_36px_rgba(244,63,94,0.12)]"
+                            />
 
-                        <BentoCard
-                            eyebrow={
-                                <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-sky-400 font-semibold">
-                                    <ShieldCheck className="w-3.5 h-3.5" />
-                                    {isRTL ? 'صلاحيات الاعتماد' : 'Authorization'}
-                                </span>
-                            }
-                            title={t('landing.pain.p3Title', 'WhatsApp Approval Amnesia')}
-                            description={t('landing.pain.p3Desc', 'Who authorized that 150,000 EGP cement delivery? Nobody remembers. Hesaby enforces role-based approval thresholds with immutable audit logs.')}
-                            graphic={
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-sky-950/40 p-6 flex items-center justify-center">
-                                    <div className="w-full max-w-xs bg-slate-900/90 border border-sky-500/20 rounded-xl p-4 shadow-xl backdrop-blur-md">
-                                        <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                            <span className="text-xs font-mono text-sky-300 flex items-center gap-1">
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {isRTL ? 'سجل تدقيق رسمي' : 'Audit Trail Sign-off'}
-                                            </span>
-                                            <span className="text-[10px] text-slate-400 font-mono">148.251.171.147</span>
+                            <BentoCard
+                                eyebrow={
+                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-amber-400 font-semibold">
+                                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                                        {isRTL ? 'تضارب الشيتات' : 'Spreadsheet Drift'}
+                                    </span>
+                                }
+                                title={t('landing.pain.p2Title', 'Excel Spreadsheet Chaos')}
+                                description={t('landing.pain.p2Desc', 'Site engineers use v3.xlsx while the office uses v5.xlsx and the bank statement matches neither. Hesaby unifies everything in real-time.')}
+                                graphic={
+                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-amber-950/50 p-6 flex items-center justify-center">
+                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-amber-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
+                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                                                <span className="text-xs font-mono text-amber-300 font-semibold">v3_final_revised.xlsx</span>
+                                                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">OUT OF SYNC</span>
+                                            </div>
+                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? 'فرق 230,000 ج.م بين الموقع وخزينة المكتب' : '230,000 EGP discrepancy vs Office Safe'}</p>
                                         </div>
-                                        <p className="text-[11px] text-slate-400 font-mono">{isRTL ? 'معتمد من مدير المشروع · الساعة 10:14 ص' : 'Signed by Project Manager · 10:14 AM'}</p>
                                     </div>
-                                </div>
-                            }
-                            fade={["bottom"]}
-                            className="rounded-2xl"
-                        />
+                                }
+                                fade={["bottom"]}
+                                className="border-amber-500/30 hover:border-amber-400/80 shadow-[0_12px_36px_rgba(245,158,11,0.12)]"
+                            />
 
-                        <BentoCard
-                            eyebrow={
-                                <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-orange-400 font-semibold">
-                                    <TrendingUp className="w-3.5 h-3.5" />
-                                    {isRTL ? 'أرباح الإشراف' : 'Management Fee'}
-                                </span>
-                            }
-                            title={t('landing.pain.p4Title', 'Leaking Management & Supervision Fees')}
-                            description={t('landing.pain.p4Desc', 'Discovering 6 months later that your cost-plus margin collapsed. The V1.2 Profit Engine auto-transfers management fees to office revenue upon approval.')}
-                            graphic={
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-orange-950/40 p-6 flex items-center justify-center">
-                                    <div className="w-full max-w-xs bg-slate-900/90 border border-orange-500/20 rounded-xl p-4 shadow-xl backdrop-blur-md">
-                                        <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                            <span className="text-xs font-mono text-orange-400">{isRTL ? 'محرك الأرباح التلقائي' : 'Auto Margin Split'}</span>
-                                            <span className="text-[10px] text-emerald-400 font-bold">+15% LOCKED</span>
+                            <BentoCard
+                                eyebrow={
+                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-sky-400 font-semibold">
+                                        <ShieldCheck className="w-3.5 h-3.5" />
+                                        {isRTL ? 'صلاحيات الاعتماد' : 'Authorization'}
+                                    </span>
+                                }
+                                title={t('landing.pain.p3Title', 'WhatsApp Approval Amnesia')}
+                                description={t('landing.pain.p3Desc', 'Who authorized that 150,000 EGP cement delivery? Nobody remembers. Hesaby enforces role-based approval thresholds with immutable audit logs.')}
+                                graphic={
+                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-sky-950/50 p-6 flex items-center justify-center">
+                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-sky-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
+                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                                                <span className="text-xs font-mono text-sky-300 flex items-center gap-1 font-semibold">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {isRTL ? 'سجل تدقيق رسمي' : 'Audit Trail Sign-off'}
+                                                </span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono font-bold">148.251.171.147</span>
+                                            </div>
+                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? 'معتمد من مدير المشروع · الساعة 10:14 ص' : 'Signed by Project Manager · 10:14 AM'}</p>
                                         </div>
-                                        <p className="text-[11px] text-slate-400 font-mono">{isRTL ? 'تحويل فوري إلى خزينة المكتب لحظة الاعتماد' : 'Instant allocation to Office Safe'}</p>
                                     </div>
-                                </div>
-                            }
-                            fade={["bottom"]}
-                            className="rounded-2xl"
-                        />
+                                }
+                                fade={["bottom"]}
+                                className="border-sky-500/30 hover:border-sky-400/80 shadow-[0_12px_36px_rgba(56,189,248,0.12)]"
+                            />
+
+                            <BentoCard
+                                eyebrow={
+                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-orange-400 font-semibold">
+                                        <TrendingUp className="w-3.5 h-3.5" />
+                                        {isRTL ? 'أرباح الإشراف' : 'Management Fee'}
+                                    </span>
+                                }
+                                title={t('landing.pain.p4Title', 'Leaking Management & Supervision Fees')}
+                                description={t('landing.pain.p4Desc', 'Discovering 6 months later that your cost-plus margin collapsed. The V1.2 Profit Engine auto-transfers management fees to office revenue upon approval.')}
+                                graphic={
+                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-orange-950/50 p-6 flex items-center justify-center">
+                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-orange-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
+                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                                                <span className="text-xs font-mono text-orange-400 font-semibold">{isRTL ? 'محرك الأرباح التلقائي' : 'Auto Margin Split'}</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">+15% LOCKED</span>
+                                            </div>
+                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? 'تحويل فوري إلى خزينة المكتب لحظة الاعتماد' : 'Instant allocation to Office Safe'}</p>
+                                        </div>
+                                    </div>
+                                }
+                                fade={["bottom"]}
+                                className="border-orange-500/30 hover:border-orange-400/80 shadow-[0_12px_36px_rgba(249,115,22,0.12)]"
+                            />
+                        </div>
                     </div>
                 </section>
 
