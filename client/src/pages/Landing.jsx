@@ -235,9 +235,12 @@ export default function Landing() {
 
                             {user ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Link to="/dashboard" className="landing-btn-primary" style={{ padding: '7px 16px', fontSize: '0.85rem' }}>
-                                        <span>{t('landing.nav.openApp', 'Dashboard')}</span>
-                                        <ArrowIcon size={15} />
+                                    <Link to="/dashboard">
+                                        <FlowButton
+                                            variant="light"
+                                            text={t('landing.nav.openApp', 'Dashboard')}
+                                            className="px-5 py-2 text-xs"
+                                        />
                                     </Link>
                                     <button
                                         type="button"
@@ -254,9 +257,12 @@ export default function Landing() {
                                     <Link to="/login" className="landing-icon-btn" style={{ fontWeight: 700 }}>
                                         {t('landing.nav.signIn', 'Sign In')}
                                     </Link>
-                                    <Link to="/signup" className="landing-btn-primary">
-                                        <span>{t('landing.nav.startFree', 'Start Free')}</span>
-                                        <ArrowIcon size={15} />
+                                    <Link to="/signup">
+                                        <FlowButton
+                                            variant="hesaby"
+                                            text={t('landing.nav.startFree', 'Start Free')}
+                                            className="px-5 py-2 text-xs"
+                                        />
                                     </Link>
                                 </>
                             )}
@@ -348,19 +354,26 @@ export default function Landing() {
                         })}
                     </div>
 
-                    {/* Window Container */}
+                    {/* Bento Showcase Card */}
                     <div className="landing-showcase-window">
+                        {/* Ambient Card Lights */}
+                        <div className="absolute -top-32 -right-32 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                        {/* Top Modern Status Bar */}
                         <div className="landing-window-header">
-                            <div className="landing-window-dots">
-                                <span className="landing-dot red"></span>
-                                <span className="landing-dot yellow"></span>
-                                <span className="landing-dot green"></span>
+                            <div className="landing-window-badge">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span>LIVE ERP SIMULATOR</span>
                             </div>
                             <div className="landing-window-title">
-                                <Building2 size={13} />
+                                <Building2 size={13} className="text-cyan-400" />
                                 <span>hesaby.ai/app/{activeTab}</span>
                             </div>
-                            <div style={{ width: 40 }}></div>
+                            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-mono">
+                                <ShieldCheck size={13} className="text-emerald-400" />
+                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">v2.4</span>
+                            </div>
                         </div>
 
                         <div className="landing-window-body">
@@ -371,7 +384,7 @@ export default function Landing() {
                                 const isPosted = ocrStage === 'posted';
 
                                 return (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', alignItems: 'center' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2.5rem', alignItems: 'center' }}>
                                         <div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                                 <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -393,7 +406,7 @@ export default function Landing() {
                                             </p>
 
                                             {/* Scenario Switcher Pills */}
-                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
                                                 {OCR_SCENARIOS.map((sc, idx) => (
                                                     <button
                                                         key={sc.id}
@@ -411,19 +424,16 @@ export default function Landing() {
                                             </div>
 
                                             {/* Action Buttons */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                                                <button
-                                                    type="button"
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                                                <FlowButton
+                                                    variant="cyan"
+                                                    icon={Camera}
+                                                    text={isRTL ? 'إعادة مسح الفاتورة ضوئياً' : 'Scan & Extract Receipt'}
                                                     onClick={() => {
                                                         setOcrStage('scanning');
                                                         setTimeout(() => setOcrStage('extracted'), 500);
                                                     }}
-                                                    className="landing-btn-primary"
-                                                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
-                                                >
-                                                    <Camera size={16} />
-                                                    <span>{isRTL ? 'إعادة مسح الفاتورة ضوئياً' : 'Scan & Extract Receipt'}</span>
-                                                </button>
+                                                />
 
                                                 {isScanning && (
                                                     <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -434,125 +444,103 @@ export default function Landing() {
                                             </div>
                                         </div>
 
-                                        {/* Dynamic Scanned Voucher Card */}
-                                        <div style={{
-                                            background: 'rgba(13, 19, 31, 0.9)',
-                                            border: isScanning ? '1px solid #38bdf8' : isPosted ? '1px solid #10b981' : '1px solid rgba(56, 189, 248, 0.25)',
-                                            borderRadius: '16px',
-                                            padding: '1.35rem',
-                                            boxShadow: isScanning ? '0 0 25px rgba(56,189,248,0.25)' : '0 12px 28px rgba(0,0,0,0.5)',
-                                            transition: 'all 0.3s ease'
-                                        }}>
+                                        {/* Dynamic Scanned Voucher Card (Bento Sub-Card) */}
+                                        <div className="relative overflow-hidden rounded-2xl bg-[#0b101b]/95 border border-white/20 ring-1 ring-white/10 shadow-2xl p-6 transition-all duration-300">
                                             {isPosted ? (
                                                 /* Success Posted State */
-                                                <div style={{ textAlign: 'center', padding: '12px 6px' }}>
+                                                <div style={{ textAlign: 'center', padding: '16px 8px' }}>
                                                     <div style={{
-                                                        width: 52,
-                                                        height: 52,
+                                                        width: 56,
+                                                        height: 56,
                                                         borderRadius: '50%',
                                                         background: 'rgba(16, 185, 129, 0.12)',
                                                         color: '#10b981',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
-                                                        margin: '0 auto 14px',
-                                                        border: '2px solid #10b981'
+                                                        margin: '0 auto 16px',
+                                                        border: '2px solid rgba(16, 185, 129, 0.5)',
+                                                        boxShadow: '0 0 20px rgba(16, 185, 129, 0.25)'
                                                     }}>
-                                                        <CheckCircle2 size={28} />
+                                                        <CheckCircle2 size={30} />
                                                     </div>
-                                                    <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: '0 0 6px' }}>
+                                                    <h4 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff', margin: '0 0 8px' }}>
                                                         {isRTL ? 'تم الترحيل بنجاح إلى الخزينة ودفتر الأستاذ!' : 'Successfully Posted to Safe & Ledger!'}
                                                     </h4>
-                                                    <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '0 0 18px', lineHeight: 1.6 }}>
+                                                    <p style={{ fontSize: '0.86rem', color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
                                                         {isRTL
                                                             ? `تم خصم ${currentScenario.amount} من خزينة ${currentScenario.projectAr} وترحيل ضريبة القيمة المضافة (${currentScenario.vat}) إلى سجل الضرائب تلقائياً.`
                                                             : `Debited ${currentScenario.amount} from ${currentScenario.projectEn} safe and recorded ${currentScenario.vat} in tax ledger.`}
                                                     </p>
 
-                                                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-                                                        <button
-                                                            type="button"
+                                                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                                                        <FlowButton
+                                                            variant="light"
+                                                            icon={RefreshCw}
+                                                            text={isRTL ? 'تجربة فاتورة أخرى' : 'Try Another Invoice'}
                                                             onClick={() => {
                                                                 setSelectedOcrScenario((selectedOcrScenario + 1) % OCR_SCENARIOS.length);
                                                                 setOcrStage('extracted');
                                                             }}
-                                                            className="landing-btn-secondary"
-                                                            style={{ fontSize: '0.82rem', padding: '7px 14px' }}
-                                                        >
-                                                            <RefreshCw size={13} />
-                                                            <span>{isRTL ? 'تجربة فاتورة أخرى' : 'Try Another Invoice'}</span>
-                                                        </button>
-                                                        <Link
-                                                            to="/signup"
-                                                            className="landing-btn-primary"
-                                                            style={{ fontSize: '0.82rem', padding: '7px 16px' }}
-                                                        >
-                                                            <span>{isRTL ? 'ابدأ حساب شركتك مجاناً' : 'Get Started Free'}</span>
-                                                            <ArrowIcon size={14} />
+                                                        />
+                                                        <Link to="/signup">
+                                                            <FlowButton
+                                                                variant="emerald"
+                                                                text={isRTL ? 'ابدأ حساب شركتك مجاناً' : 'Get Started Free'}
+                                                            />
                                                         </Link>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 /* Standard Scanned OCR Card */
                                                 <>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }}></span>
-                                                            <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                            <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#fff' }}>
                                                                 {isRTL ? 'فاتورة ضريبية مقروءة بنجاح' : 'Tax Invoice OCR Verified'}
                                                             </span>
                                                         </div>
-                                                        <span style={{ fontSize: '0.72rem', color: '#38bdf8', background: 'rgba(56,189,248,0.1)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                                                        <span style={{ fontSize: '0.74rem', color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: 8, fontWeight: 700 }}>
                                                             {currentScenario.confidence} AI Accuracy
                                                         </span>
                                                     </div>
 
                                                     {/* Items / Description Note */}
-                                                    <div style={{
-                                                        background: 'rgba(255, 255, 255, 0.02)',
-                                                        border: '1px solid rgba(255,255,255,0.05)',
-                                                        padding: '10px 12px',
-                                                        borderRadius: '8px',
-                                                        fontSize: '0.84rem',
-                                                        color: '#cbd5e1',
-                                                        marginBottom: '12px',
-                                                        lineHeight: 1.55
-                                                    }}>
-                                                        <strong>{isRTL ? 'بيان البنود: ' : 'Line Items: '}</strong>
+                                                    <div className="bg-slate-900/70 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300 font-mono mb-3.5 leading-relaxed">
+                                                        <strong className="text-white">{isRTL ? 'بيان البنود: ' : 'Line Items: '}</strong>
                                                         {isRTL ? currentScenario.itemsAr : currentScenario.itemsEn}
                                                     </div>
 
                                                     {/* Parsed Fields Grid */}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.82rem' }}>
-                                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '9px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                            <div style={{ color: 'var(--landing-text-subtle)', fontSize: '0.72rem' }}>{isRTL ? 'إجمالي الفاتورة' : 'Total Amount'}</div>
-                                                            <div style={{ fontWeight: 800, color: '#10b981', fontSize: '1.05rem' }}>{currentScenario.amount}</div>
+                                                    <div className="grid grid-cols-2 gap-2.5 mb-4">
+                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
+                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'إجمالي الفاتورة' : 'Total Amount'}</div>
+                                                            <div className="font-mono font-black text-emerald-400 text-lg">{currentScenario.amount}</div>
                                                         </div>
-                                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '9px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                            <div style={{ color: 'var(--landing-text-subtle)', fontSize: '0.72rem' }}>{isRTL ? 'ضريبة القيمة المضافة (14%)' : 'VAT (14%)'}</div>
-                                                            <div style={{ fontWeight: 700, color: '#38bdf8' }}>{currentScenario.vat}</div>
+                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
+                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'ضريبة القيمة المضافة (14%)' : 'VAT (14%)'}</div>
+                                                            <div className="font-mono font-bold text-cyan-400 text-sm">{currentScenario.vat}</div>
                                                         </div>
-                                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '9px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                            <div style={{ color: 'var(--landing-text-subtle)', fontSize: '0.72rem' }}>{isRTL ? 'المورد / السجل' : 'Vendor / Tax ID'}</div>
-                                                            <div style={{ fontWeight: 700, color: '#fff' }}>{isRTL ? currentScenario.vendorAr : currentScenario.vendorEn}</div>
-                                                            <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{currentScenario.taxNumber}</div>
+                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
+                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'المورد / السجل' : 'Vendor / Tax ID'}</div>
+                                                            <div className="font-bold text-white text-xs truncate">{isRTL ? currentScenario.vendorAr : currentScenario.vendorEn}</div>
+                                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{currentScenario.taxNumber}</div>
                                                         </div>
-                                                        <div style={{ background: 'rgba(255,255,255,0.02)', padding: '9px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                            <div style={{ color: 'var(--landing-text-subtle)', fontSize: '0.72rem' }}>{isRTL ? 'المشروع والتصنيف' : 'Project & Category'}</div>
-                                                            <div style={{ fontWeight: 700, color: '#ff8c42' }}>{isRTL ? currentScenario.projectAr : currentScenario.projectEn}</div>
-                                                            <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>{isRTL ? currentScenario.categoryAr : currentScenario.categoryEn}</div>
+                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
+                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'المشروع والتصنيف' : 'Project & Category'}</div>
+                                                            <div className="font-bold text-amber-400 text-xs truncate">{isRTL ? currentScenario.projectAr : currentScenario.projectEn}</div>
+                                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{isRTL ? currentScenario.categoryAr : currentScenario.categoryEn}</div>
                                                         </div>
                                                     </div>
 
-                                                    <button
-                                                        type="button"
+                                                    <FlowButton
+                                                        variant="emerald"
+                                                        icon={CheckCircle2}
+                                                        className="w-full justify-center py-3 text-sm font-bold shadow-lg ring-1 ring-emerald-500/30"
+                                                        text={isRTL ? 'اعتماد وترحيل فوري إلى الخزينة' : 'Approve & Post to Safe'}
                                                         onClick={() => setOcrStage('posted')}
-                                                        className="landing-btn-primary"
-                                                        style={{ width: '100%', marginTop: '12px', padding: '9px', justifyContent: 'center', fontSize: '0.86rem' }}
-                                                    >
-                                                        <CheckCircle2 size={15} />
-                                                        <span>{isRTL ? 'اعتماد وترحيل فوري إلى الخزينة' : 'Approve & Post to Safe'}</span>
-                                                    </button>
+                                                    />
                                                 </>
                                             )}
                                         </div>
@@ -563,44 +551,47 @@ export default function Landing() {
                             {/* Tab 2: Safes & Profit Engine */}
                             {activeTab === 'safes' && (
                                 <div>
-                                    <div style={{ textAlign: 'center', maxWidth: 620, margin: '0 auto 20px' }}>
-                                        <h3 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                                    <div style={{ textAlign: 'center', maxWidth: 620, margin: '0 auto 24px' }}>
+                                        <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold font-mono">
+                                            {isRTL ? 'محرك الأرباح الذكي' : 'Smart Profit Engine'}
+                                        </span>
+                                        <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', margin: '6px 0 10px' }}>
                                             {isRTL ? 'محرك الأرباح V1.2 وفصل الخزائن المحكم' : 'V1.2 Office Profit Engine & Dual Safes'}
                                         </h3>
-                                        <p style={{ color: 'var(--landing-text-muted)', fontSize: '0.88rem', lineHeight: 1.6 }}>
+                                        <p style={{ color: 'var(--landing-text-muted)', fontSize: '0.92rem', lineHeight: 1.65 }}>
                                             {isRTL
                                                 ? 'عزل كامل بين أموال المالك وخزينة المكتب مع تحويل آلي لنسبة الإشراف الإدارية (Management Fee) فور اعتماد المصروف.'
                                                 : 'Complete isolation between Project Safe and Office Safe with automated management fee allocation.'}
                                         </p>
                                     </div>
 
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.15rem' }}>
-                                        <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '14px', padding: '1.35rem' }}>
-                                            <div style={{ color: '#60a5fa', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4 }}>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                        <div className="group relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-6 shadow-xl hover:border-blue-500/50 transition-all">
+                                            <div className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">
                                                 {isRTL ? 'خزينة المشروع (Project Safe)' : 'Project Safe'}
                                             </div>
-                                            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#fff', marginBottom: 6 }}>2,450,000 EGP</div>
-                                            <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                            <div className="text-3xl font-mono font-black text-white mb-2">2,450,000 EGP</div>
+                                            <div className="text-xs text-slate-400">
                                                 {isRTL ? 'مخصص للمواد، المقاولين، والمصنعيات المباشرة' : 'Reserved for site materials & contractor wages'}
                                             </div>
                                         </div>
 
-                                        <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '14px', padding: '1.35rem' }}>
-                                            <div style={{ color: '#34d399', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4 }}>
+                                        <div className="group relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-6 shadow-xl hover:border-emerald-500/50 transition-all">
+                                            <div className="text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
                                                 {isRTL ? 'خزينة وأرباح المكتب (Office Safe)' : 'Office Safe & Revenue'}
                                             </div>
-                                            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#10b981', marginBottom: 6 }}>367,500 EGP</div>
-                                            <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                            <div className="text-3xl font-mono font-black text-emerald-400 mb-2">367,500 EGP</div>
+                                            <div className="text-xs text-slate-400">
                                                 {isRTL ? 'صافي نسبة الإشراف المحصلة (15% Net Fee)' : 'Earned Management Fees (15% Net Margin)'}
                                             </div>
                                         </div>
 
-                                        <div style={{ background: 'rgba(249, 115, 22, 0.05)', border: '1px solid rgba(249, 115, 22, 0.25)', borderRadius: '14px', padding: '1.35rem' }}>
-                                            <div style={{ color: '#fb923c', fontSize: '0.82rem', fontWeight: 700, marginBottom: 4 }}>
+                                        <div className="group relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-6 shadow-xl hover:border-amber-500/50 transition-all">
+                                            <div className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
                                                 {isRTL ? 'التحويل الآلي للأرباح' : 'Automated Margin Transfer'}
                                             </div>
-                                            <div style={{ fontSize: '1.85rem', fontWeight: 900, color: '#f97316', marginBottom: 6 }}>+3,675 EGP</div>
-                                            <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                            <div className="text-3xl font-mono font-black text-amber-400 mb-2">+3,675 EGP</div>
+                                            <div className="text-xs text-slate-400">
                                                 {isRTL ? 'يُحوّل تلقائياً لحظة اعتماد كل مصروف' : 'Auto-credited upon each approved site expense'}
                                             </div>
                                         </div>
@@ -610,49 +601,55 @@ export default function Landing() {
 
                             {/* Tab 3: Daily Site Reports */}
                             {activeTab === 'dsr' && (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'center' }}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                                     <div>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase' }}>
+                                        <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold font-mono">
                                             {isRTL ? 'متابعة الموقع لحظة بلحظة' : 'Field Operations & Workforce'}
                                         </span>
-                                        <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '6px 0 14px', color: '#fff' }}>
+                                        <h3 className="text-2xl font-bold text-white mt-1.5 mb-3">
                                             {isRTL ? 'تقارير يومية DSR معتمدة وموثقة' : 'Verified Daily Site Reports (DSR)'}
                                         </h3>
-                                        <p style={{ color: 'var(--landing-text-muted)', lineHeight: 1.65, fontSize: '0.92rem' }}>
+                                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
                                             {isRTL
                                                 ? 'سجل درجات الحرارة والطقس، حضور العمالة، تشوينات المواد، صب الخرسانات، وتوقيع الاستشاري الرقمي في تقرير رسمي فوري.'
                                                 : 'Track weather conditions, labor headcounts, equipment hours, material deliveries, and digital supervisor sign-offs.'}
                                         </p>
+                                        <FlowButton
+                                            variant="cyan"
+                                            icon={HardHat}
+                                            text={isRTL ? 'استعراض تقرير موقع تجريبي' : 'View Sample DSR'}
+                                        />
                                     </div>
 
-                                    <div style={{ background: 'rgba(13, 19, 31, 0.85)', border: '1px solid var(--landing-border)', borderRadius: '16px', padding: '1.35rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <div className="relative overflow-hidden rounded-2xl bg-[#0b101b]/95 border border-white/15 ring-1 ring-white/5 p-6 shadow-2xl">
+                                        <div className="flex justify-between items-center mb-4">
                                             <div>
-                                                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff' }}>{isRTL ? 'تقرير الموقع اليومي #142' : 'Daily Site Report #142'}</div>
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--landing-text-subtle)' }}>{isRTL ? 'برج النرجس — التجمع الخامس' : 'Al-Narges Tower — New Cairo'}</div>
+                                                <div className="font-bold text-white text-sm">{isRTL ? 'تقرير الموقع اليومي #142' : 'Daily Site Report #142'}</div>
+                                                <div className="text-xs text-slate-400">{isRTL ? 'برج النرجس — التجمع الخامس' : 'Al-Narges Tower — New Cairo'}</div>
                                             </div>
-                                            <span style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', padding: '3px 8px', borderRadius: 6, fontSize: '0.72rem', fontWeight: 800 }}>
+                                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
                                                 {isRTL ? 'معتمد من الاستشاري' : 'Consultant Approved'}
                                             </span>
                                         </div>
 
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, margin: '12px 0', textAlign: 'center' }}>
-                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 4px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8' }}>34</div>
-                                                <div style={{ fontSize: '0.68rem', color: 'var(--landing-text-subtle)' }}>{isRTL ? 'حضور العمال' : 'Labor Count'}</div>
+                                        <div className="grid grid-cols-3 gap-3 my-4 text-center">
+                                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
+                                                <div className="text-lg font-mono font-black text-cyan-400">34</div>
+                                                <div className="text-[11px] text-slate-400 mt-0.5">{isRTL ? 'حضور العمال' : 'Labor Count'}</div>
                                             </div>
-                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 4px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b' }}>☀️ 31°C</div>
-                                                <div style={{ fontSize: '0.68rem', color: 'var(--landing-text-subtle)' }}>{isRTL ? 'طقس معتدل' : 'Weather'}</div>
+                                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
+                                                <div className="text-lg font-mono font-black text-amber-400">☀️ 31°C</div>
+                                                <div className="text-[11px] text-slate-400 mt-0.5">{isRTL ? 'طقس معتدل' : 'Weather'}</div>
                                             </div>
-                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 4px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981' }}>60 m³</div>
-                                                <div style={{ fontSize: '0.68rem', color: 'var(--landing-text-subtle)' }}>{isRTL ? 'صب خرسانة' : 'Concrete Pour'}</div>
+                                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
+                                                <div className="text-lg font-mono font-black text-emerald-400">60 m³</div>
+                                                <div className="text-[11px] text-slate-400 mt-0.5">{isRTL ? 'صب خرسانة' : 'Concrete Pour'}</div>
                                             </div>
                                         </div>
 
-                                        <div style={{ fontSize: '0.78rem', color: '#cbd5e1', background: 'rgba(255,255,255,0.02)', padding: '9px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <strong>{isRTL ? 'ملاحظة المهندس:' : 'Engineer Note:'}</strong> {isRTL ? 'تم الانتهاء من حدادة وسقف الدور الثالث وجاري الاستلام الهندسي.' : 'Completed 3rd floor rebar; ready for structural inspection.'}
+                                        <div className="text-xs text-slate-300 bg-slate-900/60 border border-white/10 rounded-xl p-3.5 leading-relaxed font-mono">
+                                            <strong className="text-white">{isRTL ? 'ملاحظة المهندس: ' : 'Engineer Note: '}</strong>
+                                            {isRTL ? 'تم الانتهاء من حدادة وسقف الدور الثالث وجاري الاستلام الهندسي.' : 'Completed 3rd floor rebar; ready for structural inspection.'}
                                         </div>
                                     </div>
                                 </div>
@@ -660,39 +657,44 @@ export default function Landing() {
 
                             {/* Tab 4: Smart Bank Reconciliation */}
                             {activeTab === 'recon' && (
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'center' }}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                                     <div>
-                                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>
+                                        <span className="text-xs uppercase tracking-wider text-emerald-400 font-semibold font-mono">
                                             {isRTL ? 'مطابقة الحسابات البنكية' : 'Bank Reconciliation Engine'}
                                         </span>
-                                        <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '6px 0 14px', color: '#fff' }}>
+                                        <h3 className="text-2xl font-bold text-white mt-1.5 mb-3">
                                             {isRTL ? 'ارفع كشف الحساب البنكي.. والمطابقة في ثوانٍ' : 'Instant CSV Statement Auto-Matching'}
                                         </h3>
-                                        <p style={{ color: 'var(--landing-text-muted)', lineHeight: 1.65, fontSize: '0.92rem' }}>
+                                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
                                             {isRTL
                                                 ? 'متوافق مع كشوف حساب البنك الأهلي NBE، بنك مصر، وCIB. يطابق الإيداعات والمسحوبات مع قيود الدفتر ويكشف أي فرق مالي.'
                                                 : 'Parses NBE, CIB, and Banque Misr statements. Matches thousands of transactions and flags discrepancies automatically.'}
                                         </p>
+                                        <FlowButton
+                                            variant="emerald"
+                                            icon={Scale}
+                                            text={isRTL ? 'مطابقة كشف حساب بنكي' : 'Auto-Match Statement'}
+                                        />
                                     </div>
 
-                                    <div style={{ background: 'rgba(13, 19, 31, 0.85)', border: '1px solid var(--landing-border)', borderRadius: '16px', padding: '1.35rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                                            <span style={{ fontWeight: 800, color: '#fff' }}>{isRTL ? 'كشف حساب NBE — حساب المقاولات' : 'NBE Corporate Account'}</span>
-                                            <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.82rem' }}>100% Matched</span>
+                                    <div className="relative overflow-hidden rounded-2xl bg-[#0b101b]/95 border border-white/15 ring-1 ring-white/5 p-6 shadow-2xl">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <span className="font-bold text-white text-sm">{isRTL ? 'كشف حساب NBE — حساب المقاولات' : 'NBE Corporate Account'}</span>
+                                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">100% Matched</span>
                                         </div>
 
-                                        <div style={{ height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 999, overflow: 'hidden', marginBottom: 14 }}>
-                                            <div style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)' }}></div>
+                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-4">
+                                            <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 w-full"></div>
                                         </div>
 
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.82rem' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(16, 185, 129, 0.04)', borderRadius: 6, border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                                        <div className="flex flex-col gap-2.5 text-xs font-mono">
+                                            <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-slate-200">
                                                 <span>{isRTL ? 'تحويل دفعة عميل (برج الأمل)' : 'Client Inflow (Al-Amal)'}</span>
-                                                <strong style={{ color: '#10b981' }}>+450,000 EGP</strong>
+                                                <strong className="text-emerald-400 font-bold">+450,000 EGP</strong>
                                             </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(239, 68, 68, 0.04)', borderRadius: 6, border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                                            <div className="flex justify-between items-center p-3 rounded-xl bg-rose-950/20 border border-rose-500/20 text-slate-200">
                                                 <span>{isRTL ? 'شيك مصنع حديد عز' : 'Ezz Steel Vendor Check'}</span>
-                                                <strong style={{ color: '#ef4444' }}>-185,000 EGP</strong>
+                                                <strong className="text-rose-400 font-bold">-185,000 EGP</strong>
                                             </div>
                                         </div>
                                     </div>
@@ -702,22 +704,27 @@ export default function Landing() {
                             {/* Tab 5: Multi-Level Approvals */}
                             {activeTab === 'approval' && (
                                 <div>
-                                    <div style={{ textAlign: 'center', maxWidth: 620, margin: '0 auto 18px' }}>
-                                        <h3 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                                    <div className="text-center max-w-xl mx-auto mb-6">
+                                        <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold font-mono">
+                                            {isRTL ? 'الحوكمة الهندسية' : 'Governance & Routing'}
+                                        </span>
+                                        <h3 className="text-2xl font-bold text-white mt-1.5 mb-2">
                                             {isRTL ? 'سلسلة الموافقات والصلاحيات التلقائية' : 'Configurable Approval Thresholds'}
                                         </h3>
-                                        <p style={{ color: 'var(--landing-text-muted)', fontSize: '0.88rem' }}>
+                                        <p className="text-slate-400 text-sm">
                                             {isRTL
                                                 ? 'حدد سقف الاعتماد المالي لكل دور هندسي لمنع الصرف غير المصرح به وضمان التدقيق المحاسبي.'
                                                 : 'Enforce approval limits by amount. Move the slider to test threshold routing.'}
                                         </p>
                                     </div>
 
-                                    {/* Slider */}
-                                    <div style={{ maxWidth: 480, margin: '0 auto 18px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: 12, border: '1px solid var(--landing-border)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontWeight: 700 }}>
-                                            <span style={{ fontSize: '0.85rem' }}>{isRTL ? 'قيمة المصروف التجريبي:' : 'Sample Expense Amount:'}</span>
-                                            <span style={{ color: '#f97316', fontSize: '1.15rem', fontWeight: 900 }}>{currency(previewAmount)}</span>
+                                    {/* Slider Container */}
+                                    <div className="max-w-md mx-auto mb-6 bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-5 rounded-2xl shadow-xl">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className="text-xs text-slate-300 font-medium">{isRTL ? 'قيمة المصروف التجريبي:' : 'Sample Expense Amount:'}</span>
+                                            <span className="text-white font-mono font-black text-lg bg-white/5 border border-white/10 px-3 py-1 rounded-lg">
+                                                {currency(previewAmount)}
+                                            </span>
                                         </div>
                                         <input
                                             type="range"
@@ -726,9 +733,9 @@ export default function Landing() {
                                             step="1000"
                                             value={previewAmount}
                                             onChange={(e) => setPreviewAmount(Number(e.target.value))}
-                                            style={{ width: '100%', accentColor: '#f97316', cursor: 'pointer' }}
+                                            className="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg"
                                         />
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--landing-text-subtle)', marginTop: 4 }}>
+                                        <div className="flex justify-between text-[11px] text-slate-400 font-mono mt-2">
                                             <span>1,000 EGP</span>
                                             <span>50,000 EGP</span>
                                             <span>150,000+ EGP</span>
@@ -739,22 +746,14 @@ export default function Landing() {
                                     {(() => {
                                         const approver = getApproverForAmount(previewAmount);
                                         return (
-                                            <div style={{
-                                                maxWidth: 480,
-                                                margin: '0 auto',
-                                                background: 'rgba(13, 19, 31, 0.85)',
-                                                border: `1px solid ${approver.color}`,
-                                                borderRadius: 12,
-                                                padding: '14px',
-                                                textAlign: 'center'
-                                            }}>
-                                                <div style={{ fontSize: '0.78rem', color: 'var(--landing-text-muted)', marginBottom: 2 }}>
+                                            <div className="max-w-md mx-auto bg-slate-900/90 border border-white/20 ring-1 ring-white/10 rounded-2xl p-5 text-center shadow-2xl relative overflow-hidden">
+                                                <div className="text-xs text-slate-400 mb-1">
                                                     {isRTL ? 'المسؤول المطلوب للاعتماد:' : 'Required Approval Authority:'}
                                                 </div>
-                                                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: approver.color, marginBottom: 2 }}>
+                                                <div className="text-xl font-bold mb-1" style={{ color: approver.color }}>
                                                     {approver.role}
                                                 </div>
-                                                <div style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+                                                <div className="text-xs text-slate-300">
                                                     {approver.note}
                                                 </div>
                                             </div>
