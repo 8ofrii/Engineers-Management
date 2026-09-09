@@ -23,6 +23,10 @@ const aiServiceMock = {
 };
 vi.mock('../services/aiService.js', () => aiServiceMock);
 
+vi.mock('../lib/aiUsage.js', () => ({
+    enforceAiBudget: vi.fn().mockResolvedValue(true)
+}));
+
 // We don't actually call OpenAI in this test — mock the SDK so even if
 // a future code path leaks past the mocked aiService it doesn't network.
 vi.mock('openai', () => ({

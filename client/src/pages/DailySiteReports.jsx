@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ClipboardList, Filter, CheckCircle, Send, FileText, X, Sun, Cloud, CloudRain, Wind, Thermometer, ArrowRight, Plus } from 'lucide-react';
+import { ClipboardList, Filter, CheckCircle, Send, FileText, X, Sun, Cloud, CloudRain, Wind, Thermometer, ArrowRight, Plus, Mic, Square, Sparkles, Loader2, Play, RotateCcw } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
@@ -25,6 +25,7 @@ const WEATHER_ICONS = {
 
 const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 const fmtDateTime = (s) => s ? new Date(s).toLocaleString('en-GB') : '-';
+const fmtTimer = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 export default function DailySiteReports() {
     const { t, i18n } = useTranslation();
@@ -59,7 +60,158 @@ export default function DailySiteReports() {
         visitorsNotes: ''
     });
 
+    // Voice DSR Modal State
+    const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+    const [voicePhase, setVoicePhase] = useState('idle'); // idle | recording | preview | extracting
+    const [voiceSeconds, setVoiceSeconds] = useState(0);
+    const [voiceBlob, setVoiceBlob] = useState(null);
+    const [voiceAudioUrl, setVoiceAudioUrl] = useState(null);
+    const [voiceTranscript, setVoiceTranscript] = useState('');
+    const [voiceError, setVoiceError] = useState(null);
+
+    const recorderRef = useRef(null);
+    const chunksRef = useRef([]);
+    const streamRef = useRef(null);
+    const timerRef = useRef(null);
+    const recognitionRef = useRef(null);
+
     const canAcknowledge = ['PROJECT_MANAGER', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role);
+
+    // Clean up audio URL on unmount or reset
+    useEffect(() => () => { if (voiceAudioUrl) URL.revokeObjectURL(voiceAudioUrl); }, [voiceAudioUrl]);
+
+    const stopVoiceRecording = () => {
+        if (recorderRef.current && voicePhase === 'recording') {
+            recorderRef.current.stop();
+        }
+        if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch (_) {}
+            recognitionRef.current = null;
+        }
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(t => t.stop());
+            streamRef.current = null;
+        }
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
+    const startVoiceRecording = async () => {
+        setVoiceError(null);
+        setVoiceTranscript('');
+        setVoiceSeconds(0);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streamRef.current = stream;
+            const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            recorderRef.current = recorder;
+            chunksRef.current = [];
+
+            recorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+            };
+
+            recorder.onstop = () => {
+                const b = new Blob(chunksRef.current, { type: 'audio/webm' });
+                setVoiceBlob(b);
+                setVoiceAudioUrl(URL.createObjectURL(b));
+                setVoicePhase('preview');
+            };
+
+            recorder.start();
+            setVoicePhase('recording');
+
+            // Timer
+            timerRef.current = setInterval(() => {
+                setVoiceSeconds(s => {
+                    if (s >= 120) { // Max 2 minutes
+                        stopVoiceRecording();
+                        return 120;
+                    }
+                    return s + 1;
+                });
+            }, 1000);
+
+            // Live Web Speech Recognition (Egyptian Arabic / English)
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRec) {
+                try {
+                    const rec = new SpeechRec();
+                    rec.continuous = true;
+                    rec.interimResults = true;
+                    rec.lang = isArabic ? 'ar-EG' : 'en-US';
+                    rec.onresult = (e) => {
+                        let text = '';
+                        for (let i = 0; i < e.results.length; i++) {
+                            text += e.results[i][0].transcript + ' ';
+                        }
+                        if (text.trim()) {
+                            setVoiceTranscript(text.trim());
+                        }
+                    };
+                    rec.start();
+                    recognitionRef.current = rec;
+                } catch (recErr) {
+                    console.warn('SpeechRecognition failed to start:', recErr);
+                }
+            }
+        } catch (err) {
+            setVoiceError(isArabic ? 'تعذر الوصول إلى الميكروفون. يرجى التأكد من منح الإذن.' : 'Microphone access denied. Please grant microphone permission.');
+            setVoicePhase('idle');
+        }
+    };
+
+    const handleExtractVoiceDsr = async () => {
+        setVoicePhase('extracting');
+        setVoiceError(null);
+        try {
+            const uploadData = new FormData();
+            if (voiceBlob) {
+                uploadData.append('audio', voiceBlob, 'voice-dsr.webm');
+            }
+            if (voiceTranscript) {
+                uploadData.append('transcript', voiceTranscript);
+            }
+
+            const res = await dsrAPI.extractVoice(uploadData);
+            const extracted = res.data?.data || {};
+
+            setFormData(prev => ({
+                ...prev,
+                projectId: extracted.projectId || prev.projectId || (projects[0]?.id || ''),
+                reportDate: extracted.reportDate || prev.reportDate,
+                weather: extracted.weather || prev.weather || 'SUNNY',
+                temperatureC: extracted.temperatureC != null ? String(extracted.temperatureC) : prev.temperatureC,
+                hoursWorked: extracted.hoursWorked != null ? String(extracted.hoursWorked) : (prev.hoursWorked || '8'),
+                progressNotes: extracted.progressNotes || voiceTranscript || prev.progressNotes,
+                issues: extracted.issues || prev.issues || '',
+                visitorsNotes: extracted.visitorsNotes || prev.visitorsNotes || ''
+            }));
+
+            setIsVoiceOpen(false);
+            setIsCreateOpen(true);
+            showAlert({
+                type: 'success',
+                title: isArabic ? 'تم استخراج التقرير بنجاح' : 'Extracted Successfully',
+                message: isArabic ? 'تمت تعبئة بيانات الموقع من التسجيل الصوتي بالذكاء الاصطناعي. يمكنك مراجعتها وحفظها الآن.' : 'Daily report fields have been parsed from voice with AI. Review and save below.'
+            });
+        } catch (err) {
+            setVoiceError(err.response?.data?.message || err.message || (isArabic ? 'فشل استخراج التقرير' : 'Extraction failed'));
+            setVoicePhase('preview');
+        }
+    };
+
+    const closeVoiceModal = () => {
+        stopVoiceRecording();
+        setIsVoiceOpen(false);
+        setVoicePhase('idle');
+        setVoiceBlob(null);
+        setVoiceTranscript('');
+        setVoiceSeconds(0);
+        setVoiceError(null);
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -165,14 +317,31 @@ export default function DailySiteReports() {
 
     return (
         <Layout>
-            <div className="flex-between mb-xl">
+            <div className="flex-between mb-xl" style={{ flexWrap: 'wrap', gap: 12 }}>
                 <div>
                     <h1 className="flex gap-md"><ClipboardList size={32} /> {t('dsr.title', 'Daily Site Reports')}</h1>
                     <p className="text-secondary">{t('dsr.subtitle', "Engineer's daily log of progress, attendance, weather, and issues — submitted to managers for review.")}</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setIsCreateOpen(true)}>
-                    <Plus size={16} /> {t('dsr.newReport', 'New Daily Report')}
-                </button>
+                <div className="flex gap-sm" style={{ flexWrap: 'wrap' }}>
+                    <button
+                        className="btn"
+                        onClick={() => { closeVoiceModal(); setIsVoiceOpen(true); }}
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%)',
+                            borderColor: 'rgba(16, 185, 129, 0.4)',
+                            color: '#10b981',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6
+                        }}
+                    >
+                        <Mic size={16} /> {isArabic ? 'تقرير صوتي بالذكاء الاصطناعي' : 'Voice AI Report'}
+                    </button>
+                    <button className="btn btn-primary flex gap-xs" onClick={() => setIsCreateOpen(true)}>
+                        <Plus size={16} /> {t('dsr.newReport', 'New Daily Report')}
+                    </button>
+                </div>
             </div>
 
             <div className="card mb-lg">
@@ -521,6 +690,37 @@ export default function DailySiteReports() {
                             <button className="btn" onClick={() => setIsCreateOpen(false)}><X size={16} /></button>
                         </div>
 
+                        {/* Fast Voice AI Prompt Banner */}
+                        <div style={{
+                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                            border: '1px dashed rgba(16, 185, 129, 0.4)',
+                            borderRadius: 10,
+                            padding: '12px 14px',
+                            marginBottom: 16,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 12
+                        }}>
+                            <div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <Sparkles size={14} style={{ color: '#10b981' }} />
+                                    {isArabic ? 'إنشاء التقرير بالتسجيل الصوتي' : 'Fast Voice Note Fill'}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                                    {isArabic ? 'تحدث بحرية وسيقوم الذكاء الاصطناعي بتعبئة كافة الحقول' : 'Speak freely and AI will automatically fill out this report'}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={() => { setIsCreateOpen(false); setIsVoiceOpen(true); }}
+                                style={{ background: '#10b981', color: '#ffffff', border: 'none', padding: '6px 12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
+                            >
+                                <Mic size={14} /> {isArabic ? 'سجّل الآن' : 'Record'}
+                            </button>
+                        </div>
+
                         <form onSubmit={handleCreateReport}>
                             <div className="input-group mb-md">
                                 <label className="input-label">{t('dsr.project', 'Project')} *</label>
@@ -557,6 +757,7 @@ export default function DailySiteReports() {
                                         <option value="CLOUDY">☁️ {t('dsr.cloudy', 'Cloudy')}</option>
                                         <option value="RAINY">🌧️ {t('dsr.rainy', 'Rainy')}</option>
                                         <option value="WINDY">💨 {t('dsr.windy', 'Windy')}</option>
+                                        <option value="DUSTY">🌪️ {t('dsr.dusty', 'Dusty')}</option>
                                         <option value="HOT">🔥 {t('dsr.hot', 'Hot')}</option>
                                         <option value="COLD">❄️ {t('dsr.cold', 'Cold')}</option>
                                     </select>
@@ -630,6 +831,149 @@ export default function DailySiteReports() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Voice DSR Modal */}
+            {isVoiceOpen && (
+                <div onClick={closeVoiceModal} style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1100,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+                }}>
+                    <div onClick={e => e.stopPropagation()} className="card" style={{
+                        width: '100%', maxWidth: 520, padding: 28,
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 16,
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.4)', textAlign: 'center'
+                    }}>
+                        <div className="flex-between mb-md">
+                            <div className="flex gap-xs" style={{ alignItems: 'center' }}>
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+                                    <Mic size={16} />
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: 16 }}>{isArabic ? 'تسجيل تقرير الموقع الصوتي' : 'Record Site Voice Report'}</h3>
+                            </div>
+                            <button className="btn" onClick={closeVoiceModal} style={{ padding: 4, background: 'transparent' }}><X size={18} /></button>
+                        </div>
+
+                        <p className="text-secondary" style={{ fontSize: 13, marginBottom: 20 }}>
+                            {isArabic
+                                ? 'تحدث عن تفاصيل اليوم (المشروع، الطقس، ساعات العمل، الأعمال المنفذة، المعوقات، والزيارات).'
+                                : 'Describe today\'s site events (Project name, weather, hours, work progress, hurdles, and visitors).'}
+                        </p>
+
+                        {/* Waveform / Visualizer Animation */}
+                        <div style={{
+                            background: 'var(--bg-elevated)', borderRadius: 14, padding: '24px 16px', marginBottom: 20,
+                            border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 140
+                        }}>
+                            {voicePhase === 'idle' && (
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', color: '#10b981' }}>
+                                        <Mic size={32} />
+                                    </div>
+                                    <div style={{ fontSize: 14, fontWeight: 600 }}>{isArabic ? 'جاهز للتسجيل' : 'Ready to record'}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                                        {isArabic ? 'اضغط على زر البدء وتحدث بطبيعتك' : 'Click the button below and speak naturally'}
+                                    </div>
+                                </div>
+                            )}
+
+                            {voicePhase === 'recording' && (
+                                <div style={{ textAlign: 'center', width: '100%' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 16 }}>
+                                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>
+                                            {isArabic ? 'جاري التسجيل...' : 'Recording...'}
+                                        </span>
+                                        <span style={{ fontSize: 14, fontWeight: 700, marginLeft: 8, color: 'var(--text-primary)' }}>
+                                            {fmtTimer(voiceSeconds)}
+                                        </span>
+                                    </div>
+
+                                    {/* Animated Wave bars */}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, height: 36, marginBottom: 12 }}>
+                                        {[40, 70, 30, 90, 60, 100, 50, 80, 40, 95, 65, 30].map((h, i) => (
+                                            <div
+                                                key={i}
+                                                style={{
+                                                    width: 4,
+                                                    height: `${h}%`,
+                                                    background: 'linear-gradient(to top, #10b981, #06b6d4)',
+                                                    borderRadius: 2
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {voicePhase === 'preview' && (
+                                <div style={{ width: '100%', textAlign: 'center' }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#10b981', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                        <CheckCircle size={16} /> {isArabic ? `تم التسجيل بنجاح (${fmtTimer(voiceSeconds)})` : `Recorded (${fmtTimer(voiceSeconds)})`}
+                                    </div>
+                                    {voiceAudioUrl && (
+                                        <audio controls src={voiceAudioUrl} style={{ width: '100%', maxWidth: 360, height: 36, margin: '0 auto' }} />
+                                    )}
+                                </div>
+                            )}
+
+                            {voicePhase === 'extracting' && (
+                                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                                    <Loader2 size={36} className="spin" style={{ color: '#10b981', margin: '0 auto 12px' }} />
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+                                        {isArabic ? 'جاري تحليل التقرير الصوتي بالذكاء الاصطناعي...' : 'Parsing Voice Report with AI...'}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                                        {isArabic ? 'استخراج نسب الإنجاز، الطقس، الساعات، والمعوقات' : 'Extracting progress, weather, hours, and issues'}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Real-time Subtitles / Transcript */}
+                            {voiceTranscript && voicePhase !== 'extracting' && (
+                                <div style={{
+                                    marginTop: 12, width: '100%', padding: '10px 14px', background: 'var(--bg-secondary)',
+                                    borderRadius: 8, fontSize: 12, color: 'var(--text-primary)', textAlign: isArabic ? 'right' : 'left',
+                                    border: '1px solid var(--border-color)', maxHeight: 80, overflowY: 'auto'
+                                }}>
+                                    <strong>{isArabic ? 'النص المنطوق:' : 'Spoken text:'}</strong> {voiceTranscript}
+                                </div>
+                            )}
+                        </div>
+
+                        {voiceError && (
+                            <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 16 }}>
+                                {voiceError}
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-sm" style={{ justifyContent: 'center' }}>
+                            {voicePhase === 'idle' && (
+                                <button className="btn btn-primary" onClick={startVoiceRecording} style={{ background: '#10b981', border: 'none', padding: '10px 24px', fontWeight: 700 }}>
+                                    <Mic size={16} /> {isArabic ? 'بدء التسجيل الآن' : 'Start Recording'}
+                                </button>
+                            )}
+
+                            {voicePhase === 'recording' && (
+                                <button className="btn btn-danger" onClick={stopVoiceRecording} style={{ background: '#ef4444', border: 'none', padding: '10px 24px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <Square size={16} /> {isArabic ? 'إيقاف التسجيل' : 'Stop Recording'}
+                                </button>
+                            )}
+
+                            {voicePhase === 'preview' && (
+                                <>
+                                    <button className="btn btn-secondary" onClick={startVoiceRecording} style={{ padding: '10px 16px' }}>
+                                        <RotateCcw size={15} /> {isArabic ? 'إعادة التسجيل' : 'Re-record'}
+                                    </button>
+                                    <button className="btn btn-primary" onClick={handleExtractVoiceDsr} style={{ background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)', border: 'none', padding: '10px 20px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <Sparkles size={16} /> {isArabic ? 'تحليل وتعبئة التقرير بالذكاء الاصطناعي' : 'Parse & Auto-Fill with AI'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

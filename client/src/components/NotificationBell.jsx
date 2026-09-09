@@ -14,10 +14,12 @@ import {
     Calendar
 } from 'lucide-react';
 import api from '../services/api';
+import { useAlert } from '../context/AlertContext';
 import './NotificationBell.css';
 
 export default function NotificationBell() {
     const { t, i18n } = useTranslation();
+    const { showAlert } = useAlert();
     const [unreadCount, setUnreadCount] = useState(0);
     const [notifications, setNotifications] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -81,20 +83,27 @@ export default function NotificationBell() {
         }
     };
 
-    const clearAllNotifications = async () => {
-        if (!window.confirm(t('notifications.clearConfirm') || 'Are you sure you want to clear all notifications?')) {
-            return;
-        }
-        try {
-            setLoading(true);
-            await api.delete('/notifications');
-            setNotifications([]);
-            setUnreadCount(0);
-        } catch (error) {
-            console.error('Failed to clear all notifications:', error);
-        } finally {
-            setLoading(false);
-        }
+    const clearAllNotifications = () => {
+        showAlert({
+            type: 'warning',
+            title: i18n.language === 'ar' ? 'مسح كافة الإشعارات' : 'Clear All Notifications',
+            message: t('notifications.clearConfirm') || (i18n.language === 'ar' ? 'هل أنت متأكد من رغبتك في حذف ومسح كافة الإشعارات؟' : 'Are you sure you want to clear all notifications?'),
+            showCancel: true,
+            confirmText: i18n.language === 'ar' ? 'نعم، مسح الكل' : 'Yes, Clear All',
+            cancelText: i18n.language === 'ar' ? 'تراجع' : 'Cancel',
+            onConfirm: async () => {
+                try {
+                    setLoading(true);
+                    await api.delete('/notifications');
+                    setNotifications([]);
+                    setUnreadCount(0);
+                } catch (error) {
+                    console.error('Failed to clear all notifications:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
     };
 
     const getNotificationIcon = (type) => {

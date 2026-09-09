@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { setLanguage } from '../i18n';
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
     const { t, i18n } = useTranslation();
     const { login } = useAuth();
     const [email, setEmail] = useState('');
@@ -143,8 +143,16 @@ export default function LoginScreen() {
                                     color="#6b7280"
                                 />
                             </TouchableOpacity>
-                        </View>
-                    </View>
+                    {/* Forgot Password Link */}
+                    <TouchableOpacity
+                        onPress={() => navigation?.navigate('ForgotPassword')}
+                        style={{ alignSelf: isArabic ? 'flex-start' : 'flex-end', marginTop: 6, marginBottom: 16 }}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={{ color: '#2563eb', fontSize: 13, fontWeight: '700' }}>
+                            {t('auth.forgotPassword', 'Forgot Password?')}
+                        </Text>
+                    </TouchableOpacity>
 
                     {/* Submit Button */}
                     <TouchableOpacity
@@ -156,12 +164,24 @@ export default function LoginScreen() {
                         {submitting ? (
                             <ActivityIndicator color="#fff" />
                         ) : (
-                            <View style={styles.btnInner}>
+                            <View style={[styles.btnInner, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
                                 <Text style={styles.submitBtnText}>{isArabic ? 'دخول للنظام' : 'Sign In'}</Text>
                                 <Ionicons name={isArabic ? 'arrow-back' : 'arrow-forward'} size={18} color="#fff" />
                             </View>
                         )}
                     </TouchableOpacity>
+
+                    {/* Register New Company Workspace Link */}
+                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'center', alignItems: 'center', marginTop: 18 }}>
+                        <Text style={{ color: '#6b7280', fontSize: 13 }}>
+                            {t('auth.dontHaveAccount', "Don't have an account?")}
+                        </Text>
+                        <TouchableOpacity onPress={() => navigation?.navigate('Register')} style={{ marginHorizontal: 6 }} activeOpacity={0.7}>
+                            <Text style={{ color: '#2563eb', fontSize: 13, fontWeight: '800' }}>
+                                {t('auth.signup', 'Create Company')}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
                     {/* Error Banner */}
                     {errorDetail && (

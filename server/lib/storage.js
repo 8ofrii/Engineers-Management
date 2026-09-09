@@ -85,8 +85,13 @@ export const deleteByUrl = async (url) => {
     if (!url) return;
     try {
         if (url.startsWith('/uploads/')) {
-            const fullPath = path.join(rootDir, url);
-            if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+            const uploadsRoot = path.resolve(rootDir, 'uploads');
+            const relativePart = url.replace(/^\/uploads[\/\\]?/, '');
+            const fullPath = path.resolve(uploadsRoot, relativePart);
+            // Verify path traversal does not escape uploads directory
+            if (fullPath.startsWith(uploadsRoot) && fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+            }
             return;
         }
         if (url.includes('.s3.') && url.includes(BUCKET)) {

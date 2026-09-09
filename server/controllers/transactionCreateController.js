@@ -239,6 +239,11 @@ export const createTransaction = async (req, res, next) => {
                     }
                 } else {
                     // Inventory Purchase: Create batch, defer profit
+                    let parsedQty = Number(req.body.quantity) || 0;
+                    if (!parsedQty && req.body.unitPrice && Number(req.body.unitPrice) > 0) {
+                        parsedQty = Number(amount) / Number(req.body.unitPrice);
+                    }
+
                     await tx.materialBatch.create({
                         data: {
                             projectId,
@@ -248,9 +253,19 @@ export const createTransaction = async (req, res, next) => {
                             remainingValue: Number(amount),
                             status: 'AVAILABLE',
                             recordedBy: actualPayer,
-                            tenantId: req.user.tenantId
+                            tenantId: req.user.tenantId,
+                            materialId: req.body.materialId || null
                         }
                     });
+
+                    if (req.body.materialId) {
+                        await tx.material.update({
+                            where: { id: req.body.materialId },
+                            data: {
+                                stockLevel: { increment: parsedQty > 0 ? parsedQty : 1 }
+                            }
+                        });
+                    }
 
                     profitInfo = {
                         profit: 0,

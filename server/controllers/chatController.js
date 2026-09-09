@@ -4,6 +4,8 @@ import fs from 'fs';
 import * as aiService from '../services/aiService.js';
 import { aiErrorResponse } from '../lib/aiErrors.js';
 import logger from '../lib/logger.js';
+import { enforceAiBudget } from '../lib/aiUsage.js';
+import { auditFromReq } from '../lib/audit.js';
 
 // Lazy initialization to ensure env vars are loaded
 let openai = null;
@@ -28,6 +30,9 @@ const toIntent = (action) => (action && ACTION_TO_INTENT[action]) || 'GENERAL';
 // @access  Private
 export const sendMessage = async (req, res, next) => {
     try {
+        // Enforce Monthly AI Budget Check
+        await enforceAiBudget(req.user.tenantId);
+
         const { message, history } = req.body;
         const userId = req.user.id;
         let userMessage = message;
@@ -97,7 +102,9 @@ export const sendMessage = async (req, res, next) => {
                         select: { name: true }
                     });
 
-                    const contextualPrompt = `[Context: Company/Tenant="${tenant?.name || 'Hesaby'}", TenantID="${req.user.tenantId}", User="${req.user.name}", Role="${req.user.role}"]\n${userMessage}`;
+                    const contextualPrompt = `[Context: Company="${tenant?.name || 'Hesaby'}", TenantID="${req.user.tenantId}", User="${req.user.name}", Role="${req.user.role}"]
+[Formatting Guideline: Reply in natural human conversational speech. Avoid heavy raw markdown formatting, headers (###), or excessive asterisks (**). Keep answers conversational, clear, warm, and concise.]
+${userMessage}`;
 
                     const micromindRes = await fetch(process.env.MICROMIND_API_URL, {
                         method: 'POST',
@@ -164,12 +171,18 @@ export const sendMessage = async (req, res, next) => {
                         messages: [
                             {
                                 role: "system",
-                                content: `You are a professional construction assistant in Egypt.
-You help engineers manage sites — process transactions and answer project questions.
+                                content: `You are a professional construction assistant and financial copilot in Egypt.
+You help engineers and managers run sites, log expenses, and answer project financial questions.
+
+CONVERSATIONAL TONE & NATURAL LANGUAGE:
+- Speak in natural, human, friendly conversational language.
+- Avoid raw markdown syntax, headers (###), or asterisks (**) where simple clean sentences work best.
+- If listing multiple items, use clean bullet points.
+- Keep answers warm, direct, concise, and helpful.
 
 LANGUAGE RULE — STRICT:
-- If the user's most recent message is written in English, reply in English.
-- If the user's most recent message is written in Arabic (any dialect), reply in Egyptian Arabic.
+- If the user's most recent message is written in English, reply in natural English.
+- If the user's most recent message is written in Arabic (any dialect), reply in natural, warm Egyptian Arabic.
 - If the user mixes both, reply in the language of the majority of their words.
 - Never switch languages mid-conversation unless the user does first.`
                             },
@@ -382,6 +395,14 @@ LANGUAGE RULE — STRICT:
                 extractedData: toolData ? toolData : undefined,
                 processed: false
             }
+        });
+
+        // Record AI usage in AuditLog for real-time quota tracking
+        await auditFromReq(req, {
+            action: 'AI_CHAT',
+            entity: 'ChatMessage',
+            entityId: aiChatMessage.id,
+            metadata: { isAudio, messageType: aiChatMessage.messageType }
         });
 
         res.status(200).json({

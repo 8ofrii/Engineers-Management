@@ -17,6 +17,15 @@ export const protect = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Reject challenge tokens or tokens with non-session purpose (fixes 2FA challenge bypass)
+        if (decoded.purpose && decoded.purpose !== 'session') {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid session token purpose'
+            });
+        }
+
         req.user = await prisma.user.findUnique({ where: { id: decoded.id } });
 
         if (!req.user) {
@@ -31,6 +40,17 @@ export const protect = async (req, res, next) => {
                 success: false,
                 message: 'User account is deactivated'
             });
+        }
+
+        // Token Revocation / Session Invalidation on Password Change (VULN-MED-03)
+        if (req.user.passwordChangedAt) {
+            const changedTimestamp = Math.floor(new Date(req.user.passwordChangedAt).getTime() / 1000);
+            if (decoded.iat && decoded.iat < changedTimestamp) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Session invalidated due to password change. Please log in again.'
+                });
+            }
         }
 
         next();

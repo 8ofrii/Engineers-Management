@@ -137,14 +137,24 @@ export default function ProjectDocuments() {
         }
     };
 
-    const onDelete = async (doc) => {
-        if (!window.confirm(`Delete "${doc.name}"? This cannot be undone.`)) return;
-        try {
-            await documentsAPI.remove(doc.id);
-            setDocs(docs.filter(d => d.id !== doc.id));
-        } catch (err) {
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
-        }
+    const onDelete = (doc) => {
+        showAlert({
+            type: 'warning',
+            title: isArabic ? 'حذف المستند' : 'Delete Document',
+            message: isArabic ? `هل أنت متأكد من حذف المستند "${doc.name}"؟ لا يمكن التراجع عن هذا الإجراء.` : `Delete "${doc.name}"? This cannot be undone.`,
+            showCancel: true,
+            confirmText: isArabic ? 'نعم، حذف' : 'Yes, Delete',
+            cancelText: isArabic ? 'تراجع' : 'Cancel',
+            onConfirm: async () => {
+                try {
+                    await documentsAPI.remove(doc.id);
+                    setDocs(prev => prev.filter(d => d.id !== doc.id));
+                    showAlert({ type: 'success', title: isArabic ? 'تم الحذف' : 'Deleted', message: isArabic ? 'تم حذف المستند بنجاح.' : 'Document deleted successfully.' });
+                } catch (err) {
+                    showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
+                }
+            }
+        });
     };
 
     return (

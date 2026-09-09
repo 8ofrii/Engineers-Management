@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
-import { getUsers, inviteUser, updateUser, deleteUser } from '../controllers/userController.js';
+import { getUsers, inviteUser, updateUser, deleteUser, resendInvite } from '../controllers/userController.js';
 import { validate } from '../middleware/validate.js';
 import { inviteUserSchema, updateUserSchema, idParamSchema } from '../schemas/users.schema.js';
 
@@ -12,6 +12,7 @@ router.use(protect);
 // Get users - Allow managers to see list for transaction payer selection
 router.get('/', authorize('ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER'), getUsers);
 router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), validate({ body: inviteUserSchema }), inviteUser);
+router.post('/:id/resend-invite', authorize('ADMIN', 'SUPER_ADMIN'), validate({ params: idParamSchema }), resendInvite);
 router.put('/:id', authorize('ADMIN', 'SUPER_ADMIN'), validate({ params: idParamSchema, body: updateUserSchema }), updateUser);
 router.delete('/:id', authorize('ADMIN', 'SUPER_ADMIN'), validate({ params: idParamSchema }), deleteUser);
 

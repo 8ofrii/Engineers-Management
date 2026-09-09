@@ -23,6 +23,29 @@ const imageDir = path.join(rootDir, 'uploads', 'images');
     }
 });
 
+// Strict MIME to safe file extension maps (prevents arbitrary extension upload / stored XSS)
+const IMAGE_MIME_MAP = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp'
+};
+
+const AUDIO_MIME_MAP = {
+    'audio/mpeg': '.mp3',
+    'audio/mp3': '.mp3',
+    'audio/wav': '.wav',
+    'audio/m4a': '.m4a',
+    'audio/x-m4a': '.m4a',
+    'audio/mp4': '.mp4',
+    'audio/webm': '.webm',
+    'audio/ogg': '.ogg'
+};
+
+const getSafeImageExt = (file) => IMAGE_MIME_MAP[file.mimetype] || '.jpg';
+const getSafeAudioExt = (file) => AUDIO_MIME_MAP[file.mimetype] || '.mp3';
+
 // Configure local storage for audio (temporary)
 const localAudioStorage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -30,7 +53,7 @@ const localAudioStorage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'voice-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, 'voice-' + uniqueSuffix + getSafeAudioExt(file));
     }
 });
 
@@ -65,7 +88,7 @@ const s3ImageStorage = multerS3({
     },
     key: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'images/profile-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, 'images/profile-' + uniqueSuffix + getSafeImageExt(file));
     }
 });
 
@@ -76,7 +99,7 @@ const localImageStorage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, 'img-' + uniqueSuffix + path.extname(file.originalname));
+        cb(null, 'img-' + uniqueSuffix + getSafeImageExt(file));
     }
 });
 
@@ -99,11 +122,14 @@ const upload = multer({
 const receiptMemoryUpload = multer({
     storage: multer.memoryStorage(),
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+        const allowedTypes = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+            'application/pdf'
+        ];
         if (allowedTypes.includes(file.mimetype)) cb(null, true);
-        else cb(new Error('Invalid file type. Receipt must be JPEG/PNG/WebP/HEIC.'), false);
+        else cb(new Error('Invalid file type. Receipt must be an image (JPEG, PNG, WebP) or PDF document.'), false);
     },
-    limits: { fileSize: 8 * 1024 * 1024 } // 8 MB; phone photos comfortably fit
+    limits: { fileSize: 15 * 1024 * 1024 } // 15 MB to comfortably allow scanned PDF invoices
 });
 
 export { upload, audioUpload, receiptMemoryUpload };

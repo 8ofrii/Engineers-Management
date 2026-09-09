@@ -11,6 +11,7 @@ import { wrapExpress } from './instrument.js';
 
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import pinoHttp from 'pino-http';
 import path from 'path';
@@ -56,14 +57,26 @@ const app = express();
 // Trust proxy (Render/Heroku/etc.) so rate-limit sees real client IPs
 app.set('trust proxy', 1);
 
-// Security headers. CORP relaxed so the React frontend can load /uploads images cross-origin.
+// Security headers with Content Security Policy (CSP)
 app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com"],
+            connectSrc: ["'self'", "https://hesaby.aimicromind.com", "https://accounts.google.com", "https://*.paymob.com"],
+            frameSrc: ["'self'", "https://accept.paymob.com", "https://accounts.google.com"],
+            imgSrc: ["'self'", "data:", "https:", "blob:"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"]
+        }
+    },
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
 // Body parser with increased limits for Base64 image uploads
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(cookieParser());
 
 // CORS: whitelist via CORS_ALLOWED_ORIGINS (comma-separated). In development, fall back to permissive.
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
@@ -81,12 +94,20 @@ app.use(cors({
     credentials: true
 }));
 
+// Helper to sanitize client IP from reverse proxy (strips port and ipv6 prefixes)
+const getClientIp = (req) => {
+    const raw = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip || '127.0.0.1';
+    return raw.replace(/^::ffff:/, '').split(':')[0] || '127.0.0.1';
+};
+
 // Global rate limiter — generous so normal usage isn't affected.
 app.use('/api', rateLimit({
     windowMs: 15 * 60 * 1000,
     limit: 1000,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
+    keyGenerator: getClientIp,
+    validate: false,
     message: { success: false, message: 'Too many requests, please try again later.' }
 }));
 
@@ -97,6 +118,8 @@ const authLimiter = rateLimit({
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     skipSuccessfulRequests: true,
+    keyGenerator: getClientIp,
+    validate: false,
     message: { success: false, message: 'Too many authentication attempts, please try again later.' }
 });
 
@@ -119,8 +142,17 @@ app.use(pinoHttp({
     }
 }));
 
-// Serve static files (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve static files (uploads) with strict security headers (prevent inline script execution & XSS)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    setHeaders: (res, filePath) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "default-src 'none'");
+        const ext = path.extname(filePath).toLowerCase();
+        if (!['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+            res.setHeader('Content-Disposition', 'attachment');
+        }
+    }
+}));
 
 // Mount routers
 app.use('/api/auth', authLimiter, authRoutes);
@@ -151,13 +183,28 @@ app.use('/api/transaction-drafts', transactionDraftRoutes); // Phase 7: draft re
 app.use('/api/bank-statements', bankStatementRoutes);       // Phase 6.3: bank reconciliation
 app.use('/api/billing', billingRoutes);                     // Phase 6.4: Paymob subscriptions
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        success: true,
-        message: 'Server is running',
-        timestamp: new Date().toISOString()
-    });
+// Health check endpoint with active database ping
+app.get('/api/health', async (req, res) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.status(200).json({
+            success: true,
+            status: 'healthy',
+            database: 'connected',
+            message: 'Server and Database are operational',
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        logger.error({ err }, 'Health check failed: Database unreachable');
+        res.status(503).json({
+            success: false,
+            status: 'degraded',
+            database: 'disconnected',
+            message: 'Database connection error',
+            error: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Sentry must wrap errors BEFORE the app's own handler, so it sees raw exceptions.

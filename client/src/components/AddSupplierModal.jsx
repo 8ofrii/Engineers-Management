@@ -128,7 +128,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                     <div className="form-grid">
                         <div className="form-group full-width">
                             <label htmlFor="name">
-                                {t('suppliers.fields.name')} <span className="required">*</span>
+                                {t('suppliers.fields.name', 'Supplier Name')} <span className="required">*</span>
                             </label>
                             <input
                                 type="text"
@@ -137,14 +137,14 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 value={formData.name}
                                 onChange={handleChange}
                                 className={errors.name ? 'error' : ''}
-                                placeholder="Supplier Name"
+                                placeholder={t('suppliers.placeholders.name', 'Enter supplier name')}
                             />
                             {errors.name && <span className="error-message">{errors.name}</span>}
                         </div>
 
                         <div className="form-group">
                             <label htmlFor="category">
-                                {t('suppliers.fields.category')}
+                                {t('suppliers.fields.category', 'Category')}
                             </label>
                             <select
                                 id="category"
@@ -154,7 +154,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                             >
                                 {categories.map(cat => (
                                     <option key={cat} value={cat}>
-                                        {cat}
+                                        {t(`suppliers.categories.${cat}`, cat)}
                                     </option>
                                 ))}
                             </select>
@@ -179,7 +179,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                         )}
                         <div className="form-group">
                             <label htmlFor="phone">
-                                {t('suppliers.fields.phone')} <span className="required">*</span>
+                                {t('suppliers.fields.phone', 'Phone Number')} <span className="required">*</span>
                             </label>
                             <input
                                 type="tel"
@@ -188,14 +188,14 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 value={formData.phone}
                                 onChange={handleChange}
                                 className={errors.phone ? 'error' : ''}
-                                placeholder="Phone Number"
+                                placeholder={t('suppliers.placeholders.phone', '+20 123 456 7890')}
                             />
                             {errors.phone && <span className="error-message">{errors.phone}</span>}
                         </div>
 
                         <div className="form-group">
                             <label htmlFor="email">
-                                {t('suppliers.fields.email')}
+                                {t('suppliers.fields.email', 'Email')}
                             </label>
                             <input
                                 type="email"
@@ -203,13 +203,13 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                placeholder="email@example.com"
+                                placeholder={t('suppliers.placeholders.email', 'supplier@example.com')}
                             />
                         </div>
 
                         <div className="form-group">
                             <label htmlFor="contactName">
-                                {t('suppliers.fields.contactPerson')}
+                                {t('suppliers.fields.contactPerson', 'Contact Person')}
                             </label>
                             <input
                                 type="text"
@@ -217,13 +217,13 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 name="contactName"
                                 value={formData.contactName}
                                 onChange={handleChange}
-                                placeholder="Contact Person Name"
+                                placeholder={t('suppliers.placeholders.contactPerson', 'Contact Person Name')}
                             />
                         </div>
 
                         <div className="form-group full-width">
                             <label htmlFor="street">
-                                {t('suppliers.fields.address')}
+                                {t('suppliers.fields.address', 'Address')}
                             </label>
                             <input
                                 type="text"
@@ -231,13 +231,13 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 name="street"
                                 value={formData.street}
                                 onChange={handleChange}
-                                placeholder="Address"
+                                placeholder={t('suppliers.placeholders.address', 'Warehouse or office address')}
                             />
                         </div>
 
                         <div className="form-group full-width">
                             <label htmlFor="notes">
-                                {t('common.notes')}
+                                {t('common.notes', 'Notes')}
                             </label>
                             <textarea
                                 id="notes"
@@ -245,7 +245,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 value={formData.notes}
                                 onChange={handleChange}
                                 rows="3"
-                                placeholder="Additional notes..."
+                                placeholder={t('suppliers.placeholders.notes', 'Additional notes...')}
                             />
                         </div>
                     </div>

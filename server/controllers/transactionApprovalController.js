@@ -161,13 +161,33 @@ export const approveTransaction = async (req, res, next) => {
             });
         }
 
-        // Multi-level approval guard: Project Managers, Admins, and Super Admins can approve transactions.
-        const canApproveRole = ['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER'].includes(req.user.role);
-        if (!canApproveRole) {
+        // Segregation of duties: Creator cannot approve their own transaction (Four-Eyes Principle)
+        if (transaction.createdBy === req.user.id && req.user.role !== 'SUPER_ADMIN') {
             return res.status(403).json({
                 success: false,
-                message: 'Not authorized to approve transactions'
+                message: 'Segregation of duties violation: You cannot approve transactions that you created. A secondary reviewer must approve this transaction.'
             });
+        }
+
+        // Multi-level approval threshold check against tenant config
+        const tenant = await prisma.tenant.findUnique({
+            where: { id: req.user.tenantId },
+            select: { approvalThresholds: true }
+        });
+
+        try {
+            ensureCanApprove(req.user.role, transaction.amount, tenant);
+        } catch (err) {
+            if (err instanceof InsufficientApprovalRankError) {
+                return res.status(403).json({
+                    success: false,
+                    message: err.message,
+                    requiredRole: err.requiredRole,
+                    callerRole: err.callerRole,
+                    amount: err.amount
+                });
+            }
+            throw err;
         }
 
         // Import V1.2 office profit calculation

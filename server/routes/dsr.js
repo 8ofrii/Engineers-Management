@@ -1,8 +1,10 @@
 import express from 'express';
 import { protect } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { audioUpload } from '../middleware/upload.js';
 import {
-    listDsrs, getDsr, createDsr, updateDsr, submitDsr, acknowledgeDsr, deleteDsr
+    listDsrs, getDsr, createDsr, updateDsr, submitDsr, acknowledgeDsr, deleteDsr,
+    extractDsrFromVoice
 } from '../controllers/dsrController.js';
 import {
     createDsrSchema, updateDsrSchema, acknowledgeDsrSchema, idParamSchema
@@ -13,6 +15,8 @@ router.use(protect);
 
 router.get('/', listDsrs);
 router.post('/', validate({ body: createDsrSchema }), createDsr);
+router.post('/extract/voice', audioUpload.single('audio'), extractDsrFromVoice);
+
 router.get('/:id', validate({ params: idParamSchema }), getDsr);
 router.put('/:id', validate({ params: idParamSchema, body: updateDsrSchema }), updateDsr);
 router.delete('/:id', validate({ params: idParamSchema }), deleteDsr);

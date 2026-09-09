@@ -7,8 +7,8 @@
 ## 📌 1. Project Overview & Core Mission
 **Hesaby ERP** (`8ofry/Engineers-Management`) is a full-stack, enterprise-grade Construction & Engineering Management ERP system tailored for construction firms, project managers, and site engineers.
 
-- **Frontend Web App**: React 19 + Vite + Tailwind CSS + Vanilla CSS (`client/`, Port 5173).
-- **Backend API Server**: Node.js + Express + Prisma ORM + PostgreSQL + Sentry + Pino Logging (`server/`, Port 5000).
+- **Frontend Web App**: React 19 + Vite + Tailwind CSS (`client/`, Production: `https://hesaby.aimicromind.com`, Dev: Port 5173).
+- **Backend API Server**: Node.js + Express + Prisma ORM + PostgreSQL + Sentry (`server/`, Port 5000, Proxy: `https://hesaby.aimicromind.com/api`).
 - **Mobile Companion App**: React Native (0.81) + Expo SDK 54 + React Navigation (`mobile/`, Port 8081).
 - **Database**: Remote PostgreSQL on Windows Server (`148.251.171.147:5432/sitengineer`).
 - **AI Engine**: Context-Aware AI Copilot with MicroMind backend & Gemini for OCR receipts and spoken audio notes.
@@ -61,38 +61,47 @@ All test accounts are pre-seeded in the database:
 
 ## 🗄️ 4. PostgreSQL Database Configuration (`148.251.171.147`)
 - **Config file**: `C:\Program Files\PostgreSQL\18\data\postgresql.conf`
-- **Permanent connection leak protection settings applied**:
+- **Application Role**: `hesaby_app` (dedicated production non-root application user with full schema privileges)
+- **Root Admin Role**: `postgres` (superuser with `LOGIN` enabled)
+- **Permanent connection leak protection & stability settings**:
   ```ini
   max_connections = 200
   idle_session_timeout = 300000        # 5 minutes auto-close for idle sockets
   idle_in_transaction_session_timeout = 30000 # 30 seconds for hung transactions
+  statement_timeout = 60000            # 60 seconds query execution timeout
   ```
+- **Active Deep Health Check**: `/api/health` executes live `SELECT 1` ping and the self-healing watchdog (`scripts/watchdog.ps1`) automatically restarts services if query execution fails.
 - **Service control**: `Get-Service *postgres* | Restart-Service`
 
 ---
 
-## 🚀 5. How to Run the Servers Locally / On Remote Server
+## 🚀 5. How to Run & Manage Services on the Server
 
-### Start Backend API:
-```bash
-cd server
-npm run dev
-# Listens on http://localhost:5000 and network interface
+### 🛡️ Production Master Service Manager (Automatic Boot & Crash Recovery):
+The entire stack (PostgreSQL + Node.js API + IIS Frontend + Self-Healing Watchdog) is managed by:
+```powershell
+# Check status of all components
+.\status.bat
+# or: .\scripts\hesaby-service-manager.ps1 status
+
+# Start all services in dependency order
+.\start-all-services.bat
+# or: .\scripts\hesaby-service-manager.ps1 start
+
+# Restart all services
+.\scripts\hesaby-service-manager.ps1 restart
+
+# View live watchdog & supervisor logs
+.\scripts\hesaby-service-manager.ps1 logs
+
+# Re-install or configure automatic boot startup
+.\scripts\hesaby-service-manager.ps1 install-autostart
 ```
 
-### Start Web Client:
-```bash
-cd client
-npm run dev -- --host
-# Listens on http://localhost:5173
-```
-
-### Start Mobile Bundler:
-```bash
-cd mobile
-npx expo start --lan -c
-# Direct Wi-Fi LAN on port 8081
-```
+### Manual Local Dev Mode:
+- **Backend**: `cd server && npm run dev`
+- **Web Client**: `cd client && npm run dev -- --host`
+- **Mobile Bundler**: `cd mobile && npx expo start --lan -c`
 
 ---
 

@@ -24,14 +24,23 @@ export const extractFromVoice = async (req, res) => {
         // Step 0 — protect the bill: refuse if this tenant has hit the monthly cap
         await enforceAiBudget(req.user.tenantId);
 
-        // Step 1 — AI: transcribe + extract
-        const aiResult = await aiService.processVoiceNote(filePath);
+        // Fetch company context (projects, suppliers, materials) for AI dynamic entity matching
+        const [projects, suppliers, materials] = await Promise.all([
+            prisma.project.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true } }),
+            prisma.supplier.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, company: true } }),
+            prisma.material.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, unit: true } })
+        ]);
+        const companyContext = { projects, suppliers, materials };
+
+        // Step 1 — AI: transcribe + extract with full company context
+        const clientTranscript = req.body.transcript || '';
+        const aiResult = await aiService.processVoiceNote(filePath, clientTranscript, companyContext);
 
         // Step 2 — Persist the audio so the user can replay it later
         const audioUrl = await uploadFile(filePath, req.file.mimetype, 'audio/voice-drafts');
 
         // Step 3 — Match extraction against tenant DB (vendor, project, items, etc.)
-        const matched = await matchExtractionToTenant(aiResult.parsed_data, 'VOICE', req.user.tenantId);
+        const matched = await matchExtractionToTenant(aiResult.parsed_data, 'VOICE', req.user.tenantId, req.user.id, aiResult.raw_text);
 
         // Step 4 — Persist the draft
         const draft = await prisma.transactionDraft.create({
@@ -54,7 +63,7 @@ export const extractFromVoice = async (req, res) => {
             entityId: draft.id,
             metadata: {
                 source: 'voice',
-                provider: 'openai:whisper-1+gpt-4o-mini',
+                provider: 'micromind:gpt-5.6-luna-pro',
                 category: matched.draft.category,
                 amount: matched.draft.amount,
                 bytes: req.file.size
@@ -87,7 +96,7 @@ export const extractFromVoice = async (req, res) => {
 
 /**
  * POST /api/ai/extract/receipt
- * Multipart image in field "image". Image is read from memory, sent to GPT-4o
+ * Multipart image in field "image". Image is read from memory, sent to GPT-4o / MicroMind
  * vision, then persisted to S3 alongside the draft so user can re-view it.
  */
 export const extractFromReceipt = async (req, res) => {
@@ -97,9 +106,17 @@ export const extractFromReceipt = async (req, res) => {
 
     try {
         await enforceAiBudget(req.user.tenantId);
-        const parsed = await aiService.processReceiptImage(req.file.buffer, req.file.mimetype);
+
+        const [projects, suppliers, materials] = await Promise.all([
+            prisma.project.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true } }),
+            prisma.supplier.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, company: true } }),
+            prisma.material.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, unit: true } })
+        ]);
+        const companyContext = { projects, suppliers, materials };
+
+        const parsed = await aiService.processReceiptImage(req.file.buffer, req.file.mimetype, companyContext);
         const imageUrl = await uploadBuffer(req.file.buffer, req.file.mimetype, 'images/receipt-drafts');
-        const matched = await matchExtractionToTenant(parsed, 'RECEIPT', req.user.tenantId);
+        const matched = await matchExtractionToTenant(parsed, 'RECEIPT', req.user.tenantId, req.user.id, parsed?.description || parsed?.summary || '');
 
         const draft = await prisma.transactionDraft.create({
             data: {

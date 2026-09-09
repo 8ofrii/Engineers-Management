@@ -9,14 +9,15 @@ import {
     Alert,
     RefreshControl,
     Platform,
-    Modal
+    Modal,
+    Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { setLanguage } from '../i18n';
-import { custodyApi } from '../services/api';
+import { custodyApi, billingApi, getWebBillingUrl } from '../services/api';
 import { useFormat } from '../utils/format';
 
 import { useFocusEffect } from '@react-navigation/native';
@@ -30,6 +31,7 @@ export default function ProfileScreen({ navigation }) {
     const { theme, themeKey, setThemeKey, themes } = useTheme();
     const { currency } = useFormat();
     const [custody, setCustody] = useState(null);
+    const [subscription, setSubscription] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [themeModalVisible, setThemeModalVisible] = useState(false);
 
@@ -43,13 +45,33 @@ export default function ProfileScreen({ navigation }) {
             setCustody(res.data?.data || null);
         } catch {
             setCustody(null);
-        } finally {
-            setRefreshing(false);
         }
     }, [user?.id]);
 
-    useEffect(() => { loadCustody(); }, [loadCustody]);
-    useFocusEffect(useCallback(() => { loadCustody(); }, [loadCustody]));
+    const loadSubscription = useCallback(async () => {
+        try {
+            const res = await billingApi.subscription();
+            setSubscription(res.data?.data || null);
+        } catch {
+            setSubscription(null);
+        }
+    }, []);
+
+    const loadAll = useCallback(async () => {
+        setRefreshing(true);
+        await Promise.allSettled([loadCustody(), loadSubscription()]);
+        setRefreshing(false);
+    }, [loadCustody, loadSubscription]);
+
+    useEffect(() => {
+        loadCustody();
+        loadSubscription();
+    }, [loadCustody, loadSubscription]);
+
+    useFocusEffect(useCallback(() => {
+        loadCustody();
+        loadSubscription();
+    }, [loadCustody, loadSubscription]));
 
     const onLogout = () => {
         Alert.alert(
@@ -61,6 +83,37 @@ export default function ProfileScreen({ navigation }) {
             ]
         );
     };
+
+    const openWebBilling = async () => {
+        const url = getWebBillingUrl();
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert(isArabic ? 'تنبيه' : 'Notice', isArabic ? 'يمكنك فتح الرابط: ' + url : 'Open: ' + url);
+            }
+        } catch {
+            Linking.openURL(url).catch(() => {});
+        }
+    };
+
+    const currentPlanKey = subscription?.plan || user?.tenant?.subscriptionPlan || 'FREE';
+    const planName = currentPlanKey === 'BUSINESS'
+        ? (isArabic ? 'باقة الأعمال (Business)' : 'Business Plan')
+        : currentPlanKey === 'PREMIUM'
+        ? (isArabic ? 'الباقة الاحترافية (Premium)' : 'Premium Plan')
+        : currentPlanKey === 'ENTERPRISE'
+        ? (isArabic ? 'باقة المؤسسات (Enterprise)' : 'Enterprise Plan')
+        : (isArabic ? 'الباقة المجانية (Free Tier)' : 'Free Tier');
+
+    const planLimits = currentPlanKey === 'BUSINESS'
+        ? (isArabic ? 'مشاريع غير محدودة · 12 مقعد كحد أقصى' : 'Unlimited Projects · 12 Seats')
+        : currentPlanKey === 'PREMIUM'
+        ? (isArabic ? 'مشاريع غير محدودة · 6 مقاعد كحد أقصى' : 'Unlimited Projects · 6 Seats')
+        : currentPlanKey === 'ENTERPRISE'
+        ? (isArabic ? 'مشاريع غير محدودة · مقاعد مخصصة' : 'Unlimited Projects · Custom Seats')
+        : (isArabic ? 'مشروعين نشطين · مقعدين فقط' : '2 Active Projects · 2 Seats Max');
 
     const initials = (user?.name || 'U').split(' ').map(s => s[0]).slice(0, 2).join('').toUpperCase();
 
@@ -92,6 +145,54 @@ export default function ProfileScreen({ navigation }) {
                     <View style={[styles.roleBadge, { backgroundColor: theme.primaryLight, borderColor: theme.primary }]}>
                         <Text style={[styles.roleBadgeText, { color: theme.primary }]}>
                             {user?.role?.replace(/_/g, ' ') || 'ENGINEER'}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Company Subscription & Web Upgrade Card */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: theme.subtext }]}>
+                        {isArabic ? 'باقة واشتراك الشركة' : 'Company Subscription & Plan'}
+                    </Text>
+                    <View style={[styles.subscriptionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text, textAlign: isArabic ? 'right' : 'left' }}>
+                                    {planName}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: theme.subtext, marginTop: 3, textAlign: isArabic ? 'right' : 'left' }}>
+                                    {planLimits}
+                                </Text>
+                            </View>
+                            <View style={[styles.statusBadge, { backgroundColor: theme.primaryLight, borderColor: theme.primary }]}>
+                                <Text style={[styles.statusBadgeText, { color: theme.primary }]}>
+                                    {isArabic ? 'نشطة' : 'Active'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.upgradeBtn,
+                                {
+                                    backgroundColor: theme.id === 'monochrome' ? '#fafafa' : theme.primary,
+                                    flexDirection: isArabic ? 'row-reverse' : 'row'
+                                }
+                            ]}
+                            activeOpacity={0.8}
+                            onPress={openWebBilling}
+                        >
+                            <Ionicons name="globe-outline" size={17} color={theme.id === 'monochrome' ? '#121212' : '#ffffff'} />
+                            <Text style={[styles.upgradeBtnText, { color: theme.id === 'monochrome' ? '#121212' : '#ffffff' }]}>
+                                {isArabic ? 'إدارة وترقية الباقة عبر المتصفح' : 'Manage & Upgrade on Web'}
+                            </Text>
+                            <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={15} color={theme.id === 'monochrome' ? '#121212' : '#ffffff'} />
+                        </TouchableOpacity>
+
+                        <Text style={[styles.billingNotice, { color: theme.subtext, textAlign: isArabic ? 'right' : 'left' }]}>
+                            {isArabic
+                                ? 'تتم إدارة الاشتراكات وسداد الفواتير بأمان عبر بوابة الويب الرسمية.'
+                                : 'Subscriptions and billing are managed securely via the web portal.'}
                         </Text>
                     </View>
                 </View>
@@ -431,6 +532,50 @@ const styles = StyleSheet.create({
     topBarTitle: {
         fontSize: 17,
         fontWeight: '800'
+    },
+    subscriptionCard: {
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1.5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3
+    },
+    statusBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
+        borderWidth: 1
+    },
+    statusBadgeText: {
+        fontSize: 11,
+        fontWeight: '800'
+    },
+    upgradeBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginTop: 6,
+        marginBottom: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3
+    },
+    upgradeBtnText: {
+        fontSize: 13.5,
+        fontWeight: '700'
+    },
+    billingNotice: {
+        fontSize: 11,
+        lineHeight: 16,
+        marginTop: 2
     }
 });
 

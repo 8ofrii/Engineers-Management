@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ import {
     Building2,
     Moon,
     Sun,
+    Globe,
     Languages,
     User as UserIcon,
     HardHat,
@@ -31,10 +32,13 @@ import {
     Pencil,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
+    Boxes,
+    Gauge,
     PanelLeftClose,
     PanelLeft,
-    Palette,
-    Check
+    Check,
+    Shield
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ProfileModal from './ProfileModal';
@@ -47,22 +51,44 @@ import { useCopilot } from '../context/CopilotContext';
 import { transactionsAPI } from '../services/api';
 import './Layout.css';
 
+// Module-level persistent scroll tracker across route changes and Layout remounts
+let savedSidebarScrollTop = 0;
+try {
+    savedSidebarScrollTop = Number(sessionStorage.getItem('hesaby_sidebar_scroll')) || 0;
+} catch (_) {}
+
 export default function Layout({ children }) {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const { t, i18n } = useTranslation();
+    const navRef = useRef(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
         return localStorage.getItem('sidebar_collapsed') === 'true';
     });
     const [activeTheme, setActiveTheme] = useState(() => {
-        return localStorage.getItem('theme_preset') || 'monochrome';
+        const saved = localStorage.getItem('theme_preset');
+        return saved === 'light' ? 'light' : 'monochrome';
     });
-    const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
     const [profileModalOpen, setProfileModalOpen] = useState(false);
     const [twoFactorModalOpen, setTwoFactorModalOpen] = useState(false);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+
+    // Immediately restore sidebar scroll position on mount & whenever route changes
+    useLayoutEffect(() => {
+        if (navRef.current) {
+            navRef.current.scrollTop = savedSidebarScrollTop;
+        }
+    }, [location.pathname]);
+
+    const handleSidebarScroll = (e) => {
+        const top = e.currentTarget.scrollTop;
+        savedSidebarScrollTop = top;
+        try {
+            sessionStorage.setItem('hesaby_sidebar_scroll', String(top));
+        } catch (_) {}
+    };
 
     // Fetch pending approvals for badge
     useEffect(() => {
@@ -85,35 +111,61 @@ export default function Layout({ children }) {
         localStorage.setItem('sidebar_collapsed', next ? 'true' : 'false');
     };
 
-    // Apply active theme preset and light mode class
+    // Apply active theme preset and light mode class (Monochrome Dark <-> Light Mode)
     useEffect(() => {
         if (activeTheme === 'light') {
             document.body.classList.add('light-mode');
             document.body.removeAttribute('data-theme');
         } else {
             document.body.classList.remove('light-mode');
-            document.body.setAttribute('data-theme', activeTheme);
+            document.body.setAttribute('data-theme', 'monochrome');
         }
         localStorage.setItem('theme_preset', activeTheme);
     }, [activeTheme]);
 
-    const changeThemePreset = (presetKey) => {
-        setActiveTheme(presetKey);
-        setIsThemeMenuOpen(false);
+    const toggleTheme = () => {
+        setActiveTheme(prev => (prev === 'light' ? 'monochrome' : 'light'));
     };
 
-    // Helper function to get full image URL
+    const [avatarError, setAvatarError] = useState(false);
+
+    useEffect(() => {
+        setAvatarError(false);
+    }, [user?.profilePicture]);
+
+    // Helper function to get full image URL (handles local uploads, proxy, and remote S3)
     const getImageUrl = (path) => {
-        if (!path) return null;
-        if (path.startsWith('http')) return path;
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        return `${apiUrl}${path}`;
+        if (!path || typeof path !== 'string') return null;
+        if (path.startsWith('blob:') || path.startsWith('data:')) return path;
+        // Strip localhost:5000 / 127.0.0.1:5000 so relative proxy works seamlessly
+        const cleanPath = path.replace(/^https?:\/\/(localhost|127\.0\.0\.1):5000/i, '');
+        if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+            return cleanPath;
+        }
+        return cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
     };
 
     useEffect(() => {
         // Set RTL direction for Arabic
         document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
     }, [i18n.language]);
+
+    const [collapsedGroups, setCollapsedGroups] = useState(() => {
+        try {
+            const saved = localStorage.getItem('sidebar_collapsed_groups');
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    const toggleGroup = (groupId) => {
+        setCollapsedGroups(prev => {
+            const next = { ...prev, [groupId]: !prev[groupId] };
+            localStorage.setItem('sidebar_collapsed_groups', JSON.stringify(next));
+            return next;
+        });
+    };
 
     const handleLogout = () => {
         logout();
@@ -125,32 +177,59 @@ export default function Layout({ children }) {
         i18n.changeLanguage(newLang);
     };
 
-    const navItems = [
-        { path: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
-        { path: '/projects', icon: FolderKanban, label: t('nav.projects') },
-        { path: '/clients', icon: Users, label: t('nav.clients') },
-        { path: '/suppliers', icon: Package, label: t('nav.suppliers') },
-        { path: '/inventory', icon: Package, label: t('nav.inventory', 'Inventory') },
-        { path: '/workforce', icon: HardHat, label: t('nav.labor') },
-        { path: '/finance', icon: Wallet, label: t('finance.title') }, // or 'Accounting'
-        { path: '/chat', icon: MessageSquare, label: t('nav.chat') },
-        { path: '/reports', icon: FileText, label: t('nav.reports') },
-        { path: '/dsr', icon: ClipboardList, label: t('nav.dsr', 'Daily Reports') },
-        { path: '/invoices', icon: Receipt, label: t('nav.invoices', 'Invoices') },
-        { path: '/drafts', icon: Sparkles, label: t('nav.drafts', 'AI Drafts') }
+    // 1. Standalone Top Items (Dashboard & Projects)
+    const mainItems = [
+        { path: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard', 'Dashboard') },
+        { path: '/projects', icon: FolderKanban, label: t('nav.projects', 'Projects') }
     ];
 
-    // Reconciliation is finance work — admin/manager/accountant.
-    if (['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER', 'ACCOUNTANT'].includes(user?.role)) {
-        navItems.push({ path: '/reconcile', icon: Banknote, label: t('nav.reconcile', 'Bank Reconciliation') });
-    }
-
-    if (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
-        navItems.push({ path: '/team', icon: UserCog, label: t('teamManagement.title') });
-        navItems.push({ path: '/audit-log', icon: Activity, label: t('nav.auditLog', 'Activity Log') });
-        navItems.push({ path: '/settings/approval-thresholds', icon: ShieldCheck, label: t('nav.approvalThresholds', 'Approval Thresholds') });
-        navItems.push({ path: '/billing', icon: CreditCard, label: t('nav.billing', 'Billing') });
-    }
+    // 2. Navigation Categories / Groups
+    const navGroups = [
+        {
+            id: 'operations',
+            title: t('nav.groupOperations', 'Operations'),
+            icon: Boxes,
+            items: [
+                { path: '/clients', icon: Users, label: t('nav.clients', 'Clients') },
+                { path: '/suppliers', icon: Package, label: t('nav.suppliers', 'Suppliers') },
+                { path: '/inventory', icon: Package, label: t('nav.inventory', 'Raw Materials') },
+                { path: '/workforce', icon: HardHat, label: t('nav.labor', 'Labor & Workforce') },
+                { path: '/dsr', icon: ClipboardList, label: t('nav.dsr', 'Daily Site Reports') }
+            ]
+        },
+        {
+            id: 'finance',
+            title: t('nav.groupFinance', 'Finance'),
+            icon: Wallet,
+            badge: pendingApprovalCount > 0 ? (pendingApprovalCount > 9 ? '9+' : pendingApprovalCount) : null,
+            items: [
+                { path: '/finance', icon: Wallet, label: t('finance.title', 'Accounting & Expenses'), badge: pendingApprovalCount > 0 ? (pendingApprovalCount > 9 ? '9+' : pendingApprovalCount) : null },
+                { path: '/invoices', icon: Receipt, label: t('nav.invoices', 'Invoices') },
+                ...( ['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER', 'ACCOUNTANT'].includes(user?.role) ? [
+                    { path: '/reconcile', icon: Banknote, label: t('nav.reconcile', 'Bank Reconciliation') }
+                ] : []),
+                { path: '/drafts', icon: Sparkles, label: t('nav.drafts', 'AI Drafts') },
+                { path: '/reports', icon: FileText, label: t('nav.reports', 'Reports') }
+            ]
+        },
+        ...( ['ADMIN', 'SUPER_ADMIN'].includes(user?.role) ? [
+            {
+                id: 'cockpit',
+                title: t('nav.groupCockpit', 'Management'),
+                icon: Gauge,
+                items: [
+                    { path: '/team', icon: UserCog, label: t('teamManagement.title', 'Team Management') },
+                    { path: '/settings', icon: Settings, label: i18n.language === 'ar' ? 'إعدادات الشركة' : 'Company Settings' },
+                    { path: '/settings/approval-thresholds', icon: ShieldCheck, label: t('nav.approvalThresholds', 'Approval Thresholds') },
+                    { path: '/billing', icon: CreditCard, label: t('nav.billing', 'Billing & Plans') },
+                    ...( user?.role === 'SUPER_ADMIN' ? [
+                        { path: '/audit-log', icon: Activity, label: t('nav.auditLog', 'Activity Log') },
+                        { path: '/platform/payments', icon: Shield, label: i18n.language === 'ar' ? 'اعتمادات المنصة' : 'Platform Approvals' }
+                    ] : [])
+                ]
+            }
+        ] : [])
+    ];
 
     // Force Password Change Logic
     useEffect(() => {
@@ -194,44 +273,168 @@ export default function Layout({ children }) {
                     </button>
                 </div>
 
-                <nav className="sidebar-nav">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = location.pathname === item.path;
-                        const showBadge = item.path === '/finance' && pendingApprovalCount > 0;
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
-                                onClick={() => setSidebarOpen(false)}
-                                style={{ position: 'relative' }}
-                            >
-                                <Icon size={20} />
-                                <span>{item.label}</span>
-                                {showBadge && (
-                                    <span style={{
-                                        position: 'absolute',
-                                        top: 6,
-                                        right: sidebarCollapsed ? 4 : 12,
-                                        background: '#f59e0b',
-                                        color: 'white',
-                                        fontSize: '10px',
-                                        fontWeight: 800,
-                                        borderRadius: '50%',
-                                        minWidth: 18,
-                                        height: 18,
+                <nav className="sidebar-nav" ref={navRef} onScroll={handleSidebarScroll}>
+                    {/* Standalone Main Items (Dashboard & Projects) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '4px' }}>
+                        {mainItems.map((item) => {
+                            const Icon = item.icon;
+                            const isActive = location.pathname === item.path;
+                            return (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
+                                    onClick={() => setSidebarOpen(false)}
+                                    style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'center',
-                                        padding: '0 4px',
-                                        boxShadow: '0 0 0 2px var(--bg-primary)',
-                                        animation: 'pulse-badge 2s infinite'
-                                    }}>
-                                        {pendingApprovalCount > 9 ? '9+' : pendingApprovalCount}
-                                    </span>
+                                        gap: 'var(--spacing-md)',
+                                        padding: '10px 14px',
+                                        fontSize: '13.5px',
+                                        fontWeight: 600,
+                                        color: isActive ? 'var(--color-primary)' : 'var(--text-primary)',
+                                        borderRadius: 'var(--radius-md)',
+                                        marginBottom: '2px',
+                                        position: 'relative'
+                                    }}
+                                >
+                                    <Icon size={19} style={{ flexShrink: 0 }} />
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+
+                    {/* Categorized Dropdowns / Groups */}
+                    {navGroups.map((group) => {
+                        const isGroupActive = group.items.some((item) => location.pathname === item.path);
+                        const isCollapsed = !!collapsedGroups[group.id];
+                        const GroupIcon = group.icon;
+
+                        return (
+                            <div key={group.id} className="nav-group" style={{ marginTop: 6, marginBottom: 2 }}>
+                                {!sidebarCollapsed ? (
+                                    <button
+                                        type="button"
+                                        className="nav-item nav-group-btn"
+                                        onClick={() => toggleGroup(group.id)}
+                                        style={{
+                                            width: '100%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '10px 14px',
+                                            background: isGroupActive ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                                            border: '1px solid transparent',
+                                            color: isGroupActive ? 'var(--color-primary)' : 'var(--text-primary)',
+                                            fontSize: '13.5px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            borderRadius: 'var(--radius-md)',
+                                            transition: 'all 0.15s ease',
+                                            marginBottom: '2px',
+                                            textAlign: 'inherit'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', minWidth: 0 }}>
+                                            <GroupIcon size={19} style={{ flexShrink: 0 }} />
+                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.title}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                            {group.badge && isCollapsed && (
+                                                <span style={{
+                                                    background: '#f59e0b',
+                                                    color: 'white',
+                                                    fontSize: '10px',
+                                                    fontWeight: 800,
+                                                    borderRadius: '50%',
+                                                    minWidth: 18,
+                                                    height: 18,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '0 4px'
+                                                }}>
+                                                    {group.badge}
+                                                </span>
+                                            )}
+                                            <ChevronDown
+                                                size={16}
+                                                style={{
+                                                    transform: isCollapsed ? (i18n.language === 'ar' ? 'rotate(90deg)' : 'rotate(-90deg)') : 'rotate(0deg)',
+                                                    transition: 'transform 0.2s ease',
+                                                    opacity: 0.7
+                                                }}
+                                            />
+                                        </div>
+                                    </button>
+                                ) : (
+                                    <div style={{
+                                        height: '1px',
+                                        background: 'var(--border-color)',
+                                        margin: '10px 6px',
+                                        opacity: 0.6
+                                    }} />
                                 )}
-                            </Link>
+
+                                {/* Sub-items with tree guide line */}
+                                {(!isCollapsed || sidebarCollapsed) && (
+                                    <div
+                                        className="nav-group-items"
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '2px',
+                                            marginInlineStart: sidebarCollapsed ? 0 : 16,
+                                            paddingInlineStart: sidebarCollapsed ? 0 : 10,
+                                            borderInlineStart: sidebarCollapsed ? 'none' : '1.5px solid var(--border-color)',
+                                            marginTop: 2,
+                                            marginBottom: 6
+                                        }}
+                                    >
+                                        {group.items.map((item) => {
+                                            const Icon = item.icon;
+                                            const isActive = location.pathname === item.path;
+                                            const showBadge = item.badge;
+                                            return (
+                                                <Link
+                                                    key={item.path}
+                                                    to={item.path}
+                                                    className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
+                                                    onClick={() => setSidebarOpen(false)}
+                                                    style={{ position: 'relative', padding: '9px 12px', fontSize: '13px' }}
+                                                >
+                                                    <Icon size={18} />
+                                                    <span>{item.label}</span>
+                                                    {showBadge && (
+                                                        <span style={{
+                                                            position: 'absolute',
+                                                            top: 7,
+                                                            right: sidebarCollapsed ? 4 : (i18n.language === 'ar' ? 'auto' : 12),
+                                                            left: sidebarCollapsed ? 'auto' : (i18n.language === 'ar' ? 12 : 'auto'),
+                                                            background: '#f59e0b',
+                                                            color: 'white',
+                                                            fontSize: '10px',
+                                                            fontWeight: 800,
+                                                            borderRadius: '50%',
+                                                            minWidth: 18,
+                                                            height: 18,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            padding: '0 4px',
+                                                            boxShadow: '0 0 0 2px var(--bg-primary)',
+                                                            animation: 'pulse-badge 2s infinite'
+                                                        }}>
+                                                            {showBadge}
+                                                        </span>
+                                                    )}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         );
                     })}
                 </nav>
@@ -247,10 +450,11 @@ export default function Layout({ children }) {
                             title="Click to view/edit profile"
                         >
                             <div className="user-avatar">
-                                {user?.profilePicture ? (
+                                {user?.profilePicture && !avatarError ? (
                                     <img
                                         src={getImageUrl(user.profilePicture)}
                                         alt={user.name}
+                                        onError={() => setAvatarError(true)}
                                         style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
                                     />
                                 ) : (
@@ -417,98 +621,30 @@ export default function Layout({ children }) {
                     </div>
 
                     <div className="topbar-actions">
-                        {/* Theme Preset Switcher Dropdown */}
-                        <div style={{ position: 'relative' }}>
-                            <button
-                                className="theme-toggle"
-                                onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
-                                title="Change Color Theme / Palette"
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                            >
-                                <Palette size={19} />
-                            </button>
+                        {/* Simple 1-Click Theme Switcher (Light <-> Monochrome Dark) */}
+                        <button
+                            className="theme-toggle"
+                            onClick={toggleTheme}
+                            title={activeTheme === 'light' ? (i18n.language === 'ar' ? 'التحويل للوضع الليلي' : 'Switch to Dark Mode') : (i18n.language === 'ar' ? 'التحويل للوضع الفاتح' : 'Switch to Light Mode')}
+                            aria-label="Toggle theme"
+                        >
+                            {activeTheme === 'light' ? <Moon size={19} /> : <Sun size={19} />}
+                        </button>
 
-                            {isThemeMenuOpen && (
-                                <div
-                                    style={{
-                                        position: 'absolute',
-                                        top: '115%',
-                                        right: i18n.language === 'ar' ? 'auto' : 0,
-                                        left: i18n.language === 'ar' ? 0 : 'auto',
-                                        width: '230px',
-                                        background: 'var(--bg-secondary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '12px',
-                                        padding: '8px',
-                                        boxShadow: 'var(--shadow-xl)',
-                                        zIndex: 1200,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '4px'
-                                    }}
-                                >
-                                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', padding: '6px 10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Chill Themes
-                                    </div>
-
-                                    {[
-                                        { id: 'monochrome', name: 'Monochrome Minimal', desc: 'Neutral grey & off-white', dot: '#262626' },
-                                        { id: 'obsidian-emerald', name: 'Obsidian & Emerald', desc: 'Onyx / Vercel mint', dot: '#10b981' },
-                                        { id: 'light', name: 'Clean Light Mode', desc: 'Crisp day theme', dot: '#f59e0b' }
-                                    ].map((tPreset) => (
-                                        <button
-                                            key={tPreset.id}
-                                            onClick={() => changeThemePreset(tPreset.id)}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                padding: '8px 10px',
-                                                borderRadius: '8px',
-                                                border: 'none',
-                                                background: activeTheme === tPreset.id ? 'var(--bg-tertiary)' : 'transparent',
-                                                color: activeTheme === tPreset.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                                cursor: 'pointer',
-                                                textAlign: 'left',
-                                                transition: 'all 0.15s ease'
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span
-                                                    style={{
-                                                        width: '10px',
-                                                        height: '10px',
-                                                        borderRadius: '50%',
-                                                        background: tPreset.dot,
-                                                        border: '1px solid rgba(255,255,255,0.2)'
-                                                    }}
-                                                />
-                                                <div>
-                                                    <div style={{ fontSize: '12.5px', fontWeight: activeTheme === tPreset.id ? '700' : '500' }}>
-                                                        {tPreset.name}
-                                                    </div>
-                                                    <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)' }}>
-                                                        {tPreset.desc}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {activeTheme === tPreset.id && <Check size={14} style={{ color: 'var(--color-primary)' }} />}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
+                        {/* Clean & Simple Language Toggle Button with Globe Icon */}
                         <button
                             className="theme-toggle"
                             onClick={toggleLanguage}
-                            title="Switch Language"
+                            title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى اللغة العربية'}
+                            aria-label="Toggle language"
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 10px' }}
                         >
-                            <Languages size={20} />
-                            <span style={{ fontSize: '11px', marginLeft: '4px', fontWeight: '600' }}>
+                            <Globe size={18} />
+                            <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px' }}>
                                 {i18n.language === 'en' ? 'AR' : 'EN'}
                             </span>
                         </button>
+
                         {/* Notification bell always visible on all pages - ALWAYS LAST */}
                         <NotificationBell />
                     </div>

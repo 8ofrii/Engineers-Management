@@ -9,25 +9,33 @@ import { useFormat } from '../utils/format';
 import VoiceRecorderModal from '../components/VoiceRecorderModal';
 import DraftReviewModal from '../components/DraftReviewModal';
 
-const sourceIcon = (source) => source === 'VOICE' ? <Volume2 size={16} /> : <ImageIcon size={16} />;
+const sourceIcon = (source) => source === 'VOICE' ? <Volume2 size={20} /> : <ImageIcon size={20} />;
 
 const statusBadge = (status) => {
     const map = {
-        PENDING_REVIEW: { bg: '#fef3c7', fg: '#92400e', label: 'Pending review' },
-        COMMITTED:      { bg: '#d1fae5', fg: '#065f46', label: 'Committed' },
-        DISCARDED:      { bg: '#e5e7eb', fg: '#6b7280', label: 'Discarded' }
+        PENDING_REVIEW: { bg: 'rgba(245, 158, 11, 0.15)', fg: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)', label: 'Pending review' },
+        COMMITTED:      { bg: 'rgba(16, 185, 129, 0.15)', fg: '#34d399', border: 'rgba(16, 185, 129, 0.3)', label: 'Committed' },
+        DISCARDED:      { bg: 'rgba(148, 163, 184, 0.15)', fg: '#94a3b8', border: 'rgba(148, 163, 184, 0.3)', label: 'Discarded' }
     };
     const m = map[status] || map.PENDING_REVIEW;
     return (
         <span style={{
-            background: m.bg, color: m.fg, padding: '2px 10px',
-            borderRadius: 12, fontSize: '0.75rem', fontWeight: 600
+            background: m.bg,
+            color: m.fg,
+            border: `1px solid ${m.border}`,
+            padding: '3px 10px',
+            borderRadius: 12,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center'
         }}>{m.label}</span>
     );
 };
 
 export default function Drafts() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isRTL = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const { showAlert } = useAlert();
     const navigate = useNavigate();
     const { id: routeDraftId } = useParams();
@@ -70,11 +78,11 @@ export default function Drafts() {
 
     useEffect(() => { load(); }, [statusFilter]);
 
-    const handleVoiceCaptured = async (blob) => {
+    const handleVoiceCaptured = async (blob, transcript = '') => {
         setVoiceOpen(false);
         try {
             setUploading(true);
-            const r = await aiExtractAPI.voice(blob);
+            const r = await aiExtractAPI.voice(blob, transcript);
             // Open review locally (no full-page navigation)
             setReviewId(r.data.draft.id);
             load();
@@ -115,10 +123,10 @@ export default function Drafts() {
                 <div className="flex-between mb-xl" style={{ flexWrap: 'wrap', gap: 16 }}>
                     <div>
                         <h1 className="flex gap-md" style={{ alignItems: 'center' }}>
-                            <Sparkles size={28} />
+                            <Sparkles size={28} style={{ color: 'var(--color-accent, #38bdf8)' }} />
                             {t('drafts.title', 'AI Drafts')}
                         </h1>
-                        <p className="text-secondary">
+                        <p className="text-secondary" style={{ marginTop: 4 }}>
                             {t('drafts.subtitle', 'Capture a voice note or receipt photo and let AI prepare a draft transaction for you.')}
                         </p>
                     </div>
@@ -128,49 +136,81 @@ export default function Drafts() {
                 <div className="grid grid-2" style={{ gap: 16, marginBottom: 24 }}>
                     <button
                         type="button"
-                        className="btn btn-primary"
+                        className="card"
                         style={{
                             padding: '24px',
-                            fontSize: '1.05rem',
+                            background: 'var(--bg-secondary, #1c1c1c)',
+                            border: '1px solid var(--border-color, #2b2b2b)',
+                            color: 'var(--text-primary, #fafafa)',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: 8,
+                            gap: 10,
                             alignItems: 'center',
-                            minHeight: 110
+                            justifyContent: 'center',
+                            minHeight: 120,
+                            cursor: uploading ? 'not-allowed' : 'pointer',
+                            borderRadius: 12,
+                            textAlign: 'center',
+                            transition: 'all 0.2s ease'
                         }}
                         disabled={uploading}
                         onClick={() => setVoiceOpen(true)}
                     >
-                        {uploading ? <Loader2 size={28} className="spin" /> : <Mic size={28} />}
-                        <span>{t('drafts.captureVoice', 'Voice Draft')}</span>
-                        <small style={{ opacity: 0.8, fontWeight: 400 }}>
+                        <div style={{
+                            width: 50, height: 50, borderRadius: '50%',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#34d399'
+                        }}>
+                            {uploading ? <Loader2 size={24} className="spin" /> : <Mic size={24} />}
+                        </div>
+                        <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary, #fafafa)' }}>
+                            {t('drafts.captureVoice', 'Voice Draft')}
+                        </span>
+                        <small style={{ color: 'var(--text-secondary, #a3a3a3)', fontWeight: 400 }}>
                             {t('drafts.captureVoiceHint', 'Speak the expense in Arabic or English')}
                         </small>
                     </button>
 
                     <label
-                        className="btn btn-primary"
+                        className="card"
                         style={{
                             padding: '24px',
-                            fontSize: '1.05rem',
+                            background: 'var(--bg-secondary, #1c1c1c)',
+                            border: '1px solid var(--border-color, #2b2b2b)',
+                            color: 'var(--text-primary, #fafafa)',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: 8,
+                            gap: 10,
                             alignItems: 'center',
-                            minHeight: 110,
+                            justifyContent: 'center',
+                            minHeight: 120,
                             cursor: uploading ? 'not-allowed' : 'pointer',
-                            opacity: uploading ? 0.6 : 1
+                            borderRadius: 12,
+                            textAlign: 'center',
+                            opacity: uploading ? 0.6 : 1,
+                            transition: 'all 0.2s ease'
                         }}
                     >
-                        {uploading ? <Loader2 size={28} className="spin" /> : <Camera size={28} />}
-                        <span>{t('drafts.captureReceipt', 'Receipt Draft')}</span>
-                        <small style={{ opacity: 0.8, fontWeight: 400 }}>
+                        <div style={{
+                            width: 50, height: 50, borderRadius: '50%',
+                            background: 'rgba(59, 130, 246, 0.15)',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#60a5fa'
+                        }}>
+                            {uploading ? <Loader2 size={24} className="spin" /> : <Camera size={24} />}
+                        </div>
+                        <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary, #fafafa)' }}>
+                            {t('drafts.captureReceipt', 'Receipt Draft')}
+                        </span>
+                        <small style={{ color: 'var(--text-secondary, #a3a3a3)', fontWeight: 400 }}>
                             {t('drafts.captureReceiptHint', 'Photograph a receipt or invoice')}
                         </small>
                         <input
                             type="file"
-                            accept="image/*"
-                            capture="environment"
+                            accept="image/*,application/pdf"
                             onChange={handlePhotoSelected}
                             disabled={uploading}
                             style={{ display: 'none' }}
@@ -180,16 +220,34 @@ export default function Drafts() {
 
                 {/* Status filter pills */}
                 <div className="flex gap-sm mb-md" style={{ flexWrap: 'wrap' }}>
-                    {['PENDING_REVIEW', 'COMMITTED', 'DISCARDED', 'ALL'].map(s => (
-                        <button
-                            key={s}
-                            type="button"
-                            className={`btn btn-sm ${statusFilter === s ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setStatusFilter(s)}
-                        >
-                            {s.replace('_', ' ')}
-                        </button>
-                    ))}
+                    {[
+                        { key: 'ALL', label: isRTL ? 'الكل' : 'All' },
+                        { key: 'PENDING_REVIEW', label: isRTL ? 'قيد المراجعة' : 'Pending Review' },
+                        { key: 'COMMITTED', label: isRTL ? 'تم الترحيل' : 'Committed' },
+                        { key: 'DISCARDED', label: isRTL ? 'تم الإلغاء' : 'Discarded' }
+                    ].map(({ key, label }) => {
+                        const isActive = statusFilter === key;
+                        return (
+                            <button
+                                key={key}
+                                type="button"
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: 20,
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    background: isActive ? 'var(--bg-elevated, #303030)' : 'var(--bg-secondary, #1c1c1c)',
+                                    color: isActive ? 'var(--text-primary, #ffffff)' : 'var(--text-secondary, #a3a3a3)',
+                                    border: isActive ? '1px solid var(--border-color-light, #525252)' : '1px solid var(--border-color, #2b2b2b)',
+                                }}
+                                onClick={() => setStatusFilter(key)}
+                            >
+                                {label}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {loading ? (
@@ -197,10 +255,15 @@ export default function Drafts() {
                         <div className="spinner"></div>
                     </div>
                 ) : drafts.length === 0 ? (
-                    <div className="card text-center" style={{ padding: 48 }}>
-                        <Sparkles size={48} style={{ margin: '0 auto 12px', color: 'var(--text-tertiary)' }} />
-                        <h3>{t('drafts.empty', 'No drafts yet')}</h3>
-                        <p className="text-secondary">
+                    <div className="card text-center" style={{
+                        padding: 48,
+                        background: 'var(--bg-secondary, #1c1c1c)',
+                        border: '1px solid var(--border-color, #2b2b2b)',
+                        borderRadius: 12
+                    }}>
+                        <Sparkles size={48} style={{ margin: '0 auto 12px', color: 'var(--text-tertiary, #737373)' }} />
+                        <h3 style={{ color: 'var(--text-primary, #fafafa)', marginBottom: 6 }}>{t('drafts.empty', 'No drafts yet')}</h3>
+                        <p className="text-secondary" style={{ color: 'var(--text-secondary, #a3a3a3)' }}>
                             {t('drafts.emptyHint', 'Tap one of the buttons above to capture your first AI draft.')}
                         </p>
                     </div>
@@ -208,6 +271,7 @@ export default function Drafts() {
                     <div className="grid" style={{ gap: 12 }}>
                         {drafts.map((d) => {
                             const md = d.matchedDraft || {};
+                            const isVoice = d.source === 'VOICE';
                             return (
                                 <button
                                     key={d.id}
@@ -215,40 +279,59 @@ export default function Drafts() {
                                     onClick={() => setReviewId(d.id)}
                                     className="card"
                                     style={{
-                                        background: 'var(--bg-primary, white)',
-                                        border: '1px solid var(--border-color, #e5e7eb)',
+                                        background: 'var(--bg-secondary, #1c1c1c)',
+                                        border: '1px solid var(--border-color, #2b2b2b)',
+                                        color: 'var(--text-primary, #fafafa)',
                                         textAlign: 'inherit',
                                         cursor: 'pointer',
-                                        padding: 16,
+                                        padding: '16px 20px',
                                         display: 'flex',
                                         gap: 16,
                                         alignItems: 'center',
-                                        width: '100%'
+                                        width: '100%',
+                                        borderRadius: 12,
+                                        transition: 'all 0.2s ease'
                                     }}
                                 >
                                     <div style={{
-                                        width: 40, height: 40, borderRadius: 8,
-                                        background: 'var(--color-primary-light, #dbeafe)',
+                                        width: 44, height: 44, borderRadius: 10,
+                                        background: isVoice ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                                        border: isVoice ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(59, 130, 246, 0.25)',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        color: 'var(--color-primary, #2563eb)',
+                                        color: isVoice ? '#34d399' : '#60a5fa',
                                         flexShrink: 0
                                     }}>
                                         {sourceIcon(d.source)}
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div className="flex gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                                            <strong>
+                                        <div className="flex gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                                            <span style={{
+                                                color: 'var(--text-primary, #fafafa)',
+                                                fontWeight: 700,
+                                                fontSize: '0.98rem',
+                                                lineHeight: 1.4
+                                            }}>
                                                 {md.description || t('drafts.untitled', '(no summary)')}
-                                            </strong>
+                                            </span>
                                             {statusBadge(d.status)}
                                         </div>
-                                        <div className="text-secondary" style={{ fontSize: '0.85rem', marginTop: 4 }}>
-                                            {md.amount != null ? currency(md.amount) : '—'}
-                                            {md.category ? ` · ${md.category}` : ''}
-                                            {d.createdBy?.name ? ` · ${d.createdBy.name}` : ''}
+                                        <div style={{
+                                            color: 'var(--text-secondary, #a3a3a3)',
+                                            fontSize: '0.85rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                            flexWrap: 'wrap'
+                                        }}>
+                                            <span style={{ color: 'var(--text-primary, #fafafa)', fontWeight: 600 }}>
+                                                {md.amount != null ? currency(md.amount) : '—'}
+                                            </span>
+                                            {md.category ? <span>· {md.category}</span> : null}
+                                            {d.createdBy?.name ? <span>· {d.createdBy.name}</span> : null}
+                                            {d.createdAt ? <span>· {new Date(d.createdAt).toLocaleDateString()}</span> : null}
                                         </div>
                                     </div>
-                                    <ArrowRight size={18} style={{ flexShrink: 0, opacity: 0.5 }} />
+                                    <ArrowRight size={18} style={{ flexShrink: 0, color: 'var(--text-tertiary, #737373)' }} />
                                 </button>
                             );
                         })}

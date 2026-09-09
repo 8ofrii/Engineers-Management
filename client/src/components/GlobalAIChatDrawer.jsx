@@ -22,11 +22,9 @@ import './GlobalAIChatDrawer.css';
 export default function GlobalAIChatDrawer() {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const { isChatOpen: isOpen, closeChat } = useCopilot();
 
-    // Persist drawer open/close and docked state in localStorage
-    const [isOpen, setIsOpen] = useState(() => {
-        return localStorage.getItem('ai_assistant_open') === 'true';
-    });
+    // Persist docked state in localStorage
     const [isDocked, setIsDocked] = useState(() => {
         return localStorage.getItem('ai_assistant_docked') !== 'false';
     });
@@ -41,7 +39,6 @@ export default function GlobalAIChatDrawer() {
     const audioChunksRef = useRef([]);
 
     useEffect(() => {
-        localStorage.setItem('ai_assistant_open', isOpen);
         if (isOpen && messages.length === 0) {
             loadMessages();
         }
@@ -70,6 +67,68 @@ export default function GlobalAIChatDrawer() {
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    const renderFormattedMessage = (content) => {
+        if (!content) return null;
+        const lines = String(content).split('\n');
+        return (
+            <div className="ai-natural-text" style={{ lineHeight: 1.65, fontSize: '0.92rem' }}>
+                {lines.map((line, lIdx) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return <div key={lIdx} style={{ height: '6px' }} />;
+                    
+                    const isHeader = trimmed.startsWith('#');
+                    const cleanLine = trimmed.replace(/^#+\s*/, '');
+                    
+                    const isBullet = /^[*-•]\s+/.test(cleanLine);
+                    const bulletText = isBullet ? cleanLine.replace(/^[*-•]\s+/, '') : cleanLine;
+                    
+                    const parts = [];
+                    const boldRegex = /\*\*(.*?)\*\*|\*(.*?)\*/g;
+                    let lastIndex = 0;
+                    let match;
+                    
+                    while ((match = boldRegex.exec(bulletText)) !== null) {
+                        if (match.index > lastIndex) {
+                            parts.push(bulletText.substring(lastIndex, match.index));
+                        }
+                        parts.push(
+                            <strong key={match.index} style={{ fontWeight: 700, color: 'inherit' }}>
+                                {match[1] || match[2]}
+                            </strong>
+                        );
+                        lastIndex = match.index + match[0].length;
+                    }
+                    if (lastIndex < bulletText.length) {
+                        parts.push(bulletText.substring(lastIndex));
+                    }
+
+                    if (isHeader) {
+                        return (
+                            <div key={lIdx} style={{ fontWeight: 800, fontSize: '1rem', margin: '6px 0 3px', color: '#fff' }}>
+                                {parts.length > 0 ? parts : cleanLine}
+                            </div>
+                        );
+                    }
+
+                    if (isBullet) {
+                        return (
+                            <div key={lIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, margin: '2px 0' }}>
+                                <span style={{ color: '#ff5a36', fontSize: '0.85rem', lineHeight: 1.6 }}>•</span>
+                                <span style={{ flex: 1 }}>{parts.length > 0 ? parts : bulletText}</span>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <p key={lIdx} style={{ margin: '0 0 4px 0' }}>
+                            {parts.length > 0 ? parts : cleanLine}
+                        </p>
+                    );
+                })}
+            </div>
+        );
     };
 
     const navigate = useNavigate();
@@ -358,20 +417,6 @@ export default function GlobalAIChatDrawer() {
 
     return (
         <>
-            {/* Constant Floating Toggle / Badge on the Right */}
-            {!isOpen && (
-                <button
-                    className="ai-chat-floating-btn"
-                    onClick={() => setIsOpen(true)}
-                    title="Open AI Assistant (المساعد الذكي)"
-                >
-                    <div className="ai-btn-pulse"></div>
-                    <Bot size={22} className="ai-btn-icon" />
-                    <span className="ai-btn-label">AI Assistant</span>
-                    <Sparkles size={14} className="ai-sparkle-icon" />
-                </button>
-            )}
-
             {/* Persistent Side Drawer / Window */}
             {isOpen && (
                 <aside
@@ -406,7 +451,7 @@ export default function GlobalAIChatDrawer() {
                             </button>
                             <button
                                 className="ai-control-btn ai-close-btn"
-                                onClick={() => setIsOpen(false)}
+                                onClick={closeChat}
                                 title="Minimize / Close"
                             >
                                 <X size={18} />
@@ -433,7 +478,7 @@ export default function GlobalAIChatDrawer() {
                                     className={`ai-msg ${message.isUser ? 'ai-msg-user' : 'ai-msg-bot'}`}
                                 >
                                     <div className="ai-msg-bubble">
-                                        <p>{message.content}</p>
+                                        {renderFormattedMessage(message.content)}
 
                                         {/* Action Card for AI Commands */}
                                         {message.extractedData?.params && !message.isActionCompleted && (

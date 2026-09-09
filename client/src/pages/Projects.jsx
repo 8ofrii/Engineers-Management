@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '../services/api';
-import { FolderKanban, Plus, Pencil, Trash2, Receipt } from 'lucide-react';
+import { FolderKanban, Plus, Pencil, Trash2, Receipt, X } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import Layout from '../components/Layout';
 import AddProjectModal from '../components/AddProjectModal';
@@ -13,6 +13,10 @@ export default function Projects() {
     const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const navigate = useNavigate();
+    const { projectId: urlProjectId } = useParams();
+    const [searchParams] = useSearchParams();
+    const filterProjectId = urlProjectId || searchParams.get('projectId') || searchParams.get('id');
+
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,6 +40,10 @@ export default function Projects() {
             setLoading(false);
         }
     };
+
+    const displayedProjects = filterProjectId
+        ? projects.filter(p => p.id === filterProjectId)
+        : projects;
 
     const viewProjectTransactions = (projectId, projectName) => {
         navigate(`/finance?projectId=${projectId}&projectName=${encodeURIComponent(projectName)}`);
@@ -142,7 +150,35 @@ export default function Projects() {
                     </button>
                 </div>
 
-                {projects.length === 0 ? (
+                {filterProjectId && (
+                    <div className="card mb-lg" style={{
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        padding: '12px 20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderRadius: 'var(--radius-md)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <FolderKanban size={20} style={{ color: '#3b82f6' }} />
+                            <span style={{ fontWeight: 700 }}>
+                                {isArabic ? 'عرض تفاصيل المشروع المحدد' : 'Showing selected project details'}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => navigate('/projects')}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                            <X size={14} />
+                            <span>{isArabic ? 'عرض جميع المشاريع' : 'Show All Projects'}</span>
+                        </button>
+                    </div>
+                )}
+
+                {displayedProjects.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
                         <FolderKanban size={64} style={{ margin: '0 auto var(--spacing-lg)', color: 'var(--text-tertiary)' }} />
                         <h3>{t('projects.noProjects')}</h3>
@@ -154,12 +190,14 @@ export default function Projects() {
                     </div>
                 ) : (
                     <div className="grid grid-2">
-                        {projects.map((project) => {
+                        {displayedProjects.map((project) => {
                             const budgetPct = project.budget > 0
                                 ? Math.min(100, Math.round((Number(project.actualCost) / Number(project.budget)) * 100))
                                 : 0;
                             const budgetBarColor = budgetPct >= 90 ? '#ef4444' : budgetPct >= 70 ? '#f59e0b' : '#10b981';
-                            const completionPct = Math.min(100, Math.max(0, Number(project.completionPercent || 0)));
+                            const completionPct = project.status?.toUpperCase() === 'COMPLETED'
+                                ? 100
+                                : Math.min(100, Math.max(0, Number(project.completionPercent || 0)));
                             return (
                             <div key={project.id} className="card" style={{
                                 padding: 'var(--spacing-lg)',

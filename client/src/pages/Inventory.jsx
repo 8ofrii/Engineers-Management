@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Package, Search, Filter, ArrowRight, History, Plus, Settings, Trash2, Pencil } from 'lucide-react';
+import { Package, Search, Filter, ArrowRight, History, Plus, Settings, Trash2, Pencil, RefreshCw, X } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddMaterialModal from '../components/AddMaterialModal';
@@ -10,7 +10,8 @@ import { useFormat } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
 
 export default function Inventory() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isAr = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const { showAlert } = useAlert();
     const { currency: formatCurrency } = useFormat();
     const [batches, setBatches] = useState([]);
@@ -26,10 +27,84 @@ export default function Inventory() {
     const [usageProjectId, setUsageProjectId] = useState(null);
     const [usageBatchId, setUsageBatchId] = useState(null);
 
+    // Recharge Material Stock State
+    const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
+    const [rechargingMaterial, setRechargingMaterial] = useState(null);
+    const [suppliers, setSuppliers] = useState([]);
+    const [rechargeForm, setRechargeForm] = useState({
+        quantity: '',
+        unitPrice: '',
+        projectId: '',
+        paymentMethod: 'CUSTODY_WALLET',
+        supplierName: '',
+        createTransaction: true,
+        notes: ''
+    });
+    const [rechargeLoading, setRechargeLoading] = useState(false);
+
     const openEditMaterial = (material) => {
         setEditingMaterial(material);
         setIsMaterialModalOpen(true);
     };
+
+    const openRechargeModal = (material) => {
+        setRechargingMaterial(material);
+        setRechargeForm({
+            quantity: '',
+            unitPrice: material.unitPrice ? material.unitPrice.toString() : '',
+            projectId: '',
+            paymentMethod: 'CUSTODY_WALLET',
+            supplierName: '',
+            createTransaction: true,
+            notes: ''
+        });
+        setIsRechargeModalOpen(true);
+    };
+
+    const handleRechargeSubmit = async (e) => {
+        e.preventDefault();
+        if (!rechargingMaterial) return;
+
+        const qty = parseFloat(rechargeForm.quantity);
+        if (!qty || qty <= 0) {
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: isAr ? 'يرجى إدخال كمية صحيحة أكبر من صفر' : 'Please enter a valid quantity greater than 0' });
+            return;
+        }
+
+        const price = rechargeForm.unitPrice ? parseFloat(rechargeForm.unitPrice) : (rechargingMaterial.unitPrice || 0);
+        const totalAmount = qty * price;
+
+        setRechargeLoading(true);
+        try {
+            const res = await materialsAPI.recharge(rechargingMaterial.id, {
+                quantity: qty,
+                unitPrice: price > 0 ? price : undefined,
+                projectId: rechargeForm.projectId || undefined,
+                paymentMethod: rechargeForm.paymentMethod,
+                supplierName: rechargeForm.supplierName || undefined,
+                createTransaction: rechargeForm.createTransaction,
+                notes: rechargeForm.notes || undefined
+            });
+
+            showAlert({
+                type: 'success',
+                title: t('common.success', 'Success'),
+                message: isAr
+                    ? `تم شحن رصيد ${rechargingMaterial.nameAr || rechargingMaterial.name} بإضافة ${qty} ${rechargingMaterial.unit}${totalAmount > 0 && rechargeForm.createTransaction ? ` وتسجيل معاملة مصروف بقيمة ${formatCurrency(totalAmount)}` : ''} بنجاح!`
+                    : `Successfully recharged ${qty} ${rechargingMaterial.unit} to ${rechargingMaterial.name}${totalAmount > 0 && rechargeForm.createTransaction ? ` and recorded an expense of ${formatCurrency(totalAmount)}` : ''}!`
+            });
+
+            setIsRechargeModalOpen(false);
+            setRechargingMaterial(null);
+            loadData();
+        } catch (error) {
+            console.error("Failed to recharge material", error);
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to recharge material stock') });
+        } finally {
+            setRechargeLoading(false);
+        }
+    };
+
     const handleDeleteMaterial = (material) => {
         showAlert({
             type: 'warning',
@@ -129,19 +204,19 @@ export default function Inventory() {
                                 className={`btn btn-sm ${viewMode === 'BATCHES' ? 'btn-primary' : 'btn-ghost'}`}
                                 onClick={() => setViewMode('BATCHES')}
                             >
-                                {t('inventory.batches') || 'الاستهلاكات'}
+                                {t('inventory.batches') || 'الاستهلاكات والمواقع'}
                             </button>
                             <button
                                 className={`btn btn-sm ${viewMode === 'MATERIALS' ? 'btn-primary' : 'btn-ghost'}`}
                                 onClick={() => setViewMode('MATERIALS')}
                             >
-                                {t('inventory.rawMaterials') || 'الخامات'}
+                                {t('inventory.rawMaterials') || 'الخامات والرصيد'}
                             </button>
                         </div>
                         {viewMode === 'MATERIALS' && (
                             <button className="btn btn-primary flex gap-sm" onClick={() => setIsMaterialModalOpen(true)}>
                                 <Plus size={18} />
-                                {t('common.add')}
+                                {isAr ? 'إضافة خامة جديدة' : 'Add Raw Material'}
                             </button>
                         )}
                     </div>
@@ -167,25 +242,27 @@ export default function Inventory() {
                                 }}
                             />
                         </div>
-                        <div style={{ flex: '0 1 250px', minWidth: '200px' }}>
-                            <select
-                                value={selectedProjectId}
-                                onChange={(e) => setSelectedProjectId(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: '6px',
-                                    outline: 'none',
-                                    backgroundColor: 'transparent'
-                                }}
-                            >
-                                <option value="all">{t('inventory.allProjects') || 'جميع المشاريع'}</option>
-                                {projects.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
-                        </div>
+                        {viewMode === 'BATCHES' && (
+                            <div style={{ flex: '0 1 250px', minWidth: '200px' }}>
+                                <select
+                                    value={selectedProjectId}
+                                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '6px',
+                                        outline: 'none',
+                                        backgroundColor: 'transparent'
+                                    }}
+                                >
+                                    <option value="all">{t('inventory.allProjects') || 'جميع المشاريع'}</option>
+                                    {projects.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -281,62 +358,92 @@ export default function Inventory() {
                         {filteredMaterials.length === 0 ? (
                             <div className="card text-center py-2xl">
                                 <Package size={48} className="text-tertiary mx-auto mb-md" />
-                                <p className="text-secondary">{t('inventory.noItems')}</p>
+                                <p className="text-secondary">{isAr ? 'لا توجد خامات مسجلة حالياً' : 'No raw materials registered yet'}</p>
+                                <button className="btn btn-primary mt-md" onClick={() => setIsMaterialModalOpen(true)}>
+                                    <Plus size={18} />
+                                    {isAr ? 'إضافة خامة جديدة' : 'Add Raw Material'}
+                                </button>
                             </div>
                         ) : (
                             <div className="grid grid-4 gap-md">
-                                {filteredMaterials.map(material => (
-                                    <div key={material.id} className="card material-card" style={{
-                                        borderLeft: Number(material.stockLevel) <= Number(material.reorderLevel) ? '3px solid #ef4444' : undefined
-                                    }}>
-                                        <div className="flex-between mb-xs" style={{ alignItems: 'flex-start', gap: 8 }}>
-                                            <h4 style={{ margin: 0, flex: 1, minWidth: 0 }}>{material.nameAr || material.name}</h4>
-                                            <div className="flex gap-xs" style={{ flexShrink: 0 }}>
-                                                {/* Low stock badge (#7) */}
-                                                {Number(material.stockLevel) <= Number(material.reorderLevel) && (
-                                                    <span style={{
-                                                        background: '#ef4444', color: 'white',
-                                                        borderRadius: 6, padding: '2px 8px',
-                                                        fontSize: 10, fontWeight: 700,
-                                                        animation: 'pulse-badge 1.8s infinite'
-                                                    }}>⚠️ {t('inventory.lowStock', 'LOW')}</span>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary btn-sm"
-                                                    style={{ padding: '4px 8px' }}
-                                                    title={t('common.edit', 'Edit')}
-                                                    onClick={() => openEditMaterial(material)}
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-secondary btn-sm"
-                                                    style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444' }}
-                                                    title={t('common.delete', 'Delete')}
-                                                    onClick={() => handleDeleteMaterial(material)}
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                {filteredMaterials.map(material => {
+                                    const stock = Number(material.stockLevel || 0);
+                                    const reorder = material.reorderLevel !== null && material.reorderLevel !== undefined && material.reorderLevel !== '' ? Number(material.reorderLevel) : null;
+                                    const isLowStock = reorder !== null && reorder > 0 ? stock <= reorder : (stock === 0 && material.reorderLevel !== null);
+
+                                    return (
+                                        <div key={material.id} className="card material-card" style={{
+                                            borderLeft: isLowStock ? '3px solid #ef4444' : '3px solid #10b981',
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}>
+                                            <div className="flex-between mb-xs" style={{ alignItems: 'flex-start', gap: 8 }}>
+                                                <h4 style={{ margin: 0, flex: 1, minWidth: 0 }}>{material.nameAr || material.name}</h4>
+                                                <div className="flex gap-xs" style={{ flexShrink: 0 }}>
+                                                    {isLowStock && (
+                                                        <span style={{
+                                                            background: '#ef4444', color: 'white',
+                                                            borderRadius: 6, padding: '2px 8px',
+                                                            fontSize: 10, fontWeight: 700
+                                                        }}>⚠️ {t('inventory.lowStock', 'LOW')}</span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        style={{ padding: '4px 8px' }}
+                                                        title={t('common.edit', 'Edit')}
+                                                        onClick={() => openEditMaterial(material)}
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary btn-sm"
+                                                        style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444' }}
+                                                        title={t('common.delete', 'Delete')}
+                                                        onClick={() => handleDeleteMaterial(material)}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
+
+                                            <div className="flex-between text-xs text-tertiary mb-md">
+                                                <span>{material.name}</span>
+                                                <span className="badge badge-info">{material.unit}</span>
+                                            </div>
+
+                                            <div className="flex-between mb-sm" style={{ background: 'var(--bg-tertiary)', padding: '8px 10px', borderRadius: '6px' }}>
+                                                <span className="text-secondary" style={{ fontSize: '0.85rem' }}>{isAr ? 'الرصيد المتوفر:' : 'Stock Level:'}</span>
+                                                <span className={`font-bold ${isLowStock ? 'text-danger' : 'text-primary'}`} style={{ fontSize: '1.05rem' }}>
+                                                    {stock} <span style={{ fontSize: '0.8rem', fontWeight: 'normal' }}>{material.unit}</span>
+                                                </span>
+                                            </div>
+
+                                            <div className="flex-between text-xs text-secondary mb-sm">
+                                                <span>{isAr ? 'سعر الوحدة:' : 'Unit Price:'}</span>
+                                                <span className="font-bold">{formatCurrency(material.unitPrice)} / {material.unit}</span>
+                                            </div>
+
+                                            {reorder !== null && reorder > 0 && (
+                                                <div className="flex-between text-xs text-tertiary mb-md">
+                                                    <span>{isAr ? 'حد التنبيه:' : 'Alert Level:'}</span>
+                                                    <span>{reorder} {material.unit}</span>
+                                                </div>
+                                            )}
+
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary btn-sm full-width mt-auto"
+                                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', fontSize: '0.85rem' }}
+                                                onClick={() => openRechargeModal(material)}
+                                            >
+                                                <Plus size={15} />
+                                                <span>{isAr ? 'شحن رصيد الخامة' : 'Recharge Stock'}</span>
+                                            </button>
                                         </div>
-                                        <div className="flex-between text-xs text-tertiary mb-md">
-                                            <span>{material.name}</span>
-                                            <span className="badge badge-info">{material.unit}</span>
-                                        </div>
-                                        <div className="flex-between mb-sm">
-                                            <span className="text-secondary">Stock Level:</span>
-                                            <span className={`font-bold ${Number(material.stockLevel) <= Number(material.reorderLevel) ? 'text-danger' : ''}`}>
-                                                {material.stockLevel}
-                                            </span>
-                                        </div>
-                                        <div className="flex-between">
-                                            <span className="text-secondary">Unit Price:</span>
-                                            <span className="font-bold">{formatCurrency(material.unitPrice)}</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -366,6 +473,147 @@ export default function Inventory() {
                 }}
             />
 
+            {/* Quick Recharge Material Stock Modal */}
+            {isRechargeModalOpen && rechargingMaterial && (
+                <div className="modal-overlay" onClick={() => setIsRechargeModalOpen(false)}>
+                    <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+                        <div className="modal-header">
+                            <h2>
+                                {isAr ? `شحن رصيد: ${rechargingMaterial.nameAr || rechargingMaterial.name}` : `Recharge: ${rechargingMaterial.name}`}
+                            </h2>
+                            <button className="modal-close" onClick={() => setIsRechargeModalOpen(false)}>
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleRechargeSubmit} className="modal-body">
+                            <div className="form-section">
+                                <div style={{ background: 'var(--bg-tertiary)', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{isAr ? 'الرصيد الحالي:' : 'Current Stock:'}</span>
+                                    <span style={{ fontWeight: 'bold', color: 'var(--color-primary)', fontSize: '1.1rem' }}>
+                                        {rechargingMaterial.stockLevel || 0} {rechargingMaterial.unit}
+                                    </span>
+                                </div>
+
+                                <div className="form-group mb-md">
+                                    <label>{isAr ? `الكمية المضافة (+ ${rechargingMaterial.unit})` : `Quantity to Add (+ ${rechargingMaterial.unit})`} <span className="required">*</span></label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        required
+                                        autoFocus
+                                        value={rechargeForm.quantity}
+                                        onChange={(e) => setRechargeForm(prev => ({ ...prev, quantity: e.target.value }))}
+                                        placeholder="0.00"
+                                        style={{ fontSize: '1.2rem', fontWeight: 'bold' }}
+                                    />
+                                </div>
+
+                                <div className="form-group mb-md">
+                                    <label>{isAr ? 'سعر الوحدة للشحنة (EGP)' : 'Unit Price (EGP)'}</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={rechargeForm.unitPrice}
+                                        onChange={(e) => setRechargeForm(prev => ({ ...prev, unitPrice: e.target.value }))}
+                                        placeholder={rechargingMaterial.unitPrice ? rechargingMaterial.unitPrice.toString() : '0.00'}
+                                    />
+                                </div>
+
+                                {/* Live Total Cost Card */}
+                                {(() => {
+                                    const qty = parseFloat(rechargeForm.quantity) || 0;
+                                    const price = rechargeForm.unitPrice !== '' ? (parseFloat(rechargeForm.unitPrice) || 0) : (rechargingMaterial.unitPrice || 0);
+                                    const total = qty * price;
+                                    return (
+                                        <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                                    {isAr ? 'إجمالي تكلفة الشحنة:' : 'Total Batch Cost:'}
+                                                </span>
+                                                <span style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                                                    {formatCurrency(total)}
+                                                </span>
+                                            </div>
+                                            {total > 0 && (
+                                                <label className="flex items-center gap-sm cursor-pointer" style={{ marginTop: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={rechargeForm.createTransaction}
+                                                        onChange={(e) => setRechargeForm(prev => ({ ...prev, createTransaction: e.target.checked }))}
+                                                        style={{ accentColor: 'var(--color-primary)' }}
+                                                    />
+                                                    <span>{isAr ? 'تسجيل معاملة مصروف مالي تلقائياً في السجل' : 'Record financial expense transaction automatically'}</span>
+                                                </label>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+
+                                {rechargeForm.createTransaction && (
+                                    <div className="form-group mb-md">
+                                        <label>{isAr ? 'طريقة الدفع' : 'Payment Method'}</label>
+                                        <select
+                                            value={rechargeForm.paymentMethod}
+                                            onChange={(e) => setRechargeForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                                        >
+                                            <option value="CUSTODY_WALLET">{isAr ? 'عهدة المهندس (Custody Wallet)' : 'Custody Wallet'}</option>
+                                            <option value="CASH">{isAr ? 'نقدي (Cash)' : 'Cash'}</option>
+                                            <option value="BANK_TRANSFER">{isAr ? 'تحويل بنكي (Bank Transfer)' : 'Bank Transfer'}</option>
+                                            <option value="CHECK">{isAr ? 'شيك (Check)' : 'Check'}</option>
+                                            <option value="CREDIT_CARD">{isAr ? 'بطاقة ائتمان (Card)' : 'Credit Card'}</option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="form-group mb-md">
+                                    <label>{isAr ? 'تخصيص لمشروع محدد (اختياري)' : 'Allocate to Project (Optional)'}</label>
+                                    <select
+                                        value={rechargeForm.projectId}
+                                        onChange={(e) => setRechargeForm(prev => ({ ...prev, projectId: e.target.value }))}
+                                    >
+                                        <option value="">-- {isAr ? 'المخزن العام (بدون مشروع محدد)' : 'General Warehouse (No Project)'} --</option>
+                                        {projects.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="form-group mb-md">
+                                    <label>{isAr ? 'اسم المورد / المحل (اختياري)' : 'Supplier / Vendor (Optional)'}</label>
+                                    <input
+                                        type="text"
+                                        value={rechargeForm.supplierName}
+                                        onChange={(e) => setRechargeForm(prev => ({ ...prev, supplierName: e.target.value }))}
+                                        placeholder={isAr ? 'مثال: شركة السويس للأسمنت / تاجر الحديد' : 'e.g. Suez Cement Co. / Vendor'}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label>{isAr ? 'ملاحظات / رقم إذن التوريد' : 'Notes / Delivery Note #'}</label>
+                                    <input
+                                        type="text"
+                                        value={rechargeForm.notes}
+                                        onChange={(e) => setRechargeForm(prev => ({ ...prev, notes: e.target.value }))}
+                                        placeholder={isAr ? 'مثال: توريد دفعة حديد جديدة' : 'e.g. Batch delivery note'}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setIsRechargeModalOpen(false)}>
+                                    {t('common.cancel', 'إلغاء')}
+                                </button>
+                                <button type="submit" className="btn btn-primary" disabled={rechargeLoading}>
+                                    {rechargeLoading ? (isAr ? 'جاري الشحن...' : 'Recharging...') : (isAr ? 'تأكيد الشحن' : 'Confirm Recharge')}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             <InventoryUsageModal
                 open={isUsageModalOpen}
                 onClose={() => setIsUsageModalOpen(false)}
@@ -378,12 +626,12 @@ export default function Inventory() {
             />
 
             <style>{`
-                .inventory-card {
+                .inventory-card, .material-card {
                     padding: var(--spacing-md);
                     border: 1px solid var(--border-color);
                     transition: transform 0.2s, border-color 0.2s;
                 }
-                .inventory-card:hover {
+                .inventory-card:hover, .material-card:hover {
                     transform: translateY(-2px);
                     border-color: var(--color-primary);
                 }

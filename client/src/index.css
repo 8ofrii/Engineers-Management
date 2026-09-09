@@ -265,7 +265,7 @@ input[type="number"] {
 }
 
 html {
-  font-size: 14px;
+  font-size: 14.5px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -363,7 +363,18 @@ a:hover {
   border-radius: var(--radius-lg);
   padding: var(--spacing-xl);
   box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
   transition: all var(--transition-base);
+}
+
+button.card {
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+[dir="rtl"] button.card {
+  text-align: right;
 }
 
 .card:hover {
@@ -692,7 +703,7 @@ a:hover {
 
 [dir="rtl"] .main-content {
   margin-left: 0;
-  margin-right: 280px;
+  margin-right: var(--sidebar-width, 17.5rem);
 }
 
 [dir="rtl"] .nav-item:hover {

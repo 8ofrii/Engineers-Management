@@ -40,10 +40,10 @@ export default function Suppliers() {
         try {
             if (selectedSupplier) {
                 await suppliersAPI.update(selectedSupplier.id, data);
-                showAlert({ type: 'success', title: 'Success', message: 'Supplier updated successfully.' });
+                showAlert({ type: 'success', title: t('common.success', 'Success'), message: t('suppliers.success.updated', 'Supplier updated successfully.') });
             } else {
                 await suppliersAPI.create(data);
-                showAlert({ type: 'success', title: 'Success', message: 'Supplier created successfully.' });
+                showAlert({ type: 'success', title: t('common.success', 'Success'), message: t('suppliers.success.created', 'Supplier created successfully.') });
             }
             await loadSuppliers();
         } catch (error) {
@@ -62,7 +62,7 @@ export default function Suppliers() {
             onConfirm: async () => {
                 try {
                     await suppliersAPI.delete(supplier.id);
-                    showAlert({ type: 'success', title: 'Deleted', message: 'Supplier deleted successfully' });
+                    showAlert({ type: 'success', title: t('common.deleted', 'Deleted'), message: t('suppliers.success.deleted', 'Supplier deleted successfully') });
                     loadSuppliers();
                 } catch (error) {
                     console.error('Failed to delete supplier:', error);
@@ -134,7 +134,9 @@ export default function Suppliers() {
                                         </button>
                                     </div>
                                 </div>
-                                <span className="badge badge-primary mb-md" style={{ display: 'inline-block' }}>{supplier.category}</span>
+                                <span className="badge badge-primary mb-md" style={{ display: 'inline-block' }}>
+                                    {t(`suppliers.categories.${supplier.category}`, supplier.category)}
+                                </span>
 
                                 <div className="flex gap-sm mb-sm text-secondary">
                                     <Mail size={16} />

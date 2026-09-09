@@ -5,13 +5,15 @@ import { suppliersAPI } from '../services/api';
 import './Modal.css';
 
 export default function AddMaterialModal({ isOpen, onClose, onSave, initialData = null }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isAr = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const [suppliers, setSuppliers] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
         nameAr: '',
         description: '',
         unit: 'TON',
+        stockLevel: '',
         unitPrice: '',
         reorderLevel: '',
         supplierId: ''
@@ -28,6 +30,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                     nameAr: initialData.nameAr || '',
                     description: initialData.description || '',
                     unit: initialData.unit || 'TON',
+                    stockLevel: initialData.stockLevel !== undefined && initialData.stockLevel !== null ? initialData.stockLevel.toString() : '',
                     unitPrice: initialData.unitPrice?.toString() || '',
                     reorderLevel: initialData.reorderLevel?.toString() || '',
                     supplierId: initialData.supplierId || ''
@@ -38,6 +41,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                     nameAr: '',
                     description: '',
                     unit: 'TON',
+                    stockLevel: '',
                     unitPrice: '',
                     reorderLevel: '',
                     supplierId: ''
@@ -64,9 +68,13 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
 
     const validate = () => {
         const newErrors = {};
-        if (!formData.name?.trim()) newErrors.name = t('common.required');
+        if (!formData.name?.trim() && !formData.nameAr?.trim()) {
+            newErrors.name = isAr ? 'اسم الخامة مطلوب' : 'Material name is required';
+        }
         if (!formData.unit) newErrors.unit = t('common.required');
-        if (!formData.unitPrice || Number(formData.unitPrice) <= 0) newErrors.unitPrice = t('common.required');
+        if (!formData.unitPrice || Number(formData.unitPrice) <= 0) {
+            newErrors.unitPrice = isAr ? 'سعر الوحدة مطلوب' : 'Unit price is required';
+        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -76,12 +84,13 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
         e.preventDefault();
         if (validate()) {
             const payload = {
-                name: formData.name.trim(),
-                nameAr: formData.nameAr?.trim() || null,
+                name: formData.name.trim() || formData.nameAr.trim(),
+                nameAr: formData.nameAr?.trim() || formData.name.trim(),
                 description: formData.description?.trim() || null,
                 unit: formData.unit,
+                stockLevel: formData.stockLevel !== '' && formData.stockLevel !== null ? parseFloat(formData.stockLevel) : 0,
                 unitPrice: parseFloat(formData.unitPrice),
-                reorderLevel: formData.reorderLevel !== '' && formData.reorderLevel !== null ? parseFloat(formData.reorderLevel) : 0,
+                reorderLevel: formData.reorderLevel !== '' && formData.reorderLevel !== null ? parseFloat(formData.reorderLevel) : null,
                 supplierId: formData.supplierId || null
             };
             onSave(payload);
@@ -94,7 +103,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2>{initialData ? t('common.edit') : t('common.add')} {t('inventory.title')}</h2>
+                    <h2>{initialData ? t('common.edit') : t('common.add')} {isAr ? 'خامة جديدة' : 'Raw Material'}</h2>
                     <button className="modal-close" onClick={onClose}>
                         <X size={24} />
                     </button>
@@ -104,24 +113,24 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                     <div className="form-section">
                         <div className="form-grid">
                             <div className="form-group">
-                                <label>{t('common.name')} (EN) <span className="required">*</span></label>
+                                <label>{isAr ? 'اسم الخامة بالعربية' : 'Material Name (Arabic)'} <span className="required">*</span></label>
                                 <input
-                                    name="name"
-                                    value={formData.name}
+                                    name="nameAr"
+                                    value={formData.nameAr}
                                     onChange={handleChange}
-                                    placeholder="e.g. Portland Cement"
+                                    placeholder={isAr ? 'مثال: أسمنت بورتلاندي' : 'e.g. Portland Cement (AR)'}
                                     className={errors.name ? 'error' : ''}
                                 />
                                 {errors.name && <span className="error-message">{errors.name}</span>}
                             </div>
 
                             <div className="form-group">
-                                <label>{t('common.nameAr')} (AR)</label>
+                                <label>{isAr ? 'اسم الخامة بالإنجليزية' : 'Material Name (English)'}</label>
                                 <input
-                                    name="nameAr"
-                                    value={formData.nameAr}
+                                    name="name"
+                                    value={formData.name}
                                     onChange={handleChange}
-                                    placeholder="مثال: أسمنت بورتلاندي"
+                                    placeholder="e.g. Portland Cement"
                                 />
                             </div>
 
@@ -132,19 +141,33 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                                     value={formData.unit}
                                     onChange={handleChange}
                                 >
-                                    <option value="TON">{t('finance.uom_options.ton')}</option>
-                                    <option value="KG">{t('finance.uom_options.kg')}</option>
-                                    <option value="M3">{t('finance.uom_options.m3')}</option>
-                                    <option value="M2">{t('finance.uom_options.m2')}</option>
-                                    <option value="M">{t('finance.uom_options.m')}</option>
-                                    <option value="PIECE">{t('finance.uom_options.piece')}</option>
-                                    <option value="LITER">{t('finance.uom_options.liter')}</option>
-                                    <option value="BAG">{t('finance.uom_options.bag')}</option>
+                                    <option value="TON">{t('finance.uom_options.ton', 'طن (Ton)')}</option>
+                                    <option value="KG">{t('finance.uom_options.kg', 'كيلوجرام (KG)')}</option>
+                                    <option value="M3">{t('finance.uom_options.m3', 'متر مكعب (M³)')}</option>
+                                    <option value="M2">{t('finance.uom_options.m2', 'متر مربع (M²)')}</option>
+                                    <option value="M">{t('finance.uom_options.m', 'متر طولي (M)')}</option>
+                                    <option value="PIECE">{t('finance.uom_options.piece', 'قطعة / عدد (Piece)')}</option>
+                                    <option value="LITER">{t('finance.uom_options.liter', 'لتر (Liter)')}</option>
+                                    <option value="BAG">{t('finance.uom_options.bag', 'شيكارة (Bag)')}</option>
                                 </select>
                             </div>
 
                             <div className="form-group">
-                                <label>{t('finance.unitPrice')} <span className="required">*</span></label>
+                                <label>{isAr ? `الرصيد / الكمية الحالية (${formData.unit})` : `Current Stock Quantity (${formData.unit})`}</label>
+                                <input
+                                    type="number"
+                                    name="stockLevel"
+                                    value={formData.stockLevel}
+                                    onChange={handleChange}
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    style={{ fontWeight: 'bold' }}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>{isAr ? 'سعر الوحدة (EGP)' : 'Unit Price (EGP)'} <span className="required">*</span></label>
                                 <input
                                     type="number"
                                     name="unitPrice"
@@ -158,25 +181,25 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                             </div>
 
                             <div className="form-group">
-                                <label>Reorder Level</label>
+                                <label>{isAr ? 'حد تنبيه نقص المخزون (اختياري)' : 'Min Stock Alert Level (Optional)'}</label>
                                 <input
                                     type="number"
                                     name="reorderLevel"
                                     value={formData.reorderLevel}
                                     onChange={handleChange}
                                     step="0.01"
-                                    placeholder="0.00"
+                                    placeholder={isAr ? 'مثال: 5' : 'e.g. 5'}
                                 />
                             </div>
 
                             <div className="form-group">
-                                <label>{t('nav.suppliers')}</label>
+                                <label>{t('nav.suppliers', 'المورد الافتراضي')}</label>
                                 <select
                                     name="supplierId"
                                     value={formData.supplierId}
                                     onChange={handleChange}
                                 >
-                                    <option value="">-- No Supplier --</option>
+                                    <option value="">-- {isAr ? 'بدون مورد افتراضي' : 'No Supplier'} --</option>
                                     {suppliers.map(s => (
                                         <option key={s.id} value={s.id}>{s.name}</option>
                                     ))}
@@ -184,12 +207,13 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                             </div>
 
                             <div className="form-group full-width">
-                                <label>{t('projects.modal.fields.description')}</label>
+                                <label>{t('projects.modal.fields.description', 'الوصف / ملاحظات')}</label>
                                 <textarea
                                     name="description"
                                     value={formData.description}
                                     onChange={handleChange}
                                     rows="2"
+                                    placeholder={isAr ? 'ملاحظات حول الخامة أو مواصفاتها...' : 'Notes or specifications...'}
                                 />
                             </div>
                         </div>
@@ -200,7 +224,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                             {t('common.cancel')}
                         </button>
                         <button type="submit" className="btn btn-primary">
-                            {t('common.save')}
+                            {initialData ? t('common.update', 'تحديث') : t('common.save', 'حفظ')}
                         </button>
                     </div>
                 </form>

@@ -9,14 +9,15 @@ import {
     RefreshControl,
     SafeAreaView,
     Platform,
-    Image
+    Image,
+    Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { projectsApi, transactionsApi, dsrApi } from '../services/api';
+import { projectsApi, transactionsApi, dsrApi, getWebBillingUrl } from '../services/api';
 import DraftCaptureFAB from '../components/DraftCaptureFAB';
 import GlassBackground from '../components/GlassBackground';
 
@@ -224,6 +225,30 @@ export default function DashboardScreen({ navigation }) {
                 </View>
 
                 {/* Projects List */}
+                {/* Free Tier Project Limit Notice */}
+                {projects.length >= 2 && (!user?.tenant?.subscriptionPlan || user?.tenant?.subscriptionPlan === 'FREE') && (
+                    <TouchableOpacity
+                        style={[
+                            styles.limitNoticeCard,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.border,
+                                flexDirection: isArabic ? 'row-reverse' : 'row'
+                            }
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => Linking.openURL(getWebBillingUrl())}
+                    >
+                        <Ionicons name="sparkles" size={17} color={theme.primary} />
+                        <Text style={[styles.limitNoticeText, { color: theme.text, flex: 1, textAlign: isArabic ? 'right' : 'left' }]}>
+                            {isArabic
+                                ? 'وصلت للحد الأقصى للباقة المجانية (مشروعين). ترقية الباقة عبر المتصفح'
+                                : 'Reached Free tier limit (2 projects). Upgrade on web for unlimited'}
+                        </Text>
+                        <Ionicons name={isArabic ? 'chevron-back' : 'chevron-forward'} size={15} color={theme.primary} />
+                    </TouchableOpacity>
+                )}
+
                 {loading ? (
                     <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
                 ) : projects.length === 0 ? (
@@ -554,6 +579,19 @@ const styles = StyleSheet.create({
     copilotSubtitle: {
         fontSize: 12,
         marginTop: 2,
+        lineHeight: 16
+    },
+    limitNoticeCard: {
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+        gap: 10
+    },
+    limitNoticeText: {
+        fontSize: 12,
+        fontWeight: '700',
         lineHeight: 16
     }
 });

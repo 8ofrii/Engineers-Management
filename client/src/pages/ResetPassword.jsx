@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Building2, Lock, AlertCircle, CheckCircle } from 'lucide-react';
-import axios from 'axios';
+import { authAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import './Auth.css';
 
 export default function ResetPassword() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isAr = i18n.language === 'ar';
     const { token } = useParams();
     const navigate = useNavigate();
 
@@ -28,30 +29,29 @@ export default function ResetPassword() {
         setMessage('');
 
         if (formData.password !== formData.confirmPassword) {
-            showAlert({ type: 'error', title: 'Error', message: 'Passwords do not match' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: t('auth.passwordsDoNotMatch', 'Passwords do not match') });
             return;
         }
 
         if (formData.password.length < 6) {
-            showAlert({ type: 'error', title: 'Error', message: 'Password must be at least 6 characters' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: isAr ? 'يجب ألا تقل كلمة المرور عن 6 أحرف' : 'Password must be at least 6 characters' });
             return;
         }
 
         setLoading(true);
 
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-            const response = await axios.put(`${apiUrl}/api/auth/reset-password/${token}`, {
+            const response = await authAPI.resetPassword(token, {
                 password: formData.password
             });
-            const successMsg = response.data.message || 'Password reset successful. You can now login with your new password.';
+            const successMsg = response.data?.message || (isAr ? 'تم إعادة تعيين كلمة المرور بنجاح. جاري التحويل لتسجيل الدخول...' : 'Password reset successful. You can now login with your new password.');
             setMessage(successMsg);
-            showAlert({ type: 'success', title: 'Success', message: successMsg });
+            showAlert({ type: 'success', title: isAr ? 'تم بنجاح' : 'Success', message: successMsg });
             setTimeout(() => {
                 navigate('/login');
-            }, 3000);
+            }, 2000);
         } catch (err) {
-            showAlert({ type: 'error', title: 'Error', message: err.response?.data?.message || 'Error resolving password reset. The link might be expired.' });
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: err.response?.data?.message || (isAr ? 'تعذر إعادة تعيين كلمة المرور. قد يكون الرابط منتهي الصلاحية.' : 'Error resolving password reset. The link might be expired.') });
         } finally {
             setLoading(false);
         }
@@ -62,13 +62,13 @@ export default function ResetPassword() {
             <div className="auth-background"></div>
 
             <div className="auth-content">
-                <div className="auth-card glass">
+                <div className="auth-card glass" style={{ maxWidth: 460 }}>
                     <div className="auth-header">
                         <div className="auth-logo">
                             <Building2 size={40} />
                         </div>
-                        <h1>{t('auth.resetPassword') || 'Reset Password'}</h1>
-                        <p>{t('auth.resetPasswordSubtitle') || 'Enter your new password below'}</p>
+                        <h1>{t('auth.resetPassword', 'Reset Password')}</h1>
+                        <p>{t('auth.resetPasswordSubtitle', 'Enter your new password below.')}</p>
                     </div>
 
                     {message && (
@@ -81,9 +81,9 @@ export default function ResetPassword() {
                     {!message ? (
                         <form onSubmit={handleSubmit} className="auth-form">
                             <div className="input-group">
-                                <label className="input-label">
+                                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <Lock size={16} />
-                                    {t('auth.newPassword') || 'New Password'}
+                                    <span>{t('auth.newPassword', 'New Password')}</span>
                                 </label>
                                 <input
                                     type="password"
@@ -98,9 +98,9 @@ export default function ResetPassword() {
                             </div>
 
                             <div className="input-group">
-                                <label className="input-label">
+                                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <Lock size={16} />
-                                    {t('auth.confirmNewPassword') || 'Confirm New Password'}
+                                    <span>{t('auth.confirmNewPassword', 'Confirm New Password')}</span>
                                 </label>
                                 <input
                                     type="password"
@@ -113,21 +113,21 @@ export default function ResetPassword() {
                                 />
                             </div>
 
-                            <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
+                            <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ width: '100%', marginTop: 8 }}>
                                 {loading ? (
                                     <>
                                         <div className="spinner" style={{ width: '20px', height: '20px', borderWidth: '2px' }}></div>
-                                        {t('auth.resetting') || 'Resetting...'}
+                                        <span>{t('auth.resetting', 'Resetting...')}</span>
                                     </>
                                 ) : (
-                                    t('auth.resetPassword') || 'Reset Password'
+                                    t('auth.resetPassword', 'Reset Password')
                                 )}
                             </button>
                         </form>
                     ) : (
                         <div className="text-center mt-lg mb-lg">
                             <Link to="/login" className="btn btn-primary" style={{ width: '100%' }}>
-                                {t('auth.login') || 'Login'}
+                                {t('auth.login', 'Sign In')}
                             </Link>
                         </div>
                     )}

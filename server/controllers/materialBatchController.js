@@ -197,7 +197,10 @@ export const getAllBatches = async (req, res, next) => {
             where: whereClause,
             include: {
                 project: {
-                    select: { name: true }
+                    select: { id: true, name: true }
+                },
+                material: {
+                    select: { id: true, name: true, nameAr: true, unit: true, unitPrice: true }
                 }
             },
             orderBy: {

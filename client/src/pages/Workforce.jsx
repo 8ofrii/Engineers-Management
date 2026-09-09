@@ -21,6 +21,7 @@ export default function Workforce() {
     const [filterProjectId, setFilterProjectId] = useState('ALL');
     const [projects, setProjects] = useState([]);
     const [workmanProjectMap, setWorkmanProjectMap] = useState({}); // workmanId -> Set of projectIds
+    const [previewImage, setPreviewImage] = useState(null); // { url, name, nationalId }
     const filterRef = useRef(null);
 
     useEffect(() => {
@@ -456,13 +457,17 @@ export default function Workforce() {
                                         </div>
                                     )}
                                     {workman.nationalIdImage && (
-                                        <div className="flex gap-sm" style={{ color: 'var(--color-primary)', cursor: 'pointer' }} onClick={() => {
-                                            // Open image in new tab or modal
-                                            const win = window.open();
-                                            win.document.write('<iframe src="' + workman.nationalIdImage + '" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>');
-                                        }}>
+                                        <div
+                                            className="flex gap-sm items-center"
+                                            style={{ color: 'var(--color-primary)', cursor: 'pointer', userSelect: 'none' }}
+                                            onClick={() => setPreviewImage({
+                                                url: workman.nationalIdImage,
+                                                name: workman.name,
+                                                nationalId: workman.nationalId
+                                            })}
+                                        >
                                             <ImageIcon size={16} />
-                                            <span>{t('labor.viewId')}</span>
+                                            <span style={{ textDecoration: 'underline' }}>{t('labor.viewId', 'عرض صورة البطاقة')}</span>
                                         </div>
                                     )}
                                     <div className="flex gap-sm" style={{
@@ -482,7 +487,9 @@ export default function Workforce() {
                             </div>
                         ))}
                     </div>
-                )}                <AddWorkmanModal
+                )}
+
+                <AddWorkmanModal
                     isOpen={modalOpen}
                     onClose={() => {
                         setModalOpen(false);
@@ -491,6 +498,110 @@ export default function Workforce() {
                     onSave={handleSaveWorkman}
                     initialData={selectedWorkman}
                 />
+
+                {/* National ID Image Preview Modal Popup */}
+                {previewImage && (
+                    <div
+                        className="modal-overlay"
+                        onClick={() => setPreviewImage(null)}
+                        style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundColor: 'rgba(0, 0, 0, 0.82)',
+                            backdropFilter: 'blur(6px)',
+                            zIndex: 9999,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '20px'
+                        }}
+                    >
+                        <div
+                            className="modal-container"
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                maxWidth: '650px',
+                                width: '100%',
+                                background: 'var(--bg-secondary, #1e1e1e)',
+                                borderRadius: '16px',
+                                border: '1px solid var(--border-color, #333)',
+                                overflow: 'hidden',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
+                            }}
+                        >
+                            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border-color)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <CreditCard size={20} style={{ color: 'var(--color-primary, #38bdf8)' }} />
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary, #fff)' }}>
+                                            {previewImage.name}
+                                        </h3>
+                                        {previewImage.nationalId && (
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #888)' }}>
+                                                {t('labor.nationalId', 'الرقم القومي')}: {previewImage.nationalId}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    className="modal-close"
+                                    onClick={() => setPreviewImage(null)}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-secondary)',
+                                        cursor: 'pointer',
+                                        padding: '6px',
+                                        borderRadius: '8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    <X size={22} />
+                                </button>
+                            </div>
+
+                            <div style={{ padding: '20px', textAlign: 'center', background: 'rgba(0, 0, 0, 0.25)' }}>
+                                <img
+                                    src={previewImage.url}
+                                    alt={previewImage.name}
+                                    style={{
+                                        maxWidth: '100%',
+                                        maxHeight: '65vh',
+                                        borderRadius: '10px',
+                                        objectFit: 'contain',
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                                        border: '1px solid var(--border-color)'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{ padding: '12px 20px', display: 'flex', justifyContent: 'flex-end', gap: '10px', background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-color)' }}>
+                                <a
+                                    href={previewImage.url}
+                                    download={`NationalID_${previewImage.name}.jpg`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-secondary btn-sm"
+                                    style={{ textDecoration: 'none' }}
+                                >
+                                    {t('common.download', 'تحميل الصورة')}
+                                </a>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => setPreviewImage(null)}
+                                >
+                                    {t('common.close', 'إغلاق')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </Layout>
     );

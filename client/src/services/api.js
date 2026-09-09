@@ -49,6 +49,9 @@ export const authAPI = {
     registerCompany: (data) => api.post('/auth/register-company', data), // SaaS Sign-up Step 1
     verifyEmail: (data) => api.post('/auth/verify-email', data), // SaaS Sign-up Step 2
     verifyInvite: (token) => api.post('/auth/verify-invite', { token }),
+    previewInvite: (token) => api.post('/auth/invite/preview', { token }),
+    acceptInviteSignup: (data) => api.post('/auth/invite/accept-signup', data),
+    oauthExchange: (code) => api.post('/auth/oauth-exchange', { code }),
     login: (data) => api.post('/auth/login', data),
     login2FA: (data) => api.post('/auth/2fa/login', data),
     forgotPassword: (data) => api.post('/auth/forgot-password', data),
@@ -57,6 +60,7 @@ export const authAPI = {
     updateProfile: (formData) => api.put('/auth/profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
+    deleteAccount: (data) => api.delete('/auth/account', { data }),
     twoFactor: {
         status: () => api.get('/auth/2fa/status'),
         enroll: () => api.post('/auth/2fa/enroll'),
@@ -97,13 +101,26 @@ export const categoriesAPI = {
     list: (grouped = true) => api.get('/categories', { params: { grouped } })
 };
 
-// Phase 6.4 — Subscription billing (Paymob)
+// Phase 6.4 — Subscription billing (Paymob + InstaPay Egypt + Self-Serve)
 export const billingAPI = {
     listPlans: () => api.get('/billing/plans'),
     getSubscription: () => api.get('/billing/subscription'),
+    selectPlan: (plan) => api.post('/billing/select-plan', { plan }),
+    buyAddOn: (addOnKey) => api.post('/billing/buy-addon', { addOnKey }),
     startCheckout: (plan) => api.post('/billing/checkout', { plan }),
     cancel: () => api.post('/billing/cancel'),
-    listAttempts: () => api.get('/billing/payment-attempts')
+    listAttempts: () => api.get('/billing/payment-attempts'),
+
+    // InstaPay Egypt Integration
+    getInstaPayConfig: () => api.get('/billing/instapay-config'),
+    initiateInstaPay: (itemType, itemKey) => api.post('/billing/instapay/initiate', { itemType, itemKey }),
+    submitInstaPayProof: (formData) => api.post('/billing/instapay/submit-proof', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    listPendingPayments: (scope = 'tenant') => api.get(`/billing/instapay/pending${scope === 'all' ? '?scope=all' : ''}`),
+    cancelPendingPayment: (paymentAttemptId) => api.post('/billing/instapay/cancel', { paymentAttemptId }),
+    approveInstaPay: (paymentAttemptId, adminNotes = '') => api.post('/billing/instapay/approve', { paymentAttemptId, adminNotes }),
+    rejectInstaPay: (paymentAttemptId, reason = '') => api.post('/billing/instapay/reject', { paymentAttemptId, reason })
 };
 
 // Phase 6.3 — Bank reconciliation
@@ -128,9 +145,12 @@ export const bankStatementsAPI = {
 
 // Phase 7 — AI extraction (voice / receipt → persisted draft) + draft CRUD
 export const aiExtractAPI = {
-    voice: (audioBlob) => {
+    voice: (audioBlob, transcript = '') => {
         const fd = new FormData();
         fd.append('audio', audioBlob, 'voice.webm');
+        if (transcript) {
+            fd.append('transcript', transcript);
+        }
         return api.post('/ai/extract/voice', fd, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -162,7 +182,11 @@ export const dsrAPI = {
     submit: (id) => api.put(`/dsr/${id}/submit`),
     acknowledge: (id, acknowledgeNotes) =>
         api.put(`/dsr/${id}/acknowledge`, { acknowledgeNotes }),
-    remove: (id) => api.delete(`/dsr/${id}`)
+    remove: (id) => api.delete(`/dsr/${id}`),
+    extractVoice: (formData) =>
+        api.post('/dsr/extract/voice', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
 };
 
 // Phase 3 — Documents/photos per project
@@ -183,6 +207,7 @@ export const documentsAPI = {
 export const userAPI = {
     getAll: () => api.get('/users'),
     invite: (data) => api.post('/users', data),
+    resendInvite: (id) => api.post(`/users/${id}/resend-invite`),
     update: (id, data) => api.put(`/users/${id}`, data),
     delete: (id) => api.delete(`/users/${id}`)
 };
@@ -252,6 +277,7 @@ export const materialsAPI = {
     getOne: (id) => api.get(`/materials/${id}`),
     create: (data) => api.post('/materials', data),
     update: (id, data) => api.put(`/materials/${id}`, data),
+    recharge: (id, data) => api.post(`/materials/${id}/recharge`, data),
     delete: (id) => api.delete(`/materials/${id}`)
 };
 
@@ -294,6 +320,7 @@ export const tenantAPI = {
     updateSettings: (formData) => api.put('/tenant', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
+    deleteCompany: (data) => api.delete('/tenant', { data }),
     getApprovalThresholds: () => api.get('/tenant/approval-thresholds'),
     updateApprovalThresholds: (thresholds) => api.put('/tenant/approval-thresholds', { thresholds })
 };

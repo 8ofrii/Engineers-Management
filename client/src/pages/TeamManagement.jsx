@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Users, UserPlus, Trash2, Edit2, Search, X, Eye, EyeOff, Mail, Phone } from 'lucide-react';
+import { 
+    Users, UserPlus, Trash2, Edit2, Search, X, Eye, EyeOff, 
+    Mail, Phone, Copy, Check, Send, Link as LinkIcon, Sparkles, 
+    Clock, CheckCircle2, RefreshCw, AlertTriangle
+} from 'lucide-react';
 import { userAPI, rolesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
@@ -26,6 +30,18 @@ export default function TeamManagement() {
     });
     const [showPassword, setShowPassword] = useState(false);
 
+    // Invite Success Modal State
+    const [inviteSuccessModal, setInviteSuccessModal] = useState({
+        isOpen: false,
+        inviteToken: '',
+        inviteLink: '',
+        email: '',
+        role: ''
+    });
+    const [copiedCode, setCopiedCode] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
+    const [resendingId, setResendingId] = useState(null);
+
     // Alert State
     const [alertConfig, setAlertConfig] = useState({
         isOpen: false, type: 'info', title: '', message: '', onConfirm: () => { }, showCancel: false
@@ -38,8 +54,8 @@ export default function TeamManagement() {
     const showAlert = (config) => {
         setAlertConfig({
             isOpen: true,
-            confirmText: t('common.confirm'),
-            cancelText: t('common.cancel'),
+            confirmText: isRTL ? 'حسناً' : 'OK',
+            cancelText: isRTL ? 'إلغاء' : 'Cancel',
             onConfirm: () => setAlertConfig(prev => ({ ...prev, isOpen: false })),
             ...config
         });
@@ -53,9 +69,9 @@ export default function TeamManagement() {
         try {
             const [usersRes, rolesRes] = await Promise.all([
                 userAPI.getAll(),
-                rolesAPI.getAll().catch(() => ({ data: { data: [] } })) // Fallback if roles not seeded
+                rolesAPI.getAll().catch(() => ({ data: { data: [] } }))
             ]);
-            setUsers(usersRes.data.data);
+            setUsers(usersRes.data.data || []);
             setRoles(rolesRes.data.data || []);
         } catch (err) {
             console.error(err);
@@ -67,68 +83,76 @@ export default function TeamManagement() {
     const handleSearch = (e) => setSearchTerm(e.target.value);
 
     const filteredUsers = users.filter(u =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     // Detailed RBAC Permission Structure (matching backend)
     const PERMISSION_CATEGORIES = {
         financials: {
-            label: t('roles.permissions.financials.title'),
+            label: isRTL ? 'الإدارة المالية والأرباح' : 'Financials & Margins',
             permissions: [
-                { key: 'view_operational_fund', label: t('roles.permissions.financials.view_operational_fund') },
-                { key: 'view_office_profit', label: t('roles.permissions.financials.view_office_profit'), sensitive: true },
-                { key: 'view_all_wallets', label: t('roles.permissions.financials.view_all_wallets') },
-                { key: 'view_company_stats', label: t('roles.permissions.financials.view_company_stats') }
+                { key: 'view_operational_fund', label: isRTL ? 'عرض صندوق التشغيل' : 'View Operational Fund' },
+                { key: 'view_office_profit', label: isRTL ? 'عرض أرباح المكتب' : 'View Office Profit', sensitive: true },
+                { key: 'view_all_wallets', label: isRTL ? 'عرض محافظ العهد' : 'View Custody Wallets' },
+                { key: 'view_company_stats', label: isRTL ? 'عرض إحصائيات الشركة' : 'View Company Analytics' }
             ]
         },
         custody: {
-            label: t('roles.permissions.custody.title'),
+            label: isRTL ? 'العهد والتحويلات' : 'Custody & Transfers',
             permissions: [
-                { key: 'request_funds', label: t('roles.permissions.custody.request_funds') },
-                { key: 'authorize_transfers', label: t('roles.permissions.custody.authorize_transfers') },
-                { key: 'approve_receipts', label: t('roles.permissions.custody.approve_receipts') }
+                { key: 'request_funds', label: isRTL ? 'طلب عهدة نقدية' : 'Request Custody Funds' },
+                { key: 'authorize_transfers', label: isRTL ? 'اعتماد وصرف التحويلات' : 'Authorize Transfers' },
+                { key: 'approve_receipts', label: isRTL ? 'اعتماد إيصالات التصفية' : 'Approve Clearance Receipts' }
             ]
         },
         transactions: {
-            label: t('roles.permissions.transactions.title'),
+            label: isRTL ? 'المصروفات والإيرادات' : 'Transactions & Incomes',
             permissions: [
-                { key: 'create', label: t('roles.permissions.transactions.create') },
-                { key: 'approve', label: t('roles.permissions.transactions.approve') },
-                { key: 'record_income', label: t('roles.permissions.transactions.record_income') }
+                { key: 'create', label: isRTL ? 'تسجيل مصروف' : 'Create Transaction' },
+                { key: 'approve', label: isRTL ? 'اعتماد المصروفات' : 'Approve Transactions' },
+                { key: 'record_income', label: isRTL ? 'تسجيل إيراد وارد' : 'Record Inflow' }
             ]
         },
         projects: {
-            label: t('roles.permissions.projects.title'),
+            label: isRTL ? 'المشاريع والعقود' : 'Projects & Contracts',
             permissions: [
-                { key: 'create', label: t('roles.permissions.projects.create') },
-                { key: 'edit', label: t('roles.permissions.projects.edit') },
-                { key: 'delete', label: t('roles.permissions.projects.delete') },
-                { key: 'view', label: t('roles.permissions.projects.view') },
-                { key: 'edit_budget', label: t('roles.permissions.projects.edit_budget') }
+                { key: 'create', label: isRTL ? 'إنشاء مشروع جديد' : 'Create Project' },
+                { key: 'edit', label: isRTL ? 'تعديل المشروع' : 'Edit Project' },
+                { key: 'delete', label: isRTL ? 'حذف المشروع' : 'Delete Project' },
+                { key: 'view', label: isRTL ? 'عرض المشاريع' : 'View Projects' },
+                { key: 'edit_budget', label: isRTL ? 'تعديل الميزانية' : 'Edit Budget' }
             ]
         },
         inventory: {
-            label: t('roles.permissions.inventory.title'),
+            label: isRTL ? 'المخزن والمواد' : 'Inventory & Materials',
             permissions: [
-                { key: 'create_batch', label: t('roles.permissions.inventory.create_batch') },
-                { key: 'consume_material', label: t('roles.permissions.inventory.consume_material') },
-                { key: 'view', label: t('roles.permissions.inventory.view') }
+                { key: 'create_batch', label: isRTL ? 'توريد مواد جديدة' : 'Create Batch' },
+                { key: 'consume_material', label: isRTL ? 'صرف مواد للموقع' : 'Consume Material' },
+                { key: 'view', label: isRTL ? 'عرض المخزون' : 'View Inventory' }
             ]
         },
         admin: {
-            label: t('roles.permissions.admin.title'),
+            label: isRTL ? 'إدارة الفريق والأعضاء' : 'Team & Permissions Admin',
             permissions: [
-                { key: 'manage_users', label: t('roles.permissions.admin.manage_users') },
-                { key: 'manage_roles', label: t('roles.permissions.admin.manage_roles') },
-                { key: 'invite_users', label: t('roles.permissions.admin.invite_users') },
-                { key: 'change_user_roles', label: t('roles.permissions.admin.change_user_roles') }
+                { key: 'manage_users', label: isRTL ? 'إدارة بيانات المستخدمين' : 'Manage Users' },
+                { key: 'manage_roles', label: isRTL ? 'إنشاء وتعديل الأدوار' : 'Manage Roles' },
+                { key: 'invite_users', label: isRTL ? 'دعوة أعضاء جدد' : 'Invite Users' },
+                { key: 'change_user_roles', label: isRTL ? 'تغيير صلاحيات الفريق' : 'Change User Roles' }
             ]
         }
     };
 
     // Default permissions for legacy roles (structured format)
     const ROLE_DEFAULTS = {
+        'SUPER_ADMIN': {
+            financials: { view_operational_fund: true, view_office_profit: true, view_all_wallets: true, view_company_stats: true },
+            custody: { request_funds: true, authorize_transfers: true, approve_receipts: true },
+            transactions: { create: true, approve: true, record_income: true },
+            projects: { create: true, edit: true, delete: true, view: true, edit_budget: true },
+            inventory: { create_batch: true, consume_material: true, view: true },
+            admin: { manage_users: true, manage_roles: true, invite_users: true, change_user_roles: true }
+        },
         'ADMIN': {
             financials: { view_operational_fund: true, view_office_profit: true, view_all_wallets: true, view_company_stats: true },
             custody: { request_funds: true, authorize_transfers: true, approve_receipts: true },
@@ -169,9 +193,9 @@ export default function TeamManagement() {
         setSelectedUser(user);
         if (mode === 'edit' && user) {
             setFormData({
-                name: user.name,
-                email: user.email,
-                role: user.role,
+                name: user.name || '',
+                email: user.email || '',
+                role: user.role || 'ENGINEER',
                 roleId: user.roleId || '',
                 phone: user.phone || '',
                 password: '',
@@ -192,15 +216,13 @@ export default function TeamManagement() {
     };
 
     const handleRoleChange = (value) => {
-        // Check if it's a custom role (UUID) or legacy role
         if (value.includes('-')) {
-            // Custom role - find and load its permissions
+            // Custom role
             const customRole = roles.find(r => r.id === value);
             const rolePermissions = customRole?.permissions || ROLE_DEFAULTS['ENGINEER'];
-
             setFormData({ ...formData, roleId: value, role: 'ENGINEER', permissions: rolePermissions });
         } else {
-            // Legacy role - load default permissions
+            // Legacy role
             setFormData({ ...formData, role: value, roleId: '', permissions: ROLE_DEFAULTS[value] || ROLE_DEFAULTS['ENGINEER'] });
         }
     };
@@ -223,8 +245,6 @@ export default function TeamManagement() {
         });
     };
 
-    // Backend stores User.permissions as String[]; UI manages a category->key->bool matrix.
-    // Flatten to "category.key" entries for the truthy values so the schema accepts it.
     const flattenPermissions = (matrix) => {
         if (!matrix || typeof matrix !== 'object' || Array.isArray(matrix)) return [];
         const flat = [];
@@ -241,46 +261,41 @@ export default function TeamManagement() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Prepare data for submission
             const submitData = { ...formData };
-
-            // Convert UI permission matrix to flat string array the API expects
             submitData.permissions = flattenPermissions(submitData.permissions);
 
-            // If roleId is empty, remove it (use legacy role)
             if (!submitData.roleId) {
                 delete submitData.roleId;
             }
 
             if (modalMode === 'add') {
                 const response = await userAPI.invite(submitData);
-                let messageStr = t('teamManagement.messages.addSuccess');
-                if (response.data?.devVerifyLink) {
-                    messageStr += `\nDev Link: ${response.data.devVerifyLink}`;
-                }
-                if (response.data?.devTemporaryPassword) {
-                    messageStr += `\nTemp Password: ${response.data.devTemporaryPassword}`;
-                }
+                const result = response.data?.data || {};
 
-                showAlert({
-                    type: 'success',
-                    title: t('teamManagement.messages.addSuccess'),
-                    message: messageStr
+                setShowModal(false);
+                loadData();
+
+                // Open Invitation Success Modal with code and link
+                setInviteSuccessModal({
+                    isOpen: true,
+                    inviteToken: result.inviteToken || '',
+                    inviteLink: result.inviteLink || `${window.location.origin}/signup?invite=${result.inviteToken}`,
+                    email: result.email || submitData.email,
+                    role: result.role || submitData.role
                 });
             } else {
-                // Don't send password if empty on edit
                 if (!submitData.password) {
                     delete submitData.password;
                 }
                 await userAPI.update(selectedUser.id, submitData);
                 showAlert({
                     type: 'success',
-                    title: t('teamManagement.messages.updateSuccess'),
-                    message: t('teamManagement.messages.updateSuccess')
+                    title: isRTL ? 'تم التحديث بنجاح' : 'Updated Successfully',
+                    message: isRTL ? 'تم تحديث بيانات العضو وصلاحياته.' : 'Member data and permissions updated.'
                 });
+                setShowModal(false);
+                loadData();
             }
-            setShowModal(false);
-            loadData();
         } catch (err) {
             const data = err.response?.data;
             const fieldErrors = Array.isArray(data?.errors) && data.errors.length
@@ -288,19 +303,55 @@ export default function TeamManagement() {
                 : null;
             showAlert({
                 type: 'error',
-                title: t('common.error'),
-                message: fieldErrors || data?.message || t('teamManagement.messages.error')
+                title: isRTL ? 'خطأ' : 'Error',
+                message: fieldErrors || data?.message || (isRTL ? 'فشل تنفيذ العملية' : 'Operation failed')
             });
         }
     };
 
-    const handleDelete = (id) => {
+    const handleResendInvite = async (userId) => {
+        setResendingId(userId);
+        try {
+            const res = await userAPI.resendInvite(userId);
+            const data = res.data?.data;
+            showAlert({
+                type: 'success',
+                title: isRTL ? 'تم إعادة إرسال الدعوة' : 'Invite Re-sent',
+                message: isRTL 
+                    ? `تم إرسال بريد التذكير ورابط الانضمام بنجاح.`
+                    : `Invitation reminder email re-sent successfully.`
+            });
+            loadData();
+        } catch (err) {
+            showAlert({
+                type: 'error',
+                title: isRTL ? 'خطأ' : 'Error',
+                message: err.response?.data?.message || (isRTL ? 'فشل إعادة إرسال الدعوة' : 'Failed to resend invite')
+            });
+        } finally {
+            setResendingId(null);
+        }
+    };
+
+    const handleCopyInviteLink = (code) => {
+        const url = `${window.location.origin}/signup?invite=${code}`;
+        navigator.clipboard.writeText(url);
+        showAlert({
+            type: 'success',
+            title: isRTL ? 'تم النسخ' : 'Copied',
+            message: isRTL ? 'تم نسخ رابط الدعوة إلى الحافظة بنجاح.' : 'Invite link copied to clipboard.'
+        });
+    };
+
+    const handleDelete = (id, isPending = false) => {
         showAlert({
             type: 'danger',
-            title: t('teamManagement.confirmDelete.title'),
-            message: t('teamManagement.confirmDelete.message'),
+            title: isPending ? (isRTL ? 'إلغاء الدعوة' : 'Revoke Invite') : (isRTL ? 'حذف العضو' : 'Remove Member'),
+            message: isPending 
+                ? (isRTL ? 'هل أنت متأكد من إلغاء دعوة هذا العضو؟ لن يتمكن من استخدام كود الانضمام.' : 'Are you sure you want to cancel this pending invitation?')
+                : (isRTL ? 'هل أنت متأكد من حذف هذا العضو من فريق العمل؟' : 'Are you sure you want to remove this member from the team?'),
             showCancel: true,
-            confirmText: t('teamManagement.confirmDelete.confirm'),
+            confirmText: isRTL ? 'تأكيد الحذف' : 'Confirm Remove',
             onConfirm: async () => {
                 closeAlert();
                 try {
@@ -308,7 +359,7 @@ export default function TeamManagement() {
                     loadData();
                 } catch (err) {
                     setTimeout(() => {
-                        showAlert({ type: 'error', title: t('common.error'), message: t('teamManagement.messages.error') });
+                        showAlert({ type: 'error', title: isRTL ? 'خطأ' : 'Error', message: err.response?.data?.message || (isRTL ? 'فشل الحذف' : 'Failed to delete') });
                     }, 100);
                 }
             }
@@ -317,11 +368,11 @@ export default function TeamManagement() {
 
     const getRoleBadgeColor = (role) => {
         const colors = {
-            'SUPER_ADMIN': { bg: '#F3E5F5', text: '#7B1FA2' },
-            'ADMIN': { bg: '#E3F2FD', text: '#1976D2' },
-            'PROJECT_MANAGER': { bg: '#FFF3E0', text: '#E64A19' },
-            'ENGINEER': { bg: '#E8F5E9', text: '#2E7D32' },
-            'ACCOUNTANT': { bg: '#FAFAFA', text: '#616161' }
+            'SUPER_ADMIN': { bg: 'rgba(168, 85, 247, 0.12)', text: '#c084fc', border: 'rgba(168, 85, 247, 0.3)' },
+            'ADMIN': { bg: 'rgba(59, 130, 246, 0.12)', text: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)' },
+            'PROJECT_MANAGER': { bg: 'rgba(249, 115, 22, 0.12)', text: '#fb923c', border: 'rgba(249, 115, 22, 0.3)' },
+            'ENGINEER': { bg: 'rgba(16, 185, 129, 0.12)', text: '#34d399', border: 'rgba(16, 185, 129, 0.3)' },
+            'ACCOUNTANT': { bg: 'rgba(234, 179, 8, 0.12)', text: '#facc15', border: 'rgba(234, 179, 8, 0.3)' }
         };
         return colors[role] || colors['ENGINEER'];
     };
@@ -336,59 +387,77 @@ export default function TeamManagement() {
     };
 
     const getRoleDisplayName = (user) => {
-        // If user has custom role, show custom role name
         if (user.roleId && user.customRole) {
             return user.customRole.name;
         }
-        // Otherwise show translated legacy role
-        return t(`teamManagement.roles.${user.role}`);
+        const roleMap = {
+            'SUPER_ADMIN': isRTL ? 'مدير عام النظام' : 'Super Admin',
+            'ADMIN': isRTL ? 'مدير الشركة' : 'Company Admin',
+            'PROJECT_MANAGER': isRTL ? 'مدير مشاريع' : 'Project Manager',
+            'ENGINEER': isRTL ? 'مهندس موقع' : 'Site Engineer',
+            'ACCOUNTANT': isRTL ? 'محاسب مالي' : 'Accountant'
+        };
+        return roleMap[user.role] || user.role;
     };
 
     return (
         <Layout>
-            <div>
+            <div style={{ paddingBottom: '40px' }}>
                 {/* Header */}
-                <div className="flex-between mb-xl">
+                <div className="flex-between mb-xl" style={{ flexWrap: 'wrap', gap: '16px' }}>
                     <div>
-                        <h1 className="flex gap-md" style={{ alignItems: 'center' }}>
-                            <Users size={32} />
-                            {t('teamManagement.title')}
+                        <h1 className="flex gap-md" style={{ alignItems: 'center', margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            <Users size={32} color="#3b82f6" />
+                            <span>{isRTL ? 'إدارة الفريق والأعضاء' : 'Team & Staff Management'}</span>
                         </h1>
-                        <p className="text-secondary">{t('teamManagement.subtitle')}</p>
+                        <p className="text-secondary" style={{ marginTop: '6px', fontSize: '0.9rem' }}>
+                            {isRTL ? 'دعوة المهندسين والمحاسبين وتعيين الصلاحيات وتتبع حالة الانضمام للمساحة.' : 'Invite team members, assign custom roles, and track onboarding status.'}
+                        </p>
                     </div>
-                    <button className="btn btn-primary" onClick={() => handleOpenModal('add')}>
-                        <UserPlus size={20} /> {t('teamManagement.addMember')}
+                    <button 
+                        className="btn btn-primary" 
+                        onClick={() => handleOpenModal('add')}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, borderRadius: '10px' }}
+                    >
+                        <UserPlus size={20} />
+                        <span>{isRTL ? 'دعوة عضو جديد +' : 'Invite Member +'}</span>
                     </button>
                 </div>
 
                 {/* Content Card */}
-                <div className="card">
-                    {/* Search Bar */}
-                    <div className="flex-between mb-lg" style={{ padding: 'var(--spacing-lg)', borderBottom: '1px solid var(--border-color)' }}>
-                        <div className="input-group" style={{ maxWidth: '400px', margin: 0 }}>
-                            <div style={{ position: 'relative', width: '100%' }}>
-                                <Search size={18} style={{
-                                    position: 'absolute',
-                                    [isRTL ? 'right' : 'left']: '12px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'var(--text-tertiary)'
-                                }} />
-                                <input
-                                    type="text"
-                                    placeholder={t('teamManagement.searchPlaceholder')}
-                                    className="input"
-                                    style={{
-                                        [isRTL ? 'paddingRight' : 'paddingLeft']: '40px',
-                                        width: '100%'
-                                    }}
-                                    value={searchTerm}
-                                    onChange={handleSearch}
-                                />
-                            </div>
+                <div className="card" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '14px', overflow: 'hidden' }}>
+                    {/* Search & Counter Bar */}
+                    <div className="flex-between" style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-primary)', flexWrap: 'wrap', gap: '16px' }}>
+                        <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
+                            <Search size={18} style={{
+                                position: 'absolute',
+                                [isRTL ? 'right' : 'left']: '14px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: 'var(--text-tertiary)'
+                            }} />
+                            <input
+                                type="text"
+                                placeholder={isRTL ? 'البحث بالاسم أو البريد الإلكتروني...' : 'Search by name or email...'}
+                                className="input"
+                                style={{
+                                    [isRTL ? 'paddingRight' : 'paddingLeft']: '42px',
+                                    width: '100%',
+                                    borderRadius: '10px'
+                                }}
+                                value={searchTerm}
+                                onChange={handleSearch}
+                            />
                         </div>
-                        <div className="text-secondary" style={{ fontSize: '14px' }}>
-                            {t('teamManagement.totalMembers')}: <strong style={{ color: 'var(--text-primary)' }}>{filteredUsers.length}</strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>
+                                {isRTL ? 'إجمالي الفريق:' : 'Total Members:'} <strong style={{ color: 'var(--text-primary)', fontWeight: 800 }}>{filteredUsers.length}</strong>
+                            </span>
+                            <span style={{ color: 'var(--text-secondary)' }}>•</span>
+                            <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+                                <Clock size={15} />
+                                <span>{isRTL ? 'في انتظار الانضمام:' : 'Pending Invites:'} {filteredUsers.filter(u => !u.isVerified).length}</span>
+                            </span>
                         </div>
                     </div>
 
@@ -396,195 +465,301 @@ export default function TeamManagement() {
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', direction: isRTL ? 'rtl' : 'ltr' }}>
                             <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'start' }}>{t('teamManagement.table.user')}</th>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'start' }}>{t('teamManagement.table.role')}</th>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'start' }}>{t('teamManagement.table.contact')}</th>
-                                    <th style={{ padding: '16px', fontWeight: '600', color: 'var(--text-secondary)', textAlign: 'end' }}>{t('teamManagement.table.actions')}</th>
+                                <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+                                    <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'العضو' : 'Member'}</th>
+                                    <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'الدور الوظيفي' : 'Role'}</th>
+                                    <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'حالة الانضمام' : 'Status'}</th>
+                                    <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'بيانات التواصل' : 'Contact'}</th>
+                                    <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'end' }}>{isRTL ? 'الإجراءات' : 'Actions'}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center' }}>{t('teamManagement.loading')}</td></tr>
+                                    <tr>
+                                        <td colSpan="5" style={{ padding: '50px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                            <RefreshCw size={24} className="spin-slow" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+                                            <span>{isRTL ? 'جاري تحميل بيانات الفريق...' : 'Loading team members...'}</span>
+                                        </td>
+                                    </tr>
                                 ) : filteredUsers.length > 0 ? (
                                     filteredUsers.map(user => {
                                         const roleColor = getRoleBadgeColor(user.role);
+                                        const isPending = !user.isVerified;
+
                                         return (
-                                            <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                {/* User */}
-                                                <td style={{ padding: '16px', textAlign: 'start' }}>
+                                            <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }}>
+                                                {/* Member Name / Email */}
+                                                <td style={{ padding: '16px 20px', textAlign: 'start' }}>
                                                     <div className="flex gap-md" style={{ alignItems: 'center' }}>
                                                         <div style={{
-                                                            width: '40px',
-                                                            height: '40px',
+                                                            width: '42px',
+                                                            height: '42px',
                                                             borderRadius: '50%',
-                                                            background: 'linear-gradient(135deg, var(--primary-color), var(--accent-color))',
+                                                            background: isPending 
+                                                                ? 'linear-gradient(135deg, #f59e0b, #d97706)' 
+                                                                : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
-                                                            color: 'white',
-                                                            fontWeight: '600',
-                                                            fontSize: '14px'
+                                                            color: '#ffffff',
+                                                            fontWeight: '800',
+                                                            fontSize: '14px',
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
                                                         }}>
-                                                            {getInitials(user.name)}
+                                                            {getInitials(user.name || user.email)}
                                                         </div>
                                                         <div>
-                                                            <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{user.name}</div>
-                                                            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{user.company || t('app.name')}</div>
+                                                            <div style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+                                                                {user.name || user.email.split('@')[0]}
+                                                            </div>
+                                                            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                                                                {user.email}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </td>
 
                                                 {/* Role */}
-                                                <td style={{ padding: '16px', textAlign: 'start' }}>
+                                                <td style={{ padding: '16px 20px', textAlign: 'start' }}>
                                                     <span style={{
-                                                        padding: '6px 12px',
-                                                        borderRadius: '6px',
+                                                        padding: '5px 12px',
+                                                        borderRadius: '8px',
                                                         fontSize: '12px',
-                                                        fontWeight: '500',
+                                                        fontWeight: '700',
                                                         background: roleColor.bg,
                                                         color: roleColor.text,
+                                                        border: `1px solid ${roleColor.border}`,
                                                         display: 'inline-block'
                                                     }}>
                                                         {getRoleDisplayName(user)}
                                                     </span>
                                                 </td>
 
+                                                {/* Status: Active vs Pending Invite */}
+                                                <td style={{ padding: '16px 20px', textAlign: 'start' }}>
+                                                    {isPending ? (
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', fontSize: '12px', fontWeight: '700' }}>
+                                                            <Clock size={13} />
+                                                            <span>{isRTL ? 'في انتظار الانضمام' : 'Pending Invite'}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '12px', fontWeight: '700' }}>
+                                                            <CheckCircle2 size={13} />
+                                                            <span>{isRTL ? 'نشط' : 'Active'}</span>
+                                                        </div>
+                                                    )}
+                                                </td>
+
                                                 {/* Contact */}
-                                                <td style={{ padding: '16px', textAlign: 'start' }}>
+                                                <td style={{ padding: '16px 20px', textAlign: 'start' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                        <div className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px' }}>
+                                                        <div className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
                                                             <Mail size={14} style={{ color: 'var(--text-tertiary)' }} />
                                                             <span>{user.email}</span>
                                                         </div>
-                                                        {user.phone && (
-                                                            <div className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px' }}>
+                                                        {user.phone ? (
+                                                            <div className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
                                                                 <Phone size={14} style={{ color: 'var(--text-tertiary)' }} />
                                                                 <span>{user.phone}</span>
                                                             </div>
+                                                        ) : (
+                                                            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                                                                {isPending ? (isRTL ? 'سيتم إدخاله عند الانضمام' : 'Provided on joining') : '—'}
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </td>
 
                                                 {/* Actions */}
-                                                <td style={{ padding: '16px', textAlign: 'end' }}>
+                                                <td style={{ padding: '16px 20px', textAlign: 'end' }}>
                                                     <div className="flex gap-sm" style={{ justifyContent: 'flex-end' }}>
-                                                        <button
-                                                            className="btn btn-sm"
-                                                            onClick={() => handleOpenModal('edit', user)}
-                                                            style={{ padding: '8px' }}
-                                                        >
-                                                            <Edit2 size={16} />
-                                                        </button>
-                                                        <button
-                                                            className="btn btn-sm btn-danger"
-                                                            onClick={() => handleDelete(user.id)}
-                                                            style={{ padding: '8px' }}
-                                                            disabled={user.id === currentUser?.id}
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        {isPending ? (
+                                                            <>
+                                                                {/* Copy Invite Link */}
+                                                                <button
+                                                                    className="btn btn-sm"
+                                                                    onClick={() => handleCopyInviteLink(user.verificationCode)}
+                                                                    title={isRTL ? 'نسخ رابط الدعوة' : 'Copy Invite Link'}
+                                                                    style={{ padding: '8px 12px', background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.2)' }}
+                                                                >
+                                                                    <LinkIcon size={14} />
+                                                                    <span style={{ marginInlineStart: 4, fontSize: '12px', fontWeight: 600 }}>{isRTL ? 'نسخ الرابط' : 'Copy Link'}</span>
+                                                                </button>
+
+                                                                {/* Resend Email */}
+                                                                <button
+                                                                    className="btn btn-sm"
+                                                                    onClick={() => handleResendInvite(user.id)}
+                                                                    disabled={resendingId === user.id}
+                                                                    title={isRTL ? 'إعادة إرسال بريد الدعوة' : 'Resend Invite Email'}
+                                                                    style={{ padding: '8px 12px', background: 'rgba(245, 158, 11, 0.1)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.2)' }}
+                                                                >
+                                                                    <Send size={14} />
+                                                                    <span style={{ marginInlineStart: 4, fontSize: '12px', fontWeight: 600 }}>
+                                                                        {resendingId === user.id ? (isRTL ? 'جاري الإرسال...' : 'Sending...') : (isRTL ? 'إعادة الإرسال' : 'Resend')}
+                                                                    </span>
+                                                                </button>
+
+                                                                {/* Revoke Invite */}
+                                                                <button
+                                                                    className="btn btn-sm btn-danger"
+                                                                    onClick={() => handleDelete(user.id, true)}
+                                                                    title={isRTL ? 'إلغاء الدعوة' : 'Revoke Invite'}
+                                                                    style={{ padding: '8px' }}
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {/* Edit verified user */}
+                                                                <button
+                                                                    className="btn btn-sm"
+                                                                    onClick={() => handleOpenModal('edit', user)}
+                                                                    style={{ padding: '8px' }}
+                                                                    title={isRTL ? 'تعديل الصلاحيات' : 'Edit Permissions'}
+                                                                >
+                                                                    <Edit2 size={15} />
+                                                                </button>
+                                                                {/* Remove verified user */}
+                                                                <button
+                                                                    className="btn btn-sm btn-danger"
+                                                                    onClick={() => handleDelete(user.id, false)}
+                                                                    style={{ padding: '8px' }}
+                                                                    disabled={user.id === currentUser?.id}
+                                                                    title={isRTL ? 'حذف العضو' : 'Remove Member'}
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
                                         );
                                     })
                                 ) : (
-                                    <tr><td colSpan="4" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)' }}>{t('teamManagement.noMembers')}</td></tr>
+                                    <tr>
+                                        <td colSpan="5" style={{ padding: '50px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                            <Users size={36} style={{ margin: '0 auto 12px auto', display: 'block', opacity: 0.4 }} />
+                                            <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>{isRTL ? 'لا يوجد أعضاء مطابقين للبحث' : 'No team members found'}</p>
+                                        </td>
+                                    </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* Add/Edit Modal */}
+                {/* MODAL 1: Add (Invite) / Edit Member Modal */}
                 {showModal && (
                     <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                        <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+                        <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '850px', borderRadius: '16px' }}>
                             <div className="modal-header">
-                                <h2>{modalMode === 'add' ? t('teamManagement.addMember') : t('teamManagement.editMember')}</h2>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <UserPlus size={22} color="#3b82f6" />
+                                    <h2 style={{ margin: 0 }}>
+                                        {modalMode === 'add' ? (isRTL ? 'دعوة عضو جديد إلى مساحة العمل' : 'Invite New Team Member') : (isRTL ? 'تعديل بيانات وصلاحيات العضو' : 'Edit Member Permissions')}
+                                    </h2>
+                                </div>
                                 <button className="modal-close" onClick={() => setShowModal(false)}>
-                                    <X size={24} />
+                                    <X size={22} />
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="modal-body">
-                                {/* Basic Personnel Information */}
+                            <form onSubmit={handleSubmit} className="modal-body" style={{ padding: '24px' }}>
+                                {/* Form Inputs Section */}
                                 <div className="form-section">
-                                    <h3 className="section-title">{t('projects.modal.sections.basic')}</h3>
+                                    <h3 className="section-title">
+                                        {modalMode === 'add' ? (isRTL ? '1. بيانات الدعوة والدور الوظيفي' : '1. Invitation Details & Role') : (isRTL ? 'البيانات الشخصية' : 'Personal Details')}
+                                    </h3>
                                     <div className="form-grid">
-                                        {/* Name */}
-                                        <div className="form-group">
-                                            <label>{t('teamManagement.form.name')} <span className="required">*</span></label>
-                                            <input
-                                                type="text"
-                                                value={formData.name}
-                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                required
-                                                placeholder={t('teamManagement.form.name')}
-                                            />
-                                        </div>
-
-                                        {/* Email */}
-                                        <div className="form-group">
-                                            <label>{t('teamManagement.form.email')} <span className="required">*</span></label>
+                                        {/* Email Address */}
+                                        <div className="form-group full-width">
+                                            <label style={{ fontWeight: 700 }}>
+                                                {isRTL ? 'البريد الإلكتروني للمدعو' : 'Invitee Email Address'} <span className="required" style={{ color: '#ef4444' }}>*</span>
+                                            </label>
                                             <input
                                                 type="email"
                                                 value={formData.email}
                                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                                 required
-                                                placeholder={t('teamManagement.form.email')}
+                                                disabled={modalMode === 'edit'}
+                                                placeholder="engineer@company.com"
+                                                style={{ direction: 'ltr' }}
                                             />
+                                            {modalMode === 'add' && (
+                                                <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
+                                                    {isRTL ? '📩 سيتم إرسال كود ورابط الانضمام فوراً إلى هذا البريد الإلكتروني.' : 'An invitation link & code will be sent to this email automatically.'}
+                                                </span>
+                                            )}
                                         </div>
 
-                                        {/* Phone */}
+                                        {/* Name (Optional in Add Mode, required in Edit) */}
                                         <div className="form-group">
-                                            <label>{t('teamManagement.form.phone')}</label>
+                                            <label style={{ fontWeight: 700 }}>
+                                                {isRTL ? 'الاسم (اختياري)' : 'Member Name (Optional)'}
+                                            </label>
                                             <input
                                                 type="text"
-                                                value={formData.phone}
-                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                                placeholder={t('teamManagement.form.phone')}
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                placeholder={isRTL ? 'مثال: م. أحمد سامي' : 'e.g. Eng. Ahmed Sami'}
                                             />
                                         </div>
 
                                         {/* Role Selection */}
                                         <div className="form-group">
-                                            <label>{t('teamManagement.form.role')} <span className="required">*</span></label>
+                                            <label style={{ fontWeight: 700 }}>
+                                                {isRTL ? 'الدور الوظيفي والصلاحية' : 'Assigned Role'} <span className="required" style={{ color: '#ef4444' }}>*</span>
+                                            </label>
                                             <select
                                                 value={formData.roleId || formData.role}
                                                 onChange={(e) => handleRoleChange(e.target.value)}
                                                 required
                                             >
-                                                <option value="" disabled>{t('teamManagement.form.selectRole')}</option>
-
                                                 {/* System Roles */}
-                                                <option value="ADMIN">{t('teamManagement.roles.ADMIN')}</option>
-                                                <option value="PROJECT_MANAGER">{t('teamManagement.roles.PROJECT_MANAGER')}</option>
-                                                <option value="ENGINEER">{t('teamManagement.roles.ENGINEER')}</option>
-                                                <option value="ACCOUNTANT">{t('teamManagement.roles.ACCOUNTANT')}</option>
+                                                <option value="ADMIN">{isRTL ? 'مدير شركة (Admin)' : 'Company Admin'}</option>
+                                                <option value="PROJECT_MANAGER">{isRTL ? 'مدير مشاريع (Project Manager)' : 'Project Manager'}</option>
+                                                <option value="ENGINEER">{isRTL ? 'مهندس موقع (Site Engineer)' : 'Site Engineer'}</option>
+                                                <option value="ACCOUNTANT">{isRTL ? 'محاسب مالي (Accountant)' : 'Accountant'}</option>
 
                                                 {/* Custom Roles */}
                                                 {roles.length > 0 && roles.map(role => (
                                                     <option key={role.id} value={role.id}>
-                                                        {role.name} ({t('roles.customRole')})
+                                                        {role.name} ({isRTL ? 'دور مخصص' : 'Custom Role'})
                                                     </option>
                                                 ))}
                                             </select>
                                         </div>
 
-                                        {/* Password Field */}
-                                        {(modalMode === 'add' || modalMode === 'edit') && (
+                                        {/* Phone (Only when editing an active member) */}
+                                        {modalMode === 'edit' && (
+                                            <div className="form-group">
+                                                <label style={{ fontWeight: 700 }}>{isRTL ? 'رقم الهاتف' : 'Phone Number'}</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.phone}
+                                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                    placeholder="01012345678"
+                                                    style={{ direction: 'ltr' }}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Password Field (Only when editing) */}
+                                        {modalMode === 'edit' && (
                                             <div className="form-group full-width" style={{ position: 'relative' }}>
-                                                <label>{t('teamManagement.form.password')} {modalMode === 'add' ? <span className="required">*</span> : `(${t('common.leaveBlank')})`}</label>
+                                                <label style={{ fontWeight: 700 }}>
+                                                    {isRTL ? 'إعادة تعيين كلمة المرور' : 'Reset Password'} <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>({isRTL ? 'اتركه فارغاً لعدم التغيير' : 'leave blank to keep current'})</span>
+                                                </label>
                                                 <div style={{ position: 'relative' }}>
                                                     <input
                                                         type={showPassword ? 'text' : 'password'}
-                                                        style={{ width: '100%', paddingLeft: isRTL ? '12px' : '40px', paddingRight: isRTL ? '40px' : '12px' }}
+                                                        style={{ width: '100%', [isRTL ? 'paddingLeft' : 'paddingRight']: '40px' }}
                                                         value={formData.password}
                                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                                        required={modalMode === 'add'}
-                                                        placeholder={modalMode === 'add' ? t('teamManagement.form.password') : '••••••••'}
+                                                        placeholder="••••••••"
                                                     />
                                                     <button
                                                         type="button"
@@ -597,7 +772,6 @@ export default function TeamManagement() {
                                                             background: 'none',
                                                             border: 'none',
                                                             cursor: 'pointer',
-                                                            padding: 0,
                                                             color: 'var(--text-tertiary)'
                                                         }}
                                                     >
@@ -612,59 +786,70 @@ export default function TeamManagement() {
                                 {/* Permissions Matrix */}
                                 <div className="form-section">
                                     <div className="flex-between mb-md">
-                                        <h3 className="section-title" style={{ border: 'none', margin: 0 }}>{t('teamManagement.form.permissions')}</h3>
-                                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
-                                            {t('teamManagement.form.basedOnRole')}
+                                        <h3 className="section-title" style={{ border: 'none', margin: 0 }}>
+                                            {isRTL ? '2. تخصيص مصفوفة الصلاحيات (RBAC)' : '2. Customize Permissions Matrix'}
+                                        </h3>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                                            {isRTL ? 'تم ضبطها تلقائياً بناءً على الدور المختار' : 'Auto-configured based on selected role'}
                                         </span>
                                     </div>
 
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--spacing-md)' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
                                         {Object.entries(PERMISSION_CATEGORIES).map(([categoryKey, category]) => (
                                             <div key={categoryKey} style={{
                                                 background: 'var(--bg-secondary)',
                                                 border: '1px solid var(--border-color)',
-                                                borderRadius: 'var(--radius-md)',
-                                                padding: 'var(--spacing-md)'
+                                                borderRadius: '12px',
+                                                padding: '16px'
                                             }}>
                                                 <h4 style={{
-                                                    fontSize: 'var(--font-size-xs)',
-                                                    color: 'var(--color-primary)',
+                                                    fontSize: '13px',
+                                                    color: '#3b82f6',
                                                     textTransform: 'uppercase',
                                                     letterSpacing: '0.05em',
-                                                    marginBottom: 'var(--spacing-sm)',
-                                                    fontWeight: 600
+                                                    margin: '0 0 12px 0',
+                                                    fontWeight: 700,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between'
                                                 }}>
-                                                    {category.label}
+                                                    <span>{category.label}</span>
                                                 </h4>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                     {category.permissions.map(perm => {
                                                         const isChecked = formData.permissions?.[categoryKey]?.[perm.key] || false;
                                                         return (
                                                             <label key={perm.key} style={{
                                                                 display: 'flex',
                                                                 alignItems: 'center',
-                                                                gap: 'var(--spacing-sm)',
+                                                                gap: '10px',
                                                                 cursor: 'pointer',
-                                                                fontSize: 'var(--font-size-sm)',
+                                                                fontSize: '13px',
                                                                 color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                                                transition: 'color 0.2s'
+                                                                padding: '4px 6px',
+                                                                borderRadius: '6px',
+                                                                background: isChecked ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                                                                transition: 'all 0.15s'
                                                             }}>
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={isChecked}
                                                                     onChange={() => togglePermission(categoryKey, perm.key)}
-                                                                    style={{ accentColor: 'var(--color-primary)' }}
+                                                                    style={{ accentColor: '#3b82f6', width: '16px', height: '16px' }}
                                                                 />
                                                                 <span>
                                                                     {perm.label}
                                                                     {perm.sensitive && (
                                                                         <span style={{
-                                                                            marginLeft: 'var(--spacing-xs)',
-                                                                            color: 'var(--color-danger)',
+                                                                            marginInlineStart: '6px',
+                                                                            color: '#ef4444',
                                                                             fontSize: '10px',
-                                                                            fontWeight: 700
+                                                                            fontWeight: 800,
+                                                                            background: 'rgba(239, 68, 68, 0.1)',
+                                                                            padding: '2px 6px',
+                                                                            borderRadius: '4px'
                                                                         }}>
-                                                                            {t('common.sensitive')}
+                                                                            {isRTL ? 'حساس' : 'Sensitive'}
                                                                         </span>
                                                                     )}
                                                                 </span>
@@ -677,15 +862,124 @@ export default function TeamManagement() {
                                     </div>
                                 </div>
 
-                                <div className="modal-footer">
+                                <div className="modal-footer" style={{ marginTop: '24px' }}>
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                                        {t('common.cancel')}
+                                        {isRTL ? 'إلغاء' : 'Cancel'}
                                     </button>
-                                    <button type="submit" className="btn btn-primary">
-                                        {modalMode === 'add' ? t('common.add') : t('common.update')}
+                                    <button type="submit" className="btn btn-primary" style={{ minWidth: '140px', fontWeight: 700 }}>
+                                        {modalMode === 'add' ? (isRTL ? 'إرسال وتوليد الدعوة ➔' : 'Generate & Send Invite ➔') : (isRTL ? 'حفظ التعديلات' : 'Save Changes')}
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* MODAL 2: Invitation Success Modal with Token & Shareable Link */}
+                {inviteSuccessModal.isOpen && (
+                    <div className="modal-overlay" onClick={() => setInviteSuccessModal({ isOpen: false, inviteToken: '', inviteLink: '', email: '', role: '' })}>
+                        <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', borderRadius: '16px', textAlign: 'center', padding: '32px' }}>
+                            <div style={{
+                                width: '64px',
+                                height: '64px',
+                                borderRadius: '50%',
+                                background: 'rgba(16, 185, 129, 0.15)',
+                                color: '#10b981',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 16px auto'
+                            }}>
+                                <Sparkles size={32} />
+                            </div>
+
+                            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px 0' }}>
+                                {isRTL ? 'تم إنشاء وإرسال الدعوة بنجاح! 🎉' : 'Invitation Created & Sent! 🎉'}
+                            </h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 24px 0' }}>
+                                {isRTL 
+                                    ? `تم إرسال بريد إلكتروني تلقائياً إلى ${inviteSuccessModal.email} يتضمن تفاصيل الانضمام. يمكنك أيضاً نسخ الكود أو الرابط المباشر ومشاركته معه:`
+                                    : `An invitation email has been sent to ${inviteSuccessModal.email}. You can also copy and share the invitation code or link directly:`
+                                }
+                            </p>
+
+                            {/* Invite Code Box */}
+                            <div style={{
+                                background: 'var(--bg-primary)',
+                                border: '2px dashed rgba(59, 130, 246, 0.4)',
+                                borderRadius: '12px',
+                                padding: '18px',
+                                marginBottom: '16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                            }}>
+                                <div style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                                    <span style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase', display: 'block' }}>
+                                        {isRTL ? 'كود الانضمام للمساحة' : 'Invite Code'}
+                                    </span>
+                                    <span style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'monospace', color: '#ffffff', letterSpacing: '2px' }}>
+                                        {inviteSuccessModal.inviteToken}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(inviteSuccessModal.inviteToken);
+                                        setCopiedCode(true);
+                                        setTimeout(() => setCopiedCode(false), 2000);
+                                    }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+                                >
+                                    {copiedCode ? <Check size={16} color="#10b981" /> : <Copy size={16} />}
+                                    <span>{copiedCode ? (isRTL ? 'تم النسخ' : 'Copied!') : (isRTL ? 'نسخ الكود' : 'Copy Code')}</span>
+                                </button>
+                            </div>
+
+                            {/* Direct Link Box */}
+                            <div style={{
+                                background: 'var(--bg-primary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                marginBottom: '24px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px'
+                            }}>
+                                <div style={{ textAlign: isRTL ? 'right' : 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 700, display: 'block' }}>
+                                        {isRTL ? 'رابط الانضمام المباشر' : 'Direct Join Link'}
+                                    </span>
+                                    <span style={{ fontSize: '12px', color: '#38bdf8', direction: 'ltr', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {inviteSuccessModal.inviteLink}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(inviteSuccessModal.inviteLink);
+                                        setCopiedLink(true);
+                                        setTimeout(() => setCopiedLink(false), 2000);
+                                    }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, flexShrink: 0 }}
+                                >
+                                    {copiedLink ? <Check size={16} /> : <LinkIcon size={16} />}
+                                    <span>{copiedLink ? (isRTL ? 'تم النسخ' : 'Copied!') : (isRTL ? 'نسخ الرابط' : 'Copy Link')}</span>
+                                </button>
+                            </div>
+
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => setInviteSuccessModal({ isOpen: false, inviteToken: '', inviteLink: '', email: '', role: '' })}
+                                style={{ width: '100%', padding: '12px', fontWeight: 700, borderRadius: '10px' }}
+                            >
+                                {isRTL ? 'تم وإغلاق' : 'Done & Close'}
+                            </button>
                         </div>
                     </div>
                 )}

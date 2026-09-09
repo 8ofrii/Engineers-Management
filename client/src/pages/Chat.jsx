@@ -38,6 +38,68 @@ export default function Chat() {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    const renderFormattedMessage = (content) => {
+        if (!content) return null;
+        const lines = String(content).split('\n');
+        return (
+            <div className="ai-natural-text" style={{ lineHeight: 1.65, fontSize: '0.95rem' }}>
+                {lines.map((line, lIdx) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return <div key={lIdx} style={{ height: '6px' }} />;
+                    
+                    const isHeader = trimmed.startsWith('#');
+                    const cleanLine = trimmed.replace(/^#+\s*/, '');
+                    
+                    const isBullet = /^[*-•]\s+/.test(cleanLine);
+                    const bulletText = isBullet ? cleanLine.replace(/^[*-•]\s+/, '') : cleanLine;
+                    
+                    const parts = [];
+                    const boldRegex = /\*\*(.*?)\*\*|\*(.*?)\*/g;
+                    let lastIndex = 0;
+                    let match;
+                    
+                    while ((match = boldRegex.exec(bulletText)) !== null) {
+                        if (match.index > lastIndex) {
+                            parts.push(bulletText.substring(lastIndex, match.index));
+                        }
+                        parts.push(
+                            <strong key={match.index} style={{ fontWeight: 700, color: 'inherit' }}>
+                                {match[1] || match[2]}
+                            </strong>
+                        );
+                        lastIndex = match.index + match[0].length;
+                    }
+                    if (lastIndex < bulletText.length) {
+                        parts.push(bulletText.substring(lastIndex));
+                    }
+
+                    if (isHeader) {
+                        return (
+                            <div key={lIdx} style={{ fontWeight: 800, fontSize: '1.05rem', margin: '6px 0 3px', color: '#fff' }}>
+                                {parts.length > 0 ? parts : cleanLine}
+                            </div>
+                        );
+                    }
+
+                    if (isBullet) {
+                        return (
+                            <div key={lIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, margin: '2px 0' }}>
+                                <span style={{ color: '#ff5a36', fontSize: '0.9rem', lineHeight: 1.6 }}>•</span>
+                                <span style={{ flex: 1 }}>{parts.length > 0 ? parts : bulletText}</span>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <p key={lIdx} style={{ margin: '0 0 4px 0' }}>
+                            {parts.length > 0 ? parts : cleanLine}
+                        </p>
+                    );
+                })}
+            </div>
+        );
+    };
+
     const handleSendText = async (e) => {
         e.preventDefault();
         if (!inputText.trim() || loading) return;
@@ -197,7 +259,7 @@ export default function Chat() {
                                         className={`message ${message.isUser ? 'message-user' : 'message-bot'}`}
                                     >
                                         <div className="message-content">
-                                            <p>{message.content}</p>
+                                            {renderFormattedMessage(message.content)}
 
                                             {/* Action Card for AI Commands */}
                                             {message.extractedData?.params && !message.isActionCompleted && (

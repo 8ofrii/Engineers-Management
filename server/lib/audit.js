@@ -70,6 +70,6 @@ export const auditFromReq = (req, params) => audit({
     metadata: {
         ...(params.metadata || {}),
         ip: req.ip,
-        userAgent: req.headers['user-agent']?.slice(0, 200)
+        userAgent: req.headers?.['user-agent']?.slice(0, 200) || null
     }
 });

@@ -8,7 +8,8 @@ import AddClientModal from './AddClientModal';
 import { useAlert } from '../context/AlertContext';
 
 export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData = null }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const [clients, setClients] = useState([]);
     const [engineers, setEngineers] = useState([]);
@@ -38,6 +39,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
             loadClients();
             loadEngineers();
             if (initialData) {
+                const isCompleted = initialData.status?.toUpperCase() === 'COMPLETED';
                 setFormData({
                     name: initialData.name || '',
                     description: initialData.description || '',
@@ -53,7 +55,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     paymentTerms: initialData.paymentTerms || 'Net 30',
                     clientId: initialData.clientId || initialData.client?.id || '',
                     engineerId: initialData.engineerId || initialData.engineer?.id || '',
-                    completionPercent: initialData.completionPercent ?? 0
+                    completionPercent: isCompleted ? 100 : (initialData.completionPercent ?? 0)
                 });
             } else {
                 setFormData({
@@ -70,7 +72,8 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     totalContractValue: '',
                     paymentTerms: 'Net 30',
                     clientId: '',
-                    engineerId: ''
+                    engineerId: '',
+                    completionPercent: 0
                 });
             }
         }
@@ -96,10 +99,25 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => {
+            const next = { ...prev, [name]: value };
+            if (name === 'status') {
+                if (value === 'COMPLETED') {
+                    next.completionPercent = 100;
+                } else if (value === 'PLANNING' && prev.completionPercent === 100) {
+                    next.completionPercent = 0;
+                }
+            } else if (name === 'completionPercent') {
+                const pct = Number(value);
+                next.completionPercent = pct;
+                if (pct === 100 && prev.status !== 'COMPLETED') {
+                    next.status = 'COMPLETED';
+                } else if (pct < 100 && prev.status === 'COMPLETED') {
+                    next.status = 'IN_PROGRESS';
+                }
+            }
+            return next;
+        });
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
         }
@@ -144,7 +162,9 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
             managementFeePercent: '20',
             totalContractValue: '',
             paymentTerms: 'Net 30',
-            clientId: ''
+            clientId: '',
+            engineerId: '',
+            completionPercent: 0
         });
         setErrors({});
         onClose();
@@ -334,23 +354,46 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                                     fontSize: '1.1rem',
                                     color: Number(formData.completionPercent) >= 100 ? '#10b981' : Number(formData.completionPercent) >= 50 ? '#3b82f6' : '#f59e0b'
                                 }}>
-                                    {formData.completionPercent}%
+                                    {formData.status === 'COMPLETED' ? '100%' : `${formData.completionPercent}%`}
                                 </span>
                             </div>
-                            <input
-                                type="range"
-                                id="completionPercent"
-                                name="completionPercent"
-                                min="0"
-                                max="100"
-                                step="5"
-                                value={formData.completionPercent}
-                                onChange={handleChange}
-                                style={{ width: '100%', accentColor: '#3b82f6' }}
-                            />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
-                                <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
-                            </div>
+                            {formData.status === 'COMPLETED' ? (
+                                <div style={{
+                                    background: 'rgba(16, 185, 129, 0.1)',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    padding: '12px 16px',
+                                    borderRadius: '8px',
+                                    color: '#10b981',
+                                    fontSize: '0.92rem',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: 12
+                                }}>
+                                    <span>{isArabic ? '✅ تم اكتمال المشروع بنسبة 100%' : '✅ Project marked as 100% Completed'}</span>
+                                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 500 }}>
+                                        {isArabic ? '(غيّر الحالة من أعلى لتعديل النسبة)' : '(Change status above to adjust %)'}
+                                    </span>
+                                </div>
+                            ) : (
+                                <>
+                                    <input
+                                        type="range"
+                                        id="completionPercent"
+                                        name="completionPercent"
+                                        min="0"
+                                        max="100"
+                                        step="5"
+                                        value={formData.completionPercent}
+                                        onChange={handleChange}
+                                        style={{ width: '100%', accentColor: '#3b82f6' }}
+                                    />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                                        <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -399,12 +442,12 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                                     value={formData.paymentTerms}
                                     onChange={handleChange}
                                 >
-                                    <option value="Net 15">Net 15 Days</option>
-                                    <option value="Net 30">Net 30 Days</option>
-                                    <option value="Net 45">Net 45 Days</option>
-                                    <option value="Net 60">Net 60 Days</option>
-                                    <option value="Due on Receipt">Due on Receipt</option>
-                                    <option value="Custom">Custom</option>
+                                    <option value="Net 15">{isArabic ? 'خلال 15 يوم (Net 15)' : 'Net 15 Days'}</option>
+                                    <option value="Net 30">{isArabic ? 'خلال 30 يوم (Net 30)' : 'Net 30 Days'}</option>
+                                    <option value="Net 45">{isArabic ? 'خلال 45 يوم (Net 45)' : 'Net 45 Days'}</option>
+                                    <option value="Net 60">{isArabic ? 'خلال 60 يوم (Net 60)' : 'Net 60 Days'}</option>
+                                    <option value="Due on Receipt">{isArabic ? 'مستحق عند الاستلام (Due on Receipt)' : 'Due on Receipt'}</option>
+                                    <option value="Custom">{isArabic ? 'شروط مخصصة (Custom)' : 'Custom'}</option>
                                 </select>
                             </div>
 

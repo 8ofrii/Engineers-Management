@@ -234,10 +234,25 @@ export const getInvoicePdf = async (req, res, next) => {
         if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
         const tenant = await prisma.tenant.findUnique({ where: { id: req.user.tenantId } });
+
+        let companyName = tenant?.name;
+        if (!companyName || companyName === 'Demo Construction Co.') {
+            if (req.user?.company && req.user.company !== 'Demo Construction Co.') {
+                companyName = req.user.company;
+            }
+        }
+        companyName = companyName || req.user?.company || 'Hesaby ERP';
+
         const buffer = await generateInvoicePdf({
             invoice: { ...invoice, lineItems: invoice.lineItems || [] },
             client: invoice.client,
-            tenant,
+            tenant: {
+                ...tenant,
+                name: companyName,
+                email: tenant?.email || req.user?.email || '',
+                phone: tenant?.phone || req.user?.phone || '',
+                address: tenant?.address || ''
+            },
             project: invoice.project
         });
 
@@ -272,29 +287,239 @@ export const sendInvoice = async (req, res, next) => {
         }
 
         const tenant = await prisma.tenant.findUnique({ where: { id: req.user.tenantId } });
+
+        // Resolve personalized company name & sender details
+        let companyName = tenant?.name;
+        if (!companyName || companyName === 'Demo Construction Co.') {
+            if (req.user?.company && req.user.company !== 'Demo Construction Co.') {
+                companyName = req.user.company;
+            }
+        }
+        companyName = companyName || req.user?.company || 'Hesaby ERP';
+
+        const companyEmail = tenant?.email || req.user?.email || '';
+        const companyPhone = tenant?.phone || req.user?.phone || '';
+        const companyAddress = tenant?.address || '';
+        const senderName = req.user?.name || 'Hesaby Representative';
+        const senderRole = (req.user?.role || 'PROJECT_MANAGER').replace(/_/g, ' ');
+
         const buffer = await generateInvoicePdf({
             invoice: { ...invoice, lineItems: invoice.lineItems || [] },
             client: invoice.client,
-            tenant,
+            tenant: { ...tenant, name: companyName, email: companyEmail, phone: companyPhone, address: companyAddress },
             project: invoice.project
         });
 
         const customMessage = req.body?.message;
+        const lineItems = Array.isArray(invoice.lineItems) ? invoice.lineItems : [];
+        const fmtCurrency = (val) => Number(val || 0).toLocaleString('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const issueDateStr = invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString('en-GB') : '-';
+        const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-GB') : '-';
+
+        const lineItemsRows = lineItems.map((item, idx) => `
+            <tr style="border-bottom: 1px solid #e2e8f0; background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+                <td style="padding: 12px 16px; font-size: 14px; color: #1e293b; font-weight: 500;">
+                    ${item.description || 'Item'}
+                </td>
+                <td style="padding: 12px 16px; font-size: 14px; color: #475569; text-align: center;">
+                    ${item.quantity || 1}
+                </td>
+                <td style="padding: 12px 16px; font-size: 14px; color: #475569; text-align: right;">
+                    ${fmtCurrency(item.unitPrice)} ${invoice.currency}
+                </td>
+                <td style="padding: 12px 16px; font-size: 14px; color: #0f172a; font-weight: 700; text-align: right;">
+                    ${fmtCurrency(item.total || (item.quantity * item.unitPrice))} ${invoice.currency}
+                </td>
+            </tr>
+        `).join('');
+
         const html = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px;">
-                <p>Dear ${invoice.client?.name || 'Customer'},</p>
-                <p>${customMessage || `Please find attached invoice <strong>${invoice.invoiceNumber}</strong> for ${tenant?.name || 'our services'}.`}</p>
-                <p>Total due: <strong>${Number(invoice.totalAmount).toLocaleString('en-EG', { minimumFractionDigits: 2 })} ${invoice.currency}</strong></p>
-                ${invoice.dueDate ? `<p>Due by: ${new Date(invoice.dueDate).toLocaleDateString('en-GB')}</p>` : ''}
-                <p>Thank you for your business.</p>
-                <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">${tenant?.name || ''}</p>
-            </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice ${invoice.invoiceNumber}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 30px 10px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" style="max-width: 640px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+                    
+                    <!-- Header Banner -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 32px 36px; color: #ffffff;">
+                            <table width="100%" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td>
+                                        <div style="font-size: 20px; font-weight: 800; letter-spacing: -0.5px; color: #38bdf8;">
+                                            ${companyName}
+                                        </div>
+                                        <div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">
+                                            ${companyEmail ? `${companyEmail}` : ''} ${companyPhone ? `• ${companyPhone}` : ''}
+                                        </div>
+                                    </td>
+                                    <td align="right">
+                                        <div style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 6px 14px; display: inline-block;">
+                                            <span style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px;">TAX INVOICE</span>
+                                            <div style="font-size: 16px; font-weight: 800; color: #ffffff; margin-top: 2px;">#${invoice.invoiceNumber}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Body Content -->
+                    <tr>
+                        <td style="padding: 32px 36px;">
+                            <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                                Dear <strong>${invoice.client?.name || 'Valued Customer'}</strong>,
+                            </p>
+                            <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.6;">
+                                ${customMessage || `Thank you for your business. Please find below the invoice summary for <strong>${invoice.project?.name || 'your project'}</strong>, issued by <strong>${companyName}</strong>.`}
+                            </p>
+
+                            <!-- Meta Details Cards -->
+                            <table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 28px; background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; padding: 18px 20px;">
+                                <tr>
+                                    <td width="50%" style="vertical-align: top; padding-right: 12px;">
+                                        <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Billed To</div>
+                                        <div style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 4px;">${invoice.client?.name || '-'}</div>
+                                        ${invoice.client?.company ? `<div style="font-size: 13px; color: #475569; margin-top: 2px;">${invoice.client.company}</div>` : ''}
+                                        ${invoice.client?.email ? `<div style="font-size: 13px; color: #64748b; margin-top: 2px;">${invoice.client.email}</div>` : ''}
+                                    </td>
+                                    <td width="50%" style="vertical-align: top; padding-left: 12px; border-left: 1px solid #e2e8f0;">
+                                        <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Invoice Details</div>
+                                        <div style="font-size: 13px; color: #334155; margin-top: 4px;"><strong>Issue Date:</strong> ${issueDateStr}</div>
+                                        <div style="font-size: 13px; color: #334155; margin-top: 2px;"><strong>Due Date:</strong> ${dueDateStr}</div>
+                                        ${invoice.project?.name ? `<div style="font-size: 13px; color: #334155; margin-top: 2px;"><strong>Project:</strong> ${invoice.project.name}</div>` : ''}
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Line Items Table -->
+                            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-bottom: 10px;">Itemized Breakdown</div>
+                            <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin-bottom: 24px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+                                <thead>
+                                    <tr style="background-color: #0f172a; color: #ffffff;">
+                                        <th style="padding: 10px 16px; font-size: 12px; text-align: left; font-weight: 600; text-transform: uppercase;">Description</th>
+                                        <th style="padding: 10px 16px; font-size: 12px; text-align: center; font-weight: 600; text-transform: uppercase;">Qty</th>
+                                        <th style="padding: 10px 16px; font-size: 12px; text-align: right; font-weight: 600; text-transform: uppercase;">Unit Price</th>
+                                        <th style="padding: 10px 16px; font-size: 12px; text-align: right; font-weight: 600; text-transform: uppercase;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${lineItemsRows}
+                                </tbody>
+                            </table>
+
+                            <!-- Summary & Totals -->
+                            <table width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 28px;">
+                                <tr>
+                                    <td width="45%" style="vertical-align: top; padding-right: 16px;">
+                                        <!-- PDF Attachment Callout -->
+                                        <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px 16px;">
+                                            <div style="font-size: 13px; font-weight: 700; color: #1d4ed8; display: flex; align-items: center;">
+                                                📎 Official PDF Attached
+                                            </div>
+                                            <div style="font-size: 12px; color: #3b82f6; margin-top: 4px; line-height: 1.4;">
+                                                A printable PDF copy (<strong>${invoice.invoiceNumber}.pdf</strong>) is attached to this email for your accounting records.
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td width="55%" style="vertical-align: top;">
+                                        <table width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; padding: 14px 18px;">
+                                            <tr>
+                                                <td style="font-size: 13px; color: #64748b; padding-bottom: 6px;">Subtotal</td>
+                                                <td align="right" style="font-size: 13px; color: #0f172a; font-weight: 600; padding-bottom: 6px;">
+                                                    ${fmtCurrency(invoice.subtotal)} ${invoice.currency}
+                                                </td>
+                                            </tr>
+                                            ${Number(invoice.discountAmount) > 0 ? `
+                                            <tr>
+                                                <td style="font-size: 13px; color: #dc2626; padding-bottom: 6px;">Discount</td>
+                                                <td align="right" style="font-size: 13px; color: #dc2626; font-weight: 600; padding-bottom: 6px;">
+                                                    -${fmtCurrency(invoice.discountAmount)} ${invoice.currency}
+                                                </td>
+                                            </tr>` : ''}
+                                            <tr>
+                                                <td style="font-size: 13px; color: #64748b; padding-bottom: 8px;">VAT / Tax (${invoice.taxRate}%)</td>
+                                                <td align="right" style="font-size: 13px; color: #0f172a; font-weight: 600; padding-bottom: 8px;">
+                                                    ${fmtCurrency(invoice.taxAmount)} ${invoice.currency}
+                                                </td>
+                                            </tr>
+                                            <tr style="border-top: 2px solid #cbd5e1;">
+                                                <td style="font-size: 15px; font-weight: 800; color: #0f172a; padding-top: 8px;">TOTAL DUE</td>
+                                                <td align="right" style="font-size: 18px; font-weight: 800; color: #0284c7; padding-top: 8px;">
+                                                    ${fmtCurrency(invoice.totalAmount)} ${invoice.currency}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Issued By Card -->
+                            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
+                                <table width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td>
+                                            <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Issued By</div>
+                                            <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 2px;">${senderName}</div>
+                                            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${senderRole} • ${companyName}</div>
+                                        </td>
+                                        <td align="right" style="vertical-align: middle;">
+                                            ${companyEmail ? `<div style="font-size: 12px; color: #0284c7; font-weight: 600;">${companyEmail}</div>` : ''}
+                                            ${companyPhone ? `<div style="font-size: 12px; color: #64748b; margin-top: 2px;">${companyPhone}</div>` : ''}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            ${invoice.notes ? `
+                            <div style="background-color: #fafafa; border-left: 4px solid #0284c7; padding: 12px 16px; margin-bottom: 18px; border-radius: 4px;">
+                                <div style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase;">Notes</div>
+                                <div style="font-size: 13px; color: #334155; margin-top: 4px; white-space: pre-wrap;">${invoice.notes}</div>
+                            </div>` : ''}
+
+                            ${invoice.terms ? `
+                            <div style="font-size: 12px; color: #64748b; margin-top: 16px; line-height: 1.5; border-top: 1px dashed #e2e8f0; padding-top: 12px;">
+                                <strong>Payment Terms:</strong> ${invoice.terms}
+                            </div>` : ''}
+
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 36px; text-align: center;">
+                            <div style="font-size: 14px; font-weight: 800; color: #0f172a;">
+                                ${companyName}
+                            </div>
+                            ${companyAddress || companyEmail || companyPhone ? `
+                            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+                                ${[companyAddress, companyEmail, companyPhone].filter(Boolean).join(' • ')}
+                            </div>` : ''}
+                            <div style="font-size: 11px; color: #94a3b8; margin-top: 8px;">
+                                Generated & delivered securely via Hesaby Construction & Engineering ERP
+                            </div>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
         `;
 
         try {
             await sendEmail({
                 email: recipient,
-                subject: `Invoice ${invoice.invoiceNumber} from ${tenant?.name || 'our company'}`,
+                subject: `Invoice #${invoice.invoiceNumber} from ${companyName}${invoice.project?.name ? ` - ${invoice.project.name}` : ''}`,
                 message: html,
                 attachments: [{
                     filename: `${invoice.invoiceNumber}.pdf`,
@@ -437,7 +662,9 @@ export const deleteInvoice = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Not authorized' });
         }
 
-        await prisma.invoice.delete({ where: { id: invoice.id } });
+        await prisma.invoice.deleteMany({
+            where: { id: invoice.id, tenantId: req.user.tenantId }
+        });
 
         await auditFromReq(req, {
             action: 'DELETE',

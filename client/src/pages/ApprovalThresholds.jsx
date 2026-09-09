@@ -76,8 +76,17 @@ export default function ApprovalThresholds() {
     };
 
     const handleResetDefaults = () => {
-        if (!confirm(t('approvalThresholds.confirmReset', 'Reset to system defaults?'))) return;
-        setTiers(DEFAULT_TIERS.map(normalizeTier));
+        showAlert({
+            type: 'warning',
+            title: i18n.language === 'ar' ? 'استعادة الإعدادات الافتراضية' : 'Reset Defaults',
+            message: t('approvalThresholds.confirmReset', i18n.language === 'ar' ? 'هل أنت متأكد من استعادة المستويات الافتراضية للنظام؟' : 'Reset to system defaults?'),
+            showCancel: true,
+            confirmText: i18n.language === 'ar' ? 'نعم، استعادة' : 'Reset',
+            cancelText: i18n.language === 'ar' ? 'تراجع' : 'Cancel',
+            onConfirm: () => {
+                setTiers(DEFAULT_TIERS.map(normalizeTier));
+            }
+        });
     };
 
     const handleSave = async () => {
@@ -185,7 +194,7 @@ export default function ApprovalThresholds() {
                                             onChange={(e) => handleTierChange(idx, 'minRole', e.target.value)}
                                         >
                                             {ROLES.map(r => (
-                                                <option key={r} value={r}>{r}</option>
+                                                <option key={r} value={r}>{t(`approvalThresholds.roles.${r}`, r)}</option>
                                             ))}
                                         </select>
                                     </td>
@@ -217,7 +226,7 @@ export default function ApprovalThresholds() {
                         <div style={{ flex: 1 }} />
                         <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
                             {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
-                            {t('common.save', 'Save')}
+                            {t('approvalThresholds.saveChanges', 'Save changes')}
                         </button>
                     </div>
                 </div>
@@ -238,15 +247,27 @@ const normalizeTier = (t) => ({
 
 // Mirrors the server-side validator so users see errors instantly without a round trip.
 const validateLocally = (tiers) => {
-    if (!Array.isArray(tiers) || tiers.length === 0) return 'At least one tier is required.';
+    if (!Array.isArray(tiers) || tiers.length === 0) {
+        return 'At least one tier is required.';
+    }
     let sawNullCap = false;
+    let prevMax = -1;
     for (let i = 0; i < tiers.length; i++) {
         const { maxAmount, minRole } = tiers[i];
-        if (maxAmount !== null && (typeof maxAmount !== 'number' || isNaN(maxAmount) || maxAmount <= 0)) {
-            return `Tier ${i + 1}: amount must be a positive number or empty.`;
-        }
         if (!ROLES.includes(minRole)) {
-            return `Tier ${i + 1}: invalid role.`;
+            return `Tier #${i + 1}: Invalid role ${minRole}`;
+        }
+        if (sawNullCap) {
+            return 'The unlimited ceiling tier must be the very last tier.';
+        }
+        if (maxAmount !== null && (typeof maxAmount !== 'number' || isNaN(maxAmount) || maxAmount <= 0)) {
+            return `Tier #${i + 1}: Max amount must be a positive number or empty.`;
+        }
+        if (maxAmount !== null) {
+            if (maxAmount <= prevMax) {
+                return `Tier #${i + 1}: Ceiling (${maxAmount}) must be greater than previous tier (${prevMax}).`;
+            }
+            prevMax = maxAmount;
         }
         if (maxAmount === null) {
             if (sawNullCap) return 'Only one tier can have an unlimited ceiling.';
@@ -269,11 +290,12 @@ function PreviewBox({ tiers, currency, t }) {
                     const cap = tier.maxAmount === null
                         ? t('approvalThresholds.anyAmountAbove', 'anything above the previous tier')
                         : `${t('approvalThresholds.upTo', 'up to')} ${currency(Number(tier.maxAmount) || 0)}`;
+                    const roleName = t(`approvalThresholds.roles.${tier.minRole}`, tier.minRole);
                     return (
                         <li key={idx} style={{ marginBottom: 6 }}>
                             <strong>{cap}</strong>
                             {' → '}
-                            {t('approvalThresholds.requires', 'requires')} <strong>{tier.minRole}</strong>
+                            {t('approvalThresholds.requires', 'requires')} <strong>{roleName}</strong>
                             {' '}{t('approvalThresholds.orHigher', 'or higher')}
                         </li>
                     );

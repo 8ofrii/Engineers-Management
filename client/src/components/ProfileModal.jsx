@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Upload, User, Building2, UserCircle, AlertCircle, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { X, Upload, User, Building2, UserCircle, AlertCircle, Eye, EyeOff, CheckCircle, Trash2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
-import api, { tenantAPI } from '../services/api';
-import './Modal.css';
+import api, { tenantAPI, authAPI } from '../services/api';
 import './Modal.css';
 
 export default function ProfileModal({ isOpen, onClose, forceChangePassword = false }) {
-    const { t } = useTranslation();
-    const { user, updateUser } = useAuth();
+    const { t, i18n } = useTranslation();
+    const isAr = i18n.language === 'ar';
+    const { user, updateUser, logout } = useAuth();
     const { showAlert } = useAlert();
     const fileInputRef = useRef(null);
 
@@ -34,6 +34,16 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
     const [companyLogo, setCompanyLogo] = useState(null);
     const [companyLogoPreview, setCompanyLogoPreview] = useState(null);
 
+    // Danger Zone Deletion State
+    const [showDeleteCompanyConfirm, setShowDeleteCompanyConfirm] = useState(false);
+    const [deleteCompanyConfirmName, setDeleteCompanyConfirmName] = useState('');
+    const [deleteCompanyPassword, setDeleteCompanyPassword] = useState('');
+    const [deletingCompany, setDeletingCompany] = useState(false);
+
+    const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+    const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+    const [deletingAccount, setDeletingAccount] = useState(false);
+
     // Password Visibility State
     const [showPasswords, setShowPasswords] = useState({
         current: false,
@@ -47,11 +57,13 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
 
     // Helper function to get full image URL
     const getImageUrl = (path) => {
-        if (!path) return null;
-        if (path.startsWith('http')) return path;
-        if (path.startsWith('blob:')) return path; // For local preview
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-        return `${apiUrl}${path}`;
+        if (!path || typeof path !== 'string') return null;
+        if (path.startsWith('blob:') || path.startsWith('data:')) return path;
+        const cleanPath = path.replace(/^https?:\/\/(localhost|127\.0\.0\.1):5000/i, '');
+        if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+            return cleanPath;
+        }
+        return cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
     };
 
     useEffect(() => {
@@ -200,6 +212,78 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
             showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Failed to update company' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteCompanySubmit = async (e) => {
+        e?.preventDefault?.();
+        if (deleteCompanyConfirmName.trim().toLowerCase() !== companyData.name.trim().toLowerCase()) {
+            showAlert({
+                type: 'error',
+                title: isAr ? 'خطأ في التأكيد' : 'Confirmation Error',
+                message: isAr
+                    ? 'اسم الشركة المدخل غير متطابق مع اسم مساحة العمل.'
+                    : 'The typed company name does not match the workspace name.'
+            });
+            return;
+        }
+
+        setDeletingCompany(true);
+        try {
+            await tenantAPI.deleteCompany({
+                confirmCompanyName: deleteCompanyConfirmName,
+                password: deleteCompanyPassword
+            });
+            setShowDeleteCompanyConfirm(false);
+            onClose();
+            showAlert({
+                type: 'success',
+                title: isAr ? 'تم حذف مساحة العمل' : 'Workspace Deleted',
+                message: isAr
+                    ? 'تم حذف مساحة العمل وجميع البيانات المرتبطة بها بنجاح.'
+                    : 'The workspace and all associated data have been permanently deleted.'
+            });
+            setTimeout(() => {
+                logout();
+                window.location.href = '/login';
+            }, 1000);
+        } catch (err) {
+            showAlert({
+                type: 'error',
+                title: isAr ? 'فشل الحذف' : 'Deletion Failed',
+                message: err.response?.data?.message || (isAr ? 'تعذر حذف مساحة العمل' : 'Could not delete workspace')
+            });
+        } finally {
+            setDeletingCompany(false);
+        }
+    };
+
+    const handleDeleteAccountSubmit = async (e) => {
+        e?.preventDefault?.();
+        setDeletingAccount(true);
+        try {
+            await authAPI.deleteAccount({
+                password: deleteAccountPassword
+            });
+            setShowDeleteAccountConfirm(false);
+            onClose();
+            showAlert({
+                type: 'success',
+                title: isAr ? 'تم حذف الحساب' : 'Account Deleted',
+                message: isAr ? 'تم حذف حسابك بنجاح.' : 'Your account has been deleted.'
+            });
+            setTimeout(() => {
+                logout();
+                window.location.href = '/login';
+            }, 1000);
+        } catch (err) {
+            showAlert({
+                type: 'error',
+                title: isAr ? 'فشل الحذف' : 'Deletion Failed',
+                message: err.response?.data?.message || (isAr ? 'تعذر حذف الحساب' : 'Could not delete account')
+            });
+        } finally {
+            setDeletingAccount(false);
         }
     };
 
@@ -609,6 +693,56 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Danger Zone: Delete Personal Account */}
+                                    <div style={{ marginTop: '24px', padding: '16px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.25)', backgroundColor: 'rgba(239, 68, 68, 0.04)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', fontWeight: 600, fontSize: '14px' }}>
+                                                    <AlertTriangle size={18} />
+                                                    <span>{isAr ? 'منطقة الخطر: حذف الحساب' : 'Danger Zone: Delete Account'}</span>
+                                                </div>
+                                                <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                    {isAr ? 'سيؤدي حذف حسابك إلى إلغاء صلاحيات الوصول وتسجيل الخروج فوراً.' : 'Permanently delete your personal user account and credentials.'}
+                                                </p>
+                                            </div>
+                                            {!showDeleteAccountConfirm ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowDeleteAccountConfirm(true)}
+                                                    style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                                >
+                                                    <Trash2 size={14} />
+                                                    {isAr ? 'حذف حسابي' : 'Delete My Account'}
+                                                </button>
+                                            ) : (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', marginTop: '8px' }}>
+                                                    <input
+                                                        type="password"
+                                                        placeholder={isAr ? 'أدخل كلمة المرور للتأكيد' : 'Enter password to confirm'}
+                                                        value={deleteAccountPassword}
+                                                        onChange={(e) => setDeleteAccountPassword(e.target.value)}
+                                                        style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #ef4444', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '13px' }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleDeleteAccountSubmit}
+                                                        disabled={deletingAccount || !deleteAccountPassword}
+                                                        style={{ padding: '8px 14px', background: '#b91c1c', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                                    >
+                                                        {deletingAccount ? t('common.loading') : (isAr ? 'تأكيد الحذف' : 'Confirm Delete')}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowDeleteAccountConfirm(false)}
+                                                        style={{ padding: '8px 12px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}
+                                                    >
+                                                        {t('common.cancel')}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </>
                             )}
 
@@ -623,7 +757,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                                                 style={{
                                                     width: '120px',
                                                     height: '120px',
-                                                    borderRadius: '50%', // Circle for consistency, or square for logo? Let's use circle
+                                                    borderRadius: '50%',
                                                     overflow: 'hidden',
                                                     border: '1px solid #eee',
                                                     display: 'flex',
@@ -689,6 +823,67 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Danger Zone: Delete Company (Admins Only) */}
+                                    {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && (
+                                        <div style={{ marginTop: '24px', padding: '16px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.25)', backgroundColor: 'rgba(239, 68, 68, 0.04)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                                                <div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444', fontWeight: 600, fontSize: '14px' }}>
+                                                        <ShieldAlert size={18} />
+                                                        <span>{isAr ? 'منطقة الخطر: حذف مساحة العمل' : 'Danger Zone: Delete Workspace'}</span>
+                                                    </div>
+                                                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                        {isAr ? 'حذف مساحة العمل يؤدي لمسح دائم للمشاريع والمعاملات وحسابات الفريق.' : 'Permanently wipes all company projects, transactions, invoices, and members.'}
+                                                    </p>
+                                                </div>
+                                                {!showDeleteCompanyConfirm ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowDeleteCompanyConfirm(true)}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                        {isAr ? 'حذف الشركة بالكامل' : 'Delete Workspace'}
+                                                    </button>
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', marginTop: '8px' }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder={isAr ? `اكتب اسم الشركة للتأكيد: "${companyData.name}"` : `Type company name: "${companyData.name}"`}
+                                                            value={deleteCompanyConfirmName}
+                                                            onChange={(e) => setDeleteCompanyConfirmName(e.target.value)}
+                                                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #ef4444', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '13px' }}
+                                                        />
+                                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                                            <input
+                                                                type="password"
+                                                                placeholder={isAr ? 'كلمة مرور المدير' : 'Admin password'}
+                                                                value={deleteCompanyPassword}
+                                                                onChange={(e) => setDeleteCompanyPassword(e.target.value)}
+                                                                style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #ef4444', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '13px' }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleDeleteCompanySubmit}
+                                                                disabled={deletingCompany || !deleteCompanyPassword || !deleteCompanyConfirmName}
+                                                                style={{ padding: '8px 14px', background: '#b91c1c', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                                                            >
+                                                                {deletingCompany ? t('common.loading') : (isAr ? 'تأكيد الحذف النهائي' : 'Permanently Delete')}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowDeleteCompanyConfirm(false)}
+                                                                style={{ padding: '8px 12px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}
+                                                            >
+                                                                {t('common.cancel')}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
 

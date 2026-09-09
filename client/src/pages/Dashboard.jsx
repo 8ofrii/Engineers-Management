@@ -151,25 +151,25 @@ export default function Dashboard() {
                                 </span>
                             </h3>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+                            <div style={{ textAlign: 'center', padding: '14px 12px', background: 'var(--bg-elevated)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
                                 <FolderKanban size={20} style={{ color: 'var(--color-primary)', marginBottom: 6 }} />
-                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{todaySummary.activeProjects}</div>
+                                <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)' }}>{todaySummary.activeProjects}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'مشاريع نشطة' : 'Active Projects'}</div>
                             </div>
-                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                            <div style={{ textAlign: 'center', padding: '14px 12px', background: 'var(--bg-elevated)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
                                 <ClipboardList size={20} style={{ color: '#8b5cf6', marginBottom: 6 }} />
-                                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{todaySummary.dsrCount}</div>
+                                <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-primary)' }}>{todaySummary.dsrCount}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'تقارير اليوم' : 'DSRs Today'}</div>
                             </div>
-                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                            <div style={{ textAlign: 'center', padding: '14px 12px', background: 'var(--bg-elevated)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
                                 <TrendingUp size={20} style={{ color: '#10b981', marginBottom: 6 }} />
-                                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#10b981' }}>{formatCurrency(todaySummary.todayIncome)}</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#10b981', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCurrency(todaySummary.todayIncome)}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'إيرادات اليوم' : "Today's Income"}</div>
                             </div>
-                            <div style={{ textAlign: 'center', padding: '12px 8px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                            <div style={{ textAlign: 'center', padding: '14px 12px', background: 'var(--bg-elevated)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
                                 <TrendingDown size={20} style={{ color: '#ef4444', marginBottom: 6 }} />
-                                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ef4444' }}>{formatCurrency(todaySummary.todayExpense)}</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatCurrency(todaySummary.todayExpense)}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'مصروفات اليوم' : "Today's Expenses"}</div>
                             </div>
                         </div>

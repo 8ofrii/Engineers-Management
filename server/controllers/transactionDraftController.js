@@ -104,7 +104,7 @@ export const rematchDraft = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Only pending drafts can be rematched' });
     }
 
-    const matched = await matchExtractionToTenant(draft.rawExtraction, draft.source, req.user.tenantId);
+    const matched = await matchExtractionToTenant(draft.rawExtraction, draft.source, req.user.tenantId, draft.createdById, draft.transcript || '');
 
     const updated = await prisma.transactionDraft.update({
         where: { id: draft.id },

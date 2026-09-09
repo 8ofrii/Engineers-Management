@@ -8,11 +8,11 @@ const router = express.Router();
 
 router.use(protect);
 
-// Listing all logs is admin-only — it's basically the activity feed for the
+// Listing all logs is super-admin only — it's basically the activity feed for the
 // whole tenant and includes every actor's actions.
 router.get(
     '/',
-    authorize('ADMIN', 'SUPER_ADMIN'),
+    authorize('SUPER_ADMIN'),
     listAuditLogs
 );
 

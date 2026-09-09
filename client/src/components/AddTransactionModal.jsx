@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Mic, MicOff, Wallet, Plus } from 'lucide-react';
-import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI } from '../services/api';
+import { X, Wallet, Plus } from 'lucide-react';
+import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
 import AddWorkmanModal from './AddWorkmanModal';
@@ -9,7 +9,8 @@ import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 
 export default function AddTransactionModal({ isOpen, onClose, onSubmit, initialData = null, user }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isRTL = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const { showAlert } = useAlert();
     const { currency: fmtCurrency } = useFormat();
 
@@ -19,6 +20,41 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         return new Date(date.getTime() - offset).toISOString().slice(0, 16);
     };
 
+    // Robust natural language formatter for user roles (prevents raw code key leakage)
+    const formatUserRole = (role) => {
+        if (!role) return '';
+        const key = `teamManagement.roles.${role}`;
+        const translated = t(key);
+        if (translated && !translated.startsWith('teamManagement.roles.')) {
+            return translated;
+        }
+        const roleMap = {
+            'SUPER_ADMIN': isRTL ? 'مدير النظام' : 'Super Admin',
+            'ADMIN': isRTL ? 'مدير الشركة' : 'Company Owner',
+            'PROJECT_MANAGER': isRTL ? 'مدير مشروع' : 'Project Manager',
+            'ENGINEER': isRTL ? 'مهندس موقع' : 'Site Engineer',
+            'SITE_ENGINEER': isRTL ? 'مهندس موقع' : 'Site Engineer',
+            'ACCOUNTANT': isRTL ? 'محاسب' : 'Accountant',
+            'FINANCIAL_MANAGER': isRTL ? 'مدير مالي' : 'Financial Manager',
+            'GENERAL_MANAGER': isRTL ? 'مدير عام' : 'General Manager',
+            'VIEWER': isRTL ? 'مشاهد' : 'Viewer',
+            'CLIENT': isRTL ? 'عميل' : 'Client',
+            'AUDITOR': isRTL ? 'مراجع حسابات' : 'Auditor',
+            'HR': isRTL ? 'موارد بشرية' : 'HR Manager',
+            'PROCUREMENT': isRTL ? 'مسؤول المشتريات' : 'Procurement Officer',
+            'STOREKEEPER': isRTL ? 'أمين مخزن' : 'Storekeeper'
+        };
+        return roleMap[role] || role;
+    };
+
+    // Robust natural language formatter for workman trades
+    const formatTrade = (trade) => {
+        if (!trade) return '';
+        const key = `labor.trades.${trade}`;
+        const translated = t(key);
+        if (translated && !translated.startsWith('labor.trades.')) return translated;
+        return trade;
+    };
 
     // Modes: EXPENSE (default), INCOME, USAGE, TRANSFER
     const [mode, setMode] = useState('EXPENSE');
@@ -32,6 +68,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [workmen, setWorkmen] = useState([]); // Site workmen for labor payments
     const [clients, setClients] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
+    const [rawMaterials, setRawMaterials] = useState([]);
     const [existingCostCenters, setExistingCostCenters] = useState([]);
     const [existingTransactionFroms, setExistingTransactionFroms] = useState([]);
     const [existingTransactionTos, setExistingTransactionTos] = useState([]);
@@ -64,6 +101,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         category: '',
 
         // Stock/Expense
+        materialId: '',
         itemName: '',
         unit: 'TON',
         transactionFrom: '',
@@ -136,6 +174,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             loadWorkforce();
             loadClients();
             loadSuppliers();
+            loadMaterials();
             loadCostCenters();
             if (initialData) {
                 // Populate for Editing
@@ -235,12 +274,12 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         }
     }, [isOpen, initialData]);
 
-    // Load Batches in USAGE mode
+    // Load Batches in USAGE mode or on open
     useEffect(() => {
-        if (mode === 'USAGE' && selectedProjectId) {
-            loadBatches(selectedProjectId);
+        if (mode === 'USAGE' || isOpen) {
+            loadBatches(selectedProjectId || undefined);
         }
-    }, [mode, selectedProjectId]);
+    }, [mode, selectedProjectId, isOpen]);
 
     const loadProjects = async () => {
         try {
@@ -253,7 +292,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
     const loadBatches = async (projectId) => {
         try {
-            const res = await materialUsageAPI.getBatches({ projectId, status: 'AVAILABLE' });
+            const params = { status: 'AVAILABLE,PARTIALLY_USED' };
+            if (projectId) params.projectId = projectId;
+            const res = await materialUsageAPI.getBatches(params);
             setMaterialBatches(res.data.data || []);
         } catch (error) {
             console.error("Failed to load batches", error);
@@ -328,6 +369,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         } catch (e) { console.error("Failed to load suppliers", e); }
     };
 
+    const loadMaterials = async () => {
+        try {
+            const res = await materialsAPI.getAll();
+            setRawMaterials(res.data.data || []);
+        } catch (e) { console.error("Failed to load materials", e); }
+    };
+
     const loadCostCenters = async () => {
         try {
             const res = await transactionsAPI.getCostCenters();
@@ -350,6 +398,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         } else {
             setCostItems([]);
         }
+        if (mode === 'USAGE') {
+            loadBatches(pId || undefined);
+            if (selectedBatch && selectedBatch.projectId !== pId) {
+                setSelectedBatchId('');
+                setSelectedBatch(null);
+            }
+        }
     };
 
     const handleBatchChange = (e) => {
@@ -357,6 +412,21 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         setSelectedBatchId(bId);
         const batch = materialBatches.find(b => b.id === bId);
         setSelectedBatch(batch || null);
+        if (batch) {
+            if (batch.projectId && batch.projectId !== selectedProjectId) {
+                setSelectedProjectId(batch.projectId);
+                const proj = projects.find(p => p.id === batch.projectId) || batch.project;
+                setSelectedProject(proj || null);
+                loadCostItems(batch.projectId);
+            }
+            setFormData(prev => ({
+                ...prev,
+                amount: prev.amount || (batch.remainingValue ? batch.remainingValue.toString() : ''),
+                category: prev.category || 'MATERIALS',
+                description: prev.description || (isRTL ? `استهلاك من دفعة: ${batch.description}` : `Usage from batch: ${batch.description}`)
+            }));
+            if (errors.batchId) setErrors(prev => ({ ...prev, batchId: '' }));
+        }
     };
 
     const handleChange = (e) => {
@@ -395,103 +465,20 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         }
     }, [selectedProjectId, projects]);
 
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const mediaRecorderRef = useRef(null);
-    const audioChunksRef = useRef([]);
-
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = recorder;
-            audioChunksRef.current = [];
-
-            recorder.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunksRef.current.push(e.data);
-            };
-
-            recorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                await analyzeAudio(audioBlob);
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            recorder.start();
-            setIsRecording(true);
-        } catch (error) {
-            console.error("Recording failed", error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: "Could not start recording. Please check microphone permissions." });
-        }
-    };
-
-    const stopRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-        }
-    };
-
-    const analyzeAudio = async (blob) => {
-        setIsAnalyzing(true);
-        try {
-            const formData = new FormData();
-            formData.append('audio', blob, 'transaction.webm');
-
-            const res = await transactionsAPI.analyze(formData);
-            const data = res.data.data;
-            const parsed = data.parsed_data;
-
-            // Map AI response to form fields
-            setFormData(prev => ({
-                ...prev,
-                amount: parsed.amount ? parsed.amount.toString() : prev.amount,
-                description: parsed.summary || prev.description,
-                category: parsed.category || prev.category,
-                transactionTo: parsed.vendor || prev.transactionTo,
-            }));
-
-            // Handle Stock Purchase mapping
-            if (parsed.is_stock_purchase || parsed.category === 'MATERIALS') {
-                setIsStockPurchase(true);
-                if (parsed.items && parsed.items.length > 0) {
-                    const item = parsed.items[0];
-                    setFormData(prev => ({
-                        ...prev,
-                        itemName: item.name || prev.itemName,
-                        quantity: item.quantity ? item.quantity.toString() : prev.quantity,
-                        unit: item.unit ? item.unit.toUpperCase() : prev.unit
-                    }));
-                }
-            }
-
-            // Map to mode (AI returns type INCOME or EXPENSE)
-            if (parsed.type === 'INCOME') setMode('INCOME');
-            else if (parsed.type === 'EXPENSE') setMode('EXPENSE');
-
-        } catch (error) {
-            console.error("Analysis failed:", error);
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: "Failed to analyze voice note. Please enter details manually." });
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
-
-    const handleVoiceInput = () => {
-        if (isRecording) {
-            stopRecording();
-        } else {
-            startRecording();
-        }
-    };
-
     const validate = () => {
         const newErrors = {};
-        if (!selectedProjectId) newErrors.projectId = t('common.required');
+        if (mode !== 'TRANSFER' && !selectedProjectId) newErrors.projectId = t('common.required');
 
         if (mode === 'EXPENSE') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
-            // Category is always required
-            if (!formData.category) newErrors.category = t('common.required');
+            if (costItemMode === 'MATERIAL') {
+                if (!formData.materialId) newErrors.materialId = t('common.required');
+            } else if (costItemMode === 'EXISTING') {
+                if (!formData.projectCostItemId) newErrors.projectCostItemId = t('common.required');
+            } else {
+                if (!formData.category) newErrors.category = t('common.required');
+                if (!formData.itemName) newErrors.itemName = t('common.required');
+            }
         }
         else if (mode === 'INCOME') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
@@ -522,23 +509,31 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             let payload = {};
             // Shared payload construction
             if (mode === 'EXPENSE') {
+                const isMaterial = costItemMode === 'MATERIAL' || isStockPurchase;
+                const chosenMaterial = isMaterial ? rawMaterials.find(m => m.id === formData.materialId) : null;
+                const resolvedCategory = isMaterial ? 'MATERIALS' : (formData.category || 'MATERIALS');
+                const resolvedItemName = isMaterial
+                    ? (formData.itemName || (chosenMaterial ? (isRTL ? (chosenMaterial.nameAr || chosenMaterial.name) : chosenMaterial.name) : 'خامة مخزنية'))
+                    : (costItemMode === 'NEW' ? formData.itemName : undefined);
+
                 payload = {
                     type: 'EXPENSE',
-                    category: isStockPurchase ? 'MATERIALS' : formData.category,
+                    category: resolvedCategory,
                     amount: Number(formData.amount),
                     projectId: selectedProjectId,
-                    projectCostItemId: (costItemMode === 'EXISTING' || isStockPurchase) ? formData.projectCostItemId : undefined,
+                    projectCostItemId: costItemMode === 'EXISTING' ? formData.projectCostItemId : undefined,
                     payerUserId: formData.payerUserId || user?.id,
                     workmanId: formData.workmanId || undefined,
-                    createBatch: isStockPurchase,
-                    description: formData.description?.trim() || formData.itemName || t(`finance.categories.${formData.category?.toLowerCase()}`) || formData.category || 'Site Expense',
+                    createBatch: isMaterial,
+                    materialId: (isMaterial && formData.materialId) ? formData.materialId : undefined,
+                    description: formData.description?.trim() || resolvedItemName || t(`finance.categories.${resolvedCategory?.toLowerCase()}`) || resolvedCategory || 'Site Expense',
                     transactionDate: formData.transactionDate,
                     paymentMethod: formData.paymentMethod,
-                    itemName: (costItemMode === 'NEW' || isStockPurchase) ? formData.itemName : undefined,
-                    unit: (costItemMode === 'NEW' || isStockPurchase) ? formData.unit : undefined,
-                    unitPrice: (costItemMode === 'NEW' || isStockPurchase) ? (formData.unitPrice ? Number(formData.unitPrice) : undefined) : undefined,
-                    quantity: (costItemMode === 'NEW' || isStockPurchase) ? (formData.quantity ? Number(formData.quantity) : undefined) : undefined,
-                    costCenter: formData.costCenter || undefined,
+                    itemName: resolvedItemName,
+                    unit: isMaterial ? (formData.unit || chosenMaterial?.unit) : (costItemMode === 'NEW' ? formData.unit : undefined),
+                    unitPrice: isMaterial ? (formData.unitPrice ? Number(formData.unitPrice) : (chosenMaterial?.unitPrice ? Number(chosenMaterial.unitPrice) : undefined)) : (costItemMode === 'NEW' && formData.unitPrice ? Number(formData.unitPrice) : undefined),
+                    quantity: formData.quantity ? Number(formData.quantity) : undefined,
+                    costCenter: formData.costCenter || (isMaterial ? (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')) : undefined),
                     transactionTo: formData.transactionTo || undefined,
                     invoiceNumber: formData.invoiceNumber
                 };
@@ -755,14 +750,16 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     }}>
                         {/* Project Selection */}
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label style={{ fontSize: '0.85rem', marginBottom: '4px' }}>{t('nav.projects')} <span className="required">*</span></label>
+                            <label style={{ fontSize: '0.85rem', marginBottom: '4px' }}>
+                                {t('nav.projects')} {mode !== 'TRANSFER' ? <span className="required">*</span> : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span>}
+                            </label>
                             <select
                                 value={selectedProjectId}
                                 onChange={handleProjectChange}
                                 className={errors.projectId ? 'error' : ''}
                                 style={{ fontSize: '1rem', padding: '10px' }}
                             >
-                                <option value="">-- {t('finance.selectProject')} --</option>
+                                <option value="">-- {mode === 'TRANSFER' ? (isRTL ? 'بدون ربط بمشروع محدد' : 'General / No specific project') : t('finance.selectProject')} --</option>
                                 {projects.map(p => (
                                     <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
@@ -817,7 +814,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         </div>
 
                         {/* Transaction Payer - Inside primary card as per user image */}
-                        {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'PROJECT_MANAGER') && mode !== 'USAGE' && (
+                        {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'PROJECT_MANAGER') && (mode === 'EXPENSE' || mode === 'INCOME') && (
                             <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0, marginTop: 'var(--spacing-sm)' }}>
                                 <label style={{ fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>{t('finance.paidBy') || 'مين اللي دفع؟'}</label>
                                 <select
@@ -829,7 +826,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                     <option value="">-- {t('finance.selectPayer')} --</option>
                                     {users.map(u => (
                                         <option key={u.id} value={u.id}>
-                                            {u.name} ({t(`teamManagement.roles.${u.role}`) || u.role})
+                                            {u.name} ({formatUserRole(u.role)})
                                         </option>
                                     ))}
                                 </select>
@@ -842,51 +839,105 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         mode === 'EXPENSE' && (
                             <>
                                 <div className="form-section">
-                                    <label className="flex items-center gap-sm cursor-pointer" style={{ background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={isStockPurchase}
-                                            onChange={(e) => setIsStockPurchase(e.target.checked)}
-                                            style={{ width: '20px', height: '20px', accentColor: 'var(--color-primary)' }}
-                                        />
-                                        <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{t('finance.addToInventory')}</span>
-                                    </label>
-                                </div>
-
-                                <div className="form-section">
                                     <h3 className="section-title">{t('projects.modal.sections.financial')}</h3>
                                     <div className="form-grid">
-                                        {/* New vs Existing Smart Toggle */}
+                                        {/* 3-Way Item Type Toggle: New Cost Item vs Existing Project Band vs Registered Raw Material */}
                                         <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 'var(--spacing-sm)' }}>
-                                            <div style={{ display: 'flex', gap: '4px', padding: '3px', background: 'rgba(0,0,0,0.1)', borderRadius: '10px' }}>
+                                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+                                                {isRTL ? 'نوع بند المصروف / الشراء:' : 'Expense / Purchase Item Type:'}
+                                            </label>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.3fr', gap: '6px', padding: '4px', background: 'var(--bg-tertiary, rgba(0,0,0,0.05))', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                                                 <button
                                                     type="button"
                                                     className={`btn btn-sm ${costItemMode === 'NEW' ? 'btn-primary' : 'btn-ghost'}`}
                                                     onClick={() => {
                                                         setCostItemMode('NEW');
-                                                        setFormData(prev => ({ ...prev, projectCostItemId: '' }));
+                                                        setIsStockPurchase(false);
+                                                        setFormData(prev => ({ ...prev, projectCostItemId: '', materialId: '' }));
                                                     }}
-                                                    style={{ flex: 1, borderRadius: '8px', fontSize: '0.85rem' }}
+                                                    style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'NEW' ? '700' : '500' }}
                                                 >
-                                                    {t('finance.newCostItem')}
+                                                    {t('finance.newCostItem', 'بند جديد')}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     className={`btn btn-sm ${costItemMode === 'EXISTING' ? 'btn-primary' : 'btn-ghost'}`}
-                                                    onClick={() => setCostItemMode('EXISTING')}
-                                                    style={{ flex: 1, borderRadius: '8px', fontSize: '0.85rem' }}
+                                                    onClick={() => {
+                                                        setCostItemMode('EXISTING');
+                                                        setIsStockPurchase(false);
+                                                        setFormData(prev => ({ ...prev, materialId: '' }));
+                                                    }}
+                                                    style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'EXISTING' ? '700' : '500' }}
                                                     disabled={!selectedProjectId}
                                                 >
-                                                    {t('finance.existingCostItem')}
+                                                    {t('finance.existingCostItem', 'بند مقايسة مسجل')}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`btn btn-sm ${costItemMode === 'MATERIAL' ? 'btn-primary' : 'btn-ghost'}`}
+                                                    onClick={() => {
+                                                        setCostItemMode('MATERIAL');
+                                                        setIsStockPurchase(true);
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            projectCostItemId: '',
+                                                            category: 'MATERIALS',
+                                                            costCenter: prev.costCenter || (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
+                                                        }));
+                                                    }}
+                                                    style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'MATERIAL' ? '700' : '500' }}
+                                                >
+                                                    📦 {isRTL ? 'شراء خامة للمخزن' : 'Buy Material for Stock'}
                                                 </button>
                                             </div>
                                         </div>
 
-                                        {/* 1. Band Selection (If Existing) or Category (if New) */}
-                                        {costItemMode === 'EXISTING' ? (
+                                        {/* Option 1: Registered Raw Material Selector */}
+                                        {costItemMode === 'MATERIAL' && (
+                                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                                <label>{isRTL ? 'اختر الخامة المسجلة لشحن رصيدها المخزني' : 'Select Registered Material to Recharge'} <span className="required">*</span></label>
+                                                <select
+                                                    name="materialId"
+                                                    value={formData.materialId || ''}
+                                                    onChange={(e) => {
+                                                        const matId = e.target.value;
+                                                        const found = rawMaterials.find(m => m.id === matId);
+                                                        setFormData(prev => {
+                                                            const uPrice = found?.unitPrice ? found.unitPrice.toString() : prev.unitPrice;
+                                                            const qty = prev.quantity ? parseFloat(prev.quantity) : 0;
+                                                            const amt = (qty > 0 && uPrice) ? (qty * parseFloat(uPrice)).toString() : prev.amount;
+                                                            return {
+                                                                ...prev,
+                                                                materialId: matId,
+                                                                itemName: found ? (isRTL ? (found.nameAr || found.name) : found.name) : '',
+                                                                category: 'MATERIALS',
+                                                                unit: found?.unit || prev.unit,
+                                                                unitPrice: uPrice,
+                                                                amount: amt,
+                                                                costCenter: prev.costCenter || (selectedProject ? (isRTL ? `مخزن مشروع ${selectedProject.name}` : `${selectedProject.name} Site Warehouse`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
+                                                            };
+                                                        });
+                                                        if (errors.materialId) setErrors(prev => ({ ...prev, materialId: '' }));
+                                                    }}
+                                                    className={errors.materialId ? 'error' : ''}
+                                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.95rem', fontWeight: '600' }}
+                                                >
+                                                    <option value="">-- {isRTL ? 'اختر خامة من المخزن لتزويد رصيدها' : 'Select Material to Recharge Stock'} --</option>
+                                                    {rawMaterials.map(m => (
+                                                        <option key={m.id} value={m.id}>
+                                                            {isRTL ? (m.nameAr || m.name) : m.name} ({m.unit}) — {isRTL ? 'الرصيد الحالي:' : 'Current Stock:'} {m.stockLevel} {m.unit} {m.unitPrice ? `(${m.unitPrice} EGP)` : ''}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {errors.materialId && <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>{errors.materialId}</span>}
+                                            </div>
+                                        )}
+
+                                        {/* Option 2: Band Selection (If Existing Band) */}
+                                        {costItemMode === 'EXISTING' && (
                                             <>
                                                 <div className="form-group">
-                                                    <label>{t('finance.existingCostItem')}</label>
+                                                    <label>{t('finance.existingCostItem')} <span className="required">*</span></label>
                                                     <select
                                                         name="projectCostItemId"
                                                         value={formData.projectCostItemId}
@@ -911,12 +962,17 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                     >
                                                         <option value="">-- {t('finance.autoFilled')} --</option>
                                                         {categories.flatMap(g => g.items).map(item => (
-                                                            <option key={item.key} value={item.key}>{item.ar}</option>
+                                                            <option key={item.key} value={item.key}>
+                                                                {isRTL ? item.ar : (item.en || item.ar)}
+                                                            </option>
                                                         ))}
                                                     </select>
                                                 </div>
                                             </>
-                                        ) : (
+                                        )}
+
+                                        {/* Option 3: Category & Item Name (If New Item) */}
+                                        {costItemMode === 'NEW' && (
                                             <>
                                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                                     <label>{t('finance.category')} <span className="required">*</span></label>
@@ -928,9 +984,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                     >
                                                         <option value="">-- {t('finance.selectCategory')} --</option>
                                                         {categories.map(group => (
-                                                            <optgroup key={group.group} label={group.groupNameAr}>
+                                                            <optgroup key={group.group} label={isRTL ? group.groupNameAr : (group.groupNameEn || group.groupNameAr)}>
                                                                 {group.items.map(item => (
-                                                                    <option key={item.key} value={item.key}>{item.ar}</option>
+                                                                    <option key={item.key} value={item.key}>
+                                                                        {isRTL ? item.ar : (item.en || item.ar)}
+                                                                    </option>
                                                                 ))}
                                                             </optgroup>
                                                         ))}
@@ -967,21 +1025,30 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             </select>
                                         </div>
 
-                                        {renderDropdownWithCustom(
-                                            "transactionTo",
-                                            t('finance.transactionTo'),
-                                            [
-                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${t(`teamManagement.roles.${u.role}`) || u.role})` })),
-                                                ...workmen.map(w => ({ value: w.name, label: `${w.name} (${t(`labor.trades.${w.trade}`) || w.trade})` })),
-                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
-                                                ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
-                                                ...existingTransactionTos.map(tt => ({ value: tt, label: tt }))
-                                            ].reduce((acc, current) => {
-                                                const x = acc.find(item => item.value === current.value);
-                                                if (!x) { return acc.concat([current]); } else { return acc; }
-                                            }, []),
-                                            t('finance.transactionToPlaceholder')
-                                        )}
+                                        <div className="form-group">
+                                            <label>{t('finance.transactionTo')}</label>
+                                            <select
+                                                name="transactionTo"
+                                                value={formData.transactionTo}
+                                                onChange={handleChange}
+                                            >
+                                                <option value="">-- {t('common.select') || 'Select'} --</option>
+                                                {[
+                                                    ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
+                                                    ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
+                                                    ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
+                                                    ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+                                                    ...existingTransactionTos.map(tt => ({ value: tt, label: tt }))
+                                                ].reduce((acc, current) => {
+                                                    const x = acc.find(item => item.value === current.value);
+                                                    if (!x) { return acc.concat([current]); } else { return acc; }
+                                                }, []).map((opt, i) => (
+                                                    <option key={`txTo-${i}`} value={opt.value}>
+                                                        {opt.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
 
                                         {/* Workman Selection (Only for Labor Categories) */}
                                         {(() => {
@@ -998,7 +1065,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                                 className={errors.workmanId ? 'error' : ''}
                                                                 style={{ flex: 1 }}
                                                             >
-                                                                <option value="">-- {t('labor.selectWorkman') || 'نقي الصنيعي'} --</option>
+                                                                <option value="">-- {t('labor.selectWorkman') || 'اختر الفني / الصنايعي'} --</option>
                                                                 {workmen.map(w => (
                                                                     <option key={w.id} value={w.id}>
                                                                         {w.name} ({t(`labor.trades.${w.trade}`)})
@@ -1062,7 +1129,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 placeholder="0.00"
                                             />
                                         </div>
-                                        <div className="form-group relative">
+                                        <div className="form-group">
                                             <label>{t('finance.amount')} (EGP) <span className="required">*</span></label>
                                             <CurrencyInput
                                                 name="amount"
@@ -1073,24 +1140,6 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 style={{ fontWeight: 'bold', fontSize: '1.1rem' }}
                                             />
                                             {errors.amount && <span className="error-message">{errors.amount}</span>}
-
-                                            <button
-                                                type="button"
-                                                onClick={handleVoiceInput}
-                                                style={{
-                                                    position: 'absolute', right: '10px', top: '35px',
-                                                    background: isRecording ? '#ef4444' : '#f97316',
-                                                    color: 'white', border: 'none', borderRadius: '50%',
-                                                    width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
-                                                }}
-                                            >
-                                                {isRecording ? <MicOff size={14} /> : <Mic size={14} />}
-                                            </button>
-                                            {isAnalyzing && (
-                                                <div className="absolute top-10 right-0 bg-brand-orange text-white text-xs px-2 py-1 rounded-md animate-pulse z-10">
-                                                    {t('finance.ai_analyzing') || 'Analyzing...'}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -1108,7 +1157,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             "transactionFrom",
                                             t('finance.transactionFrom'),
                                             [
-                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${t(`teamManagement.roles.${u.role}`) || u.role})` })),
+                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
                                                 ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
                                                 ...existingTransactionFroms.map(tf => ({ value: tf, label: tf }))
                                             ].reduce((acc, current) => {
@@ -1172,21 +1221,82 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             <>
                                 <div className="form-section">
                                     <div className="form-group">
-                                        <label>{t('finance.sourceBatch')} <span className="required">*</span></label>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <label style={{ marginBottom: 0, fontWeight: 600 }}>
+                                                {t('finance.sourceBatch', 'دفعة المواد المصدرية')} <span className="required">*</span>
+                                            </label>
+                                            {selectedProjectId && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => loadBatches(undefined)}
+                                                    style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                                >
+                                                    {isRTL ? 'عرض كل الدفعات لجميع المشاريع' : 'Show batches across all projects'}
+                                                </button>
+                                            )}
+                                        </div>
                                         <select
                                             value={selectedBatchId}
                                             onChange={handleBatchChange}
                                             className={errors.batchId ? 'error' : ''}
-                                            disabled={!selectedProjectId}
+                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.95rem', fontWeight: '500' }}
                                         >
-                                            <option value="">-- {t('finance.selectBatch')} --</option>
+                                            <option value="">
+                                                -- {materialBatches.length > 0 
+                                                    ? (isRTL ? `اختر دفعة المواد المصدر (${materialBatches.length} دفعة متاحة)` : `Select Source Batch (${materialBatches.length} available)`) 
+                                                    : (isRTL ? 'لا توجد دفعات مواد متاحة' : 'No available material batches found')} --
+                                            </option>
                                             {materialBatches.map(b => (
                                                 <option key={b.id} value={b.id}>
-                                                    {b.description} ({t('inventory.remaining')}: {fmtCurrency(b.remainingValue)})
+                                                    {b.description} {b.project?.name ? `(${b.project.name})` : ''} — {isRTL ? 'المتبقي:' : 'Remaining:'} {fmtCurrency(b.remainingValue)}
                                                 </option>
                                             ))}
                                         </select>
                                         {errors.batchId && <span className="error-message">{errors.batchId}</span>}
+
+                                        {/* Helper card for selected batch */}
+                                        {selectedBatch ? (
+                                            <div style={{
+                                                marginTop: '10px',
+                                                padding: '10px 14px',
+                                                background: 'rgba(59, 130, 246, 0.08)',
+                                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                                borderRadius: '8px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                flexWrap: 'wrap',
+                                                gap: '8px'
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                        {isRTL ? 'الرصيد المالي المتاح للصرف:' : 'Available balance to consume:'}
+                                                    </div>
+                                                    <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                                                        {fmtCurrency(selectedBatch.remainingValue)}
+                                                    </div>
+                                                    {selectedBatch.project?.name && (
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                                                            {isRTL ? 'المشروع:' : 'Project:'} <strong>{selectedBatch.project.name}</strong>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-ghost"
+                                                    onClick={() => setFormData(prev => ({ ...prev, amount: selectedBatch.remainingValue.toString() }))}
+                                                    style={{ border: '1px solid var(--border-color)', fontSize: '0.8rem', padding: '4px 10px' }}
+                                                >
+                                                    {isRTL ? '⚡ استخدام كامل الرصيد' : '⚡ Use Full Balance'}
+                                                </button>
+                                            </div>
+                                        ) : materialBatches.length === 0 && (
+                                            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '6px', fontSize: '0.8rem', color: '#b45309' }}>
+                                                {isRTL 
+                                                    ? '⚠️ لا توجد دفعات مواد مسجلة لهذا المشروع برصيد متاح. يمكنك شراء خامة للمخزن من تبويب المصروفات أولاً.' 
+                                                    : '⚠️ No material batches with available balance found for this project. You can purchase materials for stock in the Expense tab first.'}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1254,26 +1364,80 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         mode === 'TRANSFER' && (
                             <>
                                 <div className="form-section">
+                                    <h3 className="section-title">{t('finance.transferCustody', 'تحويل عهدة')}</h3>
+                                    
+                                    {/* Sender Info Badge */}
+                                    <div style={{
+                                        padding: '12px 16px',
+                                        background: 'rgba(59, 130, 246, 0.08)',
+                                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                                        borderRadius: '10px',
+                                        marginBottom: 'var(--spacing-md)',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        flexWrap: 'wrap',
+                                        gap: '10px'
+                                    }}>
+                                        <div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                                {t('finance.senderCustody', 'المُحوّل (من عهدة):')}
+                                            </div>
+                                            <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                                {user?.name} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-tertiary)' }}>({formatUserRole(user?.role)})</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: isRTL ? 'left' : 'right' }}>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                {t('finance.currentCustodyBalance', 'رصيد العهدة الحالي')}:
+                                            </div>
+                                            <div style={{ fontSize: '1.15rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                                                {fmtCurrency(user?.currentCustodyBalance || 0)}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="form-grid">
                                         <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                            <label>{t('finance.transferToEngineer') || 'المستلم'} <span className="required">*</span></label>
+                                            <label>{t('finance.transferToEngineer', 'المستلم (المهندس المحول إليه)')} <span className="required">*</span></label>
                                             <select
                                                 name="toEngineerId"
                                                 value={formData.toEngineerId}
                                                 onChange={handleChange}
                                                 className={errors.toEngineerId ? 'error' : ''}
+                                                style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.95rem' }}
                                             >
-                                                <option value="">-- {t('finance.selectReceiver') || 'اختار المستلم'} --</option>
+                                                <option value="">-- {t('finance.selectReceiver', 'اختر المهندس المستلم')} --</option>
                                                 {users.filter(u => u.id !== user?.id).map(u => (
                                                     <option key={u.id} value={u.id}>
-                                                        {u.name} ({t(`teamManagement.roles.${u.role}`) || u.role})
+                                                        {u.name} — {formatUserRole(u.role)}
                                                     </option>
                                                 ))}
                                             </select>
                                             {errors.toEngineerId && <span className="error-message">{errors.toEngineerId}</span>}
                                         </div>
+
                                         <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                            <label>{t('finance.amountToTransfer') || 'مبلغ التحويل'} (EGP) <span className="required">*</span></label>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <label style={{ marginBottom: 0 }}>{t('finance.amountToTransfer', 'مبلغ التحويل')} (EGP) <span className="required">*</span></label>
+                                                {Number(user?.currentCustodyBalance) > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, amount: String(user.currentCustodyBalance) }))}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            color: 'var(--color-primary)',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            textDecoration: 'underline'
+                                                        }}
+                                                    >
+                                                        ⚡ {isRTL ? 'تحويل كامل الرصيد' : 'Use Full Balance'}
+                                                    </button>
+                                                )}
+                                            </div>
                                             <CurrencyInput
                                                 name="amount"
                                                 value={formData.amount}
@@ -1292,8 +1456,15 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
                     <div className="form-section">
                         <div className="form-group full-width">
-                            <label>{t('finance.description')} / {t('common.notes')}</label>
-                            <textarea name="description" value={formData.description} onChange={handleChange} rows="2" style={{ resize: 'none' }} placeholder={t('finance.usagePlaceholder')} />
+                            <label>{mode === 'TRANSFER' ? t('finance.transferNotes', 'سبب التحويل / ملاحظات') : `${t('finance.description')} / ${t('common.notes')}`}</label>
+                            <textarea 
+                                name="description" 
+                                value={formData.description} 
+                                onChange={handleChange} 
+                                rows="2" 
+                                style={{ resize: 'none' }} 
+                                placeholder={mode === 'TRANSFER' ? t('finance.transferNotesPlaceholder', 'مثال: عهدة موقع لتغطية مشتريات عاجلة...') : t('finance.usagePlaceholder')} 
+                            />
                             {errors.description && <span className="error-message">{errors.description}</span>}
                         </div>
                     </div>

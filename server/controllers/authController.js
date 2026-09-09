@@ -2,15 +2,19 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import sendEmail from '../utils/sendEmail.js';
+import { getVerificationEmailHtml, getPasswordResetEmailHtml } from '../utils/emailTemplates.js';
 import crypto from 'crypto';
 import { generateSecret, verifyToken } from '../lib/totp.js';
 import { auditFromReq } from '../lib/audit.js';
 import logger from '../lib/logger.js';
 
+// In-memory store for short-lived, single-use OAuth exchange codes (60s TTL)
+const oauthExchangeCodes = new Map();
+
 // Generate JWT Token
 const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE
+    return jwt.sign({ id, purpose: 'session' }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRE || '7d'
     });
 };
 
@@ -82,8 +86,8 @@ export const register = async (req, res, next) => {
     }
 };
 
-// Helper to generate 6-digit OTP
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+// Helper to generate cryptographically secure 6-digit OTP
+const generateOTP = () => crypto.randomInt(100000, 1000000).toString();
 
 // @desc    Step 1: Register a new company (SaaS Tenant + Admin User) - Sends OTP
 // @route   POST /api/auth/register-company
@@ -158,39 +162,27 @@ export const registerCompany = async (req, res, next) => {
             return { tenant, user };
         }, { timeout: 15000, maxWait: 5000 });
 
-        // Send Verification Email
-        const message = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1 style="color: #3b82f6;">Welcome to Civil Engine!</h1>
-                <p>You have successfully initialized your company workspace: <strong>${companyName}</strong></p>
-                <p>Please enter the following code to verify your account and complete the setup:</p>
-                <div style="background-color: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-                    <h2 style="color: #111827; font-size: 32px; letter-spacing: 5px; margin: 0;">${verificationCode}</h2>
-                </div>
-                <p>This code expires in 10 minutes.</p>
-                <p>If you did not request this, please ignore this email.</p>
-            </div>
-        `;
+        // Send Verification Email using Enterprise HTML Template
+        const message = getVerificationEmailHtml({
+            companyName,
+            adminName,
+            verificationCode
+        });
 
         try {
             await sendEmail({
                 email: result.user.email,
-                subject: 'Verify Your Company Workspace - Civil Engine',
+                subject: `رمز تأكيد مساحة عمل ${companyName} - Hesaby ERP`,
                 message
             });
         } catch (error) {
             logger.error({ err: error }, 'Email send error');
-            // We return success true but maybe with a warning, or fail?
-            // If we fail here, the user is created but can't verify.
-            // Let's assume it works or they can resend (need resend endpoint?)
-            // For MVP/Demo, let's just log.
         }
 
         res.status(201).json({
             success: true,
             email: result.user.email,
-            message: 'Registration successful. Verification code sent to your email.',
-            devVerificationCode: process.env.NODE_ENV !== 'production' ? verificationCode : undefined
+            message: 'Registration successful. Verification code sent to your email.'
         });
     } catch (error) {
         next(error);
@@ -211,16 +203,21 @@ export const verifyEmail = async (req, res, next) => {
             });
         }
 
-        // Find user by email AND code (since email might be duplicate)
+        const cleanCode = code.toString().trim();
+
+        // Find user by email and verification code
         const user = await prisma.user.findFirst({
-            where: { email, verificationCode: code },
+            where: {
+                email: email.trim(),
+                verificationCode: cleanCode
+            },
             include: { tenant: true }
         });
 
         if (!user) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid email'
+                message: 'Invalid email or verification code'
             });
         }
 
@@ -231,17 +228,10 @@ export const verifyEmail = async (req, res, next) => {
             });
         }
 
-        if (user.verificationCode !== code) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid verification code'
-            });
-        }
-
         if (user.verificationExpires && user.verificationExpires < new Date()) {
             return res.status(400).json({
                 success: false,
-                message: 'Verification code expired'
+                message: 'Verification code expired. Please request a new one.'
             });
         }
 
@@ -293,20 +283,31 @@ export const login = async (req, res, next) => {
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide an email and password'
+                errorCode: 'MISSING_FIELDS',
+                message: 'Please provide both email and password'
             });
         }
 
-        // Check for user(s)
+        const normalizedEmail = email.trim().toLowerCase();
+
+        // Check for user(s) by email (case-insensitive)
         const users = await prisma.user.findMany({
-            where: { email },
+            where: {
+                email: {
+                    equals: normalizedEmail,
+                    mode: 'insensitive'
+                }
+            },
             include: { tenant: true }
         });
 
+        const DUMMY_HASH = '$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUU1234567890';
         if (!users || users.length === 0) {
+            await bcrypt.compare(password, DUMMY_HASH);
             return res.status(401).json({
                 success: false,
-                message: 'Invalid credentials'
+                errorCode: 'INVALID_CREDENTIALS',
+                message: 'Invalid email or password'
             });
         }
 
@@ -323,7 +324,8 @@ export const login = async (req, res, next) => {
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: 'Invalid credentials'
+                errorCode: 'INVALID_CREDENTIALS',
+                message: 'Invalid email or password'
             });
         }
 
@@ -331,7 +333,8 @@ export const login = async (req, res, next) => {
         if (!user.isActive) {
             return res.status(401).json({
                 success: false,
-                message: 'Your account has been deactivated'
+                errorCode: 'ACCOUNT_DEACTIVATED',
+                message: 'Your account has been deactivated. Please contact your company administrator.'
             });
         }
 
@@ -639,6 +642,7 @@ export const updateProfile = async (req, res, next) => {
 
             const salt = await bcrypt.genSalt(10);
             updateData.password = await bcrypt.hash(newPassword, salt);
+            updateData.passwordChangedAt = new Date();
             updateData.mustChangePassword = false; // Reset flag on success
         }
 
@@ -712,11 +716,28 @@ export const verifyInvite = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
     try {
         const { email } = req.body;
-        // Find all users with this email (might be in multiple tenants)
-        const users = await prisma.user.findMany({ where: { email } });
+        if (!email) {
+            return res.status(400).json({ success: false, message: 'Please provide an email address' });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+
+        // Find all active users with this email (might be in multiple tenants)
+        const users = await prisma.user.findMany({
+            where: {
+                email: {
+                    equals: normalizedEmail,
+                    mode: 'insensitive'
+                },
+                isActive: true
+            }
+        });
 
         if (!users || users.length === 0) {
-            return res.status(404).json({ success: false, message: 'User not found' });
+            return res.status(200).json({
+                success: true,
+                message: 'A password reset link has been sent to your email if an account exists.'
+            });
         }
 
         // Get reset token
@@ -728,12 +749,17 @@ export const forgotPassword = async (req, res, next) => {
             .update(resetToken)
             .digest('hex');
 
-        // Set expire
-        const resetPasswordExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        // Set expire (15 minutes)
+        const resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000);
 
         // Update all associated accounts with this email
         await prisma.user.updateMany({
-            where: { email },
+            where: {
+                email: {
+                    equals: normalizedEmail,
+                    mode: 'insensitive'
+                }
+            },
             data: {
                 resetPasswordToken,
                 resetPasswordExpire
@@ -741,48 +767,42 @@ export const forgotPassword = async (req, res, next) => {
         });
 
         // Create reset url
-        const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
+        const resetUrl = `${process.env.CLIENT_URL || 'https://hesaby.aimicromind.com'}/reset-password/${resetToken}`;
 
-        const message = `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                <h2 style="color: #2563eb;">Password Reset Request</h2>
-                <p>You have requested a password reset. Please click the button below to set a new password:</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset Password</a>
-                </div>
-                <p>If you did not request this, please ignore this email.</p>
-            </div>
-        `;
+        const message = getPasswordResetEmailHtml({
+            name: users[0].name,
+            resetUrl
+        });
 
-        // Send email to the first user instance (they all share the same email)
         try {
             await sendEmail({
                 email: users[0].email,
-                subject: 'Password Reset Token',
+                subject: 'طلب إعادة تعيين كلمة المرور - Hesaby ERP',
                 message
             });
 
-            // For local development and testing
-            const isDev = process.env.NODE_ENV !== 'production';
-
             res.status(200).json({
                 success: true,
-                message: 'Email sent. Please check your inbox.',
-                devResetUrl: isDev ? resetUrl : undefined // Expose link for dev testing testing without SMTP
+                message: 'A password reset link has been sent to your email. Please check your inbox.'
             });
         } catch (err) {
             logger.error({ err }, 'Email sending failed');
 
             // Revert on failure
             await prisma.user.updateMany({
-                where: { email },
+                where: {
+                    email: {
+                        equals: normalizedEmail,
+                        mode: 'insensitive'
+                    }
+                },
                 data: {
                     resetPasswordToken: null,
                     resetPasswordExpire: null
                 }
             });
 
-            return res.status(500).json({ success: false, message: 'Email could not be sent. Please check SMTP configuration.' });
+            return res.status(500).json({ success: false, message: 'Email could not be sent. Please check your connection or try again later.' });
         }
     } catch (err) {
         next(err);
@@ -821,6 +841,7 @@ export const resetPassword = async (req, res, next) => {
             where: { resetPasswordToken },
             data: {
                 password: hashedPassword,
+                passwordChangedAt: new Date(),
                 resetPasswordToken: null,
                 resetPasswordExpire: null,
                 mustChangePassword: false
@@ -846,6 +867,432 @@ export const resetPassword = async (req, res, next) => {
             }
         });
 
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Preview invitation details from token or invite link
+// @route   POST /api/auth/invite/preview
+// @access  Public
+export const previewInvite = async (req, res, next) => {
+    try {
+        let { token } = req.body;
+        if (!token) {
+            return res.status(400).json({ success: false, message: 'Invite token is required' });
+        }
+
+        // If the user pasted the entire invite URL, extract the token
+        if (token.includes('invite=')) {
+            try {
+                const url = new URL(token.startsWith('http') ? token : `http://${token}`);
+                token = url.searchParams.get('invite') || token;
+            } catch {
+                const match = token.match(/invite=([a-zA-Z0-9_-]+)/);
+                if (match) token = match[1];
+            }
+        } else if (token.includes('token=')) {
+            try {
+                const url = new URL(token.startsWith('http') ? token : `http://${token}`);
+                token = url.searchParams.get('token') || token;
+            } catch {
+                const match = token.match(/token=([a-zA-Z0-9_-]+)/);
+                if (match) token = match[1];
+            }
+        }
+
+        const cleanToken = token.trim();
+
+        const user = await prisma.user.findFirst({
+            where: {
+                verificationCode: {
+                    equals: cleanToken,
+                    mode: 'insensitive'
+                }
+            },
+            include: {
+                tenant: true,
+                customRole: { select: { name: true } }
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Invalid invitation code or link.' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ success: false, message: 'This invitation has already been accepted and verified. Please log in.' });
+        }
+
+        if (user.verificationExpires && user.verificationExpires < new Date()) {
+            return res.status(400).json({ success: false, message: 'This invitation has expired. Please contact your company administrator to resend an invite.' });
+        }
+
+        const roleDisplay = user.customRole?.name || user.role;
+
+        res.json({
+            success: true,
+            data: {
+                token: cleanToken,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                roleDisplayName: roleDisplay,
+                companyName: user.tenant ? user.tenant.name : user.company || 'Hesaby ERP Workspace',
+                companyLogo: user.tenant?.logo || null
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Accept invitation and complete user signup to existing company
+// @route   POST /api/auth/invite/accept-signup
+// @access  Public
+export const acceptInviteSignup = async (req, res, next) => {
+    try {
+        let { token, name, phone, password } = req.body;
+        if (!token || !password) {
+            return res.status(400).json({ success: false, message: 'Invite token and password are required.' });
+        }
+
+        // Extract token if full URL was provided
+        if (token.includes('invite=')) {
+            try {
+                const url = new URL(token.startsWith('http') ? token : `http://${token}`);
+                token = url.searchParams.get('invite') || token;
+            } catch {
+                const match = token.match(/invite=([a-zA-Z0-9_-]+)/);
+                if (match) token = match[1];
+            }
+        } else if (token.includes('token=')) {
+            try {
+                const url = new URL(token.startsWith('http') ? token : `http://${token}`);
+                token = url.searchParams.get('token') || token;
+            } catch {
+                const match = token.match(/token=([a-zA-Z0-9_-]+)/);
+                if (match) token = match[1];
+            }
+        }
+
+        const cleanToken = token.trim();
+
+        const user = await prisma.user.findFirst({
+            where: {
+                verificationCode: {
+                    equals: cleanToken,
+                    mode: 'insensitive'
+                }
+            },
+            include: { tenant: true }
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired invitation token.' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ success: false, message: 'This invitation has already been accepted.' });
+        }
+
+        if (user.verificationExpires && user.verificationExpires < new Date()) {
+            return res.status(400).json({ success: false, message: 'This invitation has expired. Please contact your company administrator to resend an invite.' });
+        }
+
+        // Validate password complexity
+        const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+        if (!strongPasswordRegex.test(password)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character.'
+            });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const updatedUser = await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                name: (name && name.trim()) || user.name,
+                phone: (phone && phone.trim()) || user.phone,
+                password: hashedPassword,
+                isVerified: true,
+                verificationCode: null,
+                verificationExpires: null,
+                isActive: true,
+                mustChangePassword: false
+            },
+            include: { tenant: true }
+        });
+
+        await auditFromReq(req, {
+            action: 'ACCEPT_INVITE',
+            entity: 'User',
+            entityId: updatedUser.id,
+            after: updatedUser,
+            metadata: { acceptedRole: updatedUser.role }
+        });
+
+        const authToken = generateToken(updatedUser.id);
+
+        res.json({
+            success: true,
+            token: authToken,
+            user: {
+                id: updatedUser.id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                role: updatedUser.role,
+                company: updatedUser.tenant ? updatedUser.tenant.name : updatedUser.company,
+                permissions: updatedUser.permissions || [],
+                companyLogo: updatedUser.tenant?.logo || null,
+                tenantId: updatedUser.tenantId
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Initiate Google OAuth 2.0 Redirect
+// @route   GET /api/auth/google
+// @access  Public
+export const googleRedirect = async (req, res, next) => {
+    try {
+        const clientId = process.env.GOOGLE_CLIENT_ID || '1023456789012-hesabyexample.apps.googleusercontent.com';
+        const clientUrl = process.env.CLIENT_URL || 'https://hesaby.aimicromind.com';
+        const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${clientUrl}/api/auth/google/callback`;
+
+        // Generate cryptographically secure anti-CSRF state token
+        const state = crypto.randomBytes(32).toString('hex');
+        res.cookie('oauth_state', state, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 10 * 60 * 1000 // 10 minutes
+        });
+
+        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&access_type=offline&state=${encodeURIComponent(state)}`;
+
+        res.redirect(googleAuthUrl);
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Handle Google OAuth 2.0 Callback
+// @route   GET /api/auth/google/callback
+// @access  Public
+export const googleCallback = async (req, res, next) => {
+    const clientUrl = process.env.CLIENT_URL || 'https://hesaby.aimicromind.com';
+    try {
+        const { code, state, error } = req.query;
+
+        if (error) {
+            return res.redirect(`${clientUrl}/login?error=${encodeURIComponent(error)}`);
+        }
+
+        // Anti-CSRF state token validation
+        const cookieState = req.cookies?.oauth_state;
+        if (!state || !cookieState || state !== cookieState) {
+            return res.redirect(`${clientUrl}/login?error=invalid_oauth_state`);
+        }
+        res.clearCookie('oauth_state');
+
+        if (!code) {
+            return res.redirect(`${clientUrl}/login?error=missing_code`);
+        }
+
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${clientUrl}/api/auth/google/callback`;
+
+        if (!clientId || !clientSecret) {
+            // Google credentials need to be configured in .env
+            return res.redirect(`${clientUrl}/signup?googleNotice=need_credentials`);
+        }
+
+        // Exchange authorization code for tokens
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                code,
+                client_id: clientId,
+                client_secret: clientSecret,
+                redirect_uri: redirectUri,
+                grant_type: 'authorization_code'
+            })
+        });
+
+        const tokenData = await tokenResponse.json();
+        if (!tokenResponse.ok || !tokenData.access_token) {
+            return res.redirect(`${clientUrl}/login?error=google_token_exchange_failed`);
+        }
+
+        // Fetch User Info from Google
+        const userinfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+
+        const profile = await userinfoResponse.json();
+        if (!profile.email) {
+            return res.redirect(`${clientUrl}/login?error=no_email_returned`);
+        }
+
+        // Check if user exists in database
+        const existingUser = await prisma.user.findFirst({
+            where: { email: profile.email },
+            include: { tenant: true }
+        });
+
+        if (existingUser) {
+            const exchangeCode = crypto.randomBytes(32).toString('hex');
+            oauthExchangeCodes.set(exchangeCode, {
+                userId: existingUser.id,
+                expiresAt: Date.now() + 60000 // 60s single-use TTL
+            });
+            return res.redirect(`${clientUrl}/login?code=${encodeURIComponent(exchangeCode)}`);
+        }
+
+        // New user: Redirect to signup with verified Google details
+        return res.redirect(
+            `${clientUrl}/signup?googleEmail=${encodeURIComponent(profile.email)}&googleName=${encodeURIComponent(profile.name || '')}&googleVerified=true`
+        );
+    } catch (err) {
+        console.error('Google OAuth callback error:', err);
+        return res.redirect(`${clientUrl}/login?error=oauth_internal_error`);
+    }
+};
+
+// @desc    Exchange one-time OAuth code for session token
+// @route   POST /api/auth/oauth-exchange
+// @access  Public
+export const exchangeOAuthCode = async (req, res, next) => {
+    try {
+        const { code } = req.body;
+        if (!code) {
+            return res.status(400).json({ success: false, message: 'OAuth exchange code is required' });
+        }
+
+        const entry = oauthExchangeCodes.get(code);
+        if (!entry || entry.expiresAt < Date.now()) {
+            oauthExchangeCodes.delete(code);
+            return res.status(400).json({ success: false, message: 'Invalid or expired exchange code' });
+        }
+
+        // Single-use guarantee
+        oauthExchangeCodes.delete(code);
+
+        const user = await prisma.user.findUnique({
+            where: { id: entry.userId },
+            include: { tenant: true, customRole: true }
+        });
+
+        if (!user || !user.isActive) {
+            return res.status(401).json({ success: false, message: 'User not found or account is deactivated' });
+        }
+
+        const token = generateToken(user.id);
+        return res.json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                company: user.company,
+                phone: user.phone,
+                profilePicture: user.profilePicture,
+                permissions: user.permissions,
+                tenantId: user.tenantId,
+                tenant: user.tenant,
+                customRole: user.customRole
+            }
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// @desc    Delete Personal User Account
+// @route   DELETE /api/auth/account
+// @access  Private
+export const deleteAccount = async (req, res, next) => {
+    try {
+        const { password } = req.body;
+        const userId = req.user.id;
+
+        if (!password) {
+            return res.status(400).json({ success: false, message: 'Password is required to delete your account' });
+        }
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: 'Incorrect password' });
+        }
+
+        // If user is ADMIN of a tenant with multiple active users, prevent deleting without transferring admin or deleting company
+        if (user.role === 'ADMIN' && user.tenantId) {
+            const otherUsersCount = await prisma.user.count({
+                where: { tenantId: user.tenantId, NOT: { id: userId }, isActive: true }
+            });
+            if (otherUsersCount > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You are the Admin of an active workspace with team members. Please transfer admin role or delete the workspace in Company Settings first.'
+                });
+            }
+        }
+
+        // Check if user has dependent financial history
+        const [hasTransactions, hasProjects, hasInvoices, hasDsrs, hasAuditLogs] = await Promise.all([
+            prisma.transaction.count({ where: { OR: [{ createdBy: userId }, { approvedById: userId }, { payerId: userId }] } }),
+            prisma.project.count({ where: { engineerId: userId } }),
+            prisma.invoice.count({ where: { createdBy: userId } }),
+            prisma.dailySiteReport.count({ where: { OR: [{ reportedBy: userId }, { acknowledgedBy: userId }] } }),
+            prisma.auditLog.count({ where: { userId: userId } })
+        ]);
+
+        const hasHistory = (hasTransactions + hasProjects + hasInvoices + hasDsrs + hasAuditLogs) > 0;
+
+        if (hasHistory) {
+            // Soft delete: deactivate user
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    isActive: false,
+                    isVerified: false,
+                    password: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
+                    totpEnabled: false,
+                    totpSecret: null,
+                    verificationCode: null,
+                    resetPasswordToken: null,
+                    name: `${user.name} (Deleted User)`,
+                    email: `deleted_${userId.slice(0, 8)}_${user.email}`
+                }
+            });
+        } else {
+            // Clean hard delete
+            await prisma.user.delete({ where: { id: userId } });
+        }
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'User',
+            entityId: userId,
+            metadata: { selfDeleted: true }
+        });
+
+        res.json({ success: true, message: 'Your account has been deleted.' });
     } catch (err) {
         next(err);
     }

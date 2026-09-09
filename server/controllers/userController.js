@@ -1,9 +1,11 @@
 import prisma from '../lib/prisma.js';
 import bcrypt from 'bcryptjs';
 import sendEmail from '../utils/sendEmail.js';
+import { getUserInviteEmailHtml } from '../utils/emailTemplates.js';
 import crypto from 'crypto';
 import { auditFromReq } from '../lib/audit.js';
 import logger from '../lib/logger.js';
+import { getPlan } from '../lib/plans.js';
 
 // Get All Users
 export const getUsers = async (req, res) => {
@@ -15,10 +17,19 @@ export const getUsers = async (req, res) => {
                 name: true,
                 email: true,
                 role: true,
+                roleId: true,
+                customRole: {
+                    select: { id: true, name: true }
+                },
                 phone: true,
                 profilePicture: true,
                 company: true,
-                permissions: true
+                permissions: true,
+                isActive: true,
+                isVerified: true,
+                verificationCode: true,
+                verificationExpires: true,
+                createdAt: true
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -31,12 +42,13 @@ export const getUsers = async (req, res) => {
 
 // Add New User (Invite)
 export const inviteUser = async (req, res) => {
-    const { name, email, role, password, phone, permissions } = req.body;
+    const { email, role, roleId, permissions, name } = req.body;
 
-    // Validate Input: Email and Phone are mandatory
-    if (!name || !email || !password || !phone) {
-        return res.status(400).json({ success: false, message: 'Please provide all required fields (Name, Email, Password, Phone)' });
+    if (!email) {
+        return res.status(400).json({ success: false, message: 'Please provide an email address' });
     }
+
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Only SUPER_ADMIN may grant SUPER_ADMIN — prevents tenant ADMINs from
     // escalating to platform-level access by inviting a peer with that role.
@@ -44,117 +56,206 @@ export const inviteUser = async (req, res) => {
         return res.status(403).json({ success: false, message: 'You are not authorized to assign the SUPER_ADMIN role' });
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(password)) {
-        return res.status(400).json({
-            success: false,
-            message: 'Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character.'
-        });
-    }
     try {
-        // Check if user exists in THIS tenant (email unique per tenant)
-        const emailExists = await prisma.user.findFirst({
+        // Enforce Plan Capacity Limits
+        const [sub, tenant, activeUserCount] = await Promise.all([
+            prisma.subscription.findFirst({
+                where: { tenantId: req.user.tenantId, status: 'ACTIVE' },
+                select: { plan: true }
+            }),
+            prisma.tenant.findUnique({
+                where: { id: req.user.tenantId },
+                select: { subscriptionPlan: true, name: true }
+            }),
+            prisma.user.count({
+                where: { tenantId: req.user.tenantId, isActive: true }
+            })
+        ]);
+
+        const planKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
+        const plan = getPlan(planKey);
+        if (plan.limits.maxUsers !== -1 && activeUserCount >= plan.limits.maxUsers) {
+            return res.status(403).json({
+                success: false,
+                code: 'USER_LIMIT_REACHED',
+                message: `You have reached the maximum seat limit of ${plan.limits.maxUsers} user(s) for the ${plan.name}. Please upgrade your plan in Billing to add more team members.`,
+                limit: plan.limits.maxUsers,
+                current: activeUserCount
+            });
+        }
+
+        // Check if user exists in THIS tenant
+        const existingUser = await prisma.user.findFirst({
             where: {
-                email,
+                email: { equals: normalizedEmail, mode: 'insensitive' },
                 tenantId: req.user.tenantId
             }
         });
-        if (emailExists) {
-            return res.status(400).json({ success: false, message: 'User with this email already exists in this company' });
+
+        if (existingUser && existingUser.isVerified) {
+            return res.status(400).json({ success: false, message: 'A verified team member with this email already exists in your company' });
         }
 
-        // Check if user exists in THIS tenant with same phone
-        const phoneExists = await prisma.user.findFirst({
-            where: {
-                phone,
-                tenantId: req.user.tenantId
-            }
-        });
-        if (phoneExists) {
-            return res.status(400).json({ success: false, message: 'User with this phone number already exists in this company' });
+        // Generate clean human-readable invite token
+        const inviteToken = 'HSB-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+        const verificationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        const placeholderPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        const companyName = tenant?.name || req.user.company || 'Hesaby ERP';
+
+        let newUser;
+        if (existingUser && !existingUser.isVerified) {
+            // Update existing pending invite
+            newUser = await prisma.user.update({
+                where: { id: existingUser.id },
+                data: {
+                    name: (name && name.trim()) || existingUser.name || normalizedEmail.split('@')[0],
+                    role: role || 'ENGINEER',
+                    roleId: roleId || null,
+                    permissions: permissions || [],
+                    verificationCode: inviteToken,
+                    verificationExpires,
+                    isActive: true
+                },
+                select: {
+                    id: true, name: true, email: true, role: true, roleId: true, permissions: true, isVerified: true, verificationCode: true, verificationExpires: true
+                }
+            });
+        } else {
+            // Create new pending member
+            newUser = await prisma.user.create({
+                data: {
+                    name: (name && name.trim()) || normalizedEmail.split('@')[0],
+                    email: normalizedEmail,
+                    password: placeholderPassword,
+                    role: role || 'ENGINEER',
+                    roleId: roleId || null,
+                    tenantId: req.user.tenantId,
+                    isActive: true,
+                    isVerified: false,
+                    verificationCode: inviteToken,
+                    verificationExpires,
+                    company: companyName,
+                    permissions: permissions || []
+                },
+                select: {
+                    id: true, name: true, email: true, role: true, roleId: true, permissions: true, isVerified: true, verificationCode: true, verificationExpires: true
+                }
+            });
         }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-
-        const newUser = await prisma.user.create({
-            data: {
-                name,
-                email,
-                password: hashedPassword,
-                role: role || 'ENGINEER',
-                phone: phone, // Mandatory now
-                tenantId: req.user.tenantId,
-                isActive: true,
-                isVerified: false, // User must verify via email
-                verificationCode: verificationToken,
-                company: req.user.company,
-                permissions: permissions || [],
-                mustChangePassword: true
-            },
-            select: {
-                id: true, name: true, email: true, role: true
-            }
-        });
 
         await auditFromReq(req, {
             action: 'INVITE',
             entity: 'User',
             entityId: newUser.id,
             after: newUser,
-            metadata: { invitedRole: newUser.role }
+            metadata: { invitedRole: newUser.role, inviteToken }
         });
 
         // Send Invitation Email
-        const verifyLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-invite?token=${verificationToken}`;
-        const isDev = process.env.NODE_ENV !== 'production';
+        const clientBase = process.env.CLIENT_URL || 'https://hesaby.aimicromind.com';
+        const inviteLink = `${clientBase}/signup?invite=${inviteToken}`;
+
         try {
-            const message = `
-                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                    <h2 style="color: #2563eb;">Welcome to Team!</h2>
-                    <p>Hello <strong>${name}</strong>,</p>
-                    <p>You have been invited to join the Engineers Management System.</p>
-                    <p>Please verifying your account by clicking the button below:</p>
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="${verifyLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Verify Account</a>
-                    </div>
-                    <p>Below are your temporary login credentials:</p>
-                    <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                        <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-                        <p style="margin: 5px 0;"><strong>Password:</strong> ${password}</p>
-                    </div>
-                    <p style="color: #dc2626;"><strong>Important:</strong> You must verify your account before logging in. You will be required to change your password upon first login.</p>
-                </div>
-            `;
+            const message = getUserInviteEmailHtml({
+                name: newUser.name,
+                companyName,
+                email: newUser.email,
+                roleName: role || 'ENGINEER',
+                inviteCode: inviteToken,
+                inviteLink
+            });
 
             await sendEmail({
                 email: newUser.email,
-                subject: 'Verify Your Account - Engineers Management',
+                subject: `دعوة للانضمام إلى مساحة عمل ${companyName} - Hesaby ERP`,
                 message
             });
-
-            res.status(201).json({
-                success: true,
-                data: newUser,
-                message: 'User invited. Verification email sent.',
-                devVerifyLink: isDev ? verifyLink : undefined,
-                devTemporaryPassword: isDev ? password : undefined
-            });
-
         } catch (emailError) {
             logger.error({ err: emailError }, 'Failed to send invitation email');
-            // Return success even if email fails, but warn
-            res.status(201).json({
-                success: true,
-                data: newUser,
-                message: 'User created, but failed to send verification email. Please contact admin.',
-                devVerifyLink: isDev ? verifyLink : undefined,
-                devTemporaryPassword: isDev ? password : undefined
-            });
         }
+
+        res.status(201).json({
+            success: true,
+            data: {
+                ...newUser,
+                inviteToken,
+                inviteLink
+            },
+            message: `Invitation generated and dispatched to ${newUser.email}`
+        });
+
     } catch (err) {
-        logger.error({ err }, 'Failed to create user');
-        res.status(500).json({ success: false, message: 'Failed to create user' });
+        logger.error({ err }, 'Failed to create user invitation');
+        res.status(500).json({ success: false, message: 'Failed to create user invitation' });
+    }
+};
+
+// Resend Invitation Email & Refresh Code
+export const resendInvite = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const user = await prisma.user.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
+            include: { tenant: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Invited member not found' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ success: false, message: 'User has already verified and joined this workspace' });
+        }
+
+        const inviteToken = user.verificationCode || ('HSB-' + crypto.randomBytes(4).toString('hex').toUpperCase());
+        const verificationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                verificationCode: inviteToken,
+                verificationExpires
+            }
+        });
+
+        const clientBase = process.env.CLIENT_URL || 'https://hesaby.aimicromind.com';
+        const inviteLink = `${clientBase}/signup?invite=${inviteToken}`;
+        const companyName = user.tenant?.name || req.user.company || 'Hesaby ERP';
+
+        try {
+            const message = getUserInviteEmailHtml({
+                name: user.name,
+                companyName,
+                email: user.email,
+                roleName: user.role,
+                inviteCode: inviteToken,
+                inviteLink
+            });
+
+            await sendEmail({
+                email: user.email,
+                subject: `تذكير: دعوة للانضمام إلى مساحة عمل ${companyName} - Hesaby ERP`,
+                message
+            });
+        } catch (emailError) {
+            logger.error({ err: emailError }, 'Failed to resend invitation email');
+        }
+
+        res.json({
+            success: true,
+            data: {
+                inviteToken,
+                inviteLink
+            },
+            message: `Invitation email re-sent to ${user.email}`
+        });
+
+    } catch (err) {
+        logger.error({ err }, 'Failed to resend invite');
+        res.status(500).json({ success: false, message: 'Failed to resend invitation' });
     }
 };
 
@@ -242,7 +343,7 @@ export const deleteUser = async (req, res) => {
     try {
         // Prevent deleting self
         if (id === req.user.id) {
-            return res.status(400).json({ success: false, message: 'You cannot delete your own account' });
+            return res.status(400).json({ success: false, message: 'You cannot delete your own account from the team page. Use Profile settings to delete your account.' });
         }
 
         // Only a SUPER_ADMIN may delete a SUPER_ADMIN.
@@ -261,20 +362,55 @@ export const deleteUser = async (req, res) => {
             select: { id: true, name: true, email: true, role: true }
         });
 
-        await prisma.user.delete({
-            where: { id, tenantId: req.user.tenantId }
-        });
+        if (!before) {
+            return res.status(404).json({ success: false, message: 'User not found in your company' });
+        }
+
+        // Check if user has associated history that requires soft-deletion
+        const [hasTransactions, hasProjects, hasInvoices, hasDsrs, hasAuditLogs] = await Promise.all([
+            prisma.transaction.count({ where: { OR: [{ createdBy: id }, { approvedById: id }, { payerId: id }] } }),
+            prisma.project.count({ where: { engineerId: id } }),
+            prisma.invoice.count({ where: { createdBy: id } }),
+            prisma.dailySiteReport.count({ where: { OR: [{ reportedBy: id }, { acknowledgedBy: id }] } }),
+            prisma.auditLog.count({ where: { userId: id } })
+        ]);
+
+        const hasHistory = (hasTransactions + hasProjects + hasInvoices + hasDsrs + hasAuditLogs) > 0;
+
+        if (hasHistory) {
+            // Soft delete: deactivate user, scramble credentials & release email so company can re-invite if needed
+            await prisma.user.update({
+                where: { id },
+                data: {
+                    isActive: false,
+                    isVerified: false,
+                    password: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
+                    totpEnabled: false,
+                    totpSecret: null,
+                    verificationCode: null,
+                    resetPasswordToken: null,
+                    name: `${before.name} (Archived)`,
+                    email: `archived_${id.slice(0, 8)}_${before.email}`
+                }
+            });
+        } else {
+            // Clean hard-delete
+            await prisma.user.delete({
+                where: { id, tenantId: req.user.tenantId }
+            });
+        }
 
         await auditFromReq(req, {
             action: 'DELETE',
             entity: 'User',
             entityId: id,
-            before
+            before,
+            metadata: { softDelete: hasHistory }
         });
 
-        res.json({ success: true, message: 'User removed successfully' });
+        res.json({ success: true, message: 'User removed from team successfully' });
     } catch (err) {
         logger.error({ err }, 'Failed to delete user');
-        res.status(500).json({ success: false, message: 'Failed to delete user' });
+        res.status(500).json({ success: false, message: 'Failed to delete user: ' + (err.message || 'Database error') });
     }
 };

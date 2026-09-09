@@ -1,35 +1,43 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Building2, Mail, AlertCircle, CheckCircle } from 'lucide-react';
-import axios from 'axios';
+import { Mail, AlertCircle, CheckCircle, Globe, ArrowRight, ArrowLeft } from 'lucide-react';
+import { authAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import './Auth.css';
 
 export default function ForgotPassword() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isAr = i18n.language === 'ar';
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
     const { showAlert } = useAlert();
     const [loading, setLoading] = useState(false);
-    const [devUrl, setDevUrl] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+
+    const toggleLanguage = () => {
+        const nextLang = isAr ? 'en' : 'ar';
+        i18n.changeLanguage(nextLang);
+        document.documentElement.dir = nextLang === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = nextLang;
+        localStorage.setItem('language', nextLang);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
-        setDevUrl('');
+        setErrorMessage('');
         setLoading(true);
 
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-            const response = await axios.post(`${apiUrl}/api/auth/forgot-password`, { email });
-            setMessage(response.data.message || 'If an account with that email exists, an email has been sent with a link to reset your password.');
-            if (response.data.devResetUrl) {
-                setDevUrl(response.data.devResetUrl);
-            }
-            showAlert({ type: 'success', title: 'Success', message: response.data.message || 'Email sent successfully.' });
+            const response = await authAPI.forgotPassword({ email: email.trim().toLowerCase() });
+            const successMsg = response.data?.message || (isAr ? 'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني.' : 'A password reset link has been sent to your email.');
+            setMessage(successMsg);
+            showAlert({ type: 'success', title: isAr ? 'تم الإرسال' : 'Success', message: successMsg });
         } catch (err) {
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Error sending password reset email.' });
+            const errText = err.response?.data?.message || (isAr ? 'حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً.' : 'Error sending password reset email. Please try again.');
+            setErrorMessage(errText);
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: errText });
         } finally {
             setLoading(false);
         }
@@ -39,14 +47,28 @@ export default function ForgotPassword() {
         <div className="auth-container">
             <div className="auth-background"></div>
 
+            {/* Top Bar with Language Switcher */}
+            <div className="auth-top-bar">
+                <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <span>{isAr ? '← العودة لتسجيل الدخول' : '← Back to Sign In'}</span>
+                </Link>
+                <button type="button" className="auth-lang-btn" onClick={toggleLanguage}>
+                    <Globe size={16} />
+                    <span>{isAr ? 'English' : 'العربية'}</span>
+                </button>
+            </div>
+
             <div className="auth-content">
-                <div className="auth-card glass">
+                <div className="auth-card" style={{ maxWidth: 460 }}>
                     <div className="auth-header">
-                        <div className="auth-logo">
-                            <Building2 size={40} />
-                        </div>
-                        <h1>{t('auth.forgotPassword') || 'Forgot Password'}</h1>
-                        <p>{t('auth.forgotPasswordSubtitle') || 'Enter your email to receive a reset link'}</p>
+                        <img 
+                            src="/hesaby_logo_icon.png" 
+                            alt="Hesaby ERP Logo" 
+                            className="auth-logo-img" 
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                        <h1>{t('auth.forgotPassword', 'Forgot Password?')}</h1>
+                        <p>{t('auth.forgotPasswordSubtitle', 'Enter your registered email to receive a password reset link.')}</p>
                     </div>
 
                     {message && (
@@ -58,10 +80,10 @@ export default function ForgotPassword() {
                             {devUrl && (
                                 <div style={{ width: '100%', marginTop: '10px' }}>
                                     <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: 'var(--color-primary)' }}>
-                                        <strong>[Dev Testing Mode]</strong> No SMTP? Use this link directly:
+                                        <strong>[Dev Link]</strong> Direct Reset URL:
                                     </p>
-                                    <a href={devUrl} className="btn btn-secondary btn-sm" style={{ width: '100%' }}>
-                                        Reset Password Link
+                                    <a href={devUrl} className="btn btn-secondary btn-sm" style={{ width: '100%', textAlign: 'center' }}>
+                                        {isAr ? 'فتح صفحة إعادة تعيين كلمة المرور' : 'Open Reset Password Page'}
                                     </a>
                                 </div>
                             )}
@@ -71,47 +93,48 @@ export default function ForgotPassword() {
                     {!message ? (
                         <form onSubmit={handleSubmit} className="auth-form">
                             <div className="input-group">
-                                <label className="input-label">
+                                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <Mail size={16} />
-                                    {t('auth.email')}
+                                    <span>{t('auth.email', 'Email Address')}</span>
                                 </label>
                                 <input
                                     type="email"
                                     name="email"
                                     className="input"
-                                    placeholder="john@example.com"
+                                    placeholder="name@company.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
                                     autoFocus
+                                    style={{ direction: 'ltr', textAlign: isAr ? 'right' : 'left' }}
                                 />
                             </div>
 
-                            <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
+                            <button type="submit" className="btn btn-primary btn-lg" disabled={loading} style={{ width: '100%', marginTop: 8 }}>
                                 {loading ? (
                                     <>
                                         <div className="spinner" style={{ width: '20px', height: '20px', borderWidth: '2px' }}></div>
-                                        {t('auth.sending') || 'Sending...'}
+                                        <span>{t('auth.sending', 'Sending...')}</span>
                                     </>
                                 ) : (
-                                    t('auth.sendResetLink') || 'Send Reset Link'
+                                    t('auth.sendResetLink', 'Send Reset Link')
                                 )}
                             </button>
                         </form>
                     ) : (
                         <div className="text-center mt-lg mb-lg">
                             <Link to="/login" className="btn btn-primary" style={{ width: '100%' }}>
-                                {t('auth.backToLogin') || 'Back to Login'}
+                                {t('auth.backToLogin', 'Back to Sign In')}
                             </Link>
                         </div>
                     )}
 
                     {!message && (
-                        <div className="auth-footer">
+                        <div className="auth-footer" style={{ marginTop: 20 }}>
                             <p>
-                                {t('auth.rememberPassword') || 'Remember your password? '}{' '}
-                                <Link to="/login" className="auth-link">
-                                    {t('auth.backToLogin') || 'Back to Login'}
+                                {t('auth.rememberPassword', 'Remember your password? ')}{' '}
+                                <Link to="/login" className="auth-link" style={{ fontWeight: 700 }}>
+                                    {t('auth.backToLogin', 'Back to Sign In')}
                                 </Link>
                             </p>
                         </div>

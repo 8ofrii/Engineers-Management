@@ -31,6 +31,7 @@ import ApprovalThresholds from './pages/ApprovalThresholds';
 import BankReconciliation from './pages/BankReconciliation';
 import BankStatementReview from './pages/BankStatementReview';
 import Billing from './pages/Billing';
+import PlatformPayments from './pages/PlatformPayments';
 import Landing from './pages/Landing';
 
 function App() {
@@ -58,6 +59,14 @@ function App() {
                         />
                         <Route
                             path="/projects"
+                            element={
+                                <PrivateRoute>
+                                    <Projects />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/projects/:projectId"
                             element={
                                 <PrivateRoute>
                                     <Projects />
@@ -147,7 +156,7 @@ function App() {
                         <Route
                             path="/audit-log"
                             element={
-                                <PrivateRoute>
+                                <PrivateRoute roles={['SUPER_ADMIN']}>
                                     <AuditLog />
                                 </PrivateRoute>
                             }
@@ -223,6 +232,14 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <Billing />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/platform/payments"
+                            element={
+                                <PrivateRoute roles={['SUPER_ADMIN']}>
+                                    <PlatformPayments />
                                 </PrivateRoute>
                             }
                         />

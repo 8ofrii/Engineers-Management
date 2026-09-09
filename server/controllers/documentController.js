@@ -150,7 +150,9 @@ export const deleteDocument = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Not authorized to delete this document' });
         }
 
-        await prisma.document.delete({ where: { id } });
+        await prisma.document.deleteMany({
+            where: { id: doc.id, tenantId: req.user.tenantId }
+        });
 
         await auditFromReq(req, {
             action: 'DELETE',

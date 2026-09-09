@@ -155,24 +155,44 @@ export default function Invoices() {
         }
     };
 
-    const onCancel = async (inv) => {
-        if (!window.confirm(isArabic ? `هل أنت متأكد من إلغاء الفاتورة ${inv.invoiceNumber}؟` : `Cancel invoice ${inv.invoiceNumber}? This cannot be undone.`)) return;
-        try {
-            await invoicesAPI.cancel(inv.id);
-            load();
-        } catch (err) {
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
-        }
+    const onCancel = (inv) => {
+        showAlert({
+            type: 'warning',
+            title: isArabic ? 'إلغاء الفاتورة' : 'Cancel Invoice',
+            message: isArabic ? `هل أنت متأكد من إلغاء الفاتورة ${inv.invoiceNumber}؟ لا يمكن التراجع عن هذا الإجراء.` : `Cancel invoice ${inv.invoiceNumber}? This cannot be undone.`,
+            showCancel: true,
+            confirmText: isArabic ? 'نعم، إلغاء الفاتورة' : 'Yes, Cancel',
+            cancelText: isArabic ? 'تراجع' : 'Back',
+            onConfirm: async () => {
+                try {
+                    await invoicesAPI.cancel(inv.id);
+                    showAlert({ type: 'success', title: isArabic ? 'تم الإلغاء' : 'Cancelled', message: isArabic ? 'تم إلغاء الفاتورة بنجاح.' : 'Invoice cancelled.' });
+                    load();
+                } catch (err) {
+                    showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
+                }
+            }
+        });
     };
 
-    const onDelete = async (inv) => {
-        if (!window.confirm(isArabic ? `هل تريد حذف مسودة الفاتورة ${inv.invoiceNumber}؟` : `Delete draft ${inv.invoiceNumber}?`)) return;
-        try {
-            await invoicesAPI.remove(inv.id);
-            load();
-        } catch (err) {
-            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
-        }
+    const onDelete = (inv) => {
+        showAlert({
+            type: 'warning',
+            title: isArabic ? 'حذف مسودة الفاتورة' : 'Delete Draft Invoice',
+            message: isArabic ? `هل تريد حذف مسودة الفاتورة ${inv.invoiceNumber} نهائياً؟` : `Delete draft invoice ${inv.invoiceNumber}?`,
+            showCancel: true,
+            confirmText: isArabic ? 'نعم، حذف' : 'Yes, Delete',
+            cancelText: isArabic ? 'تراجع' : 'Back',
+            onConfirm: async () => {
+                try {
+                    await invoicesAPI.remove(inv.id);
+                    showAlert({ type: 'success', title: isArabic ? 'تم الحذف' : 'Deleted', message: isArabic ? 'تم حذف مسودة الفاتورة.' : 'Draft invoice deleted.' });
+                    load();
+                } catch (err) {
+                    showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
+                }
+            }
+        });
     };
 
     return (
@@ -348,27 +368,39 @@ export default function Invoices() {
 
             {/* Send modal */}
             {sending && (
-                <Modal title={`Send ${sending.invoiceNumber}`} onClose={() => setSending(null)}>
+                <Modal title={i18n.language?.startsWith('ar') ? `إرسال الفاتورة ${sending.invoiceNumber}` : `Send Invoice ${sending.invoiceNumber}`} onClose={() => setSending(null)} maxWidth={520}>
+                    <div style={{ background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '18px' }}>📎</span>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            {i18n.language?.startsWith('ar')
+                                ? `سيتم إرفاق ملف الفاتورة PDF (${sending.invoiceNumber}.pdf) مع تفاصيل البنود والأسعار تلقائياً في الإيميل.`
+                                : `The official PDF file (${sending.invoiceNumber}.pdf) with all line items and pricing will be attached automatically.`}
+                        </div>
+                    </div>
+
                     <div className="input-group">
-                        <label className="input-label">Recipient email</label>
+                        <label className="input-label">{i18n.language?.startsWith('ar') ? 'بريد العميل المستلم *' : 'Recipient email *'}</label>
                         <input
                             type="email"
                             className="input"
                             value={sendTo}
                             onChange={(e) => setSendTo(e.target.value)}
+                            placeholder="client@example.com"
+                            required
                         />
                     </div>
                     <div className="input-group">
-                        <label className="input-label">Message (optional)</label>
+                        <label className="input-label">{i18n.language?.startsWith('ar') ? 'رسالة مخصصة (اختياري)' : 'Custom message (optional)'}</label>
                         <textarea
                             className="input"
                             rows={3}
                             value={sendMessage}
                             onChange={(e) => setSendMessage(e.target.value)}
+                            placeholder={i18n.language?.startsWith('ar') ? 'ملاحظة خاصة تظهر في نص البريد الإلكتروني...' : 'Add a note to appear in the email body...'}
                         />
                     </div>
-                    <button className="btn btn-primary" onClick={onSend}>
-                        <Send size={16} /> Send invoice
+                    <button className="btn btn-primary full-width" onClick={onSend} style={{ marginTop: '10px', padding: '10px' }}>
+                        <Send size={16} /> {i18n.language?.startsWith('ar') ? 'إرسال الفاتورة بالبريد الآن' : 'Send Invoice via Email'}
                     </button>
                 </Modal>
             )}
@@ -416,19 +448,20 @@ const Td = ({ children, align = 'left' }) => (
     </td>
 );
 
-const Modal = ({ title, onClose, children }) => (
+const Modal = ({ title, onClose, maxWidth = 560, children }) => (
     <div onClick={onClose} style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 1000,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
     }}>
         <div onClick={(e) => e.stopPropagation()} style={{
-            background: 'var(--bg-elevated)', borderRadius: 12, padding: 24,
-            maxWidth: 540, width: '100%', maxHeight: '90vh', overflow: 'auto',
-            border: '1px solid var(--border-color)'
+            background: 'var(--bg-elevated)', borderRadius: 14, padding: 24,
+            maxWidth, width: '100%', maxHeight: '90vh', overflow: 'auto',
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
         }}>
             <div className="flex-between mb-md">
-                <h2 style={{ margin: 0 }}>{title}</h2>
-                <button className="btn" onClick={onClose}><X size={16} /></button>
+                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>{title}</h2>
+                <button className="btn" onClick={onClose} style={{ padding: '6px', background: 'transparent' }}><X size={18} /></button>
             </div>
             {children}
         </div>
@@ -436,7 +469,7 @@ const Modal = ({ title, onClose, children }) => (
 );
 
 const ViewModal = ({ invoice, onClose, onDownload }) => (
-    <Modal title={invoice.invoiceNumber} onClose={onClose}>
+    <Modal title={invoice.invoiceNumber} onClose={onClose} maxWidth={680}>
         <div className="grid grid-2 mb-md" style={{ gap: 8 }}>
             <Stat label="Client" value={invoice.client?.name || '-'} />
             <Stat label="Project" value={invoice.project?.name || '—'} />
@@ -494,6 +527,7 @@ const Stat = ({ label, value }) => (
 );
 
 const InvoiceForm = ({ invoice, clients, projects, onSubmit, onClose }) => {
+    const isAr = i18n.language?.startsWith('ar');
     const [clientId, setClientId] = useState(invoice?.clientId || '');
     const [projectId, setProjectId] = useState(invoice?.projectId || '');
     const [dueDate, setDueDate] = useState(invoice?.dueDate ? new Date(invoice.dueDate).toISOString().slice(0, 10) : '');
@@ -521,9 +555,9 @@ const InvoiceForm = ({ invoice, clients, projects, onSubmit, onClose }) => {
     const total = afterDiscount + taxAmount;
 
     const submit = () => {
-        if (!clientId) { alert('Pick a client'); return; }
+        if (!clientId) { alert(isAr ? 'يرجى اختيار العميل' : 'Pick a client'); return; }
         if (items.length === 0 || items.every(i => !i.description)) {
-            alert('At least one line item required'); return;
+            alert(isAr ? 'يرجى إدخال بند واحد على الأقل' : 'At least one line item required'); return;
         }
         onSubmit({
             clientId,
@@ -538,105 +572,157 @@ const InvoiceForm = ({ invoice, clients, projects, onSubmit, onClose }) => {
     };
 
     return (
-        <Modal title={invoice ? `Edit ${invoice.invoiceNumber}` : 'New Invoice'} onClose={onClose}>
+        <Modal title={invoice ? `Edit ${invoice.invoiceNumber}` : (isAr ? 'فاتورة جديدة' : 'New Invoice')} onClose={onClose} maxWidth={820}>
             <div className="grid grid-2" style={{ gap: 12 }}>
                 <div className="input-group">
-                    <label className="input-label">Client *</label>
+                    <label className="input-label">{isAr ? 'العميل *' : 'Client *'}</label>
                     <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                        <option value="">Pick…</option>
+                        <option value="">{isAr ? 'اختر العميل…' : 'Pick…'}</option>
                         {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
                 <div className="input-group">
-                    <label className="input-label">Project (optional)</label>
+                    <label className="input-label">{isAr ? 'المشروع (اختياري)' : 'Project (optional)'}</label>
                     <select className="input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                         <option value="">—</option>
                         {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                 </div>
                 <div className="input-group">
-                    <label className="input-label">Due date</label>
+                    <label className="input-label">{isAr ? 'تاريخ الاستحقاق' : 'Due date'}</label>
                     <input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </div>
                 <div className="input-group">
-                    <label className="input-label">Tax rate (%)</label>
+                    <label className="input-label">{isAr ? 'نسبة الضريبة (%)' : 'Tax rate (%)'}</label>
                     <input type="number" step="0.01" className="input" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
                 </div>
             </div>
 
-            <h4 style={{ marginTop: 16 }}>Line items</h4>
+            <h4 style={{ marginTop: 20, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>{isAr ? 'بنود الفاتورة' : 'Line Items'}</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontWeight: 'normal' }}>
+                    {items.length} {isAr ? 'بند' : 'item(s)'}
+                </span>
+            </h4>
+
+            {/* Line items column headers */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(180px, 3.2fr) 80px 130px 145px 36px',
+                gap: 8,
+                padding: '0 4px',
+                marginBottom: 6,
+                fontSize: '11px',
+                fontWeight: 700,
+                color: 'var(--text-tertiary)',
+                textTransform: 'uppercase'
+            }}>
+                <div>{isAr ? 'الوصف / البند' : 'Description'}</div>
+                <div style={{ textAlign: 'center' }}>{isAr ? 'الكمية' : 'Qty'}</div>
+                <div style={{ textAlign: 'right' }}>{isAr ? 'سعر الوحدة' : 'Unit Price'}</div>
+                <div style={{ textAlign: 'right' }}>{isAr ? 'الإجمالي' : 'Total'}</div>
+                <div></div>
+            </div>
+
             {items.map((item, i) => (
-                <div key={i} className="grid" style={{ gridTemplateColumns: '3fr 1.2fr 1.5fr 1.5fr auto', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 3.2fr) 80px 130px 145px 36px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                     <input
                         className="input"
-                        placeholder="Description (e.g. Concrete Pouring)"
+                        placeholder={isAr ? 'الوصف (مثال: صب خرسانة مسلحة)' : 'Description (e.g. Concrete Pouring)'}
                         value={item.description}
                         onChange={(e) => updateItem(i, 'description', e.target.value)}
+                        style={{ padding: '8px 12px' }}
                     />
                     <input
                         type="number"
+                        min="0.01"
+                        step="any"
                         className="input"
-                        placeholder="Qty"
+                        placeholder="1"
                         value={item.quantity}
                         onChange={(e) => updateItem(i, 'quantity', e.target.value)}
-                        style={{ textAlign: 'center' }}
+                        style={{ textAlign: 'center', padding: '8px 4px' }}
                     />
                     <input
                         type="number"
                         step="0.01"
+                        min="0"
                         className="input"
-                        placeholder="Unit price (EGP)"
+                        placeholder="0.00"
                         value={item.unitPrice}
                         onChange={(e) => updateItem(i, 'unitPrice', e.target.value)}
-                        style={{ textAlign: 'right' }}
+                        style={{ textAlign: 'right', padding: '8px 8px' }}
                     />
-                    <input
+                    <div
                         className="input"
-                        readOnly
-                        value={fmtMoney(item.total)}
-                        style={{ background: 'var(--bg-elevated)', textAlign: 'right', fontWeight: 600 }}
-                    />
-                    <button className="btn" onClick={() => removeLine(i)} style={{ color: '#ef4444', padding: '8px' }}>
+                        style={{
+                            background: 'var(--bg-elevated, #252525)',
+                            textAlign: 'right',
+                            fontWeight: 700,
+                            color: 'var(--color-primary, #38bdf8)',
+                            padding: '8px 10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            fontSize: '0.85rem',
+                            minWidth: 0
+                        }}
+                        title={fmtMoney(item.total)}
+                    >
+                        {fmtMoney(item.total)}
+                    </div>
+                    <button
+                        type="button"
+                        className="btn"
+                        onClick={() => removeLine(i)}
+                        style={{ color: '#ef4444', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}
+                        title={isAr ? 'حذف البند' : 'Remove line'}
+                    >
                         <Trash2 size={16} />
                     </button>
                 </div>
             ))}
-            <button className="btn" onClick={addLine}><Plus size={14} /> Add line</button>
+            <button className="btn" onClick={addLine} style={{ marginTop: 4 }}>
+                <Plus size={14} /> {isAr ? 'إضافة بند' : 'Add line'}
+            </button>
 
-            <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-elevated)', borderRadius: 8 }}>
-                <div className="flex-between"><span>Subtotal:</span><strong>{fmtMoney(subtotal)}</strong></div>
-                <div className="flex-between" style={{ marginTop: 4 }}>
-                    <span>Discount:</span>
+            <div style={{ marginTop: 16, padding: 14, background: 'var(--bg-elevated)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
+                <div className="flex-between"><span>{isAr ? 'المجموع الفرعي:' : 'Subtotal:'}</span><strong>{fmtMoney(subtotal)}</strong></div>
+                <div className="flex-between" style={{ marginTop: 6, alignItems: 'center' }}>
+                    <span>{isAr ? 'الخصم:' : 'Discount:'}</span>
                     <input
                         type="number"
                         step="0.01"
                         className="input"
                         value={discountAmount}
                         onChange={(e) => setDiscountAmount(e.target.value)}
-                        style={{ width: 100, textAlign: 'right', padding: '4px 8px' }}
+                        style={{ width: 120, textAlign: 'right', padding: '4px 8px' }}
                     />
                 </div>
-                <div className="flex-between" style={{ marginTop: 4 }}>
-                    <span>Tax ({taxRate}%):</span>
+                <div className="flex-between" style={{ marginTop: 6 }}>
+                    <span>{isAr ? `ضريبة القيمة المضافة (${taxRate}%):` : `Tax (${taxRate}%):`}</span>
                     <strong>{fmtMoney(taxAmount)}</strong>
                 </div>
-                <div className="flex-between" style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-color)', fontSize: 16 }}>
-                    <span><strong>Total:</strong></span>
+                <div className="flex-between" style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-color)', fontSize: 17 }}>
+                    <span><strong>{isAr ? 'الإجمالي النهائي:' : 'Total:'}</strong></span>
                     <strong style={{ color: 'var(--color-primary)' }}>{fmtMoney(total)}</strong>
                 </div>
             </div>
 
             <div className="input-group" style={{ marginTop: 12 }}>
-                <label className="input-label">Notes</label>
-                <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <label className="input-label">{isAr ? 'ملاحظات' : 'Notes'}</label>
+                <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={isAr ? 'ملاحظات إضافية على الفاتورة...' : 'Additional notes...'} />
             </div>
             <div className="input-group">
-                <label className="input-label">Terms</label>
+                <label className="input-label">{isAr ? 'شروط الدفع' : 'Terms'}</label>
                 <textarea className="input" rows={2} value={terms} onChange={(e) => setTerms(e.target.value)} />
             </div>
 
-            <button className="btn btn-primary" onClick={submit} style={{ marginTop: 8 }}>
-                {invoice ? 'Save changes' : 'Create invoice'}
+            <button className="btn btn-primary full-width" onClick={submit} style={{ marginTop: 12, padding: '10px' }}>
+                {invoice ? (isAr ? 'حفظ التعديلات' : 'Save changes') : (isAr ? 'إنشاء الفاتورة' : 'Create invoice')}
             </button>
         </Modal>
     );

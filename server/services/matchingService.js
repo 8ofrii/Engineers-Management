@@ -5,19 +5,50 @@
 // possible — Supplier / Client / Project / Material — with a confidence score
 // so the UI can surface "we matched X with 87% confidence — confirm?" prompts.
 //
-// Algorithm: Arabic-normalized Levenshtein-based similarity ratio. Cheap,
-// pure-JS, dependency-free, good enough for v1. We can upgrade to pg_trgm or
-// vector embeddings later if precision becomes a problem.
+// Algorithm: Arabic-normalized + Bilingual Phonetic + Token Inclusion matcher.
 
 import prisma from '../lib/prisma.js';
+import { mapToExactCategory, resolvePaymentMethod } from './aiService.js';
+
+// Common Arabic <-> English construction & Egyptian name transliterations
+const TRANSLITERATIONS = {
+    // Projects & Locations
+    'الرحاب': 'rehab', 'rehab': 'الرحاب', 'al rehab': 'الرحاب', 'al-rehab': 'الرحاب',
+    'فيلا': 'villa', 'villa': 'فيلا',
+    'زايد': 'zayed', 'zayed': 'زايد', 'sheikh zayed': 'الشيخ زايد',
+    'التجمع': 'tagamoa', 'tagamoa': 'التجمع', 'tagamo3': 'التجمع',
+    'الشروق': 'shorouk', 'shorouk': 'الشروق',
+    'مدينتي': 'madinaty', 'madinaty': 'مدينتي',
+    'اكتوبر': 'october', 'october': 'اكتوبر',
+    'المعادي': 'maadi', 'maadi': 'المعادي',
+    'هليوبوليس': 'heliopolis', 'heliopolis': 'هليوبوليس',
+    'عمارة': 'building', 'building': 'عمارة',
+    'برج': 'tower', 'tower': 'برج',
+    'مول': 'mall', 'mall': 'مول',
+    'مدرسة': 'school', 'school': 'مدرسة',
+    'مستشفى': 'hospital', 'hospital': 'مستشفى',
+    'كمبوند': 'compound', 'compound': 'كمبوند',
+
+    // People & Suppliers
+    'حماده': 'hamada', 'حمادة': 'hamada', 'hamada': 'حماده',
+    'احمد': 'ahmed', 'ahmed': 'احمد',
+    'محمد': 'mohamed', 'mohamed': 'محمد', 'mohammed': 'محمد',
+    'علي': 'ali', 'ali': 'علي',
+    'حسن': 'hassan', 'hassan': 'حسن',
+    'ابراهيم': 'ibrahim', 'ibrahim': 'ابراهيم',
+    'محمود': 'mahmoud', 'mahmoud': 'محمود',
+    'طارق': 'tarek', 'tarek': 'طارق',
+    'خالد': 'khaled', 'khaled': 'خالد',
+    'مصطفى': 'mostafa', 'mostafa': 'مصطفى',
+    'عز': 'ezz', 'ezz': 'عز',
+    'السويدي': 'elsewedy', 'elsewedy': 'السويدي', 'sewedy': 'السويدي',
+    'الاهرام': 'ahram', 'ahram': 'الاهرام', 'الأهرام': 'ahram'
+};
 
 // ---------- Arabic normalization ----------
-// Several characters have multiple visual forms that mean the same thing in
-// most contexts (alef variants, tah marbuta, etc.). Normalizing them before
-// comparison lets "شركة" match "شركه" and "أحمد" match "احمد".
 const normalizeArabic = (s) => {
     if (!s) return '';
-    return String(s)
+    let str = String(s)
         .toLowerCase()
         .replace(/[ً-ْ]/g, '')           // strip diacritics (tashkeel)
         .replace(/[آأإ]/g, 'ا') // أ إ آ → ا
@@ -27,9 +58,20 @@ const normalizeArabic = (s) => {
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')          // strip punctuation
         .replace(/\s+/g, ' ')
         .trim();
+
+    return str;
 };
 
-// ---------- Levenshtein distance (iterative, O(n*m) memory-light) ----------
+const normalizeBilingual = (s) => {
+    if (!s) return '';
+    let norm = normalizeArabic(s);
+    for (const [k, v] of Object.entries(TRANSLITERATIONS)) {
+        norm = norm.replace(new RegExp(k, 'g'), v);
+    }
+    return norm;
+};
+
+// ---------- Levenshtein distance ----------
 const levenshtein = (a, b) => {
     if (a === b) return 0;
     if (!a.length) return b.length;
@@ -47,10 +89,9 @@ const levenshtein = (a, b) => {
     return prev[b.length];
 };
 
-// 1.0 = identical, 0.0 = nothing in common
 const similarityRatio = (a, b) => {
-    const na = normalizeArabic(a);
-    const nb = normalizeArabic(b);
+    const na = normalizeBilingual(a);
+    const nb = normalizeBilingual(b);
     if (!na || !nb) return 0;
     if (na === nb) return 1;
     const dist = levenshtein(na, nb);
@@ -58,64 +99,80 @@ const similarityRatio = (a, b) => {
     return 1 - dist / maxLen;
 };
 
-const MIN_CONFIDENCE = 0.5; // below this, no match (free-text string passes through)
+const MIN_CONFIDENCE = 0.45;
 
-const bestMatch = (query, candidates, getName) => {
-    if (!query || !candidates?.length) return null;
+const bestMatch = (query, fullText, candidates, getName) => {
+    if (!candidates?.length) return null;
     let best = null;
+
+    const qNorm = normalizeBilingual(query || '');
+    const fNorm = normalizeBilingual(fullText || '');
+
     for (const c of candidates) {
-        const name = getName(c);
-        const score = similarityRatio(query, name);
-        if (!best || score > best.score) best = { candidate: c, score };
+        const rawName = getName(c);
+        const nameNorm = normalizeBilingual(rawName);
+
+        // 1. Direct Levenshtein similarity on query
+        let score = qNorm ? similarityRatio(qNorm, nameNorm) : 0;
+
+        // 2. Token inclusion check (e.g. 'hamada' or 'rehab' present in text)
+        const nameTokens = nameNorm.split(/\s+/).filter(t => t.length >= 3);
+        for (const token of nameTokens) {
+            if ((qNorm && qNorm.includes(token)) || (fNorm && fNorm.includes(token))) {
+                score = Math.max(score, 0.92);
+            }
+        }
+
+        // 3. Candidate name is substring of query or fullText
+        if ((qNorm && qNorm.includes(nameNorm)) || (fNorm && fNorm.includes(nameNorm))) {
+            score = Math.max(score, 0.95);
+        }
+
+        if (!best || score > best.score) {
+            best = { candidate: c, score };
+        }
     }
+
     if (!best || best.score < MIN_CONFIDENCE) return null;
     return best;
 };
 
 // ---------- Per-entity matchers ----------
-// Each returns either { id, name, confidence } or null.
-// The Json `matchedDraft` will store these alongside the original AI string so
-// the UI can render "Cairo Cement → Cairo Cement Co (matched 92%) [change]".
 
-export const matchSupplier = async (vendorName, tenantId) => {
-    if (!vendorName) return null;
+export const matchSupplier = async (vendorName, tenantId, fullText = '') => {
     const candidates = await prisma.supplier.findMany({
         where: { tenantId, deletedAt: null },
-        select: { id: true, name: true }
+        select: { id: true, name: true, company: true }
     });
-    const m = bestMatch(vendorName, candidates, c => c.name);
+    const m = bestMatch(vendorName, fullText, candidates, c => `${c.name} ${c.company || ''}`);
     return m ? { id: m.candidate.id, name: m.candidate.name, confidence: round(m.score) } : null;
 };
 
-export const matchClient = async (clientName, tenantId) => {
-    if (!clientName) return null;
+export const matchClient = async (clientName, tenantId, fullText = '') => {
     const candidates = await prisma.client.findMany({
         where: { tenantId, deletedAt: null },
         select: { id: true, name: true, company: true }
     });
-    // Match against name OR company so "Cairo Real Estate" matches a client whose
-    // primary contact is "Ahmed" but whose company is "Cairo Real Estate Dev"
-    const m = bestMatch(clientName, candidates, c => `${c.name} ${c.company || ''}`);
+    const m = bestMatch(clientName, fullText, candidates, c => `${c.name} ${c.company || ''}`);
     return m ? { id: m.candidate.id, name: m.candidate.name, confidence: round(m.score) } : null;
 };
 
-export const matchProject = async (projectName, tenantId) => {
-    if (!projectName) return null;
+export const matchProject = async (projectName, tenantId, fullText = '') => {
     const candidates = await prisma.project.findMany({
         where: { tenantId, deletedAt: null },
         select: { id: true, name: true }
     });
-    const m = bestMatch(projectName, candidates, c => c.name);
+    const m = bestMatch(projectName, fullText, candidates, c => c.name);
     return m ? { id: m.candidate.id, name: m.candidate.name, confidence: round(m.score) } : null;
 };
 
-export const matchMaterial = async (itemName, tenantId) => {
+export const matchMaterial = async (itemName, tenantId, fullText = '') => {
     if (!itemName) return null;
     const candidates = await prisma.material.findMany({
         where: { tenantId, deletedAt: null },
         select: { id: true, name: true, unit: true }
     });
-    const m = bestMatch(itemName, candidates, c => c.name);
+    const m = bestMatch(itemName, fullText, candidates, c => c.name);
     return m
         ? { id: m.candidate.id, name: m.candidate.name, unit: m.candidate.unit, confidence: round(m.score) }
         : null;
@@ -124,56 +181,91 @@ export const matchMaterial = async (itemName, tenantId) => {
 const round = (n) => Math.round(n * 100) / 100;
 
 // ---------- Top-level: take a raw AI extraction and produce a matched draft ----------
-//
-// Returns { draft, matches } where:
-//   draft  — the values to show in the form (with matched IDs where found)
-//   matches — per-field match metadata for the UI to render confidence pills
-export const matchExtractionToTenant = async (extraction, source, tenantId) => {
-    const isReceipt = source === 'RECEIPT';
+export const matchExtractionToTenant = async (extraction, source, tenantId, userId = null, rawText = '') => {
+    const ext = extraction || {};
+    const fullText = [
+        rawText,
+        ext.summary,
+        ext.description,
+        ext.transcript,
+        ext.vendor,
+        ext.projectName,
+        ext.project_name
+    ].filter(Boolean).join(' ');
 
-    const supplierMatch = await matchSupplier(extraction.vendor, tenantId);
-    const projectMatch = extraction.project_name
-        ? await matchProject(extraction.project_name, tenantId)
-        : null;
-    const clientMatch = extraction.client_name
-        ? await matchClient(extraction.client_name, tenantId)
-        : null;
+    const vendorQuery = ext.vendor || ext.supplier || ext.supplierName || ext.merchant_name || '';
+    let supplierMatch = null;
+    if (ext.supplierId) {
+        const directSupplier = await prisma.supplier.findFirst({
+            where: { id: ext.supplierId, tenantId, deletedAt: null },
+            select: { id: true, name: true }
+        });
+        if (directSupplier) {
+            supplierMatch = { id: directSupplier.id, name: directSupplier.name, confidence: 1.0 };
+        }
+    }
+    if (!supplierMatch) {
+        supplierMatch = await matchSupplier(vendorQuery, tenantId, fullText);
+    }
 
-    // Match each line item to a Material if possible
-    const items = Array.isArray(extraction.items) ? extraction.items : [];
+    const projectQuery = ext.projectName || ext.project || ext.project_name || '';
+    let projectMatch = null;
+    if (ext.projectId) {
+        const directProject = await prisma.project.findFirst({
+            where: { id: ext.projectId, tenantId, deletedAt: null },
+            select: { id: true, name: true }
+        });
+        if (directProject) {
+            projectMatch = { id: directProject.id, name: directProject.name, confidence: 1.0 };
+        }
+    }
+    if (!projectMatch) {
+        projectMatch = await matchProject(projectQuery, tenantId, fullText);
+    }
+
+    const clientQuery = ext.clientName || ext.client || ext.client_name || '';
+    const clientMatch = await matchClient(clientQuery, tenantId, fullText);
+
+    // Match line items
+    const items = Array.isArray(ext.items) ? ext.items : [];
     const matchedItems = await Promise.all(items.map(async (it) => {
-        const materialMatch = await matchMaterial(it.name, tenantId);
+        const materialMatch = it?.name ? await matchMaterial(it.name, tenantId, fullText) : null;
         return {
             ...it,
             materialMatch
         };
     }));
 
+    // Fine-grained category and payment method
+    const category = mapToExactCategory(ext.category, items, fullText);
+    const paymentMethod = ext.paymentMethod || resolvePaymentMethod(ext, fullText);
+
     return {
         draft: {
             type: 'EXPENSE',
-            amount: isReceipt ? (extraction.totalAmount ?? null) : (extraction.amount ?? null),
-            subtotal: extraction.subtotal ?? null,
-            taxAmount: extraction.taxAmount ?? null,
-            currency: extraction.currency ?? 'EGP',
-            transactionDate: extraction.transactionDate ?? null,
-            category: extraction.category ?? 'OTHER',
-            description: extraction.summary ?? '',
-            // Resolved IDs (null when no confident match) — UI can use these to
-            // pre-select dropdowns; they fall back to free-text otherwise.
+            amount: ext.totalAmount ?? ext.amount ?? null,
+            subtotal: ext.subtotal ?? null,
+            taxAmount: ext.taxAmount ?? null,
+            currency: ext.currency ?? 'EGP',
+            transactionDate: ext.transactionDate ?? new Date().toISOString().slice(0, 10),
+            category,
+            paymentMethod,
+            payerUserId: userId || null,
+            description: ext.summary ?? ext.description ?? '',
+            // Resolved IDs pre-fill the form cleanly
             supplierId: supplierMatch?.id ?? null,
             clientId: clientMatch?.id ?? null,
             projectId: projectMatch?.id ?? null,
-            isStockPurchase: !!extraction.is_stock_purchase,
+            isStockPurchase: !!ext.is_stock_purchase,
             items: matchedItems
         },
         matches: {
-            vendor: { raw: extraction.vendor ?? null, ...supplierMatch ? { matched: supplierMatch } : { matched: null } },
-            client: { raw: extraction.client_name ?? null, matched: clientMatch },
-            project: { raw: extraction.project_name ?? null, matched: projectMatch },
-            items: matchedItems.map(it => ({ raw: it.name, matched: it.materialMatch }))
+            vendor: { raw: vendorQuery || null, ...supplierMatch ? { matched: supplierMatch } : { matched: null } },
+            client: { raw: clientQuery || null, matched: clientMatch },
+            project: { raw: projectQuery || null, matched: projectMatch },
+            items: matchedItems.map(it => ({ raw: it?.name || null, matched: it?.materialMatch }))
         }
     };
 };
 
-export const _internals = { normalizeArabic, levenshtein, similarityRatio, bestMatch };
+export const _internals = { normalizeArabic, normalizeBilingual, levenshtein, similarityRatio, bestMatch };

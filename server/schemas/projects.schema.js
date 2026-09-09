@@ -28,7 +28,10 @@ const baseProject = z.object({
     managementFeePercent: decimalString.optional(),
     totalContractValue: decimalString.optional(),
     paymentTerms: z.string().max(100).optional(),
-    clientId: z.string().uuid()
+    clientId: z.string().uuid(),
+    completionPercent: z.union([z.number(), z.string()])
+        .transform(v => Math.min(100, Math.max(0, parseInt(v, 10) || 0)))
+        .optional()
 });
 
 export const createProjectSchema = baseProject;

@@ -12,8 +12,14 @@ import {
     getMe,
     updateProfile,
     verifyInvite,
+    previewInvite,
+    acceptInviteSignup,
+    googleRedirect,
+    googleCallback,
+    exchangeOAuthCode,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    deleteAccount
 } from '../controllers/authController.js';
 import { protect } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
@@ -39,6 +45,11 @@ router.post('/register', validate({ body: registerSchema }), register);
 router.post('/register-company', validate({ body: registerCompanySchema }), registerCompany);
 router.post('/verify-email', validate({ body: verifyEmailSchema }), verifyEmail);
 router.post('/verify-invite', validate({ body: verifyInviteSchema }), verifyInvite);
+router.post('/invite/preview', previewInvite);
+router.post('/invite/accept-signup', acceptInviteSignup);
+router.get('/google', googleRedirect);
+router.get('/google/callback', googleCallback);
+router.post('/oauth-exchange', exchangeOAuthCode);
 router.post('/login', validate({ body: loginSchema }), login);
 router.post('/forgot-password', validate({ body: forgotPasswordSchema }), forgotPassword);
 router.put(
@@ -61,6 +72,7 @@ router.get('/2fa/status', protect, status2FA);
 router.post('/2fa/enroll', protect, enroll2FA);
 router.post('/2fa/confirm', protect, validate({ body: confirmEnroll2FASchema }), confirmEnroll2FA);
 router.post('/2fa/disable', protect, validate({ body: disable2FASchema }), disable2FA);
+router.delete('/account', protect, deleteAccount);
 
 export default router;
 

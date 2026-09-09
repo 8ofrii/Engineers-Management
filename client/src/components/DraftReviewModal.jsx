@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Sparkles, Save, Trash2, RefreshCw, X, Volume2, ImageIcon, AlertCircle, Loader2
+    Sparkles, Save, Trash2, RefreshCw, X, Volume2, ImageIcon, AlertCircle, Loader2, FileText, ExternalLink
 } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import {
@@ -38,7 +38,8 @@ const HIGH_LEVEL_DEFAULT = {
 };
 
 export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isRTL = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const { showAlert } = useAlert();
     const { currency } = useFormat();
 
@@ -94,8 +95,7 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
 
                 setForm({
                     amount: md.amount != null ? String(md.amount) : '',
-                    // AI returns high-level category — pick a sensible specific one
-                    category: HIGH_LEVEL_DEFAULT[md.category] || md.category || 'OTHER',
+                    category: md.category || 'OTHER',
                     description: md.description || '',
                     projectId: md.projectId || '',
                     supplierId: md.supplierId || '',
@@ -104,10 +104,10 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                     quantity: firstItem?.quantity != null ? String(firstItem.quantity) : '',
                     unit: firstItem?.unit || '',
                     unitPrice: firstItem?.unitPrice != null ? String(firstItem.unitPrice) : '',
-                    costCenter: '',
-                    paymentMethod: 'CUSTODY_WALLET',
-                    transactionTo: '',
-                    payerUserId: ''
+                    costCenter: md.costCenter || '',
+                    paymentMethod: md.paymentMethod || 'CASH',
+                    transactionTo: md.transactionTo || '',
+                    payerUserId: md.payerUserId || d.createdById || ''
                 });
             } catch (err) {
                 showAlert({
@@ -137,8 +137,11 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
             const md = r.data.data.matchedDraft || {};
             setForm(prev => ({
                 ...prev,
-                projectId: prev.projectId || md.projectId || '',
-                supplierId: prev.supplierId || md.supplierId || ''
+                projectId: md.projectId || prev.projectId || '',
+                supplierId: md.supplierId || prev.supplierId || '',
+                category: md.category || prev.category || 'OTHER',
+                paymentMethod: md.paymentMethod || prev.paymentMethod || 'CASH',
+                payerUserId: md.payerUserId || prev.payerUserId || ''
             }));
             setDraft(r.data.data);
             showAlert({ type: 'success', title: t('common.success', 'Done'), message: t('drafts.rematched', 'Re-matched against your latest data') });
@@ -153,19 +156,33 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
         }
     };
 
-    const handleDiscard = async () => {
-        if (!confirm(t('drafts.confirmDiscard', 'Discard this draft?'))) return;
-        try {
-            await draftsAPI.discard(draftId);
-            onCommitted?.();
-            onClose?.();
-        } catch (err) {
-            showAlert({
-                type: 'error',
-                title: t('common.error', 'Error'),
-                message: err.response?.data?.message || 'Discard failed'
-            });
-        }
+    const handleDiscard = () => {
+        showAlert({
+            type: 'warning',
+            title: isRTL ? 'إلغاء المسودة' : 'Discard Draft',
+            message: t('drafts.confirmDiscard', isRTL ? 'هل أنت متأكد من رغبتك في إلغاء هذه المسودة؟ لن تتمكن من استعادتها.' : 'Are you sure you want to discard this draft? This action cannot be undone.'),
+            showCancel: true,
+            confirmText: isRTL ? 'نعم، إلغاء المسودة' : 'Yes, Discard',
+            cancelText: t('common.cancel', isRTL ? 'تراجع' : 'Cancel'),
+            onConfirm: async () => {
+                try {
+                    await draftsAPI.discard(draftId);
+                    showAlert({
+                        type: 'success',
+                        title: t('common.success', isRTL ? 'تم الإلغاء' : 'Discarded'),
+                        message: isRTL ? 'تم إلغاء المسودة بنجاح.' : 'Draft discarded successfully.'
+                    });
+                    onCommitted?.();
+                    onClose?.();
+                } catch (err) {
+                    showAlert({
+                        type: 'error',
+                        title: t('common.error', 'Error'),
+                        message: err.response?.data?.message || 'Discard failed'
+                    });
+                }
+            }
+        });
     };
 
     // Save edits without committing — user wants to keep iterating on the
@@ -310,18 +327,37 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                                         <audio controls src={draft.originalMediaUrl} style={{ width: '100%', marginBottom: 12 }} />
                                     )}
                                     {draft.source === 'RECEIPT' && draft.originalMediaUrl && (
-                                        <img
-                                            src={draft.originalMediaUrl}
-                                            alt="Receipt"
-                                            style={{ width: '100%', borderRadius: 8, marginBottom: 12, maxHeight: 360, objectFit: 'contain', background: '#f3f4f6' }}
-                                        />
+                                        (draft.originalMediaMime === 'application/pdf' || draft.originalMediaUrl.endsWith('.pdf')) ? (
+                                            <div style={{ padding: 20, textAlign: 'center', background: 'var(--bg-tertiary, #262626)', borderRadius: 8, marginBottom: 12, border: '1px solid var(--border-color, #2b2b2b)' }}>
+                                                <FileText size={44} style={{ color: '#ef4444', marginBottom: 8 }} />
+                                                <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: 10, color: 'var(--text-primary, #fafafa)' }}>PDF Document (Invoice / Receipt)</div>
+                                                <a
+                                                    href={draft.originalMediaUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="btn btn-secondary btn-sm"
+                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                                >
+                                                    <ExternalLink size={14} />
+                                                    {t('common.view', 'Open Document')}
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <img
+                                                src={draft.originalMediaUrl}
+                                                alt="Receipt"
+                                                style={{ width: '100%', borderRadius: 8, marginBottom: 12, maxHeight: 360, objectFit: 'contain', background: 'var(--bg-tertiary, #262626)', border: '1px solid var(--border-color, #2b2b2b)' }}
+                                            />
+                                        )
                                     )}
 
                                     {draft.transcript && (
                                         <div style={{ marginTop: 12 }}>
-                                            <strong>{t('drafts.transcript', 'Transcript')}</strong>
+                                            <strong style={{ color: 'var(--text-primary, #fafafa)' }}>{t('drafts.transcript', 'Transcript')}</strong>
                                             <p style={{
-                                                background: 'var(--bg-secondary, #f9fafb)',
+                                                background: 'var(--bg-tertiary, #262626)',
+                                                color: 'var(--text-primary, #fafafa)',
+                                                border: '1px solid var(--border-color, #2b2b2b)',
                                                 padding: 12, borderRadius: 8, marginTop: 4, whiteSpace: 'pre-wrap'
                                             }}>{draft.transcript}</p>
                                         </div>
@@ -377,9 +413,11 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                                                 <option value={form.category}>{form.category}</option>
                                             ) : (
                                                 categoryGroups.map(group => (
-                                                    <optgroup key={group.group} label={group.groupNameAr || group.group}>
+                                                    <optgroup key={group.group} label={(isRTL ? group.groupNameAr : group.groupNameEn) || group.group}>
                                                         {group.items.map(item => (
-                                                            <option key={item.key} value={item.key}>{item.ar || item.key}</option>
+                                                            <option key={item.key} value={item.key}>
+                                                                {isRTL ? item.ar : (item.en || item.ar || item.key)}
+                                                            </option>
                                                         ))}
                                                     </optgroup>
                                                 ))
@@ -435,9 +473,12 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
 
                                     <FormRow label={t('drafts.paymentMethod', 'Payment Method')}>
                                         <select value={form.paymentMethod} onChange={handleChange('paymentMethod')} disabled={isReadOnly}>
-                                            {PAYMENT_METHODS.map(m => (
-                                                <option key={m.value} value={m.value}>{m.label}</option>
-                                            ))}
+                                            <option value="CUSTODY_WALLET">{t('finance.methods.custodyWallet', 'Custody Wallet')}</option>
+                                            <option value="CASH">{t('finance.methods.cash', 'Cash')}</option>
+                                            <option value="BANK_TRANSFER">{t('finance.methods.bankTransfer', 'Bank Transfer')}</option>
+                                            <option value="CHECK">{t('finance.methods.check', 'Check')}</option>
+                                            <option value="CREDIT_CARD">{t('finance.methods.creditCard', 'Credit Card')}</option>
+                                            <option value="OTHER">{t('finance.categories.other', 'Other')}</option>
                                         </select>
                                     </FormRow>
 
@@ -522,17 +563,27 @@ function FormRow({ label, match, children }) {
     return (
         <div className="form-group" style={{ marginBottom: 10 }}>
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>{label}</span>
+                <span style={{ color: 'var(--text-primary, #fafafa)', fontWeight: 600 }}>{label}</span>
                 {match?.matched && (
                     <span style={{
-                        fontSize: '0.7rem', background: '#dbeafe', color: '#1e40af',
-                        padding: '2px 8px', borderRadius: 10
+                        fontSize: '0.7rem',
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: '#60a5fa',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        padding: '2px 8px',
+                        borderRadius: 10,
+                        fontWeight: 600
                     }}>AI · {Math.round((match.matched.confidence || 0) * 100)}%</span>
                 )}
                 {match?.raw && !match?.matched && (
                     <span style={{
-                        fontSize: '0.7rem', background: '#fef3c7', color: '#92400e',
-                        padding: '2px 8px', borderRadius: 10
+                        fontSize: '0.7rem',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        color: '#fbbf24',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        padding: '2px 8px',
+                        borderRadius: 10,
+                        fontWeight: 600
                     }}>"{match.raw}" — no match</span>
                 )}
             </label>

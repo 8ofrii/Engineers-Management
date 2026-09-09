@@ -24,15 +24,40 @@ const startOfCurrentMonth = () => {
 
 /**
  * Resolve the cap for this tenant: plan limit (from active subscription)
- * or FREE_PILOT default; clamp to ENV_HARD_CAP if set.
+ * + any purchased add-on token packs; clamp to ENV_HARD_CAP if set.
  */
 const resolveCap = async (tenantId) => {
-    const sub = await prisma.subscription.findFirst({
-        where: { tenantId, status: 'ACTIVE' },
-        select: { plan: true }
-    });
-    const planKey = sub?.plan || 'FREE_PILOT';
-    const planCap = aiCapForPlan(planKey);
+    const periodStart = startOfCurrentMonth();
+    const [sub, tenant, addOns] = await Promise.all([
+        prisma.subscription.findFirst({
+            where: { tenantId, status: 'ACTIVE' },
+            select: { plan: true }
+        }),
+        prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { subscriptionPlan: true }
+        }),
+        prisma.auditLog.findMany({
+            where: {
+                tenantId,
+                action: 'ADDON_PURCHASED',
+                createdAt: { gte: periodStart }
+            },
+            select: { metadata: true }
+        })
+    ]);
+    const planKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
+    let planCap = aiCapForPlan(planKey);
+
+    // Sum purchased add-on tokens in this billing cycle
+    if (addOns && addOns.length > 0) {
+        for (const addon of addOns) {
+            const meta = typeof addon.metadata === 'string' ? JSON.parse(addon.metadata) : addon.metadata;
+            const uses = Number(meta?.uses || 0);
+            planCap += uses;
+        }
+    }
+
     if (ENV_HARD_CAP != null) return Math.min(planCap, ENV_HARD_CAP);
     return planCap;
 };
@@ -42,11 +67,11 @@ const resolveCap = async (tenantId) => {
  */
 export const getTenantAiUsage = async (tenantId) => {
     const periodStart = startOfCurrentMonth();
-    const [count, cap, sub] = await Promise.all([
+    const [count, cap, sub, tenant] = await Promise.all([
         prisma.auditLog.count({
             where: {
                 tenantId,
-                action: 'AI_EXTRACT',
+                action: { in: ['AI_EXTRACT', 'AI_CHAT'] },
                 createdAt: { gte: periodStart }
             }
         }),
@@ -54,13 +79,18 @@ export const getTenantAiUsage = async (tenantId) => {
         prisma.subscription.findFirst({
             where: { tenantId, status: 'ACTIVE' },
             select: { plan: true }
+        }),
+        prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { subscriptionPlan: true }
         })
     ]);
+    const activePlanKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
     return {
         count,
         cap,
         remaining: Math.max(0, cap - count),
-        plan: sub?.plan || 'FREE_PILOT',
+        plan: activePlanKey,
         periodStart
     };
 };

@@ -5,6 +5,7 @@
 // Run from server/:
 //   node scripts/setup-test-users.js
 
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 

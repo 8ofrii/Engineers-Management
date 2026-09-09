@@ -17,12 +17,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
         city: '',
         state: '',
         zipCode: '',
-        country: '',
-        // Contact Person
-        contactName: '',
-        contactPosition: '',
-        contactPhone: '',
-        contactEmail: ''
+        country: ''
     });
 
     useEffect(() => {
@@ -38,11 +33,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                 city: initialData.city || '',
                 state: initialData.state || '',
                 zipCode: initialData.zipCode || '',
-                country: initialData.country || '',
-                contactName: initialData.contactName || '',
-                contactPosition: initialData.contactPosition || '',
-                contactPhone: initialData.contactPhone || '',
-                contactEmail: initialData.contactEmail || ''
+                country: initialData.country || ''
             });
         } else if (isOpen && !initialData) {
             // Reset form when opening in "Add" mode
@@ -57,11 +48,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                 city: '',
                 state: '',
                 zipCode: '',
-                country: '',
-                contactName: '',
-                contactPosition: '',
-                contactPhone: '',
-                contactEmail: ''
+                country: ''
             });
         }
     }, [isOpen, initialData]);
@@ -85,7 +72,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
 
         if (!formData.name.trim()) newErrors.name = t('clients.modal.fields.name') + ' is required';
         if (!formData.email.trim()) newErrors.email = t('clients.modal.fields.email') + ' is required';
-        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('clients.modal.fields.email') + ' is invalid';
+        else if (!/\S+@\S+\.\S+/.test(formData.email.trim())) newErrors.email = t('clients.modal.fields.email') + ' is invalid';
         if (!formData.phone.trim()) newErrors.phone = t('clients.modal.fields.phone') + ' is required';
 
         setErrors(newErrors);
@@ -117,11 +104,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
             city: '',
             state: '',
             zipCode: '',
-            country: '',
-            contactName: '',
-            contactPosition: '',
-            contactPhone: '',
-            contactEmail: ''
+            country: ''
         });
         setErrors({});
         onClose();
@@ -171,7 +154,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                             </div>
 
                             <div className="form-group">
-                                <label htmlFor="email">{t('clients.modal.fields.email')}</label>
+                                <label htmlFor="email">{t('clients.modal.fields.email')} <span className="required">*</span></label>
                                 <input
                                     type="email"
                                     id="email"
@@ -287,60 +270,6 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                                     value={formData.country}
                                     onChange={handleChange}
                                     placeholder={t('clients.modal.placeholders.country')}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Contact Person */}
-                    <div className="form-section">
-                        <h3 className="section-title">{t('clients.modal.sections.contact')}</h3>
-                        <div className="form-grid">
-                            <div className="form-group">
-                                <label htmlFor="contactName">{t('clients.modal.fields.contactName')}</label>
-                                <input
-                                    type="text"
-                                    id="contactName"
-                                    name="contactName"
-                                    value={formData.contactName}
-                                    onChange={handleChange}
-                                    placeholder={t('clients.modal.placeholders.contactName')}
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="contactPosition">{t('clients.modal.fields.contactPosition')}</label>
-                                <input
-                                    type="text"
-                                    id="contactPosition"
-                                    name="contactPosition"
-                                    value={formData.contactPosition}
-                                    onChange={handleChange}
-                                    placeholder={t('clients.modal.placeholders.contactPosition')}
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="contactPhone">{t('clients.modal.fields.contactPhone')}</label>
-                                <input
-                                    type="tel"
-                                    id="contactPhone"
-                                    name="contactPhone"
-                                    value={formData.contactPhone}
-                                    onChange={handleChange}
-                                    placeholder={t('clients.modal.placeholders.contactPhone')}
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="contactEmail">{t('clients.modal.fields.contactEmail')}</label>
-                                <input
-                                    type="email"
-                                    id="contactEmail"
-                                    name="contactEmail"
-                                    value={formData.contactEmail}
-                                    onChange={handleChange}
-                                    placeholder={t('clients.modal.placeholders.contactEmail')}
                                 />
                             </div>
                         </div>

@@ -114,10 +114,11 @@ export const createTransactionV2 = async (req, res, next) => {
         } = req.body;
 
         // Validate required fields
-        if (!type || !amount || !projectId) {
+        const parsedAmount = Number(amount);
+        if (!type || isNaN(parsedAmount) || parsedAmount <= 0 || parsedAmount > 999999999999 || !projectId) {
             return res.status(400).json({
                 success: false,
-                message: 'Type, amount, and projectId are required'
+                message: 'A valid type, positive amount, and projectId are required'
             });
         }
 
@@ -312,10 +313,12 @@ export const createTransactionV2 = async (req, res, next) => {
 
                 // PROFIT CALCULATION
                 // If it's NOT an inventory purchase and is APPROVED, recognize profit immediately
-                if (!createBatch) {
+                if (!createBatch && !req.body.materialId) {
                     profitInfo = await calculateAndTransferProfit(tx, updatedProject, amount, actualPayer);
                 } else {
-                    // Inventory Purchase: Create batch, defer profit
+                    // Inventory Purchase: Create batch, defer profit, and recharge material stock
+                    const parsedQty = Number(quantity) || (unitPrice && Number(unitPrice) > 0 ? Number(amount) / Number(unitPrice) : 0);
+
                     await tx.materialBatch.create({
                         data: {
                             projectId,
@@ -325,13 +328,24 @@ export const createTransactionV2 = async (req, res, next) => {
                             remainingValue: Number(amount),
                             status: 'AVAILABLE',
                             recordedBy: actualPayer,
-                            tenantId: req.user.tenantId
+                            tenantId: req.user.tenantId,
+                            materialId: req.body.materialId || null
                         }
                     });
 
+                    if (req.body.materialId) {
+                        await tx.material.update({
+                            where: { id: req.body.materialId },
+                            data: {
+                                stockLevel: { increment: parsedQty > 0 ? parsedQty : 1 },
+                                ...(unitPrice && Number(unitPrice) > 0 ? { unitPrice: Number(unitPrice) } : {})
+                            }
+                        });
+                    }
+
                     profitInfo = {
                         profit: 0,
-                        message: 'Inventory created. Profit deferred until usage.'
+                        message: 'Inventory batch created & material stock recharged. Profit deferred until site usage.'
                     };
                 }
 

@@ -34,7 +34,11 @@ api.interceptors.response.use(
 
 export const authApi = {
     login: (email, password) => api.post('/auth/login', { email, password }),
-    me: () => api.get('/auth/me')
+    me: () => api.get('/auth/me'),
+    forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+    resetPassword: (token, password) => api.put(`/auth/reset-password/${token}`, { password }),
+    registerCompany: (data) => api.post('/auth/register-company', data),
+    verifyEmail: (data) => api.post('/auth/verify-email', data)
 };
 
 export const projectsApi = {
@@ -143,6 +147,14 @@ export const aiChatApi = {
     },
     history: () => api.get('/chat/history'),
     clear: () => api.delete('/chat/history')
+};
+
+export const billingApi = {
+    subscription: () => api.get('/billing/subscription')
+};
+
+export const getWebBillingUrl = () => {
+    return process.env.EXPO_PUBLIC_WEB_URL || 'http://148.251.171.147/billing';
 };
 
 export default api;

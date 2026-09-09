@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
+import { processDsrVoiceNote } from '../services/aiDsrService.js';
 
 const decimalOrNull = (v) => v == null || v === '' ? null : Number(v);
 
@@ -338,7 +339,9 @@ export const deleteDsr = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Only DRAFT reports can be deleted by the author. Submitted/acknowledged DSRs can only be removed by an admin.' });
         }
 
-        await prisma.dailySiteReport.delete({ where: { id: dsr.id } });
+        await prisma.dailySiteReport.deleteMany({
+            where: { id: dsr.id, tenantId: req.user.tenantId }
+        });
 
         await auditFromReq(req, {
             action: 'DELETE',
@@ -348,6 +351,36 @@ export const deleteDsr = async (req, res, next) => {
         });
 
         res.status(200).json({ success: true, data: {} });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Extract structured DSR from voice note audio or live transcript
+// @route   POST /api/dsr/extract/voice
+// @access  Private
+export const extractDsrFromVoice = async (req, res, next) => {
+    try {
+        const filePath = req.file?.path || null;
+        const clientTranscript = req.body?.transcript || '';
+
+        if (!filePath && !clientTranscript) {
+            return res.status(400).json({ success: false, message: 'Audio file or transcript is required' });
+        }
+
+        // Fetch company projects for AI matching
+        const projects = await prisma.project.findMany({
+            where: { tenantId: req.user.tenantId, deletedAt: null },
+            select: { id: true, name: true, location: true }
+        });
+
+        const result = await processDsrVoiceNote(filePath, clientTranscript, projects);
+
+        res.status(200).json({
+            success: true,
+            data: result.data,
+            transcript: result.transcript
+        });
     } catch (error) {
         next(error);
     }

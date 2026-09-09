@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
+import { getPlan } from '../lib/plans.js';
 
 // @desc    Get all projects
 // @route   GET /api/projects
@@ -98,11 +99,44 @@ export const getProject = async (req, res, next) => {
 // @access  Private
 export const createProject = async (req, res, next) => {
     try {
+        // Enforce Plan Capacity Limits
+        const [sub, tenant, activeProjectCount] = await Promise.all([
+            prisma.subscription.findFirst({
+                where: { tenantId: req.user.tenantId, status: 'ACTIVE' },
+                select: { plan: true }
+            }),
+            prisma.tenant.findUnique({
+                where: { id: req.user.tenantId },
+                select: { subscriptionPlan: true }
+            }),
+            prisma.project.count({
+                where: { tenantId: req.user.tenantId, deletedAt: null }
+            })
+        ]);
+
+        const planKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
+        const plan = getPlan(planKey);
+        if (plan.limits.maxProjects !== -1 && activeProjectCount >= plan.limits.maxProjects) {
+            return res.status(403).json({
+                success: false,
+                code: 'PROJECT_LIMIT_REACHED',
+                message: `You have reached the maximum limit of ${plan.limits.maxProjects} project(s) for the ${plan.name}. Please upgrade your plan in Billing to create more projects.`,
+                limit: plan.limits.maxProjects,
+                current: activeProjectCount
+            });
+        }
+
+        const status = req.body.status || 'PLANNING';
+        const completionPercent = status === 'COMPLETED'
+            ? 100
+            : (req.body.completionPercent !== undefined ? Math.min(100, Math.max(0, parseInt(req.body.completionPercent, 10) || 0)) : 0);
+
         const project = await prisma.project.create({
             data: {
                 name: req.body.name,
                 description: req.body.description,
-                status: req.body.status,
+                status: status,
+                completionPercent: completionPercent,
                 projectType: req.body.projectType,
                 location: req.body.location,
                 startDate: new Date(req.body.startDate),
@@ -215,6 +249,12 @@ export const updateProject = async (req, res, next) => {
             updateData.totalContractValue = parseFloat(updateData.totalContractValue);
         } else if (updateData.totalContractValue === '') {
             updateData.totalContractValue = 0;
+        }
+
+        if (updateData.status === 'COMPLETED') {
+            updateData.completionPercent = 100;
+        } else if (updateData.completionPercent !== undefined && updateData.completionPercent !== '') {
+            updateData.completionPercent = Math.min(100, Math.max(0, parseInt(updateData.completionPercent, 10) || 0));
         }
 
         const updatedProject = await prisma.project.update({

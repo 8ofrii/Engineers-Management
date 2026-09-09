@@ -1,20 +1,24 @@
 .dashboard {
-    padding: var(--spacing-xl) 0;
+    padding: var(--spacing-sm) 0;
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .dashboard-header {
-    margin-bottom: var(--spacing-2xl);
+    margin-bottom: var(--spacing-xl);
 }
 
 .dashboard-header h1 {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+    font-size: 1.75rem;
 }
 
 .dashboard-header p {
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-base);
     color: var(--text-secondary);
 }
 
@@ -26,16 +30,24 @@
     margin-bottom: var(--spacing-2xl);
 }
 
+@media (min-width: 1100px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
 .stat-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     display: flex;
+    align-items: center;
     gap: var(--spacing-md);
-    padding: var(--spacing-lg);
+    padding: 1.15rem 1.35rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    min-height: 105px;
 }
 
 .stat-card::before {
@@ -50,7 +62,7 @@
 }
 
 .stat-card:hover {
-    transform: translateY(-5px) scale(1.02);
+    transform: translateY(-3px);
     box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5);
     border-color: var(--color-primary-light);
     background: var(--bg-elevated);
@@ -60,9 +72,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 56px;
-    height: 56px;
-    border-radius: 14px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     flex-shrink: 0;
     backdrop-filter: blur(4px);
     border: 1px solid rgba(255, 255, 255, 0.05);
@@ -70,24 +82,27 @@
 
 .stat-content {
     flex: 1;
+    min-width: 0;
 }
 
 .stat-label {
-    font-size: var(--font-size-xs);
+    font-size: 0.72rem;
     color: var(--text-tertiary);
-    margin-bottom: var(--spacing-xs);
+    margin-bottom: 3px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.8px;
     font-weight: 700;
 }
 
 .stat-value {
-    font-size: 1.75rem;
-    font-weight: 800;
+    font-size: 1.35rem;
+    font-weight: 700;
     color: var(--text-primary);
-    margin-bottom: var(--spacing-sm);
-    line-height: 1.1;
-    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .stat-meta {
@@ -110,7 +125,7 @@
 /* Charts Grid */
 .charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
     gap: var(--spacing-lg);
     margin-bottom: var(--spacing-2xl);
 }

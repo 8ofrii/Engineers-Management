@@ -78,6 +78,7 @@ model User {
   resetPasswordToken    String?
   totpSecret            String?           // base32 secret; nullable until enrolled
   totpEnabled           Boolean           @default(false)
+  passwordChangedAt     DateTime?
   roleId                String?
   chatMessages          ChatMessage[]
   custodyTransfers      CustodyTransfer[]

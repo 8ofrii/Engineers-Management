@@ -20,10 +20,13 @@ const passwordSchema = z.string().superRefine((val, ctx) => {
 });
 
 const emailSchema = z.string().email('Invalid email').max(254);
-const phoneSchema = z.string().min(5).max(30).optional().nullable();
+const phoneSchema = z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? null : val),
+    z.string().min(5, 'Phone number must be at least 5 characters').max(30).optional().nullable()
+);
 
 export const registerSchema = z.object({
-    name: z.string().min(1).max(120),
+    name: z.string().min(1, 'Name is required').max(120),
     email: emailSchema,
     password: passwordSchema,
     company: z.string().max(200).optional().nullable(),
@@ -31,8 +34,8 @@ export const registerSchema = z.object({
 });
 
 export const registerCompanySchema = z.object({
-    companyName: z.string().min(2).max(200),
-    adminName: z.string().min(1).max(120),
+    companyName: z.string().min(2, 'Company name must be at least 2 characters').max(200),
+    adminName: z.string().min(1, 'Admin name is required').max(120),
     email: emailSchema,
     password: passwordSchema,
     phone: phoneSchema

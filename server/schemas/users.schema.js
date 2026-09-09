@@ -26,12 +26,12 @@ const passwordSchema = z.string().superRefine((val, ctx) => {
 });
 
 export const inviteUserSchema = z.object({
-    name: z.string().min(1).max(120),
-    email: z.string().email().max(254),
-    phone: z.string().min(3).max(30),
-    password: passwordSchema,
-    role: UserRole.optional(),
-    permissions: z.array(z.string().max(100)).max(200).optional()
+    email: z.string().email('Invalid email address').max(254),
+    password: passwordSchema.optional(),
+    role: UserRole.optional().default('ENGINEER'),
+    roleId: z.string().uuid().optional().nullable(),
+    permissions: z.array(z.string().max(100)).max(200).optional().default([]),
+    name: z.string().max(120).optional().nullable()
 });
 
 export const updateUserSchema = z.object({

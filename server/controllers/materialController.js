@@ -196,3 +196,134 @@ export const deleteMaterial = async (req, res, next) => {
         next(error);
     }
 };
+
+// @desc    Recharge/Add stock to existing material & record financial transaction
+// @route   POST /api/materials/:id/recharge
+// @access  Private
+export const rechargeMaterial = async (req, res, next) => {
+    try {
+        const {
+            quantity,
+            notes,
+            projectId,
+            unitPrice,
+            paymentMethod,
+            payerUserId,
+            costCenter,
+            supplierName,
+            createTransaction
+        } = req.body;
+
+        const addQty = Number(quantity);
+        if (!addQty || addQty <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide a valid positive quantity to recharge'
+            });
+        }
+
+        const material = await prisma.material.findFirst({
+            where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
+        });
+
+        if (!material) {
+            return res.status(404).json({
+                success: false,
+                message: 'Material not found or unauthorized'
+            });
+        }
+
+        const effectivePrice = (unitPrice !== undefined && unitPrice !== null && unitPrice !== '')
+            ? Number(unitPrice)
+            : (Number(material.unitPrice) || 0);
+        const totalCost = addQty * effectivePrice;
+        const actualPayer = payerUserId || req.user.id;
+
+        const { updatedMaterial, transactionRecord } = await prisma.$transaction(async (tx) => {
+            const mat = await tx.material.update({
+                where: { id: material.id },
+                data: {
+                    stockLevel: { increment: addQty },
+                    ...(effectivePrice > 0 ? { unitPrice: effectivePrice } : {})
+                }
+            });
+
+            // 1. Create a financial expense transaction if total cost > 0 and not explicitly disabled
+            let createdTx = null;
+            if (createTransaction !== false && totalCost > 0) {
+                createdTx = await tx.transaction.create({
+                    data: {
+                        tenantId: req.user.tenantId,
+                        projectId: projectId || null,
+                        type: 'EXPENSE',
+                        category: 'MATERIALS',
+                        amount: totalCost,
+                        description: notes || `شحن رصيد مخزن: ${material.nameAr || material.name} (+${addQty} ${material.unit} @ ${effectivePrice} EGP)`,
+                        costCenter: costCenter || (projectId ? 'المشروع' : 'المخزن الرئيسي'),
+                        paymentMethod: paymentMethod || 'CUSTODY_WALLET',
+                        transactionTo: supplierName || 'شراء خامات مخزنية',
+                        payerUserId: actualPayer,
+                        status: 'APPROVED',
+                        createdBy: req.user.id,
+                        transactionDate: new Date()
+                    }
+                });
+
+                // Deduct from project safe if allocated to a specific project
+                if (projectId) {
+                    await tx.project.update({
+                        where: { id: projectId, tenantId: req.user.tenantId },
+                        data: {
+                            projectSafeBalance: { decrement: totalCost },
+                            actualCost: { increment: totalCost }
+                        }
+                    });
+                }
+            }
+
+            // 2. If a project is selected, also create a material batch for site usage tracking
+            if (projectId) {
+                await tx.materialBatch.create({
+                    data: {
+                        projectId,
+                        materialId: material.id,
+                        originalReceiptId: createdTx?.id || null,
+                        description: `${material.nameAr || material.name} (+${addQty} ${material.unit})`,
+                        initialValue: totalCost,
+                        remainingValue: totalCost,
+                        status: 'AVAILABLE',
+                        recordedBy: actualPayer,
+                        tenantId: req.user.tenantId
+                    }
+                });
+            }
+
+            return { updatedMaterial: mat, transactionRecord: createdTx };
+        });
+
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Material',
+            entityId: material.id,
+            before: material,
+            after: updatedMaterial,
+            metadata: {
+                rechargedQuantity: addQty,
+                unitPrice: effectivePrice,
+                totalCost,
+                transactionId: transactionRecord?.id,
+                notes,
+                projectId
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: updatedMaterial,
+            transaction: transactionRecord,
+            message: `Successfully recharged ${addQty} ${material.unit} to ${material.nameAr || material.name}${totalCost > 0 ? ` (Recorded Expense: ${totalCost.toLocaleString()} EGP)` : ''}`
+        });
+    } catch (error) {
+        next(error);
+    }
+};

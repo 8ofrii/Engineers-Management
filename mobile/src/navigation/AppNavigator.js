@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import LoginScreen from '../screens/LoginScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import RegisterScreen from '../screens/RegisterScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import ProjectDetailScreen from '../screens/ProjectDetailScreen';
 import FinanceScreen from '../screens/FinanceScreen';
@@ -166,6 +168,8 @@ export default function AppNavigator() {
             {user ? <TabBar /> : (
                 <Stack.Navigator screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="Login" component={LoginScreen} />
+                    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+                    <Stack.Screen name="Register" component={RegisterScreen} />
                 </Stack.Navigator>
             )}
         </NavigationContainer>

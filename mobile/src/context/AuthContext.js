@@ -37,13 +37,22 @@ export const AuthProvider = ({ children }) => {
         return data.user;
     }, []);
 
+    const setSession = useCallback(async (token, userData) => {
+        await AsyncStorage.multiSet([
+            ['token', token],
+            ['user', JSON.stringify(userData)]
+        ]);
+        setUser(userData);
+        return userData;
+    }, []);
+
     const logout = useCallback(async () => {
         await AsyncStorage.multiRemove(['token', 'user']);
         setUser(null);
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, setSession, logout }}>
             {children}
         </AuthContext.Provider>
     );
