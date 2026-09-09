@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 // Custom plugin to intercept malformed bot/scanner URIs on public port 80
 // and respond with 400 instead of crashing Vite's static middleware
@@ -26,6 +27,11 @@ const safeUriPlugin = () => ({
 
 export default defineConfig({
     plugins: [safeUriPlugin(), react()],
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, './src'),
+        },
+    },
     server: {
         host: '0.0.0.0',
         port: 5173,
