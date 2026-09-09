@@ -60,18 +60,33 @@ All test accounts are pre-seeded in the database:
 ---
 
 ## 🗄️ 4. PostgreSQL Database Configuration (`148.251.171.147`)
-- **Config file**: `C:\Program Files\PostgreSQL\18\data\postgresql.conf`
-- **Application Role**: `hesaby_app` (dedicated production non-root application user with full schema privileges)
-- **Root Admin Role**: `postgres` (superuser with `LOGIN` enabled)
-- **Permanent connection leak protection & stability settings**:
+- **Config file**: `C:\Program Files\PostgreSQL\18\data\postgresql.auto.conf` (applied via `ALTER SYSTEM`)
+- **Application Roles**:
+  - `hesaby_app` (dedicated production non-root application user for `sitengineer` database)
+  - `campus_app` (application user for `campus` database)
+- **Root Admin Role**: `postgres` (superuser with `LOGIN` enabled, password `admin`, restricted to localhost)
+- **Production Connection Pool Stability & Tuning Settings**:
   ```ini
-  max_connections = 200
-  idle_session_timeout = 300000        # 5 minutes auto-close for idle sockets
-  idle_in_transaction_session_timeout = 30000 # 30 seconds for hung transactions
-  statement_timeout = 60000            # 60 seconds query execution timeout
+  idle_session_timeout = 0                     # DISABLED: Never terminate idle pooled client connections
+  idle_in_transaction_session_timeout = 60000  # 60 seconds cutoff for hung transactions
+  statement_timeout = 60000                    # 60 seconds query execution timeout
+  tcp_keepalives_idle = 30                     # TCP keepalive probe every 30s prevents router/NAT socket death
+  tcp_keepalives_interval = 10                 # TCP keepalive interval 10s
+  tcp_keepalives_count = 5                     # Drop after 5 failed probes
+  shared_buffers = 512MB                       # In-memory shared cache
+  effective_cache_size = 2GB                   # Planner cache estimation
+  work_mem = 8MB                               # Per-operation sort/hash memory
+  maintenance_work_mem = 128MB                 # Vacuum & index creation memory
+  max_connections = 250                        # Ample pool headroom for Hesaby, Campus, and TeamSync
   ```
-- **Active Deep Health Check**: `/api/health` executes live `SELECT 1` ping and the self-healing watchdog (`scripts/watchdog.ps1`) automatically restarts services if query execution fails.
-- **Service control**: `Get-Service *postgres* | Restart-Service`
+- **Network Security (`pg_hba.conf`)**:
+  - `postgres` superuser: Strictly restricted to `127.0.0.1` and `::1` (cannot be brute-forced from the public internet).
+  - `campus_app` & `hesaby_app`: Scoped to their respective databases (`campus`, `sitengineer`) with `scram-sha-256`.
+- **Active Deep Health Check & Watchdog**:
+  - The hardened watchdog (`scripts/watchdog.ps1`) monitors `/api/health` and PostgreSQL live queries every 30s.
+  - Requires **3 consecutive failures (90s)** before initiating any recovery.
+  - Automatically detects **WAL Recovery Mode** on boot and waits gracefully without triggering restart death loops.
+- **Service control**: `Restart-Service postgresql-x64-18`
 
 ---
 
