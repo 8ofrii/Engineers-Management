@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Package, Search, Filter, ArrowRight, History, Plus, Settings, Trash2, Pencil, RefreshCw, X } from 'lucide-react';
+import { Package, Search, ArrowRight, History, Plus, Trash2, Pencil, X, AlertTriangle } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddMaterialModal from '../components/AddMaterialModal';
@@ -192,14 +192,15 @@ export default function Inventory() {
             <div className="inventory-page">
                 <div className="flex-between mb-xl">
                     <div>
-                        <h1 className="flex gap-md">
-                            <Package size={32} />
+                        <div className="app-eyebrow">{isAr ? 'المخزون' : 'Inventory'}</div>
+                        <h1 className="app-title" style={{ fontSize: '1.9rem' }}>
+                            <Package size={28} />
                             {t('inventory.title') || 'المخزون'}
                         </h1>
-                        <p className="text-secondary">{t('inventory.subtitle') || 'إدارة ومتابعة المواد في المخازن والمواقع'}</p>
+                        <p className="app-sub">{t('inventory.subtitle') || 'إدارة ومتابعة المواد في المخازن والمواقع'}</p>
                     </div>
-                    <div className="flex gap-md">
-                        <div className="tab-group" style={{ background: 'var(--bg-tertiary)', padding: '4px', borderRadius: '8px' }}>
+                    <div className="flex gap-md" style={{ alignItems: 'center' }}>
+                        <div className="tab-group">
                             <button
                                 className={`btn btn-sm ${viewMode === 'BATCHES' ? 'btn-primary' : 'btn-ghost'}`}
                                 onClick={() => setViewMode('BATCHES')}
@@ -214,8 +215,8 @@ export default function Inventory() {
                             </button>
                         </div>
                         {viewMode === 'MATERIALS' && (
-                            <button className="btn btn-primary flex gap-sm" onClick={() => setIsMaterialModalOpen(true)}>
-                                <Plus size={18} />
+                            <button className="btn btn-primary btn-sm flex gap-sm" onClick={() => setIsMaterialModalOpen(true)}>
+                                <Plus size={16} />
                                 {isAr ? 'إضافة خامة جديدة' : 'Add Raw Material'}
                             </button>
                         )}
@@ -226,19 +227,21 @@ export default function Inventory() {
                 <div className="card mb-xl" style={{ padding: 'var(--spacing-md)' }}>
                     <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                         <div style={{ flex: '1 1 250px', position: 'relative' }}>
-                            <Search style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} size={18} />
+                            <Search style={{ position: 'absolute', insetInlineStart: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} size={18} />
                             <input
                                 type="text"
                                 placeholder={t('common.search') || 'بحث...'}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 style={{
-                                    padding: '10px 10px 10px 42px',
+                                    padding: '10px 12px',
+                                    paddingInlineStart: '42px',
                                     width: '100%',
                                     border: '1px solid var(--border-color)',
-                                    borderRadius: '6px',
+                                    borderRadius: '10px',
                                     outline: 'none',
-                                    backgroundColor: 'transparent'
+                                    backgroundColor: 'var(--bg-tertiary)',
+                                    color: 'var(--text-primary)'
                                 }}
                             />
                         </div>
@@ -249,11 +252,12 @@ export default function Inventory() {
                                     onChange={(e) => setSelectedProjectId(e.target.value)}
                                     style={{
                                         width: '100%',
-                                        padding: '10px',
+                                        padding: '10px 12px',
                                         border: '1px solid var(--border-color)',
-                                        borderRadius: '6px',
+                                        borderRadius: '10px',
                                         outline: 'none',
-                                        backgroundColor: 'transparent'
+                                        backgroundColor: 'var(--bg-tertiary)',
+                                        color: 'var(--text-primary)'
                                     }}
                                 >
                                     <option value="all">{t('inventory.allProjects') || 'جميع المشاريع'}</option>
@@ -281,7 +285,7 @@ export default function Inventory() {
                             {Object.entries(groupedInventory).map(([projectName, items]) => (
                                 <div key={projectName} className="inventory-section mb-xl">
                                     <h3 className="section-title flex items-center gap-sm mb-md">
-                                        <ArrowRight size={18} className="text-primary" />
+                                        <ArrowRight size={18} className="text-primary" style={isAr ? { transform: 'scaleX(-1)' } : {}} />
                                         {projectName}
                                         <span className="badge badge-secondary ml-sm">{items.length} {t('inventory.items') || 'بنود'}</span>
                                     </h3>
@@ -297,18 +301,18 @@ export default function Inventory() {
                                                         {/* Low remaining value warning badge (#7) */}
                                                         {item.initialValue > 0 && (item.remainingValue / item.initialValue) < 0.15 && (
                                                             <span style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: 4,
                                                                 background: '#fef2f2', color: '#ef4444',
                                                                 border: '1px solid #fecaca', borderRadius: 6,
                                                                 padding: '2px 7px', fontSize: 11, fontWeight: 700
-                                                            }}>⚠️ {t('inventory.lowStock', 'Low')}</span>
+                                                            }}><AlertTriangle size={11} /> {t('inventory.lowStock', 'Low')}</span>
                                                         )}
                                                         <button
-                                                            className="btn btn-secondary"
+                                                            className="icon-btn danger"
                                                             onClick={() => handleDeleteBatch(item.id, item.description)}
-                                                            style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444', background: 'transparent' }}
                                                             title={t('common.delete')}
                                                         >
-                                                            <Trash2 size={16} />
+                                                            <Trash2 size={15} />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -382,15 +386,15 @@ export default function Inventory() {
                                                 <div className="flex gap-xs" style={{ flexShrink: 0 }}>
                                                     {isLowStock && (
                                                         <span style={{
+                                                            display: 'inline-flex', alignItems: 'center', gap: 4,
                                                             background: '#ef4444', color: 'white',
                                                             borderRadius: 6, padding: '2px 8px',
                                                             fontSize: 10, fontWeight: 700
-                                                        }}>⚠️ {t('inventory.lowStock', 'LOW')}</span>
+                                                        }}><AlertTriangle size={11} /> {t('inventory.lowStock', 'LOW')}</span>
                                                     )}
                                                     <button
                                                         type="button"
-                                                        className="btn btn-secondary btn-sm"
-                                                        style={{ padding: '4px 8px' }}
+                                                        className="icon-btn"
                                                         title={t('common.edit', 'Edit')}
                                                         onClick={() => openEditMaterial(material)}
                                                     >
@@ -398,8 +402,7 @@ export default function Inventory() {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        className="btn btn-secondary btn-sm"
-                                                        style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444' }}
+                                                        className="icon-btn danger"
                                                         title={t('common.delete', 'Delete')}
                                                         onClick={() => handleDeleteMaterial(material)}
                                                     >
@@ -527,7 +530,7 @@ export default function Inventory() {
                                     const price = rechargeForm.unitPrice !== '' ? (parseFloat(rechargeForm.unitPrice) || 0) : (rechargingMaterial.unitPrice || 0);
                                     const total = qty * price;
                                     return (
-                                        <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px' }}>
+                                        <div style={{ background: 'rgba(255, 90, 31, 0.07)', border: '1px solid rgba(255, 90, 31, 0.28)', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                                                     {isAr ? 'إجمالي تكلفة الشحنة:' : 'Total Batch Cost:'}
@@ -629,11 +632,12 @@ export default function Inventory() {
                 .inventory-card, .material-card {
                     padding: var(--spacing-md);
                     border: 1px solid var(--border-color);
-                    transition: transform 0.2s, border-color 0.2s;
+                    border-radius: 16px;
+                    transition: border-color 0.2s ease, box-shadow 0.2s ease;
                 }
                 .inventory-card:hover, .material-card:hover {
-                    transform: translateY(-2px);
-                    border-color: var(--color-primary);
+                    border-color: rgba(255, 90, 31, 0.4);
+                    box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.65), 0 0 26px -12px rgba(255, 90, 31, 0.3);
                 }
                 .progress-bar-container {
                     height: 6px;

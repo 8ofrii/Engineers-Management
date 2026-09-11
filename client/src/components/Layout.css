@@ -87,8 +87,8 @@
 
 .expand-sidebar-btn:hover {
     background: var(--bg-elevated);
-    color: #60a5fa;
-    border-color: #60a5fa;
+    color: var(--color-primary-light);
+    border-color: var(--color-primary);
     transform: scale(1.05);
 }
 
@@ -99,6 +99,19 @@
     font-size: var(--font-size-xl);
     font-weight: 700;
     color: var(--text-primary);
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.company-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .sidebar-logo svg {

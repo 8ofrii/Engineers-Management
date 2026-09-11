@@ -1,0 +1,291 @@
+/* Hesaby app theme — carries the landing cinematic system (ember dark /
+   cafe light) into the authenticated shell. Scoped under .layout so
+   landing + auth styles are untouched. Doubled class beats index.css
+   :root / body[data-theme] token rules without touching them. */
+
+.layout.layout {
+  --bg-primary: #08080a;
+  --bg-secondary: #0e0e12;
+  --bg-tertiary: #15151b;
+  --bg-elevated: #17171d;
+  --bg-overlay: rgba(8, 8, 10, 0.92);
+  --bg-glass: rgba(14, 14, 18, 0.82);
+
+  --text-primary: #f5f4f0;
+  --text-secondary: #a8a29e;
+  --text-tertiary: #6b6660;
+  --text-disabled: #4a4540;
+
+  --border-color: rgba(255, 255, 255, 0.09);
+  --border-color-light: rgba(255, 255, 255, 0.16);
+  --border-glass: rgba(255, 255, 255, 0.08);
+
+  --color-primary: #ff5a1f;
+  --color-primary-dark: #c2410c;
+  --color-primary-light: #ff8a50;
+
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 28px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 20px 50px -16px rgba(0, 0, 0, 0.7);
+
+  --font-family: 'Inter Tight', 'Inter', 'Cairo', system-ui, sans-serif;
+
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+}
+
+body.light-mode .layout {
+  --bg-primary: #ece5d6;
+  --bg-secondary: #f7f1e5;
+  --bg-tertiary: #eee5d1;
+  --bg-elevated: #fdfaf2;
+  --bg-overlay: rgba(236, 229, 214, 0.94);
+  --bg-glass: rgba(247, 241, 229, 0.86);
+
+  --text-primary: #1c1710;
+  --text-secondary: #6b5f4d;
+  --text-tertiary: #a29379;
+  --text-disabled: #c4b797;
+
+  --border-color: #d8cbaf;
+  --border-color-light: #bfae87;
+  --border-glass: rgba(28, 23, 16, 0.08);
+
+  --color-primary: #c2410c;
+  --color-primary-dark: #9a3412;
+  --color-primary-light: #ea580c;
+
+  --shadow-sm: 0 2px 8px rgba(60, 45, 20, 0.1);
+  --shadow-md: 0 10px 28px -12px rgba(60, 45, 20, 0.25);
+  --shadow-lg: 0 24px 55px -20px rgba(60, 45, 20, 0.3);
+}
+
+/* ---------- buttons: ember-tinted primary, quiet ghost, neutral secondary ---------- */
+.layout .btn-primary {
+  background: rgba(255, 90, 31, 0.13);
+  border: 1px solid rgba(255, 90, 31, 0.45);
+  color: var(--color-primary-light);
+  box-shadow: none;
+}
+.layout .btn-primary:hover:not(:disabled) {
+  background: rgba(255, 90, 31, 0.2);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -6px rgba(255, 90, 31, 0.4);
+  filter: none;
+}
+body.light-mode .layout .btn-primary { color: var(--color-primary); background: rgba(194, 65, 12, 0.09); }
+body.light-mode .layout .btn-primary:hover:not(:disabled) { background: rgba(194, 65, 12, 0.16); }
+.layout .btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+}
+.layout .btn-ghost:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+.layout .tab-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 4px;
+}
+.layout .tab-group .btn { border-radius: 8px; }
+.layout .badge-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+.layout .badge-info {
+  background: rgba(255, 90, 31, 0.1);
+  color: var(--color-primary-light);
+  border: 1px solid rgba(255, 90, 31, 0.3);
+}
+body.light-mode .layout .badge-info { color: var(--color-primary); }
+.layout .btn-secondary:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary-light); }
+body.light-mode .layout .btn-secondary:hover:not(:disabled) { color: var(--color-primary); }
+
+/* ---------- sidebar active item: limelight bar, not a blue box ---------- */
+.layout .nav-item { border-radius: 10px; }
+.layout .nav-item-active {
+  background: rgba(255, 90, 31, 0.09);
+  color: var(--color-primary-light);
+  border: 1px solid rgba(255, 90, 31, 0.28);
+  box-shadow: none;
+  font-weight: 650;
+  position: relative;
+}
+body.light-mode .layout .nav-item-active { color: var(--color-primary); background: rgba(194, 65, 12, 0.08); }
+.layout .nav-item-active::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -11px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #ffb37a, var(--color-primary));
+  box-shadow: 0 0 10px rgba(255, 90, 31, 0.8);
+}
+.layout .nav-group-btn { border-radius: 10px; }
+
+/* ---------- topbar ---------- */
+.layout .topbar {
+  background: var(--bg-glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.layout .theme-toggle { border-radius: 10px; }
+.layout .theme-toggle:hover { transform: none; border-color: var(--color-primary); color: var(--color-primary-light); }
+
+/* ---------- content well ---------- */
+.layout .content { border-radius: 20px 0 0 0; }
+[dir="rtl"] .layout .content { border-radius: 0 20px 0 0; }
+
+/* ---------- shared app primitives ---------- */
+.layout .app-eyebrow {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-primary-light);
+  margin-bottom: 6px;
+}
+body.light-mode .layout .app-eyebrow { color: var(--color-primary); }
+.layout .app-title {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+[dir="rtl"] .layout .app-title { letter-spacing: 0; }
+.layout .app-title svg { color: var(--color-primary-light); flex-shrink: 0; }
+body.light-mode .layout .app-title svg { color: var(--color-primary); }
+.layout .app-sub { color: var(--text-secondary); margin-top: 6px; }
+
+.layout .card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.layout .card:hover { box-shadow: var(--shadow-md); transform: none; }
+.layout .proj-card:hover { border-color: var(--border-color-light); }
+
+.layout .stat-cell {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.layout .stat-cell label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+.layout .stat-cell b {
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.layout .stat-cell b.pos { color: #22c55e; }
+.layout .stat-cell b.neg { color: #f87171; }
+.layout .stat-cell b.acc { color: var(--color-primary-light); }
+body.light-mode .layout .stat-cell b.acc { color: var(--color-primary); }
+
+.layout .input:focus, .layout input.input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.16);
+}
+.layout .badge-primary { background: rgba(255, 90, 31, 0.13); color: var(--color-primary-light); }
+body.light-mode .layout .badge-primary { color: var(--color-primary); }
+
+.layout .meter { height: 8px; border-radius: 99px; background: var(--bg-tertiary); overflow: hidden; border: 1px solid var(--border-color); }
+.layout .meter > i { display: block; height: 100%; border-radius: 99px; transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+.layout .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+.layout .user-avatar { background: linear-gradient(180deg, #ff7040, #c2410c); border: 1px solid rgba(255, 255, 255, 0.2); }
+
+.layout .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  flex-shrink: 0;
+}
+.layout .icon-btn:hover { color: var(--color-primary-light); border-color: var(--color-primary); background: rgba(255, 90, 31, 0.08); }
+.layout .icon-btn.danger:hover { color: #f87171; border-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+
+/* ---------- cinematic depth: ambient wash, glass, sheen (dark-first) ---------- */
+.layout.layout {
+  background:
+    radial-gradient(1000px 520px at 10% -120px, rgba(255, 90, 31, 0.08), transparent 60%),
+    radial-gradient(860px 520px at 96% 4%, rgba(255, 120, 60, 0.05), transparent 60%),
+    radial-gradient(1200px 800px at 50% 110%, rgba(255, 90, 31, 0.04), transparent 60%),
+    #08080a;
+}
+body.light-mode .layout.layout { background: #ece5d6; }
+
+.layout .sidebar {
+  background:
+    linear-gradient(180deg, rgba(255, 90, 31, 0.06), transparent 220px),
+    var(--bg-primary);
+}
+body.light-mode .layout .sidebar { background: var(--bg-primary); }
+
+.layout .topbar {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 14px 34px -18px rgba(0, 0, 0, 0.65);
+}
+body.light-mode .layout .topbar {
+  box-shadow: 0 1px 0 rgba(28, 23, 16, 0.06), 0 12px 28px -18px rgba(60, 45, 20, 0.25);
+}
+
+.layout .content { background: transparent; }
+
+.layout .card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 42%), var(--bg-secondary);
+  box-shadow: 0 18px 44px -22px rgba(0, 0, 0, 0.65);
+}
+body.light-mode .layout .card {
+  background: var(--bg-secondary);
+  box-shadow: 0 14px 34px -22px rgba(60, 45, 20, 0.28);
+}
+.layout .proj-card:hover {
+  border-color: rgba(255, 90, 31, 0.4);
+  box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.7), 0 0 32px -12px rgba(255, 90, 31, 0.35);
+}
+body.light-mode .layout .proj-card:hover {
+  border-color: #c2410c;
+  box-shadow: 0 16px 36px -18px rgba(60, 45, 20, 0.3), 0 0 28px -14px rgba(194, 65, 12, 0.35);
+}
+.layout .nav-item-active { box-shadow: 0 0 24px -8px rgba(255, 90, 31, 0.5); }
+.layout .stat-cell b.acc { text-shadow: 0 0 18px rgba(255, 90, 31, 0.45); }
+body.light-mode .layout .stat-cell b.acc { text-shadow: none; }
+.layout .meter > i {
+  background: linear-gradient(90deg, var(--color-primary-dark), var(--color-primary-light));
+  box-shadow: 0 0 12px rgba(255, 90, 31, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout .meter > i { transition: none; }
+}

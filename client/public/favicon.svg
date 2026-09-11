@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Hesaby">
+  <defs>
+    <linearGradient id="hxf" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff7040"/>
+      <stop offset="0.6" stop-color="#f04e00"/>
+      <stop offset="1" stop-color="#c2410c"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#hxf)"/>
+  <g stroke="#fff7ed" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 47V21"/>
+    <path d="M43 47V21"/>
+    <path d="M21 37H43"/>
+  </g>
+</svg>

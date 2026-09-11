@@ -62,7 +62,7 @@ export default function ForgotPassword() {
                 <div className="auth-card" style={{ maxWidth: 460 }}>
                     <div className="auth-header">
                         <img 
-                            src="/hesaby_logo_icon.png" 
+                            src="/hesaby_logo_icon.svg" 
                             alt="Hesaby ERP Logo" 
                             className="auth-logo-img" 
                             onError={(e) => { e.target.style.display = 'none'; }}

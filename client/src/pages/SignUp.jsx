@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAlert } from '../context/AlertContext';
-import { 
-    Building2, Mail, Lock, User, Phone, CheckCircle2, 
-    Eye, EyeOff, Sparkles, ArrowRight, ArrowLeft, 
+import {
+    Building2, Mail, Lock, User, Phone, CheckCircle2,
+    Eye, EyeOff, Sparkles, ArrowRight, ArrowLeft,
     ShieldCheck, Users, Link as LinkIcon, Check, Loader2, AlertTriangle, Globe, X
 } from 'lucide-react';
+import SkyToggle from '../components/ui/sky-toggle';
 import { authAPI } from '../services/api';
 import './Auth.css';
 
@@ -34,6 +35,13 @@ export default function SignUp() {
     // UI States
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [theme, setTheme] = useState(() => localStorage.getItem('theme_preset') || 'dark');
+    const light = theme === 'light';
+
+    useEffect(() => {
+        document.body.classList.toggle('light-mode', light);
+        localStorage.setItem('theme_preset', theme);
+    }, [theme, light]);
     const [loading, setLoading] = useState(false);
     const [validatingInvite, setValidatingInvite] = useState(false);
     const [invitePreview, setInvitePreview] = useState(null);
@@ -291,37 +299,41 @@ export default function SignUp() {
         }
     };
 
-    // Handle Direct Google OAuth 2.0 Redirect
+    // Google OAuth via backend (sets state cookie, then redirects to Google)
     const handleGoogleAuth = () => {
-        const clientId = '685331176998-ve7827qr2u5ts6a4enk1in2d1t378irm.apps.googleusercontent.com';
-        const redirectUri = `${window.location.origin}/api/auth/google/callback`;
-        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&access_type=offline`;
-        window.location.href = googleAuthUrl;
+        window.location.href = '/api/auth/google';
     };
 
     return (
         <div className="auth-container">
             <div className="auth-background"></div>
 
-            {/* Top Bar with Language Switcher */}
+            {/* Top Bar with brand + theme + language */}
             <div className="auth-top-bar">
-                <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
-                    <span>{isAr ? '← الرئيسية' : '← Home'}</span>
-                </Link>
-                <button type="button" className="auth-lang-btn" onClick={toggleLanguage}>
-                    <Globe size={16} />
-                    <span>{isAr ? 'English' : 'العربية'}</span>
-                </button>
+                <div className="auth-top-bar-inner">
+                    <Link to="/" className="auth-brand">
+                        <img src="/hesaby_logo_lockup.svg" alt="Hesaby.ai" className="auth-brand-lockup logo-for-dark" />
+                        <img src="/hesaby_logo_lockup_light.svg" alt="Hesaby.ai" className="auth-brand-lockup logo-for-light" />
+                    </Link>
+                    <div className="auth-top-actions">
+                        <Link to="/" className="auth-home-link">{isAr ? 'الرئيسية' : 'Home'}</Link>
+                        <SkyToggle dark={!light} onToggle={() => setTheme(light ? 'dark' : 'light')} label={isAr ? (light ? 'التحويل للوضع الليلي' : 'التحويل للوضع الفاتح') : (light ? 'Switch to dark mode' : 'Switch to light mode')} />
+                        <button type="button" className="auth-lang-btn" onClick={toggleLanguage}>
+                            <Globe size={14} />
+                            <span>{isAr ? 'English' : 'العربية'}</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div className="auth-content">
                 <div className="auth-card">
                     {/* Header with Hesaby Logo */}
                     <div className="auth-header">
-                        <img 
-                            src="/hesaby_logo_icon.png" 
-                            alt="Hesaby ERP Logo" 
-                            className="auth-logo-img" 
+                        <img
+                            src="/hesaby_logo_icon.svg"
+                            alt="Hesaby ERP Logo"
+                            className="auth-logo-img"
                             onError={(e) => { e.target.style.display = 'none'; }}
                         />
                         <h1>
@@ -539,11 +551,11 @@ export default function SignUp() {
                                     onClick={() => setWorkspacePath('CREATE_COMPANY')}
                                 >
                                     <div>
-                                        <span className="workspace-card-badge" style={{ background: '#3b82f6', color: '#ffffff' }}>
-                                            {isAr ? '✨ فترة تجريبية 30 يوم' : '✨ 30-Day Pilot'}
+                                        <span className="workspace-card-badge">
+                                            {isAr ? 'فترة تجريبية 30 يوم' : '30-Day Pilot'}
                                         </span>
                                         <h3 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <Building2 size={18} color="#3b82f6" />
+                                            <Building2 size={18} color="#ff5a1f" />
                                             <span>{isAr ? 'إنشاء شركة جديدة' : 'Create New Company'}</span>
                                         </h3>
                                         <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
@@ -558,8 +570,8 @@ export default function SignUp() {
                                     onClick={() => setWorkspacePath('JOIN_COMPANY')}
                                 >
                                     <div>
-                                        <span className="workspace-card-badge" style={{ background: '#10b981', color: '#ffffff' }}>
-                                            {isAr ? '🤝 رابط / كود دعوة' : '🤝 Invite Link/Code'}
+                                        <span className="workspace-card-badge">
+                                            {isAr ? 'رابط / كود دعوة' : 'Invite Link/Code'}
                                         </span>
                                         <h3 style={{ margin: '0 0 6px 0', fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                                             <Users size={18} color="#10b981" />
@@ -674,9 +686,9 @@ export default function SignUp() {
                                 >
                                     {loading ? <Loader2 size={18} className="spin" /> : null}
                                     <span>
-                                        {workspacePath === 'CREATE_COMPANY' 
-                                            ? (isAr ? 'تأكيد وإنشاء حساب الشركة 🚀' : 'Create Company 🚀')
-                                            : (isAr ? 'الانضمام للشركة وتفعيل الحساب 🚀' : 'Join Company 🚀')
+                                        {workspacePath === 'CREATE_COMPANY'
+                                            ? (isAr ? 'تأكيد وإنشاء حساب الشركة' : 'Create Company')
+                                            : (isAr ? 'الانضمام للشركة وتفعيل الحساب' : 'Join Company')
                                         }
                                     </span>
                                 </button>
@@ -720,7 +732,7 @@ export default function SignUp() {
                                 type="button"
                                 onClick={() => setStep(2)}
                                 className="btn"
-                                style={{ marginTop: '12px', background: 'transparent', color: 'var(--color-primary)', width: '100%' }}
+                                style={{ marginTop: '12px', background: 'transparent', color: '#ff8a50', width: '100%' }}
                             >
                                 {isAr ? 'الرجوع لتعديل بيانات الشركة' : 'Back to Edit Details'}
                             </button>

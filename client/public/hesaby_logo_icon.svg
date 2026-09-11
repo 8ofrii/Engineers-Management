@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Hesaby">
+  <defs>
+    <linearGradient id="hxg" x1="10" y1="58" x2="54" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff8a50"/>
+      <stop offset="0.55" stop-color="#ff5a1f"/>
+      <stop offset="1" stop-color="#c2410c"/>
+    </linearGradient>
+  </defs>
+  <path d="M17 53V15" stroke="url(#hxg)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M47 53V11" stroke="url(#hxg)" stroke-width="9" stroke-linecap="round"/>
+  <path d="M17 40L47 28" stroke="url(#hxg)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

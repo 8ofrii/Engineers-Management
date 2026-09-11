@@ -1,1221 +1,219 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { billingAPI } from '../services/api';
 import { useFormat } from '../utils/format';
-import {
-    Building2, Sparkles, Camera, FileText, CheckCircle2, TrendingUp,
-    ShieldCheck, ArrowRight, ArrowLeft, Play, Check, Layers, Globe, Users,
-    Smartphone, Receipt, Scale, DollarSign, Clock, ChevronRight, ChevronLeft,
-    Zap, Award, Sun, Moon, ExternalLink, Lock, RefreshCw, AlertCircle,
-    BarChart3, Database, Inbox, CheckCircle, Flame, HardHat, FileSpreadsheet,
-    LogOut, Mail, MessageCircle
-} from 'lucide-react';
-import KineticGrid from '@/components/ui/kinetic-grid';
-import { FlowButton } from '@/components/ui/flow-button';
-import { BentoCard } from '@/components/ui/bento';
-import HesabyBentoGrid from '@/components/ui/hesaby-bento';
+import { Camera, Check, Globe, ShieldCheck, HardHat, Scale, DollarSign, Receipt, FileSpreadsheet, TrendingUp, Smartphone, Zap, Play, CheckCircle2 } from 'lucide-react';
+import SkyToggle from '@/components/ui/sky-toggle';
+import HandwritingText from '@/components/ui/handwriting-text';
+import { AuroraBackground } from '@/components/ui/aurora-background';
+import DisplayCards from '@/components/ui/display-cards';
+import { LampContainer } from '@/components/ui/lamp';
+import TubeNav from '@/components/ui/tubelight-navbar';
+import { motion, MotionConfig } from 'framer-motion';
+import { cn } from '@/lib/utils';
 import './Landing.css';
 
-const OCR_SCENARIOS = [
-    {
-        id: 'ezz-steel',
-        titleAr: '🧾 فاتورة حديد عز (مواد)',
-        titleEn: '🧾 Ezz Steel Tax Invoice',
-        vendorAr: 'شركة حديد عز للصناعة',
-        vendorEn: 'Ezz Steel Industry Co.',
-        projectAr: 'برج الأمل السكني',
-        projectEn: 'Al-Amal Tower',
-        categoryAr: 'حديد ومواد تسليح',
-        categoryEn: 'Rebar & Steel Materials',
-        amount: '185,000 EGP',
-        vat: '+25,900 EGP (14% VAT)',
-        taxNumber: '100-345-890',
-        date: '2026-08-28',
-        itemsAr: 'توريد 4 طن حديد تسليح مشرشر 16مم و12مم عالي المقاومة',
-        itemsEn: '4 Tons deformed high-tensile steel rebar 16mm & 12mm',
-        confidence: '99.8%'
-    },
-    {
-        id: 'lafarge-cement',
-        titleAr: '🏗️ فاتورة لافارج للأسمنت (خرسانة)',
-        titleEn: '🏗️ Lafarge Cement Invoice',
-        vendorAr: 'شركة لافارج مصر للأسمنت',
-        vendorEn: 'Lafarge Egypt Cement',
-        projectAr: 'فيلا التجمع الخامس',
-        projectEn: 'New Cairo Villa',
-        categoryAr: 'أسمنت ومواد بناء',
-        categoryEn: 'Cement & Building Materials',
-        amount: '42,600 EGP',
-        vat: '+5,964 EGP (14% VAT)',
-        taxNumber: '204-871-112',
-        date: '2026-08-29',
-        itemsAr: 'توريد 15 طن أسمنت بورتلاندي مقاوم للكبريتات',
-        itemsEn: '15 Tons Portland Sulfate-Resistant Bulk Cement',
-        confidence: '99.4%'
-    },
-    {
-        id: 'excavator-fuel',
-        titleAr: '⛽ إيصال وقود وطنية (معدات)',
-        titleEn: '⛽ Watanya Fuel Receipt',
-        vendorAr: 'محطة وطنية للبترول',
-        vendorEn: 'Watanya Petroleum',
-        projectAr: 'موقع العاصمة الإدارية',
-        projectEn: 'New Capital Site',
-        categoryAr: 'وقود ومعدات موقع',
-        categoryEn: 'Fuel & Site Equipment',
-        amount: '8,500 EGP',
-        vat: '+1,190 EGP (14% VAT)',
-        taxNumber: '310-992-441',
-        date: '2026-08-30',
-        itemsAr: 'تفويل سولار ديزل لحفار كاتربيلر ومولد الموقع',
-        itemsEn: 'Diesel fuel refill for CAT Excavator & Site Generator',
-        confidence: '99.1%'
-    }
+const SCEN = [
+  { id:'ezz', tAr:'فاتورة حديد عز', tEn:'Ezz Steel', vAr:'حديد عز', vEn:'Ezz Steel', pAr:'برج الأمل', pEn:'Al-Amal Tower', amt:'185,000 EGP', vat:'25,900 EGP', itemsAr:'4 طن حديد 16مم و12مم', itemsEn:'4t rebar 16/12mm', conf:'99.8%' },
+  { id:'laf', tAr:'فاتورة لافارج', tEn:'Lafarge', vAr:'لافارج مصر', vEn:'Lafarge Egypt', pAr:'فيلا التجمع', pEn:'New Cairo Villa', amt:'42,600 EGP', vat:'5,964 EGP', itemsAr:'15 طن أسمنت', itemsEn:'15t cement', conf:'99.4%' },
+  { id:'fuel', tAr:'إيصال وقود', tEn:'Fuel receipt', vAr:'وطنية', vEn:'Watanya', pAr:'العاصمة الإدارية', pEn:'New Capital', amt:'8,500 EGP', vat:'1,190 EGP', itemsAr:'سولار للحفار والمولد', itemsEn:'Diesel — excavator', conf:'99.1%' },
+];
+const PLANS = [
+  { key:'FREE', n:'Free Plan', nAr:'الباقة المجانية', d:'Ideal for site engineers & pilot testing on initial construction sites.', dAr:'مثالية لمهندسي المواقع وتجربة النظام على المشاريع الأولى.', price:0, f:['Up to 2 Active Projects','2 Dedicated Team Seats','150 AI Extractions / month','Daily Site Reports (DSR)','Site Custody & Mobile App'], fAr:['مشروعين هندسيين نشطين','عضوين بصلاحيات محددة','150 عملية ذكاء اصطناعي شهرياً','تقارير الموقع اليومية (DSR)','إدارة العهدة وتطبيق الموبايل'] },
+  { key:'PREMIUM', n:'Premium Plan', nAr:'الباقة المميزة (Premium)', d:'For active contractors and teams requiring real-time site control.', dAr:'لشركات المقاولات وفرق المواقع ذات العمليات المتواصلة.', price:2450, pop:true, f:['Up to 10 Active Projects','15 Multi-Role Team Seats','2,500 AI OCR & Actions / mo','Multi-Tier Financial Approvals','Workforce Wages & Inventory'], fAr:['10 مشاريع هندسية نشطة','15 مستخدم بصلاحيات متقدمة','2,500 عملية ذكاء اصطناعي شهرياً','دورة اعتمادات الصرف متعددة المستويات','سجل أجور العمالة والمخازن'] },
+  { key:'BUSINESS', n:'Business Plan', nAr:'باقة الأعمال (Business)', d:'For mid-sized contractors and developers running multi-site operations.', dAr:'لشركات المقاولات والتطوير العقاري وإدارة عدة مواقع متزامنة.', price:4450, f:['Up to 30 Active Projects','40 Team Seats & Roles','6,000 AI Agent Actions / mo','Multi-Site Safes & Egyptian VAT','Cost Variance & Audit Logging'], fAr:['30 مشروعاً وموقعاً متزامناً','40 مستخدماً مع سجل الصلاحيات','6,000 عملية ذكاء اصطناعي شهرياً','خزائن المواقع وفواتير ضريبة 14%','تحليل انحراف التكاليف وسجل التدقيق'] },
+  { key:'ENTERPRISE', n:'Enterprise Plan', nAr:'باقة الشركات (Enterprise)', d:'Dedicated infrastructure, custom SLAs, and unlimited capacity.', dAr:'بنية تحتية مخصصة، واتفاقية مستوى خدمة، وسعة غير محدودة.', price:null, f:['Unlimited Projects & Subcontracts','Unlimited Seats & Custom RBAC','Dedicated Isolated Database','15,000+ AI Extractions & SLA','Custom ERP API & 24/7 Support'], fAr:['مشاريع ومواقع وعقود غير محدودة','مستخدمين غير محدودين وصلاحيات مخصصة','قاعدة بيانات مخصصة ومعزولة','15,000+ عملية AI وضمان 99.9%','ربط أنظمة ERP ودعم فني مخصص 24/7'] },
 ];
 
 export default function Landing() {
-    const { t, i18n } = useTranslation();
-    const { user, logout } = useAuth();
-    const { currency } = useFormat();
-
-    const [plans, setPlans] = useState([]);
-    const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'annual'
-    const [activeTab, setActiveTab] = useState('ocr');
-    const [activeSection, setActiveSection] = useState('preview');
-
-    // Interactive slider for approval threshold preview
-    const [previewAmount, setPreviewAmount] = useState(25000);
-
-    // Active Section Scroll Tracking (Scrollspy)
-    useEffect(() => {
-        const sections = ['preview', 'pain', 'modules', 'pricing'];
-        const handleScroll = () => {
-            const scrollPos = window.scrollY + 240;
-            let current = 'preview';
-            for (const sectionId of sections) {
-                const el = document.getElementById(sectionId);
-                if (el) {
-                    const top = el.offsetTop;
-                    if (scrollPos >= top) {
-                        current = sectionId;
-                    }
-                }
-            }
-            setActiveSection(current);
-        };
-
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll();
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    // Interactive OCR Receipt AI Simulator State
-    const [selectedOcrScenario, setSelectedOcrScenario] = useState(0);
-    const [ocrStage, setOcrStage] = useState('extracted'); // 'idle' | 'scanning' | 'extracted' | 'posted'
-
-    const isRTL = i18n.language === 'ar';
-    const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
-
-    useEffect(() => {
-        billingAPI.listPlans()
-            .then(r => setPlans(r.data.data || []))
-            .catch(() => {
-                // Fallback default plans if offline
-                setPlans([
-                    {
-                        key: 'FREE',
-                        name: 'Free Plan',
-                        nameAr: 'الباقة المجانية',
-                        priceEgp: 0,
-                        features: ['2 Active Projects', '2 Team Seats', '150 AI Extractions / mo', 'Standard DSR & Ledger'],
-                        featuresAr: ['مشروعين نشطين', 'عضوين للفريق', '150 عملية ذكاء اصطناعي / شهر', 'تقارير يومية ودفتر الأستاذ']
-                    },
-                    {
-                        key: 'PREMIUM',
-                        name: 'Premium Plan',
-                        nameAr: 'الباقة المميزة (Premium)',
-                        priceEgp: 2450,
-                        popular: true,
-                        features: ['10 Active Projects', '15 Team Seats', '1,000 AI Actions / mo', 'Bank Reconciliation & Approvals'],
-                        featuresAr: ['10 مشاريع نشطة', '15 مستخدم بصلاحيات متقدمة', '1,000 عملية ذكاء اصطناعي / شهر', 'المطابقة البنكية ونظام الموافقات']
-                    },
-                    {
-                        key: 'BUSINESS',
-                        name: 'Business Plan',
-                        nameAr: 'باقة الأعمال (Business)',
-                        priceEgp: 4450,
-                        features: ['30 Active Projects', '40 Team Seats', '3,500 AI Actions / mo', 'Full Audit Logs & VAT Invoicing'],
-                        featuresAr: ['30 مشروع نشط', '40 مستخدم بصلاحيات كاملة', '3,500 عملية ذكاء اصطناعي / شهر', 'سجلات التدقيق وفواتير ضريبة القيمة المضافة']
-                    },
-                    {
-                        key: 'ENTERPRISE',
-                        name: 'Enterprise Plan',
-                        nameAr: 'باقة الشركات (Enterprise)',
-                        priceEgp: null,
-                        isCustom: true,
-                        features: ['Unlimited Projects & Users', 'Dedicated Database Instance', '10,000+ AI Actions & SLA', '24/7 Dedicated Account Manager'],
-                        featuresAr: ['مشاريع ومستخدمين غير محدودين', 'قاعدة بيانات مخصصة للشركة', '10,000+ عملية ذكاء اصطناعي مع SLA', 'مدير حساب ودعم فني مخصص 24/7']
-                    }
-                ]);
-            });
-    }, [isRTL]);
-
-    const toggleLang = () => {
-        const newLang = isRTL ? 'en' : 'ar';
-        i18n.changeLanguage(newLang);
-        document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
-    };
-
-    const getApproverForAmount = (amt) => {
-        if (amt <= 5000) return { role: isRTL ? 'مهندس الموقع' : 'Site Engineer', color: '#10b981', note: isRTL ? 'موافقة فورية ضمن عهدة الموقع' : 'Auto-approved within site custody' };
-        if (amt <= 50000) return { role: isRTL ? 'مدير المشروع' : 'Project Manager', color: '#f59e0b', note: isRTL ? 'تتطلب اعتماد مدير المشروع الهندسي' : 'Requires Project Manager Sign-off' };
-        return { role: isRTL ? 'المدير العام / الإدارة العليا' : 'General Manager / Executive', color: '#ef4444', note: isRTL ? 'تتطلب موافقة مجلس الإدارة' : 'Requires Executive Board Approval' };
-    };
-
-    return (
-        <KineticGrid globalColor="default" className="min-h-screen bg-[#090d16] text-slate-100 font-sans">
-            <div className="landing-wrapper" dir={isRTL ? 'rtl' : 'ltr'}>
-                {/* Ambient Background & Subtle Masked Dots */}
-                <div className="landing-ambient-bg">
-                    <div className="landing-bg-dots"></div>
-                    <div className="landing-hero-spotlight"></div>
-                    <div className="landing-glow-secondary"></div>
-                </div>
-
-                {/* ---------- 1. Floating Tubelight Nav Dock ---------- */}
-                <div className="landing-header-wrap">
-                    <header className="landing-nav-container">
-                        <Link to="/" className="landing-brand">
-                            <div className="landing-logo-badge">
-                                <Building2 size={20} />
-                            </div>
-                            <div className="landing-brand-text">
-                                <span>Hesaby<span style={{ color: '#f97316' }}>.ai</span></span>
-                                <span className="landing-version-pill">
-                                    ERP 2.0
-                                </span>
-                            </div>
-                        </Link>
-
-                        {/* Navigation Links with Active Tubelight Indicator */}
-                        <nav className="landing-nav-links">
-                            {[
-                                { id: 'preview', label: t('landing.nav.preview', 'Live Preview'), labelAr: 'العرض التفاعلي' },
-                                { id: 'pain', label: t('landing.nav.features', 'Why Us'), labelAr: 'لماذا حسابي' },
-                                { id: 'modules', label: t('landing.nav.modules', 'ERP Modules'), labelAr: 'الموديولات' },
-                                { id: 'pricing', label: t('landing.nav.pricing', 'Pricing'), labelAr: 'الأسعار والباقات' },
-                            ].map((item) => {
-                                const isActive = activeSection === item.id;
-                                return (
-                                    <a 
-                                        key={item.id} 
-                                        href={`#${item.id}`} 
-                                        className={`landing-nav-link ${isActive ? 'active' : ''}`}
-                                    >
-                                        <span className={`landing-nav-dot ${isActive ? 'active' : ''}`} />
-                                        <span>{isRTL ? item.labelAr : item.label}</span>
-                                    </a>
-                                );
-                            })}
-                        </nav>
-
-                        {/* Actions */}
-                        <div className="landing-nav-actions">
-                            <button
-                                type="button"
-                                onClick={toggleLang}
-                                className="landing-icon-btn"
-                                title="Toggle Language"
-                            >
-                                <Globe size={15} />
-                                <span>{isRTL ? 'English' : 'عربي'}</span>
-                            </button>
-
-                            {user ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Link to="/dashboard">
-                                        <FlowButton
-                                            variant="light"
-                                            text={t('landing.nav.openApp', 'Dashboard')}
-                                            className="px-5 py-2 text-xs"
-                                        />
-                                    </Link>
-                                    <button
-                                        type="button"
-                                        onClick={logout}
-                                        className="landing-btn-logout"
-                                        title={isRTL ? 'تسجيل الخروج' : 'Sign Out'}
-                                    >
-                                        <LogOut size={14} />
-                                        <span>{isRTL ? 'خروج' : 'Sign Out'}</span>
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    <Link to="/login" className="landing-icon-btn" style={{ fontWeight: 700 }}>
-                                        {t('landing.nav.signIn', 'Sign In')}
-                                    </Link>
-                                    <Link to="/signup">
-                                        <FlowButton
-                                            variant="hesaby"
-                                            text={t('landing.nav.startFree', 'Start Free')}
-                                            className="px-5 py-2 text-xs"
-                                        />
-                                    </Link>
-                                </>
-                            )}
-                        </div>
-                    </header>
-                </div>
-
-                <main style={{ position: 'relative', zIndex: 10, flexGrow: 1 }}>
-                    {/* ---------- 2. Hero Section ---------- */}
-                    <section className="landing-hero">
-                        <div className="landing-hero-badge">
-                            <span className="landing-pulse-dot"></span>
-                            <span>{t('landing.badge', 'Hesaby ERP 2.0 · Built for Egyptian Construction & Engineering')}</span>
-                        </div>
-
-                        <h1 className="landing-hero-title">
-                            {t('landing.heroTitle1', isRTL ? 'فواتيرك، تقاريرك، وميزانيات مشاريعك...' : 'Your Receipts, Site Reports & Budgets...')}<br />
-                            <span className="landing-accent-gradient">
-                                {t('landing.heroTitle2', isRTL ? 'مدققة ومطابقة في ثوانٍ معدودة.' : 'Reconciled & Audited in Seconds.')}
-                            </span>
-                        </h1>
-
-                        <p className="landing-hero-subtitle">
-                            {t('landing.heroSubtitle', isRTL ? 'النظام المحاسبي والهندسي السحابي لشركات المقاولات والاستشارات في مصر. حوّل الفواتير المصورة والتقارير اليومية إلى قيود أستاذ مدققة وخزائن حية ومطابقات بنكية فورية بنقرة واحدة.' : 'The comprehensive AI-powered ERP tailored for Egyptian construction firms and engineering consultancies. Turn paper receipts, daily site reports, and bank statements into audit-proof ledgers, real-time safes, and automated tax books in one click.')}
-                        </p>
-
-                        <div className="landing-hero-actions" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
-                            <Link to={user ? '/dashboard' : '/signup'}>
-                                <FlowButton 
-                                    variant="hesaby" 
-                                    text={user ? t('landing.nav.openApp', 'Open Dashboard') : t('landing.startPilot', 'Start Your Free Pilot')} 
-                                />
-                            </Link>
-
-                            <a href="#preview">
-                                <FlowButton 
-                                    variant="light" 
-                                    text={t('landing.seeFeatures', 'Explore System')} 
-                                />
-                            </a>
-                        </div>
-
-                    <div className="landing-trust-bar">
-                        <div className="landing-trust-item">
-                            <CheckCircle2 size={16} className="landing-trust-icon" />
-                            <span>{t('landing.trustNoCard', 'No credit card required · Free forever for 1 project')}</span>
-                        </div>
-                        <div className="landing-trust-item">
-                            <CheckCircle2 size={16} className="landing-trust-icon" />
-                            <span>{t('landing.trustVat', '100% Egyptian VAT Compliant (14% VAT)')}</span>
-                        </div>
-                        <div className="landing-trust-item">
-                            <CheckCircle2 size={16} className="landing-trust-icon" />
-                            <span>{t('landing.trustOffline', 'Field-ready for low-connectivity site conditions')}</span>
-                        </div>
-                    </div>
-                </section>
-
-                {/* ---------- 3. Interactive Live ERP Showcase ---------- */}
-                <section id="preview" className="landing-preview-section">
-                    <div className="landing-section-header">
-                        <span className="landing-section-tag">{t('landing.preview.tag', 'Live Interactive Showcase')}</span>
-                        <h2 className="landing-section-title">
-                            {t('landing.preview.title', 'Experience Hesaby ERP at Site and in the Office')}
-                        </h2>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className="landing-tabs-container">
-                        {[
-                            { key: 'ocr', label: isRTL ? 'المسح الضوئي للفواتير (OCR)' : 'Smart Receipt & PDF OCR', icon: Camera },
-                            { key: 'safes', label: isRTL ? 'الخزائن ونظام الأرباح' : 'Safes & Profit Engine', icon: DollarSign },
-                            { key: 'dsr', label: isRTL ? 'التقارير اليومية (DSR)' : 'Daily Site Reports (DSR)', icon: HardHat },
-                            { key: 'recon', label: isRTL ? 'المطابقة البنكية' : 'Smart Bank Reconciliation', icon: Scale },
-                            { key: 'approval', label: isRTL ? 'سلسلة الموافقات' : 'Multi-Level Approvals', icon: ShieldCheck },
-                        ].map(tab => {
-                            const TabIcon = tab.icon;
-                            return (
-                                <button
-                                    key={tab.key}
-                                    type="button"
-                                    onClick={() => setActiveTab(tab.key)}
-                                    className={`landing-tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-                                >
-                                    <TabIcon size={16} />
-                                    <span>{tab.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Bento Showcase Card */}
-                    <div className="landing-showcase-window">
-                        {/* Ambient Card Lights */}
-                        <div className="absolute -top-32 -right-32 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-                        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-                        {/* Top Modern Status Bar */}
-                        <div className="landing-window-header">
-                            <div className="landing-window-badge">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                <span>LIVE ERP SIMULATOR</span>
-                            </div>
-                            <div className="landing-window-title">
-                                <Building2 size={13} className="text-cyan-400" />
-                                <span>hesaby.ai/app/{activeTab}</span>
-                            </div>
-                            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-mono">
-                                <ShieldCheck size={13} className="text-emerald-400" />
-                                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">v2.4</span>
-                            </div>
-                        </div>
-
-                        <div className="landing-window-body">
-                            {/* Tab 1: Smart Receipt & PDF OCR */}
-                            {activeTab === 'ocr' && (() => {
-                                const currentScenario = OCR_SCENARIOS[selectedOcrScenario] || OCR_SCENARIOS[0];
-                                const isScanning = ocrStage === 'scanning';
-                                const isPosted = ocrStage === 'posted';
-
-                                return (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2.5rem', alignItems: 'center' }}>
-                                        <div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                                                    {isRTL ? 'المسح الضوئي الذكي للفواتير (AI OCR)' : 'Smart AI Document & Receipt OCR'}
-                                                </span>
-                                                <span style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', padding: '2px 8px', borderRadius: 12, fontSize: '0.68rem', fontWeight: 800 }}>
-                                                    LIVE DEMO
-                                                </span>
-                                            </div>
-
-                                            <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '6px 0 12px', color: '#fff', lineHeight: 1.3 }}>
-                                                {isRTL ? 'التقط صورة الفاتورة أو ارفع ملف PDF.. والاستخراج فوري' : 'Snap Receipt Photo or Upload PDF.. Structured Instantly'}
-                                            </h3>
-
-                                            <p style={{ color: 'var(--landing-text-muted)', lineHeight: 1.65, fontSize: '0.92rem', marginBottom: '16px' }}>
-                                                {isRTL
-                                                    ? 'يمسح محرك الذكاء الاصطناعي فواتير الموقع، ويستخرج اسم المورد، الرقم الضريبي، تاريخ المعاملة، وتفاصيل البنود ونسبة الـ 14% VAT دون كتابة يدوية:'
-                                                    : 'AI scans site receipts, extracting vendor, Egyptian Tax ID, date, line items, and 14% VAT breakdown with zero manual entry:'}
-                                            </p>
-
-                                            {/* Scenario Switcher Pills */}
-                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                                                {OCR_SCENARIOS.map((sc, idx) => (
-                                                    <button
-                                                        key={sc.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setSelectedOcrScenario(idx);
-                                                            setOcrStage('scanning');
-                                                            setTimeout(() => setOcrStage('extracted'), 400);
-                                                        }}
-                                                        className={`scenario-pill ${selectedOcrScenario === idx ? 'active' : ''}`}
-                                                    >
-                                                        {isRTL ? sc.titleAr : sc.titleEn}
-                                                    </button>
-                                                ))}
-                                            </div>
-
-                                            {/* Action Buttons */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                                                <FlowButton
-                                                    variant="cyan"
-                                                    icon={Camera}
-                                                    text={isRTL ? 'إعادة مسح الفاتورة ضوئياً' : 'Scan & Extract Receipt'}
-                                                    onClick={() => {
-                                                        setOcrStage('scanning');
-                                                        setTimeout(() => setOcrStage('extracted'), 500);
-                                                    }}
-                                                />
-
-                                                {isScanning && (
-                                                    <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <Sparkles size={15} className="animate-spin" />
-                                                        {isRTL ? 'جارٍ قراءة البنود والضريبة...' : 'AI Scanning & Extracting...'}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Dynamic Scanned Voucher Card (Bento Sub-Card) */}
-                                        <div className="relative overflow-hidden rounded-2xl bg-[#0b101b]/95 border border-white/20 ring-1 ring-white/10 shadow-2xl p-6 transition-all duration-300">
-                                            {isPosted ? (
-                                                /* Success Posted State */
-                                                <div style={{ textAlign: 'center', padding: '16px 8px' }}>
-                                                    <div style={{
-                                                        width: 56,
-                                                        height: 56,
-                                                        borderRadius: '50%',
-                                                        background: 'rgba(16, 185, 129, 0.12)',
-                                                        color: '#10b981',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        margin: '0 auto 16px',
-                                                        border: '2px solid rgba(16, 185, 129, 0.5)',
-                                                        boxShadow: '0 0 20px rgba(16, 185, 129, 0.25)'
-                                                    }}>
-                                                        <CheckCircle2 size={30} />
-                                                    </div>
-                                                    <h4 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff', margin: '0 0 8px' }}>
-                                                        {isRTL ? 'تم الترحيل بنجاح إلى الخزينة ودفتر الأستاذ!' : 'Successfully Posted to Safe & Ledger!'}
-                                                    </h4>
-                                                    <p style={{ fontSize: '0.86rem', color: '#94a3b8', margin: '0 0 20px', lineHeight: 1.6 }}>
-                                                        {isRTL
-                                                            ? `تم خصم ${currentScenario.amount} من خزينة ${currentScenario.projectAr} وترحيل ضريبة القيمة المضافة (${currentScenario.vat}) إلى سجل الضرائب تلقائياً.`
-                                                            : `Debited ${currentScenario.amount} from ${currentScenario.projectEn} safe and recorded ${currentScenario.vat} in tax ledger.`}
-                                                    </p>
-
-                                                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                                                        <FlowButton
-                                                            variant="light"
-                                                            icon={RefreshCw}
-                                                            text={isRTL ? 'تجربة فاتورة أخرى' : 'Try Another Invoice'}
-                                                            onClick={() => {
-                                                                setSelectedOcrScenario((selectedOcrScenario + 1) % OCR_SCENARIOS.length);
-                                                                setOcrStage('extracted');
-                                                            }}
-                                                        />
-                                                        <Link to="/signup">
-                                                            <FlowButton
-                                                                variant="emerald"
-                                                                text={isRTL ? 'ابدأ حساب شركتك مجاناً' : 'Get Started Free'}
-                                                            />
-                                                        </Link>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                /* Standard Scanned OCR Card */
-                                                <>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                                            <span style={{ fontWeight: 700, fontSize: '0.86rem', color: '#fff' }}>
-                                                                {isRTL ? 'فاتورة ضريبية مقروءة بنجاح' : 'Tax Invoice OCR Verified'}
-                                                            </span>
-                                                        </div>
-                                                        <span style={{ fontSize: '0.74rem', color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: 8, fontWeight: 700 }}>
-                                                            {currentScenario.confidence} AI Accuracy
-                                                        </span>
-                                                    </div>
-
-                                                    {/* Items / Description Note */}
-                                                    <div className="bg-slate-900/70 border border-white/10 rounded-xl p-3.5 text-xs text-slate-300 font-mono mb-3.5 leading-relaxed">
-                                                        <strong className="text-white">{isRTL ? 'بيان البنود: ' : 'Line Items: '}</strong>
-                                                        {isRTL ? currentScenario.itemsAr : currentScenario.itemsEn}
-                                                    </div>
-
-                                                    {/* Parsed Fields Grid */}
-                                                    <div className="grid grid-cols-2 gap-2.5 mb-4">
-                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
-                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'إجمالي الفاتورة' : 'Total Amount'}</div>
-                                                            <div className="font-mono font-black text-emerald-400 text-lg">{currentScenario.amount}</div>
-                                                        </div>
-                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
-                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'ضريبة القيمة المضافة (14%)' : 'VAT (14%)'}</div>
-                                                            <div className="font-mono font-bold text-cyan-400 text-sm">{currentScenario.vat}</div>
-                                                        </div>
-                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
-                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'المورد / السجل' : 'Vendor / Tax ID'}</div>
-                                                            <div className="font-bold text-white text-xs truncate">{isRTL ? currentScenario.vendorAr : currentScenario.vendorEn}</div>
-                                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{currentScenario.taxNumber}</div>
-                                                        </div>
-                                                        <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
-                                                            <div className="text-slate-400 text-[11px] mb-1">{isRTL ? 'المشروع والتصنيف' : 'Project & Category'}</div>
-                                                            <div className="font-bold text-amber-400 text-xs truncate">{isRTL ? currentScenario.projectAr : currentScenario.projectEn}</div>
-                                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{isRTL ? currentScenario.categoryAr : currentScenario.categoryEn}</div>
-                                                        </div>
-                                                    </div>
-
-                                                    <FlowButton
-                                                        variant="emerald"
-                                                        icon={CheckCircle2}
-                                                        className="w-full justify-center py-3 text-sm font-bold shadow-lg ring-1 ring-emerald-500/30"
-                                                        text={isRTL ? 'اعتماد وترحيل فوري إلى الخزينة' : 'Approve & Post to Safe'}
-                                                        onClick={() => setOcrStage('posted')}
-                                                    />
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* Tab 2: Safes & Profit Engine */}
-                            {activeTab === 'safes' && (
-                                <div>
-                                    <div style={{ textAlign: 'center', maxWidth: 620, margin: '0 auto 24px' }}>
-                                        <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold font-mono">
-                                            {isRTL ? 'محرك الأرباح الذكي' : 'Smart Profit Engine'}
-                                        </span>
-                                        <h3 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', margin: '6px 0 10px' }}>
-                                            {isRTL ? 'محرك الأرباح V1.2 وفصل الخزائن المحكم' : 'V1.2 Office Profit Engine & Dual Safes'}
-                                        </h3>
-                                        <p style={{ color: 'var(--landing-text-muted)', fontSize: '0.92rem', lineHeight: 1.65 }}>
-                                            {isRTL
-                                                ? 'عزل كامل بين أموال المالك وخزينة المكتب مع تحويل آلي لنسبة الإشراف الإدارية (Management Fee) فور اعتماد المصروف.'
-                                                : 'Complete isolation between Project Safe and Office Safe with automated management fee allocation.'}
-                                        </p>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                                        <div className="group relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-6 shadow-xl hover:border-blue-500/50 transition-all">
-                                            <div className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">
-                                                {isRTL ? 'خزينة المشروع (Project Safe)' : 'Project Safe'}
-                                            </div>
-                                            <div className="text-3xl font-mono font-black text-white mb-2">2,450,000 EGP</div>
-                                            <div className="text-xs text-slate-400">
-                                                {isRTL ? 'مخصص للمواد، المقاولين، والمصنعيات المباشرة' : 'Reserved for site materials & contractor wages'}
-                                            </div>
-                                        </div>
-
-                                        <div className="group relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-6 shadow-xl hover:border-emerald-500/50 transition-all">
-                                            <div className="text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
-                                                {isRTL ? 'خزينة وأرباح المكتب (Office Safe)' : 'Office Safe & Revenue'}
-                                            </div>
-                                            <div className="text-3xl font-mono font-black text-emerald-400 mb-2">367,500 EGP</div>
-                                            <div className="text-xs text-slate-400">
-                                                {isRTL ? 'صافي نسبة الإشراف المحصلة (15% Net Fee)' : 'Earned Management Fees (15% Net Margin)'}
-                                            </div>
-                                        </div>
-
-                                        <div className="group relative overflow-hidden rounded-2xl bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-6 shadow-xl hover:border-amber-500/50 transition-all">
-                                            <div className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
-                                                {isRTL ? 'التحويل الآلي للأرباح' : 'Automated Margin Transfer'}
-                                            </div>
-                                            <div className="text-3xl font-mono font-black text-amber-400 mb-2">+3,675 EGP</div>
-                                            <div className="text-xs text-slate-400">
-                                                {isRTL ? 'يُحوّل تلقائياً لحظة اعتماد كل مصروف' : 'Auto-credited upon each approved site expense'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Tab 3: Daily Site Reports */}
-                            {activeTab === 'dsr' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                                    <div>
-                                        <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold font-mono">
-                                            {isRTL ? 'متابعة الموقع لحظة بلحظة' : 'Field Operations & Workforce'}
-                                        </span>
-                                        <h3 className="text-2xl font-bold text-white mt-1.5 mb-3">
-                                            {isRTL ? 'تقارير يومية DSR معتمدة وموثقة' : 'Verified Daily Site Reports (DSR)'}
-                                        </h3>
-                                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                                            {isRTL
-                                                ? 'سجل درجات الحرارة والطقس، حضور العمالة، تشوينات المواد، صب الخرسانات، وتوقيع الاستشاري الرقمي في تقرير رسمي فوري.'
-                                                : 'Track weather conditions, labor headcounts, equipment hours, material deliveries, and digital supervisor sign-offs.'}
-                                        </p>
-                                        <FlowButton
-                                            variant="cyan"
-                                            icon={HardHat}
-                                            text={isRTL ? 'استعراض تقرير موقع تجريبي' : 'View Sample DSR'}
-                                        />
-                                    </div>
-
-                                    <div className="relative overflow-hidden rounded-2xl bg-[#0b101b]/95 border border-white/15 ring-1 ring-white/5 p-6 shadow-2xl">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <div>
-                                                <div className="font-bold text-white text-sm">{isRTL ? 'تقرير الموقع اليومي #142' : 'Daily Site Report #142'}</div>
-                                                <div className="text-xs text-slate-400">{isRTL ? 'برج النرجس — التجمع الخامس' : 'Al-Narges Tower — New Cairo'}</div>
-                                            </div>
-                                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-                                                {isRTL ? 'معتمد من الاستشاري' : 'Consultant Approved'}
-                                            </span>
-                                        </div>
-
-                                        <div className="grid grid-cols-3 gap-3 my-4 text-center">
-                                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
-                                                <div className="text-lg font-mono font-black text-cyan-400">34</div>
-                                                <div className="text-[11px] text-slate-400 mt-0.5">{isRTL ? 'حضور العمال' : 'Labor Count'}</div>
-                                            </div>
-                                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
-                                                <div className="text-lg font-mono font-black text-amber-400">☀️ 31°C</div>
-                                                <div className="text-[11px] text-slate-400 mt-0.5">{isRTL ? 'طقس معتدل' : 'Weather'}</div>
-                                            </div>
-                                            <div className="bg-slate-900/80 border border-white/10 rounded-xl p-3">
-                                                <div className="text-lg font-mono font-black text-emerald-400">60 m³</div>
-                                                <div className="text-[11px] text-slate-400 mt-0.5">{isRTL ? 'صب خرسانة' : 'Concrete Pour'}</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="text-xs text-slate-300 bg-slate-900/60 border border-white/10 rounded-xl p-3.5 leading-relaxed font-mono">
-                                            <strong className="text-white">{isRTL ? 'ملاحظة المهندس: ' : 'Engineer Note: '}</strong>
-                                            {isRTL ? 'تم الانتهاء من حدادة وسقف الدور الثالث وجاري الاستلام الهندسي.' : 'Completed 3rd floor rebar; ready for structural inspection.'}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Tab 4: Smart Bank Reconciliation */}
-                            {activeTab === 'recon' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                                    <div>
-                                        <span className="text-xs uppercase tracking-wider text-emerald-400 font-semibold font-mono">
-                                            {isRTL ? 'مطابقة الحسابات البنكية' : 'Bank Reconciliation Engine'}
-                                        </span>
-                                        <h3 className="text-2xl font-bold text-white mt-1.5 mb-3">
-                                            {isRTL ? 'ارفع كشف الحساب البنكي.. والمطابقة في ثوانٍ' : 'Instant CSV Statement Auto-Matching'}
-                                        </h3>
-                                        <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                                            {isRTL
-                                                ? 'متوافق مع كشوف حساب البنك الأهلي NBE، بنك مصر، وCIB. يطابق الإيداعات والمسحوبات مع قيود الدفتر ويكشف أي فرق مالي.'
-                                                : 'Parses NBE, CIB, and Banque Misr statements. Matches thousands of transactions and flags discrepancies automatically.'}
-                                        </p>
-                                        <FlowButton
-                                            variant="emerald"
-                                            icon={Scale}
-                                            text={isRTL ? 'مطابقة كشف حساب بنكي' : 'Auto-Match Statement'}
-                                        />
-                                    </div>
-
-                                    <div className="relative overflow-hidden rounded-2xl bg-[#0b101b]/95 border border-white/15 ring-1 ring-white/5 p-6 shadow-2xl">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <span className="font-bold text-white text-sm">{isRTL ? 'كشف حساب NBE — حساب المقاولات' : 'NBE Corporate Account'}</span>
-                                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">100% Matched</span>
-                                        </div>
-
-                                        <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-4">
-                                            <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 w-full"></div>
-                                        </div>
-
-                                        <div className="flex flex-col gap-2.5 text-xs font-mono">
-                                            <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-slate-200">
-                                                <span>{isRTL ? 'تحويل دفعة عميل (برج الأمل)' : 'Client Inflow (Al-Amal)'}</span>
-                                                <strong className="text-emerald-400 font-bold">+450,000 EGP</strong>
-                                            </div>
-                                            <div className="flex justify-between items-center p-3 rounded-xl bg-rose-950/20 border border-rose-500/20 text-slate-200">
-                                                <span>{isRTL ? 'شيك مصنع حديد عز' : 'Ezz Steel Vendor Check'}</span>
-                                                <strong className="text-rose-400 font-bold">-185,000 EGP</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Tab 5: Multi-Level Approvals */}
-                            {activeTab === 'approval' && (
-                                <div>
-                                    <div className="text-center max-w-xl mx-auto mb-6">
-                                        <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold font-mono">
-                                            {isRTL ? 'الحوكمة الهندسية' : 'Governance & Routing'}
-                                        </span>
-                                        <h3 className="text-2xl font-bold text-white mt-1.5 mb-2">
-                                            {isRTL ? 'سلسلة الموافقات والصلاحيات التلقائية' : 'Configurable Approval Thresholds'}
-                                        </h3>
-                                        <p className="text-slate-400 text-sm">
-                                            {isRTL
-                                                ? 'حدد سقف الاعتماد المالي لكل دور هندسي لمنع الصرف غير المصرح به وضمان التدقيق المحاسبي.'
-                                                : 'Enforce approval limits by amount. Move the slider to test threshold routing.'}
-                                        </p>
-                                    </div>
-
-                                    {/* Slider Container */}
-                                    <div className="max-w-md mx-auto mb-6 bg-slate-900/80 border border-white/15 ring-1 ring-white/5 p-5 rounded-2xl shadow-xl">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <span className="text-xs text-slate-300 font-medium">{isRTL ? 'قيمة المصروف التجريبي:' : 'Sample Expense Amount:'}</span>
-                                            <span className="text-white font-mono font-black text-lg bg-white/5 border border-white/10 px-3 py-1 rounded-lg">
-                                                {currency(previewAmount)}
-                                            </span>
-                                        </div>
-                                        <input
-                                            type="range"
-                                            min="1000"
-                                            max="150000"
-                                            step="1000"
-                                            value={previewAmount}
-                                            onChange={(e) => setPreviewAmount(Number(e.target.value))}
-                                            className="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg"
-                                        />
-                                        <div className="flex justify-between text-[11px] text-slate-400 font-mono mt-2">
-                                            <span>1,000 EGP</span>
-                                            <span>50,000 EGP</span>
-                                            <span>150,000+ EGP</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Calculated Result */}
-                                    {(() => {
-                                        const approver = getApproverForAmount(previewAmount);
-                                        return (
-                                            <div className="max-w-md mx-auto bg-slate-900/90 border border-white/20 ring-1 ring-white/10 rounded-2xl p-5 text-center shadow-2xl relative overflow-hidden">
-                                                <div className="text-xs text-slate-400 mb-1">
-                                                    {isRTL ? 'المسؤول المطلوب للاعتماد:' : 'Required Approval Authority:'}
-                                                </div>
-                                                <div className="text-xl font-bold mb-1" style={{ color: approver.color }}>
-                                                    {approver.role}
-                                                </div>
-                                                <div className="text-xs text-slate-300">
-                                                    {approver.note}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </section>
-
-                {/* ---------- 4. Pain Points: Before vs After (Bento Style) ---------- */}
-                <section id="pain" className="landing-preview-section" style={{ paddingTop: '2.5rem' }}>
-                    <div className="landing-section-header">
-                        <span className="landing-section-tag">{t('landing.pain.tag', 'Why Hesaby ERP?')}</span>
-                        <h2 className="landing-section-title">
-                            {t('landing.pain.title', 'Contractor Bottlenecks Solved for Good')}
-                        </h2>
-                    </div>
-
-                    {/* Elevated Glass Tray Container Behind All Cards */}
-                    <div className="max-w-6xl mx-auto mt-10 rounded-3xl p-5 sm:p-8 bg-slate-900/60 border border-white/15 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.1)] relative overflow-hidden">
-                        {/* Ambient diffuse backlights */}
-                        <div className="absolute -top-20 -left-20 w-80 h-80 bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
-                        <div className="absolute top-1/3 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-                        <div className="absolute -bottom-20 left-1/4 w-80 h-80 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                            <BentoCard
-                                eyebrow={
-                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-rose-400 font-semibold">
-                                        <Receipt className="w-3.5 h-3.5" />
-                                        {isRTL ? 'المستندات الورقية' : 'Paper Invoices'}
-                                    </span>
-                                }
-                                title={t('landing.pain.p1Title', 'Lost & Ruined Paper Receipts')}
-                                description={t('landing.pain.p1Desc', 'Paper invoices get destroyed in dusty site pockets before Friday payroll. With Hesaby, snap a photo or upload a PDF; AI extracts vendor and items immediately.')}
-                                graphic={
-                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-rose-950/50 p-6 flex items-center justify-center">
-                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-rose-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
-                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                                <span className="text-xs font-mono text-rose-300 flex items-center gap-1 font-semibold">
-                                                    <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> {isRTL ? 'فاتورة تالفة في الجيب' : 'Damaged Receipt'}
-                                                </span>
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">SITE POCKET #4</span>
-                                            </div>
-                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? '14,200 ج.م حديد مشرشر غير مقيد قبل تصفية الجمعة' : '14,200 EGP unrecorded rebar before Friday cutoff'}</p>
-                                        </div>
-                                    </div>
-                                }
-                                fade={["bottom"]}
-                                className="border-rose-500/30 hover:border-rose-400/80 shadow-[0_12px_36px_rgba(244,63,94,0.12)]"
-                            />
-
-                            <BentoCard
-                                eyebrow={
-                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-amber-400 font-semibold">
-                                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                                        {isRTL ? 'تضارب الشيتات' : 'Spreadsheet Drift'}
-                                    </span>
-                                }
-                                title={t('landing.pain.p2Title', 'Excel Spreadsheet Chaos')}
-                                description={t('landing.pain.p2Desc', 'Site engineers use v3.xlsx while the office uses v5.xlsx and the bank statement matches neither. Hesaby unifies everything in real-time.')}
-                                graphic={
-                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-amber-950/50 p-6 flex items-center justify-center">
-                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-amber-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
-                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                                <span className="text-xs font-mono text-amber-300 font-semibold">v3_final_revised.xlsx</span>
-                                                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">OUT OF SYNC</span>
-                                            </div>
-                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? 'فرق 230,000 ج.م بين الموقع وخزينة المكتب' : '230,000 EGP discrepancy vs Office Safe'}</p>
-                                        </div>
-                                    </div>
-                                }
-                                fade={["bottom"]}
-                                className="border-amber-500/30 hover:border-amber-400/80 shadow-[0_12px_36px_rgba(245,158,11,0.12)]"
-                            />
-
-                            <BentoCard
-                                eyebrow={
-                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-sky-400 font-semibold">
-                                        <ShieldCheck className="w-3.5 h-3.5" />
-                                        {isRTL ? 'صلاحيات الاعتماد' : 'Authorization'}
-                                    </span>
-                                }
-                                title={t('landing.pain.p3Title', 'WhatsApp Approval Amnesia')}
-                                description={t('landing.pain.p3Desc', 'Who authorized that 150,000 EGP cement delivery? Nobody remembers. Hesaby enforces role-based approval thresholds with immutable audit logs.')}
-                                graphic={
-                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-sky-950/50 p-6 flex items-center justify-center">
-                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-sky-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
-                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                                <span className="text-xs font-mono text-sky-300 flex items-center gap-1 font-semibold">
-                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {isRTL ? 'سجل تدقيق رسمي' : 'Audit Trail Sign-off'}
-                                                </span>
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono font-bold">148.251.171.147</span>
-                                            </div>
-                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? 'معتمد من مدير المشروع · الساعة 10:14 ص' : 'Signed by Project Manager · 10:14 AM'}</p>
-                                        </div>
-                                    </div>
-                                }
-                                fade={["bottom"]}
-                                className="border-sky-500/30 hover:border-sky-400/80 shadow-[0_12px_36px_rgba(56,189,248,0.12)]"
-                            />
-
-                            <BentoCard
-                                eyebrow={
-                                    <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-orange-400 font-semibold">
-                                        <TrendingUp className="w-3.5 h-3.5" />
-                                        {isRTL ? 'أرباح الإشراف' : 'Management Fee'}
-                                    </span>
-                                }
-                                title={t('landing.pain.p4Title', 'Leaking Management & Supervision Fees')}
-                                description={t('landing.pain.p4Desc', 'Discovering 6 months later that your cost-plus margin collapsed. The V1.2 Profit Engine auto-transfers management fees to office revenue upon approval.')}
-                                graphic={
-                                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-slate-950 to-orange-950/50 p-6 flex items-center justify-center">
-                                        <div className="w-full max-w-xs bg-slate-800/90 border-2 border-orange-500/30 rounded-xl p-4 shadow-2xl backdrop-blur-md">
-                                            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                                                <span className="text-xs font-mono text-orange-400 font-semibold">{isRTL ? 'محرك الأرباح التلقائي' : 'Auto Margin Split'}</span>
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">+15% LOCKED</span>
-                                            </div>
-                                            <p className="text-xs text-slate-300 font-mono">{isRTL ? 'تحويل فوري إلى خزينة المكتب لحظة الاعتماد' : 'Instant allocation to Office Safe'}</p>
-                                        </div>
-                                    </div>
-                                }
-                                fade={["bottom"]}
-                                className="border-orange-500/30 hover:border-orange-400/80 shadow-[0_12px_36px_rgba(249,115,22,0.12)]"
-                            />
-                        </div>
-                    </div>
-                </section>
-
-                {/* ---------- 5. Core Platform Modules (Hesaby Bento Grid) ---------- */}
-                <div id="modules">
-                    <HesabyBentoGrid isAr={isRTL} />
-                </div>
-
-                {/* ---------- 6. Mobile Companion App Showcase ---------- */}
-                <section className="landing-preview-section" style={{ paddingTop: '1.5rem' }}>
-                    <div style={{
-                        background: 'rgba(13, 19, 31, 0.7)',
-                        border: '1px solid var(--landing-border)',
-                        borderRadius: '20px',
-                        padding: '3rem 2rem',
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                        gap: '2.5rem',
-                        alignItems: 'center'
-                    }}>
-                        <div>
-                            <span className="landing-section-tag">{t('landing.mobile.tag', 'Mobile Companion')}</span>
-                            <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#fff', lineHeight: 1.25, margin: '8px 0 16px' }}>
-                                {t('landing.mobile.title', 'Enterprise Power in Your Pocket')}
-                            </h2>
-                            <p style={{ color: 'var(--landing-text-muted)', fontSize: '0.98rem', lineHeight: 1.65, marginBottom: '1.75rem' }}>
-                                {t('landing.mobile.desc', 'Built specifically for tough construction site environments. Ultra-high-contrast Field Mode ensures readability under harsh sunlight with instant offline expense queuing.')}
-                            </p>
-
-                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--landing-border)', borderRadius: 10, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    <Smartphone size={24} style={{ color: '#10b981' }} />
-                                    <div>
-                                        <div style={{ fontSize: '0.65rem', color: 'var(--landing-text-subtle)', fontWeight: 700 }}>EXPO / REACT NATIVE</div>
-                                        <div style={{ fontWeight: 800, color: '#fff', fontSize: '0.88rem' }}>iOS & Android APK</div>
-                                    </div>
-                                </div>
-                                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--landing-border)', borderRadius: 10, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    <Zap size={24} style={{ color: '#f97316' }} />
-                                    <div>
-                                        <div style={{ fontSize: '0.65rem', color: 'var(--landing-text-subtle)', fontWeight: 700 }}>OFFLINE QUEUE</div>
-                                        <div style={{ fontWeight: 800, color: '#fff', fontSize: '0.88rem' }}>Auto-Sync on Wi-Fi</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Minimalist Phone Mockup */}
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <div style={{
-                                width: 280,
-                                height: 490,
-                                background: '#080c14',
-                                border: '2px solid rgba(255,255,255,0.12)',
-                                borderRadius: 36,
-                                padding: 10,
-                                boxShadow: '0 20px 40px -10px rgba(0,0,0,0.8)',
-                                display: 'flex',
-                                flexDirection: 'column'
-                            }}>
-                                <div style={{ width: 70, height: 14, background: '#1e293b', borderRadius: 999, margin: '0 auto 10px' }}></div>
-                                <div style={{ background: '#0f172a', borderRadius: 24, flexGrow: 1, padding: 12, color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                    <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                            <span style={{ fontWeight: 800, fontSize: '0.84rem' }}>Hesaby Field</span>
-                                            <span style={{ fontSize: '0.65rem', color: '#10b981', background: 'rgba(16,185,129,0.12)', padding: '2px 6px', borderRadius: 4 }}>ONLINE</span>
-                                        </div>
-                                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', padding: 8, borderRadius: 8, marginBottom: 8, fontSize: '0.78rem' }}>
-                                            <div style={{ color: '#94a3b8', fontSize: '0.68rem' }}>Project Safe</div>
-                                            <div style={{ fontWeight: 800, color: '#fff', fontSize: '0.95rem' }}>2,450,000 EGP</div>
-                                        </div>
-                                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#cbd5e1', marginBottom: 4 }}>Recent Site Expenses</div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: '0.72rem' }}>
-                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: 7, borderRadius: 6, display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>Cairo Ready-Mix</span>
-                                                <strong style={{ color: '#ef4444' }}>-24,500</strong>
-                                            </div>
-                                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: 7, borderRadius: 6, display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>Rebar Batch #12</span>
-                                                <strong style={{ color: '#ef4444' }}>-85,000</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div style={{
-                                        width: 44,
-                                        height: 44,
-                                        borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)',
-                                        color: '#fff',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        margin: '0 auto',
-                                        boxShadow: '0 6px 16px rgba(234,88,12,0.4)'
-                                    }}>
-                                        <Camera size={18} />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                {/* ---------- 7. Industry Supply Chain Ribbon ---------- */}
-                <div className="landing-industry-ribbon">
-                    <div className="landing-industry-item">
-                        <Layers size={16} style={{ color: '#f97316' }} />
-                        <span>Steel & Rebar (حديد التسليح)</span>
-                    </div>
-                    <div className="landing-industry-item">
-                        <Building2 size={16} style={{ color: '#38bdf8' }} />
-                        <span>Ready-Mix Concrete (الخرسانة الجاهزة)</span>
-                    </div>
-                    <div className="landing-industry-item">
-                        <HardHat size={16} style={{ color: '#f59e0b' }} />
-                        <span>Heavy Equipment & Fuel (معدات ووقود)</span>
-                    </div>
-                    <div className="landing-industry-item">
-                        <Award size={16} style={{ color: '#10b981' }} />
-                        <span>MEP & Finishing (تشطيبات وكهروميكانيك)</span>
-                    </div>
-                </div>
-
-                {/* ---------- 8. Pricing Section ---------- */}
-                <section id="pricing" className="landing-preview-section">
-                    <div className="landing-section-header">
-                        <span className="landing-section-tag">{t('landing.pricing.tag', 'Transparent & Fair Pricing')}</span>
-                        <h2 className="landing-section-title">
-                            {t('landing.pricing.title', 'Invest in Operational Clarity')}
-                        </h2>
-                        <p style={{ color: 'var(--landing-text-muted)', fontSize: '0.98rem', marginTop: 8 }}>
-                            {t('landing.pricing.subtitle', 'Start free forever. Scale your subscription as your engineering projects expand.')}
-                        </p>
-
-                        {/* Billing cycle switch */}
-                        <div className="landing-pricing-toggle" style={{ marginTop: '1.5rem' }}>
-                            <div className="toggle-switch-pill">
-                                <button
-                                    type="button"
-                                    onClick={() => setBillingCycle('monthly')}
-                                    className={`toggle-btn ${billingCycle === 'monthly' ? 'active' : ''}`}
-                                >
-                                    {t('landing.pricing.monthly', 'Monthly')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setBillingCycle('annual')}
-                                    className={`toggle-btn ${billingCycle === 'annual' ? 'active' : ''}`}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                                >
-                                    <span>{t('landing.pricing.annual', 'Annually')}</span>
-                                    <span className="annual-discount-pill">-20%</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="landing-pricing-grid">
-                        {plans.map(plan => {
-                            const isPopular = plan.popular || plan.key === 'PREMIUM';
-                            const isEnterprise = plan.key === 'ENTERPRISE' || plan.isCustom || plan.priceEgp === null;
-                            const isFree = !isEnterprise && (plan.priceEgp === 0 || plan.key === 'FREE');
-                            const multiplier = billingCycle === 'annual' ? 0.8 : 1;
-                            const price = !isEnterprise && plan.priceEgp !== null ? Math.round(plan.priceEgp * multiplier) : null;
-                            const displayName = (isRTL && plan.nameAr) ? plan.nameAr : plan.name;
-                            const displayFeatures = (isRTL && plan.featuresAr) ? plan.featuresAr : (plan.features || []);
-                            
-                            const userPlanKey = (user?.company?.subscriptionPlan || user?.subscriptionPlan || 'FREE').toUpperCase();
-                            const isCurrentPlan = !!user && userPlanKey === (plan.key || '').toUpperCase();
-
-                            return (
-                                <div key={plan.key} className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-[#0d121f]/90 border ${isPopular ? 'border-orange-500/60 [box-shadow:0_-20px_80px_-20px_rgba(249,115,22,0.25)_inset] ring-1 ring-orange-500/30' : 'border-white/10 [box-shadow:0_-20px_80px_-20px_rgba(249,115,22,0.08)_inset] ring-1 ring-white/10'} p-7 transition-all duration-300 hover:border-white/25`}>
-                                    {isPopular && (
-                                        <div className="popular-badge">
-                                            {t('landing.pricing.popular', 'MOST POPULAR')}
-                                        </div>
-                                    )}
-
-                                    <div>
-                                        <h3 className="pricing-title">{displayName}</h3>
-
-                                        <div style={{ marginBottom: '1.25rem' }}>
-                                            {isEnterprise ? (
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                    <span style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8' }}>
-                                                        {isRTL ? 'تسعير مخصص' : 'Custom Pricing'}
-                                                    </span>
-                                                    <span style={{ fontSize: '0.78rem', color: 'var(--landing-text-subtle)' }}>
-                                                        {isRTL ? 'حسب حجم الشركة والمشاريع' : 'Tailored for your organization'}
-                                                    </span>
-                                                </div>
-                                            ) : isFree ? (
-                                                <span style={{ fontSize: '1.85rem', fontWeight: 900, color: '#10b981' }}>
-                                                    {t('landing.pricing.free', 'Free')}
-                                                </span>
-                                            ) : (
-                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                                                    <span className="pricing-amount">{currency(price)}</span>
-                                                    <span style={{ fontSize: '0.82rem', color: 'var(--landing-text-subtle)' }}> / {isRTL ? 'شهرياً' : 'month'}</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <ul className="pricing-features">
-                                            {displayFeatures.map((feat, idx) => (
-                                                <li key={idx} className="pricing-feature-item">
-                                                    <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                                                    <span>{feat}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-
-                                    {isEnterprise ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', marginTop: 'auto' }}>
-                                            <a
-                                                href={`https://mail.google.com/mail/?view=cm&fs=1&to=nooraldeenahmed04@gmail.com&su=${encodeURIComponent(isRTL ? 'استفسار عن باقة الشركات Enterprise - نظام حسابي ERP' : 'Hesaby ERP Enterprise Plan Inquiry')}&body=${encodeURIComponent(isRTL ? 'مرحباً فريق مبيعات حسابي، نود الاستفسار عن باقة الشركات الكبرى (Enterprise) وتفاصيل الاشتراك المخصص لشركتنا.' : 'Hello Hesaby Sales Team, We would like to inquire about the Enterprise Plan and custom quotation for our organization.')}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                style={{ width: '100%' }}
-                                            >
-                                                <FlowButton 
-                                                    variant="light" 
-                                                    text={isRTL ? 'مراسلة المبيعات' : 'Email Sales'} 
-                                                    className="w-full justify-center"
-                                                />
-                                            </a>
-                                            <a
-                                                href={`https://wa.me/201092041908?text=${encodeURIComponent(isRTL ? 'مرحباً، أود الاستفسار عن باقة الشركات الكبرى (Enterprise) لنظام حسابي ERP' : "Hello, I'm interested in Hesaby ERP Enterprise Plan")}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                style={{ width: '100%' }}
-                                            >
-                                                <FlowButton 
-                                                    variant="hesaby" 
-                                                    text={isRTL ? 'واتساب المبيعات' : 'WhatsApp Sales'} 
-                                                    className="w-full justify-center"
-                                                />
-                                            </a>
-                                        </div>
-                                    ) : isCurrentPlan ? (
-                                        <Link
-                                            to="/billing"
-                                            style={{ width: '100%', marginTop: 'auto' }}
-                                        >
-                                            <FlowButton 
-                                                variant="light" 
-                                                text={t('landing.pricing.current', 'Current Plan')} 
-                                                className="w-full justify-center !border-emerald-500/50 !text-emerald-400"
-                                            />
-                                        </Link>
-                                    ) : (
-                                        <Link
-                                            to={user ? '/billing' : '/signup'}
-                                            style={{ width: '100%', marginTop: 'auto' }}
-                                        >
-                                            <FlowButton 
-                                                variant={isPopular ? "hesaby" : "light"}
-                                                text={isFree
-                                                    ? t('landing.startPilot', 'Start Free')
-                                                    : (user ? t('landing.pricing.upgrade', 'Upgrade Plan') : t('landing.pricing.choose', 'Choose Plan'))}
-                                                className="w-full justify-center"
-                                            />
-                                        </Link>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </section>
-
-                {/* ---------- 9. Final Call to Action ---------- */}
-                <section className="landing-preview-section" style={{ paddingBottom: '4rem' }}>
-                    <div style={{
-                        padding: '3.5rem 2rem',
-                        textAlign: 'center',
-                        background: 'linear-gradient(180deg, rgba(249, 115, 22, 0.08) 0%, rgba(13, 19, 31, 0.95) 100%)',
-                        border: '1px solid rgba(249, 115, 22, 0.25)',
-                        borderRadius: '24px',
-                        boxShadow: '0 20px 50px -15px rgba(0,0,0,0.7)',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}>
-                        <div style={{
-                            width: 52,
-                            height: 52,
-                            borderRadius: '14px',
-                            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                            color: '#fff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 1.25rem',
-                            boxShadow: '0 4px 16px rgba(249,115,22,0.4)'
-                        }}>
-                            <Building2 size={26} />
-                        </div>
-
-                        <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', fontWeight: 900, color: '#fff', marginBottom: '0.75rem', letterSpacing: '-0.02em' }}>
-                            {t('landing.cta.title', 'Ready to Transform Your Engineering Operations?')}
-                        </h2>
-
-                        <p style={{ color: 'var(--landing-text-muted)', fontSize: '1.02rem', maxWidth: 640, margin: '0 auto 2rem', lineHeight: 1.65 }}>
-                            {t('landing.cta.subtitle', 'Join leading contractors and engineering consultancies operating with speed and precision on Hesaby ERP.')}
-                        </p>
-
-                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                            <Link to={user ? '/dashboard' : '/signup'}>
-                                <FlowButton
-                                    variant="hesaby"
-                                    text={user ? t('landing.nav.openApp', 'Open Dashboard') : t('landing.cta.button', 'Start Your Free Pilot Now')}
-                                />
-                            </Link>
-                        </div>
-                    </div>
-                </section>
-            </main>
-
-            {/* ---------- 10. Minimalist Footer ---------- */}
-            <footer className="landing-footer">
-                <div className="landing-footer-inner">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Building2 size={18} style={{ color: '#f97316' }} />
-                        <span style={{ fontWeight: 800, color: '#fff', fontSize: '0.98rem' }}>Hesaby ERP</span>
-                        <span>— Enterprise Construction Platform</span>
-                    </div>
-
-                    <div>
-                        <span>{isRTL ? `جميع الحقوق محفوظة © ${new Date().getFullYear()} حسابي ERP` : `© ${new Date().getFullYear()} Hesaby ERP · All rights reserved.`}</span>
-                    </div>
-                </div>
-            </footer>
+  const { i18n } = useTranslation();
+  const { user, logout } = useAuth();
+  const { currency } = useFormat();
+  const [plans] = useState(PLANS);
+  const [cycle, setCycle] = useState('monthly');
+  const [tab, setTab] = useState('ocr');
+  const [theme, setTheme] = useState(() => (localStorage.getItem('theme_preset') === 'light' ? 'light' : 'dark'));
+  const light = theme === 'light';
+  const [amt, setAmt] = useState(25000);
+  const [sel, setSel] = useState(0);
+  const [posted, setPosted] = useState(false);
+  const isRTL = i18n.language === 'ar';
+  const T = (en, ar) => (isRTL ? ar : en);
+  useEffect(() => { document.body.classList.toggle('light-mode', light); localStorage.setItem('theme_preset', theme); }, [theme, light]);
+  useEffect(() => { billingAPI.listPlans().catch(() => {}); }, []);
+  /* scroll reveals: .rv elements fade/rise in once when scrolled into view */
+  const rootRef = useRef(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const els = root.querySelectorAll('.rv');
+    if (!('IntersectionObserver' in window)) { els.forEach((e) => e.classList.add('rv-on')); return; }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => { en.target.classList.toggle('rv-on', en.isIntersecting); });
+    }, { threshold: 0.1, rootMargin: '0px 0px -6% 0px' });
+    els.forEach((e) => io.observe(e));
+    return () => io.disconnect();
+  }, []);
+  /* subtle pointer tilt on the dashboard frame (desktop, motion-safe only) */
+  const frameRef = useRef(null);
+  const onTilt = (e) => {
+    const el = frameRef.current;
+    if (!el || (e.pointerType && e.pointerType !== 'mouse')) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.setProperty('--ry', `${(px * 5).toFixed(2)}deg`);
+    el.style.setProperty('--rx', `${(-py * 5).toFixed(2)}deg`);
+  };
+  const offTilt = () => {
+    const el = frameRef.current;
+    if (el) { el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg'); }
+  };
+  const go = (e, id) => { e?.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior:'smooth' }); };
+  const sc = SCEN[sel];
+  const appr = amt <= 5000 ? { r:T('Site Engineer','مهندس الموقع'), c:'#22c55e' } : amt <= 50000 ? { r:T('Project Manager','مدير المشروع'), c:'#ff5a1f' } : { r:T('General Manager','المدير العام'), c:'#ef4444' };
+  const tabs = [{k:'ocr',l:T('Receipt OCR','مسح الفواتير'),i:Camera},{k:'safes',l:T('Safes','الخزائن'),i:DollarSign},{k:'dsr',l:T('Site reports','تقارير الموقع'),i:HardHat},{k:'recon',l:T('Bank match','المطابقة'),i:Scale},{k:'approval',l:T('Approvals','الاعتمادات'),i:ShieldCheck}];
+  /* tubelight nav: scrollspy drives the lamp, clicks jump + set it */
+  const [active, setActive] = useState('preview');
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1020px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1020px)');
+    const fn = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, []);
+  useEffect(() => {
+    const secs = ['preview', 'modules', 'why', 'pricing'].map((sid) => document.getElementById(sid)).filter(Boolean);
+    if (!('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver((es) => {
+      es.forEach((en) => { if (en.isIntersecting) setActive(en.target.id); });
+    }, { rootMargin: '-38% 0px -55% 0px' });
+    secs.forEach((s) => io.observe(s));
+    return () => io.disconnect();
+  }, []);
+  const navItems = [
+    { key: 'preview', label: T('Product', 'المنتج') },
+    { key: 'modules', label: T('Modules', 'الموديولات') },
+    { key: 'why', label: T('Why', 'لماذا') },
+    { key: 'pricing', label: T('Pricing', 'الأسعار') },
+  ];
+  const pick = (it) => { setActive(it.key); go(null, it.key); };
+
+  return (
+    <MotionConfig reducedMotion="user">
+    <div ref={rootRef} className={cn('hx', light && 'hx-light')} dir={isRTL ? 'rtl' : 'ltr'}>
+      <AuroraBackground />
+      <header className="hx-nav"><div className="hx-inner hx-nav-row">
+        <Link to="/" className="hx-brand"><img src="/hesaby_logo_lockup.svg" alt="Hesaby.ai" className="hx-logo-lockup logo-for-dark" /><img src="/hesaby_logo_lockup_light.svg" alt="Hesaby.ai" className="hx-logo-lockup logo-for-light" /></Link>
+        <div className="tube-top"><TubeNav id="tube-top" items={navItems} active={active} onSelect={pick} /></div>
+        <div className="hx-actions">
+          <SkyToggle dark={!light} onToggle={()=>setTheme(light?'dark':'light')} label={isRTL ? (light ? 'التحويل للوضع الليلي' : 'التحويل للوضع الفاتح') : (light ? 'Switch to dark mode' : 'Switch to light mode')} />
+          <button 
+            type="button" 
+            className="hx-lang-btn" 
+            onClick={()=>{const n=isRTL?'en':'ar';i18n.changeLanguage(n);document.documentElement.dir=n==='ar'?'rtl':'ltr';}}
+            title={isRTL ? 'Switch to English' : 'التحويل للعربية'}
+          >
+            <Globe size={13} />
+            <span>{isRTL ? 'EN' : 'عربي'}</span>
+          </button>
+          {user ? (
+            <>
+              <Link to="/dashboard" className="hx-btn hx-btn-fire hx-btn-sm">{T('Dashboard','لوحة التحكم')}</Link>
+              <button onClick={logout} className="hx-login-btn">{T('Out','خروج')}</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="hx-login-btn">{T('Log in','دخول')}</Link>
+              <Link to="/signup" className="hx-btn hx-btn-fire hx-btn-sm">{T('Start free','ابدأ مجانًا')}</Link>
+            </>
+          )}
+        </div></div></header>
+
+      <div className="hx-stage"><div className="hx-ember"/><div className="hx-grain"/>
+        <div className="hx-inner hx-hero">
+          <h1 className="hx-h1"><span>{T('Say it. Snap it.','قولها. صوّرها.')}</span><span>{T('It’s already logged.','واتسجّلت خلاص.')}</span><span className="hx-hw"><HandwritingText text={T('Never lose a record.','ولا قيد يضيع.')} arabic={isRTL} replayKey={`${i18n.language}-${theme}`} /></span></h1>
+          <p className="hx-sub">{T('Hesaby is the site-to-office ledger for Egyptian contractors: speak in Egyptian Arabic or snap a receipt photo, and the expense posts to the right project safe with the 14% VAT split handled. Daily reports, custody wallets, approvals and bank matching run on the same ledger — so Friday payroll stops being a hunt through pockets, WhatsApp threads and duplicate sheets.','حسابي هو دفتر الموقع والمكتب لشركات المقاولات في مصر: اتكلم بالمصري أو صوّر فاتورة، والمصروف يتسجّل في خزينة المشروع الصحيحة مع فصل ضريبة ١٤٪. التقارير اليومية والعهد والاعتمادات والمطابقة البنكية كلها على نفس الدفتر — فتصفية الجمعة تبطّل تكون مطاردة بين الجيوب وواتساب والشيتات المكررة.')}</p>
+          <div className="hx-ctas"><Link to={user?'/dashboard':'/signup'} className="hx-btn hx-btn-fire">{T('Start free','ابدأ مجانًا')}</Link><a href="#preview" onClick={(e)=>go(e,'preview')} className="hx-btn hx-btn-ghost"><Play size={14}/>{T('See live demo','شاهد تجربة حيّة')}</a></div>
+          <div className="hx-micro">{T('Free for 1 project · Arabic voice first · Works on site offline','مجاني لمشروع واحد · الصوت العربي أولًا · شغّال في الموقع دون إنترنت')}</div>
         </div>
-    </KineticGrid>
-    );
+
+        <div className="hx-inner hx-frame-wrap" id="preview">
+          <div className="hx-head rv"><div className="hx-eyebrow">{T('Live demo','تجربة حيّة')}</div><h2 className="hx-h2">{T('One ledger, five daily flows.','دفتر واحد، خمسة تدفقات يومية.')}</h2><p className="hx-lead">{T('This is the real product logic, not screenshots: scan a receipt, watch safes split, file a site report, match the bank, test who approves what. Click through the tabs.','هذا منطق المنتج الحقيقي وليس صورًا ثابتة: امسح فاتورة، وشاهد انقسام الخزائن، وسجّل تقرير موقع، وطابق البنك، وجرّب من يعتمد ماذا. تنقّل بين التبويبات.')}</p></div>
+          <div className="hx-tabs rv" style={{'--rv-d':'.12s'}}>{tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} className={cn('hx-tab',tab===t.k&&'on')}><t.i size={14}/>{t.l}</button>)}</div>
+          <div ref={frameRef} onPointerMove={onTilt} onPointerLeave={offTilt} className="hx-frame tilt rv" style={{'--rv-d':'.2s'}}>
+            <div className="hx-fbar"><span className="hx-dots"><i/><i/><i/></span><span className="hx-furl">hesaby.ai/app/{tab}</span><span className="hx-live"><span className="hx-pulse"/>{T('LIVE','مباشر')}</span></div>
+            <div className="hx-fbody" key={tab}>
+              {tab==='ocr'&&(<><div><h3 className="hx-h3">{T('Snap it. Structured instantly.','صوّرها. وتتبوّب فورًا.')}</h3><p className="hx-p">{T('The AI reads Arabic and English invoices — vendor name, tax ID, dates, line items and the 14% VAT breakdown — with zero typing. Pick a real site scenario, then approve: the amount leaves the project safe, the VAT posts to the tax ledger, and the audit trail writes itself.','الذكاء الاصطناعي يقرأ الفواتير العربية والإنجليزية — اسم المورّد والرقم الضريبي والتواريخ والبنود وتفصيل ضريبة ١٤٪ — دون كتابة. اختر سيناريو حقيقيًا من الموقع، ثم اعتمد: المبلغ يخرج من خزينة المشروع، والضريبة تُرحّل لدفتر الضرائب، وسجل التدقيق يُكتب وحده.')}</p>
+                <div className="hx-pick">{SCEN.map((s,i)=><button key={s.id} onClick={()=>{setSel(i);setPosted(false);}} className={cn(i===sel&&'on')}>{isRTL?s.tAr:s.tEn}</button>)}</div>
+                {!posted?<button className="hx-btn hx-btn-fire" onClick={()=>setPosted(true)}><Camera size={15}/>{T('Approve & post','اعتماد وترحيل')}</button>:<button className="hx-btn hx-btn-ghost" onClick={()=>setPosted(false)}>{T('Try another','جرّب أخرى')}</button>}<p className="hx-p" style={{fontSize:12.5,marginTop:12,marginBottom:0}}>{T('Confidence shown per scan. Low-confidence fields are flagged for review instead of posting silently.','تظهر نسبة الثقة مع كل مسح. الحقول منخفضة الثقة تُعلَّم للمراجعة بدل الترحيل بصمت.')}</p></div>
+                <div className="hx-card"><div className="hx-card-top"><span>{isRTL?sc.vAr:sc.vEn} → {isRTL?sc.pAr:sc.pEn}</span><span className="hx-conf">{sc.conf}</span></div>
+                {!posted?<><div className="hx-note"><strong>{T('Items: ','البنود: ')}</strong>{isRTL?sc.itemsAr:sc.itemsEn}</div><div className="hx-kv"><div className="hx-cell"><label>{T('Total','الإجمالي')}</label><b className="g">{sc.amt}</b></div><div className="hx-cell"><label>{T('VAT 14%','ضريبة ١٤٪')}</label><b>{sc.vat}</b></div><div className="hx-cell"><label>{T('Project safe','خزينة المشروع')}</label><b style={{fontSize:13}}>{isRTL?sc.pAr:sc.pEn}</b></div><div className="hx-cell"><label>{T('Posting','الترحيل')}</label><b style={{fontSize:13}}>{T('Safe + VAT ledger + trail','خزينة + ضرائب + سجل')}</b></div></div></>
+                :<div style={{textAlign:'center',padding:10}}><div style={{width:52,height:52,borderRadius:'50%',background:'rgba(34,197,94,.12)',color:'#22c55e',border:'1px solid rgba(34,197,94,.4)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 12px'}}><CheckCircle2 size={24}/></div><b>{T('Posted to safe & ledger','تم الترحيل للخزينة والدفتر')}</b><p className="hx-p" style={{textAlign:'center'}}>{sc.amt} → {isRTL?sc.pAr:sc.pEn} · {T('VAT ledger updated, audit entry sealed.','دفتر الضرائب تحدّث، وقيد التدقيق اتقفل.')}</p></div>}</div></>)}
+              {tab==='safes'&&(<div style={{gridColumn:'1/-1'}}><h3 className="hx-h3" style={{textAlign:'center'}}>{T('Project money and office money never mix.','فلوس المشروع وفلوس المكتب لا يختلطان أبدًا.')}</h3><p className="hx-p" style={{textAlign:'center',maxWidth:620,marginInline:'auto'}}>{T('Each project holds its own safe for materials, contractors and labor. The office safe only earns its supervision fee — moved automatically the second site spend is approved, so the owner sees true site cost and true office profit side by side.','كل مشروع له خزينته الخاصة للمواد والمقاولين والعمالة. وخزينة المكتب لا تكسب إلا نسبة الإشراف — تتحوّل تلقائيًا لحظة اعتماد مصروف الموقع، فيرى المالك تكلفة الموقع الحقيقية وربح المكتب الحقيقي جنبًا إلى جنب.')}</p><div className="hx-kpis"><div className="hx-kpi"><label>{T('Project safe · Al-Amal','خزينة المشروع · الأمل')}</label><b>2,450,000 EGP</b><span>{T('Materials, contractors, day labor — fenced per project','مواد ومقاولون ويوميات — مسيّجة لكل مشروع')}</span><div className="hx-meter"><i style={{'--w':'68%'}}/></div><span style={{marginTop:6,display:'block'}}>{T('68% committed · 32% free','68% مرتبط · 32% حر')}</span></div><div className="hx-kpi"><label>{T('Office safe · supervision earned','خزينة المكتب · إشراف محصّل')}</label><b style={{color:'#22c55e'}}>367,500 EGP</b><span>{T('15% fee auto-moved on every approval','نسبة 15% تتحوّل تلقائيًا مع كل اعتماد')}</span><div className="hx-meter"><i style={{'--w':'34%'}}/></div><span style={{marginTop:6,display:'block'}}>{T('Last move +3,675 EGP · just now','آخر تحويل +3,675 جنيه · الآن')}</span></div></div></div>)}
+              {tab==='dsr'&&(<><div><h3 className="hx-h3">{T('A site diary the consultant actually signs.','يومية موقع يوقّعها الاستشاري فعلًا.')}</h3><p className="hx-p">{T('The engineer files it in under two minutes with one hand: weather is prefilled, attendance is headcounts not names, deliveries and concrete pours are quantities, and the consultant e-signs on the spot. Late or missing reports chase themselves.','المهندس يقدّمها في أقل من دقيقتين بيد واحدة: الطقس مسجّل مسبقًا، والحضور أعداد لا أسماء، والتوريدات والصب كميات، والاستشاري يوقّع إلكترونيًا في الموقع. والتقارير المتأخرة أو الناقصة تطارد نفسها بنفسها.')}</p><p className="hx-p" style={{fontSize:12.5}}>{T('Every report locks to its project ledger the same day — no end-of-month reconstruction.','كل تقرير يُقفل على دفتر مشروعه في نفس اليوم — بلا إعادة بناء آخر الشهر.')}</p></div><div className="hx-card"><div className="hx-card-top"><span>DSR #142 · {T('Al-Narges Tower','برج النرجس')}</span><span className="hx-conf">{T('Approved','معتمد')}</span></div><div className="hx-kv" style={{gridTemplateColumns:'1fr 1fr 1fr'}}><div className="hx-cell"><label>{T('Labor present','الحضور')}</label><b>34</b></div><div className="hx-cell"><label>{T('Weather','الطقس')}</label><b>31°C</b></div><div className="hx-cell"><label>{T('Pour','الصب')}</label><b>60 m³</b></div></div><div className="hx-note"><strong>{T('Engineer: ','المهندس: ')}</strong>{T('3rd-floor columns poured, curing started, consultant punch list attached.','تم صب أعمدة الدور الثالث وبدء المعالجة، وقائمة ملاحظات الاستشاري مرفقة.')}</div><div className="hx-note" style={{marginBottom:0}}><strong>{T('Signed: ','التوقيع: ')}</strong>{T('Site consultant · 4:40 PM, same day','استشاري الموقع · 4:40 مساءً نفس اليوم')}</div></div></>)}
+              {tab==='recon'&&(<><div><h3 className="hx-h3">{T('Bank statements that match themselves.','كشوف بنك تطابق نفسها.')}</h3><p className="hx-p">{T('Upload the CSV from NBE, CIB, QNB or Banque Misr. Hesaby pairs each line with its ledger entry — client inflows against invoices, vendor checks against purchase orders — and flags only the true differences with their amounts. What took an accountant days takes seconds.','ارفع ملف CSV من الأهلي أو CIB أو QNB أو بنك مصر. حسابي يزاوج كل سطر مع قيده — التحصيلات مع الفواتير، وشيكات الموردين مع أوامر الشراء — ويُظهر فقط الفروق الحقيقية بمبالغها. ما كان يستغرق من المحاسب أيامًا يستغرق ثوانٍ.')}</p></div><div className="hx-card"><div className="hx-card-top"><span>NBE · {T('Contracting account','حساب المقاولات')}</span><span className="hx-conf">100%</span></div><div className="hx-rows"><div className="hx-rowline"><span>{T('Client inflow · Al-Amal invoice #12','تحصيل عميل · فاتورة الأمل #12')}</span><b style={{color:'#22c55e'}}>+450,000</b></div><div className="hx-rowline"><span>{T('Ezz Steel check · matched to PO-44','شيك عز · مطابق لأمر شراء 44')}</span><b style={{color:'#ef4444'}}>-185,000</b></div><div className="hx-rowline"><span>{T('Cement Lafarge · pending approval','أسمنت لافارج · بانتظار الاعتماد')}</span><b style={{color:'var(--accent)'}}>-42,600</b></div><div className="hx-meter"><i style={{'--w':'100%'}}/></div><p className="hx-p" style={{fontSize:12,margin:'10px 0 0'}}>{T('2 matched · 1 awaiting approval · 0 unexplained differences.','سطرا ن مطابقان · سطر بانتظار الاعتماد · صفر فروق غير مفسرة.')}</p></div></div></>)}
+              {tab==='approval'&&(<div style={{gridColumn:'1/-1',textAlign:'center'}}><h3 className="hx-h3">{T('Spending limits that enforce themselves.','حدود صرف تفرض نفسها.')}</h3><p className="hx-p" style={{textAlign:'center',maxWidth:560,marginInline:'auto'}}>{T('Site engineers approve up to 5,000 EGP from custody, project managers to 50,000, anything above routes to the general manager with the full receipt, report and balance attached. Drag the slider to see where an amount lands.','مهندس الموقع يعتمد حتى 5,000 جنيه من العهدة، ومدير المشروع حتى 50,000، وما فوق ذلك يتحوّل للمدير العام مرفقًا بالفاتورة والتقرير والرصيد. حرّك المؤشر لترى أين يقع أي مبلغ.')}</p><p className="hx-p" style={{textAlign:'center'}}><b style={{fontSize:24,color:'var(--text)'}}>{currency(amt)}</b></p><input type="range" min={1000} max={150000} step={1000} value={amt} onChange={(e)=>setAmt(Number(e.target.value))} style={{width:'min(440px,100%)',accentColor:'var(--accent)'}}/><div style={{display:'flex',gap:8,justifyContent:'center',marginTop:12,flexWrap:'wrap',fontSize:12,color:'var(--muted)'}}><span>≤ 5k · {T('Engineer','مهندس')}</span><span>·</span><span>≤ 50k · {T('Manager','مدير')}</span><span>·</span><span>&gt; 50k · {T('Executive','إدارة')}</span></div><div style={{fontSize:20,fontWeight:800,color:appr.c,marginTop:10}}>{appr.r}</div></div>)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section id="modules" className="hx-inner hx-sec">
+        <div className="hx-head rv"><div className="hx-eyebrow">{T('Modules','الموديولات')}</div><h2 className="hx-h2">{T('Everything site + office, on one ledger.','كل شيء للموقع والمكتب على دفتر واحد.')}</h2><p className="hx-lead">{T('Five modules share the same balances, so a receipt scanned at noon is a safe movement, a payroll line and a tax entry by evening — with the numbers to prove it.','خمسة موديولات تتشارك نفس الأرصدة، فالفاتورة الممسوحة ظهرًا تصبح حركة خزينة وبند أجور وقيد ضريبي بحلول المساء — بالأرقام الدالة على ذلك.')}</p></div>
+        <div className="hx-grid6">
+          {[{c:'c3',tag:T('Receipt OCR','مسح الفواتير'),t:T('Receipts become ledger entries','الفواتير تصبح قيودًا'),d:T('Arabic and English invoices read in seconds — vendor, tax ID, line items, 14% VAT — then posted to the correct project safe with an audit trail. No typing pool, no Friday backlog.','فواتير عربية وإنجليزية تُقرأ في ثوانٍ — المورّد والرقم الضريبي والبنود وضريبة ١٤٪ — ثم تُرحّل لخزينة المشروع الصحيحة بسجل تدقيق. بلا إدخال يدوي ولا تراكم للجمعة.'),v:[['Ezz Steel · Al-Amal','185,000'],['VAT 14% · posted','25,900'],['Audit trail','Sealed']]},
+            {c:'c3',tag:T('Safes & custody','الخزائن والعهد'),t:T('Balances you can trust at midnight','أرصدة تثق بها منتصف الليل'),d:T('Project safes fenced per site, engineer custody wallets capped by role, and office supervision fees moved automatically on approval. The owner sees site cost and office profit separately, live.','خزائن مشاريع مسيّجة لكل موقع، وعهد مهندسين مسقوفة بالدور، ونسب إشراف المكتب تتحوّل تلقائيًا عند الاعتماد. فيرى المالك تكلفة الموقع وربح المكتب منفصلين ولحظيًا.'),v:[['Available across sites','2,480,500'],['Office earned · 15%','367,500'],['Last auto-move','+3,675']]},
+            {c:'c2',tag:'DSR',t:T('Site diary in 2 minutes','يومية الموقع في دقيقتين'),d:T('Weather, headcounts, deliveries, pours and consultant e-sign — filed one-handed from site and locked to the project ledger the same day.','الطقس والأعداد والتوريدات والصب وتوقيع الاستشاري — تُقدَّم بيد واحدة من الموقع وتُقفل على دفتر المشروع نفس اليوم.'),v:[['Labor present','34'],['Concrete poured','60 m³'],['Consultant','Signed 4:40 PM']]},
+            {c:'c2',tag:T('Payroll & draws','الأجور والمستخلصات'),t:T('Wages without fights','أجور بلا مشاكل'),d:T('Craft rates, day counts, advances and deductions computed once per cycle, then locked into contractor draws everyone can audit.','فئات الحرف وأعداد الأيام والسلفيات والخصومات تُحسب مرة واحدة كل دورة، ثم تُقفل في مستخلصات يستطيع الجميع مراجعتها.'),v:[['Rebar draw #4','45,000'],['Advances deducted','9,200'],['Status','Locked']]},
+            {c:'c2',tag:T('Inventory','المخازن'),t:T('Stock tied to pours','المخزون مربوط بالصب'),d:T('Cement and rebar deliveries matched against actual consumption per work item, with safety levels per site — waste and leakage show up as numbers, not rumors.','توريدات الأسمنت والحديد تُطابَق مع المنصرف الفعلي لكل بند، وبحدود أمان لكل موقع — فيظهر الهدر والتسرب أرقامًا لا شائعات.'),v:[['Rebar 16mm on hand','18.5t'],['Site safety level','5.0t'],['This week used','6.2t']]}].map((m,i)=>(
+            <div key={i} className={cn('hx-b rv',m.c)} style={{'--rv-d':`${(i*0.08).toFixed(2)}s`}}><div className="hx-viz"><div className="hx-vizcard">{m.v.map(([k,v])=><div key={k} className="hx-vr"><span>{k}</span><b>{v}</b></div>)}<div className="hx-meter"><i style={{'--w':`${55+i*9}%`}}/></div></div></div>
+            <div className="hx-btxt"><span className="hx-tagline">{m.tag}</span><h4>{m.t}</h4><p>{m.d}</p></div></div>))}
+        </div>
+      </section>
+
+      <section id="why" className="hx-inner hx-sec">
+        <div className="hx-head rv"><div className="hx-eyebrow">{T('The problem','المشكلة')}</div><h2 className="hx-h2">{T('Your money disappears between site and office.','الفلوس بتضيع بين الموقع والمكتب.')}</h2><p className="hx-lead">{T('Four ways contractors leak profit every week — and what Hesaby puts in its place.','أربع طرق يتسرب بها الربح كل أسبوع — وما يضعه حسابي مكانها.')}</p></div>
+        <div className="rv" style={{ paddingBlock: '100px 110px' }}><DisplayCards cards={[{ icon: <Receipt size={15} />, title: T('The receipt dies in a pocket','الفاتورة بتموت في الجيب'), description: T('Paper invoices get destroyed in dusty site pockets before Friday payroll. Snap a photo on site and it posts with vendor, tax ID and VAT before the engineer leaves.','الفواتير الورق بتتبهدل في جيوب الموقع قبل تصفية الجمعة. صوّرها في الموقع فتتسجّل بالمورّد والرقم الضريبي والضريبة قبل ما المهندس يمشي.'), tag: T('Every Friday','كل جمعة'), className: '[grid-area:stack] -skew-y-[8deg] transition-all duration-500 max-sm:[grid-area:auto] max-sm:skew-y-0 max-sm:translate-x-0 max-sm:translate-y-0 translate-x-0 translate-y-0 hover:-translate-y-10 hover:scale-[1.02] group-hover/dc:opacity-60 hover:!opacity-100 max-sm:hover:translate-y-0 max-sm:hover:scale-100 dim' }, { icon: <FileSpreadsheet size={15} />, title: T('Three versions of the truth','ثلاث نسخ للحقيقة'), description: T('Site runs v3, office runs v5, the bank matches neither. One live ledger both sides read, with safe balances updating the moment spend is approved.','الموقع شغّال على نسخة والمكتب على نسخة والبنك لا يطابق أيًا منهما. دفتر واحد حي يقرأه الطرفان، وأرصدة الخزائن تتحدث لحظة اعتماد المصروف.'), tag: T('v3 vs v5','نسخة ضد نسخة'), className: '[grid-area:stack] -skew-y-[8deg] transition-all duration-500 max-sm:[grid-area:auto] max-sm:skew-y-0 max-sm:translate-x-0 max-sm:translate-y-0 translate-x-20 translate-y-6 hover:-translate-y-16 hover:scale-[1.02] group-hover/dc:opacity-60 hover:!opacity-100 max-sm:hover:translate-y-0 max-sm:hover:scale-100 dim' }, { icon: <ShieldCheck size={15} />, title: T('“Who approved this?” on WhatsApp','"مين اعتمد؟" على واتساب'), description: T('A 150,000 EGP delivery nobody remembers authorizing. Role thresholds with a timestamped trail — engineer, manager, executive — no voice-note approvals.','توريدة بـ 150 ألف جنيه لا أحد يذكر من اعتمدها. حدود صلاحيات بسجل موقّت — مهندس ومدير وإدارة — بلا اعتمادات صوتية.'), tag: T('150,000 EGP','150 ألف جنيه'), className: '[grid-area:stack] -skew-y-[8deg] transition-all duration-500 max-sm:[grid-area:auto] max-sm:skew-y-0 max-sm:translate-x-0 max-sm:translate-y-0 translate-x-40 translate-y-12 hover:-translate-y-24 hover:scale-[1.02] group-hover/dc:opacity-60 hover:!opacity-100 max-sm:hover:translate-y-0 max-sm:hover:scale-100 dim' }, { icon: <TrendingUp size={15} />, title: T('Margin shock at project close','صدمة الهامش عند التسليم'), description: T('You learn the 10% margin became 4% six months too late. Management fees move to office revenue on every approval, so net margin is visible daily.','تكتشف أن هامش 10% أصبح 4% بعد فوات الأوان بستة أشهر. نسبة الإشراف تتحوّل لإيراد المكتب مع كل اعتماد، فيظهر الصافي يوميًا.'), tag: T('10% → 4%','10% ← 4%'), className: '[grid-area:stack] -skew-y-[8deg] transition-all duration-500 max-sm:[grid-area:auto] max-sm:skew-y-0 max-sm:translate-x-0 max-sm:translate-y-0 translate-x-60 translate-y-18 hover:-translate-y-6 hover:scale-[1.02] group-hover/dc:opacity-60 hover:!opacity-100 max-sm:hover:translate-y-0 max-sm:hover:scale-100' }]} /></div>
+      </section>
+
+      <section className="hx-inner hx-sec"><div className="hx-split rv">
+        <div><div className="hx-eyebrow">{T('Field app','تطبيق الموقع')}</div><h2 className="hx-h2" style={{marginTop:12}}>{T('Designed for sun, dust and gloves.','مصمم للشمس والتراب والقفازات.')}</h2><p className="hx-lead">{T('The engineer carries the ledger in his pocket: high-contrast field mode readable in direct sun, one-hand voice and photo capture, live custody balance before spending, and an offline queue that syncs the moment Wi-Fi returns. The office sees it all without a single phone call.','المهندس يحمل الدفتر في جيبه: وضع ميداني عالي التباين يُقرأ تحت الشمس المباشرة، والتقاط صوتي وفوتوغرافي بيد واحدة، ورصيد العهدة ظاهر قبل الصرف، وقائمة دون إنترنت تتزامن لحظة عودة الواي فاي. والمكتب يرى كل ذلك دون مكالمة واحدة.')}</p>
+        <div style={{display:'flex',gap:10,marginTop:20,flexWrap:'wrap'}}><span className="hx-pill"><Smartphone size={13}/> iOS & Android · {T('one-hand capture','التقاط بيد واحدة')}</span><span className="hx-pill"><Zap size={13}/> {T('Offline queue · auto-sync','قائمة دون إنترنت · مزامنة تلقائية')}</span></div></div>
+        <div><div className="hx-phone"><div className="hx-screen"><div style={{display:'flex',justifyContent:'space-between',marginBottom:12}}><b style={{fontSize:13}}>Hesaby Field · {T('Al-Amal','الأمل')}</b><span className="hx-conf">Online</span></div><div className="hx-cell" style={{marginBottom:10}}><label>{T('My custody left','المتبقي من عهدتي')}</label><b>86,400 EGP</b></div><div className="hx-cell" style={{marginBottom:10}}><label>{T('Project safe','خزينة المشروع')}</label><b>2,450,000 EGP</b></div><div className="hx-rows"><div className="hx-rowline"><span>{T('Ready-mix · today 11:20','خرسانة جاهزة · اليوم 11:20')}</span><b style={{color:'#ef4444'}}>-24,500</b></div><div className="hx-rowline"><span>{T('Rebar batch #12 · yesterday','حديد دفعة 12 · أمس')}</span><b style={{color:'#ef4444'}}>-85,000</b></div></div></div></div></div>
+      </div></section>
+
+      <section id="pricing" className="hx-inner hx-sec">
+        <div className="hx-head rv"><div className="hx-eyebrow">{T('Pricing','الأسعار')}</div><h2 className="hx-h2">{T('Start free. Scale with sites.','ابدأ مجانًا. وتوسّع مع مواقعك.')}</h2><p className="hx-lead">{T('Run your first project free as long as you need. Upgrade when you add sites, seats or AI volume — annual billing saves 20% on every paid plan.','شغّل مشروعك الأول مجانًا مهما طالت المدة. وانتقل للمدفوع عندما تضيف مواقع أو مستخدمين أو عمليات ذكاء اصطناعي — والفوترة السنوية توفّر 20% على كل باقة مدفوعة.')}</p>
+        <div className="hx-bill"><button onClick={()=>setCycle('monthly')} className={cn(cycle==='monthly'&&'on')}>{T('Monthly','شهري')}</button><button onClick={()=>setCycle('annual')} className={cn(cycle==='annual'&&'on')}>{T('Annual −20%','سنوي −٢٠٪')}</button></div></div>
+        <div className="hx-plans">{plans.map(p=>{const ent=p.price==null;const price=!ent?((cycle==='annual')?Math.round(p.price*12*.8):p.price):null;const feats=(isRTL?p.fAr:p.f)||[];return(
+          <div key={p.key} className={cn('hx-plan rv',p.pop&&'pop')} style={{'--rv-d':`${(({FREE:0,PREMIUM:.08,BUSINESS:.16,ENTERPRISE:.24})[p.key] ?? 0).toFixed(2)}s`}}><h3>{isRTL?p.nAr:p.n}{p.pop&&<span className="hx-pop">{T('POPULAR','الأكثر')}</span>}</h3><p className="hx-pdesc">{isRTL?p.dAr:p.d}</p>
+          <div>{ent?<span className="hx-price" style={{fontSize:22}}>{T('Custom','مخصص')}</span>:p.price===0?<span className="hx-price" style={{fontSize:22}}>{T('Free','مجاني')}</span>:<><span className="hx-price">{currency(price)}</span> <span className="hx-per">/ {cycle==='annual'?T('yr','سنة'):T('mo','شهر')}</span></>}</div>
+          <ul className="hx-feats">{feats.slice(0,5).map(f=><li key={f}><Check size={14}/>{f}</li>)}</ul>
+          <Link to={user?'/billing':'/signup'} className={cn('hx-btn',p.pop?'hx-btn-fire':'hx-btn-ghost')} style={{width:'100%'}}>{ent?T('Talk to us','كلمنا'):p.price===0?T('Start free','ابدأ مجانًا'):T('Choose','اختر')}</Link></div>);})}</div>
+      </section>
+
+      <section className="hx-inner hx-sec"><LampContainer className="rv min-h-[560px] rounded-[26px] border border-[var(--line2)] lamp-tight">
+        <motion.div
+          initial={{ opacity: 0.5, y: 60 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.8, ease: "easeInOut" }}
+          className="flex flex-col items-center text-center lamp-ink"
+        >
+          <div style={{display:'flex',justifyContent:'center',marginBottom:18}}><span className="hx-logo-chip" style={{width:52,height:52,borderRadius:14}}><img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{width:40,height:40}} /></span></div>
+          <h2 className="hx-h2" style={{color:'#f5f4f0'}}>{T('Run your next project on Hesaby.','شغّل مشروعك القادم على حسابي.')}</h2>
+          <p className="hx-lead" style={{maxWidth:600,marginInline:'auto',color:'#a8a29e'}}>{T('Bring one live project this week — its receipts, reports, custody and bank lines. By Friday you will know its true cost, its safe balance and your earned fee, down to the pound.','أحضر مشروعًا واحدًا حيًا هذا الأسبوع — بفواتيره وتقاريره وعهدته وكشوف بنكه. وبحلول الجمعة ستعرف تكلفته الحقيقية ورصيد خزينته وأتعابك المستحقة، حتى آخر جنيه.')}</p>
+          <div className="hx-ctas"><Link to={user?'/dashboard':'/signup'} className="hx-btn hx-btn-fire" style={{padding:'15px 34px',fontSize:15}}>{T('Start free — no card needed','ابدأ مجانًا — بلا بطاقة')}</Link></div>
+          <p className="hx-micro2">{T('Free for 1 project · Arabic-first · Cancel anytime','مجاني لمشروع واحد · عربي أولًا · إلغاء في أي وقت')}</p>
+        </motion.div>
+      </LampContainer></section>
+      <footer className="hx-footer"><div className="hx-inner hx-foot"><span style={{display:'inline-flex',alignItems:'center',gap:10}}><span className="hx-logo-chip" style={{width:28,height:28,borderRadius:8}}><img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{width:20,height:20}} /></span><b style={{color:'var(--text)'}}>Hesaby</b> — {T('Your voice, instantly logged.','صوتك، حساباتك، فورًا.')}</span><span>© {new Date().getFullYear()} · EN / عربي</span></div></footer>
+      {isMobile && (<div className="tube-dock"><TubeNav id="tube-dock" items={navItems} active={active} onSelect={pick} /></div>)}
+    </div>
+    </MotionConfig>
+  );
 }

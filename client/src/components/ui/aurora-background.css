@@ -1,0 +1,70 @@
+/* Aurora ribbons — Aceternity-style flowing band layers, retinted to Hesaby
+   ember (dark) and warm sand (cafe light). Respects reduced motion. */
+.aurora-scope {
+  --au1: rgba(255, 106, 43, 0.16);
+  --au2: rgba(255, 166, 77, 0.08);
+  --au3: rgba(200, 60, 10, 0.11);
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+body.light-mode .aurora-scope {
+  --au1: rgba(194, 65, 12, 0.1);
+  --au2: rgba(160, 118, 58, 0.07);
+  --au3: rgba(194, 65, 12, 0.06);
+}
+.aurora-field { position: absolute; inset: -6%; }
+.au {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(100deg, var(--au1) 0%, var(--au1) 1.6%, transparent 1.6%, transparent 9%, var(--au2) 9%, var(--au2) 10.4%, transparent 10.4%, transparent 19%);
+  background-size: 320% 200%;
+  filter: blur(60px);
+  mask-image: radial-gradient(ellipse 82% 70% at 50% 34%, black 18%, transparent 74%);
+  -webkit-mask-image: radial-gradient(ellipse 82% 70% at 50% 34%, black 18%, transparent 74%);
+  animation: aurora-drift 62s linear infinite, flick-a 18s ease-in-out -4s infinite;
+}
+.au-b {
+  background-image: repeating-linear-gradient(118deg, transparent 0%, var(--au3) 3%, transparent 6%, var(--au1) 11%, var(--au1) 12.2%, transparent 12.2%, transparent 21%);
+  background-size: 220% 160%;
+  mix-blend-mode: soft-light;
+  animation: aurora-drift 84s linear infinite reverse, flick-b 26s ease-in-out -9s infinite;
+  opacity: 0.8;
+}
+.au-c {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(92deg, transparent 0%, var(--au2) 5%, transparent 7.5%, transparent 16%, var(--au1) 22%, transparent 24%);
+  background-size: 260% 200%;
+  filter: blur(70px);
+  mix-blend-mode: overlay;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 15%, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 15%, transparent 72%);
+  animation: aurora-drift 97s linear infinite, flick-a 31s ease-in-out -15s infinite;
+  opacity: 0.55;
+}
+@keyframes aurora-drift {
+  from { background-position: 50% 50%, 50% 50%; }
+  to { background-position: 350% 50%, 350% 50%; }
+}
+@keyframes flick-a {
+  0%, 100% { opacity: 0.62; }
+  25% { opacity: 0.85; }
+  52% { opacity: 0.45; }
+  76% { opacity: 0.78; }
+}
+@keyframes flick-b {
+  0%, 100% { opacity: 0.8; }
+  33% { opacity: 0.5; }
+  64% { opacity: 0.92; }
+}
+.au-fade {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 62% 52% at 50% 40%, transparent 42%, var(--bg, transparent) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .au, .au-b, .au-c { animation: none; }
+}

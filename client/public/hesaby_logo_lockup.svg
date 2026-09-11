@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 178 64" fill="none" role="img" aria-label="Hesaby.ai">
+  <defs>
+    <linearGradient id="hxg" x1="10" y1="58" x2="54" y2="8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff8a50"/>
+      <stop offset="0.55" stop-color="#ff5a1f"/>
+      <stop offset="1" stop-color="#c2410c"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#hxg)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 53V15"/>
+    <path d="M47 53V11"/>
+    <path d="M17 40L47 28"/>
+  </g>
+  <text x="56" y="42" font-family="'Inter Tight','Inter','Cairo',system-ui,sans-serif" font-size="30" font-weight="800" letter-spacing="-0.5" fill="#f5f4f0">esaby<tspan fill="#ff8a50">.ai</tspan></text>
+</svg>

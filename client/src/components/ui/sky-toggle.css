@@ -1,0 +1,51 @@
+/* Sky Toggle — day/night scene switch (sun + clouds / moon + stars). Pure CSS, no deps. */
+.sky-toggle {
+  position: relative;
+  width: 58px; height: 32px; flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, #6db9f2 0%, #3f96dd 100%);
+  cursor: pointer; overflow: hidden; padding: 0;
+  transition: background .5s ease, border-color .5s ease;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.25);
+}
+body.light-mode .sky-toggle { border-color: #d8cbaf; }
+.sky-toggle.is-night { background: linear-gradient(180deg, #0a0f24 0%, #1c2450 100%); }
+/* stars */
+.sky-toggle .sk-stars { position: absolute; inset: 0; opacity: 0; transition: opacity .5s ease; }
+.sky-toggle.is-night .sk-stars { opacity: 1; }
+.sky-toggle .sk-stars i {
+  position: absolute; width: 2px; height: 2px; border-radius: 50%;
+  background: #fff; animation: sk-tw 1.8s infinite ease-in-out;
+}
+.sky-toggle .sk-stars i:nth-child(1){ top:6px; left:8px; }
+.sky-toggle .sk-stars i:nth-child(2){ top:12px; left:18px; animation-delay:.4s; }
+.sky-toggle .sk-stars i:nth-child(3){ top:5px; left:30px; animation-delay:.9s; }
+.sky-toggle .sk-stars i:nth-child(4){ top:16px; left:8px; animation-delay:1.2s; width:1.5px; height:1.5px; }
+.sky-toggle .sk-stars i:nth-child(5){ top:19px; left:26px; animation-delay:.2s; width:1.5px; height:1.5px; }
+@keyframes sk-tw { 50% { opacity: .25; } }
+/* clouds */
+.sky-toggle .sk-cloud { position: absolute; background: #fff; border-radius: 999px; transition: transform .55s cubic-bezier(.34,1.3,.64,1), opacity .45s ease; filter: blur(.2px); }
+.sky-toggle .sk-c1 { width: 30px; height: 12px; bottom: 2px; right: -4px; opacity: .95; }
+.sky-toggle .sk-c1::before { content:''; position: absolute; width: 14px; height: 14px; background: #fff; border-radius: 50%; top: -7px; left: 5px; }
+.sky-toggle .sk-c1::after { content:''; position: absolute; width: 10px; height: 10px; background: #fff; border-radius: 50%; top: -4px; right: 5px; }
+.sky-toggle .sk-c2 { width: 22px; height: 9px; bottom: 6px; right: 18px; opacity: .7; }
+.sky-toggle.is-night .sk-cloud { transform: translateX(34px); opacity: 0; }
+/* knob: sun by day, moon by night */
+.sky-toggle .sk-knob {
+  position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #ffefa8 0%, #ffd94d 55%, #f0a500 100%);
+  box-shadow: 0 0 12px rgba(255,200,40,.85), 0 2px 5px rgba(0,0,0,.3);
+  transition: transform .5s cubic-bezier(.34,1.56,.64,1), background .5s ease, box-shadow .5s ease;
+  z-index: 2;
+}
+.sky-toggle.is-night .sk-knob {
+  transform: translateX(26px);
+  background: radial-gradient(circle at 62% 60%, #d9d4c0 0 2px, transparent 3px),
+              radial-gradient(circle at 34% 34%, #fffdf4 0%, #e8e2cc 70%, #cfc8ab 100%);
+  box-shadow: 0 0 12px rgba(240,235,210,.5), 0 2px 5px rgba(0,0,0,.45);
+}
+.sky-toggle:focus-visible { outline: 2px solid #ff5a1f; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .sky-toggle *, .sky-toggle { transition: none !important; animation: none !important; }
+}

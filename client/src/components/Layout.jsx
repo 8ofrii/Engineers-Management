@@ -12,9 +12,6 @@ import {
     LogOut,
     Menu,
     X,
-    Building2,
-    Moon,
-    Sun,
     Globe,
     Languages,
     User as UserIcon,
@@ -41,6 +38,7 @@ import {
     Shield
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import SkyToggle from './ui/sky-toggle';
 import ProfileModal from './ProfileModal';
 import TwoFactorModal from './TwoFactorModal';
 import DraftCaptureFAB from './DraftCaptureFAB';
@@ -250,10 +248,12 @@ export default function Layout({ children }) {
                             <img
                                 src={getImageUrl(user.companyLogo)}
                                 alt="Logo"
-                                style={{ height: '48px', width: '48px', borderRadius: '50%', marginRight: '8px', objectFit: 'cover' }}
+                                style={{ height: '40px', width: '40px', borderRadius: '12px', marginRight: '8px', objectFit: 'cover' }}
                             />
                         ) : (
-                            <Building2 size={26} />
+                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, background: '#fff', overflow: 'hidden', flexShrink: 0 }}>
+                                <img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+                            </span>
                         )}
                         <span className="company-title">{user?.company || t('app.name')}</span>
                     </div>
@@ -324,7 +324,7 @@ export default function Layout({ children }) {
                                             alignItems: 'center',
                                             justifyContent: 'space-between',
                                             padding: '10px 14px',
-                                            background: isGroupActive ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
+                                            background: isGroupActive ? 'rgba(255, 90, 31, 0.09)' : 'transparent',
                                             border: '1px solid transparent',
                                             color: isGroupActive ? 'var(--color-primary)' : 'var(--text-primary)',
                                             fontSize: '13.5px',
@@ -490,9 +490,9 @@ export default function Layout({ children }) {
                                 flexShrink: 0
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.color = '#60a5fa';
-                                e.currentTarget.style.borderColor = '#60a5fa';
-                                e.currentTarget.style.background = 'rgba(96, 165, 250, 0.15)';
+                                e.currentTarget.style.color = '#ff8a50';
+                                e.currentTarget.style.borderColor = '#ff8a50';
+                                e.currentTarget.style.background = 'rgba(255, 90, 31, 0.12)';
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.color = 'var(--text-secondary)';
@@ -528,7 +528,7 @@ export default function Layout({ children }) {
                                 width: '36px',
                                 height: '36px',
                                 borderRadius: '8px',
-                                background: twoFactorModalOpen ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-tertiary)',
+                                background: twoFactorModalOpen ? 'rgba(255, 90, 31, 0.14)' : 'var(--bg-tertiary)',
                                 border: twoFactorModalOpen ? '1px solid var(--color-primary)' : '1px solid var(--border-color)',
                                 color: twoFactorModalOpen ? 'var(--color-primary)' : 'var(--text-secondary)',
                                 cursor: 'pointer',
@@ -543,7 +543,7 @@ export default function Layout({ children }) {
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.color = twoFactorModalOpen ? 'var(--color-primary)' : 'var(--text-secondary)';
                                 e.currentTarget.style.borderColor = twoFactorModalOpen ? 'var(--color-primary)' : 'var(--border-color)';
-                                e.currentTarget.style.background = twoFactorModalOpen ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-tertiary)';
+                                e.currentTarget.style.background = twoFactorModalOpen ? 'rgba(255, 90, 31, 0.14)' : 'var(--bg-tertiary)';
                             }}
                         >
                             <ShieldCheck size={18} />
@@ -578,58 +578,32 @@ export default function Layout({ children }) {
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
-                            padding: '6px 14px',
+                            gap: '10px',
+                            padding: '6px 14px 6px 8px',
                             background: 'var(--bg-tertiary)',
                             borderRadius: '12px',
-                            border: '1px solid var(--border-color)',
-                            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.08)'
+                            border: '1px solid var(--border-color)'
                         }}>
-                            <img
-                                src="/hesaby_logo_icon.png"
-                                alt="Hesaby Logo"
-                                style={{
-                                    height: '44px',
-                                    width: 'auto',
-                                    objectFit: 'contain',
-                                    filter: 'drop-shadow(0 2px 6px rgba(37, 99, 235, 0.35))'
-                                }}
-                            />
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span style={{
-                                    fontWeight: 900,
-                                    fontSize: '1.45rem',
-                                    lineHeight: '1.1',
-                                    background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #2563eb 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    letterSpacing: '0.5px'
-                                }}>
-                                    Hesaby
-                                </span>
-                                <span style={{
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    color: 'var(--text-tertiary)',
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase'
-                                }}>
-                                    ERP Construction
-                                </span>
-                            </div>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, background: '#fff', overflow: 'hidden', flexShrink: 0 }}>
+                                <img
+                                    src="/hesaby_logo_icon.svg"
+                                    alt="Hesaby Logo"
+                                    style={{ width: 27, height: 27, objectFit: 'contain' }}
+                                />
+                            </span>
+                            <span style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+                                Hesaby
+                            </span>
                         </div>
                     </div>
 
                     <div className="topbar-actions">
-                        {/* Simple 1-Click Theme Switcher (Light <-> Monochrome Dark) */}
-                        <button
-                            className="theme-toggle"
-                            onClick={toggleTheme}
-                            title={activeTheme === 'light' ? (i18n.language === 'ar' ? 'التحويل للوضع الليلي' : 'Switch to Dark Mode') : (i18n.language === 'ar' ? 'التحويل للوضع الفاتح' : 'Switch to Light Mode')}
-                            aria-label="Toggle theme"
-                        >
-                            {activeTheme === 'light' ? <Moon size={19} /> : <Sun size={19} />}
-                        </button>
+                        {/* Sky day/night switcher, synced with landing + auth */}
+                        <SkyToggle
+                            dark={activeTheme !== 'light'}
+                            onToggle={toggleTheme}
+                            label={activeTheme === 'light' ? (i18n.language === 'ar' ? 'التحويل للوضع الليلي' : 'Switch to Dark Mode') : (i18n.language === 'ar' ? 'التحويل للوضع الفاتح' : 'Switch to Light Mode')}
+                        />
 
                         {/* Clean & Simple Language Toggle Button with Globe Icon */}
                         <button

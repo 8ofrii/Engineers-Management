@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI } from '../services/api';
-import { FolderKanban, Plus, Pencil, Trash2, Receipt, X } from 'lucide-react';
+import { FolderKanban, Plus, Pencil, Trash2, Receipt, X, AlertTriangle } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import Layout from '../components/Layout';
 import AddProjectModal from '../components/AddProjectModal';
@@ -138,11 +138,12 @@ export default function Projects() {
             <div>
                 <div className="flex-between mb-xl">
                     <div>
-                        <h1 className="flex gap-md">
-                            <FolderKanban size={32} />
+                        <div className="app-eyebrow">{isArabic ? 'مساحة العمل' : 'Workspace'}</div>
+                        <h1 className="app-title" style={{ fontSize: '1.9rem' }}>
+                            <FolderKanban size={28} />
                             {t('projects.title')}
                         </h1>
-                        <p className="text-secondary">{t('projects.subtitle')}</p>
+                        <p className="app-sub">{t('projects.subtitle')}</p>
                     </div>
                     <button className="btn btn-primary" onClick={openCreateModal}>
                         <Plus size={20} />
@@ -152,8 +153,8 @@ export default function Projects() {
 
                 {filterProjectId && (
                     <div className="card mb-lg" style={{
-                        background: 'rgba(59, 130, 246, 0.1)',
-                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        background: 'rgba(255, 90, 31, 0.08)',
+                        border: '1px solid rgba(255, 90, 31, 0.3)',
                         padding: '12px 20px',
                         display: 'flex',
                         alignItems: 'center',
@@ -161,7 +162,7 @@ export default function Projects() {
                         borderRadius: 'var(--radius-md)'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <FolderKanban size={20} style={{ color: '#3b82f6' }} />
+                            <FolderKanban size={20} style={{ color: 'var(--color-primary-light)' }} />
                             <span style={{ fontWeight: 700 }}>
                                 {isArabic ? 'عرض تفاصيل المشروع المحدد' : 'Showing selected project details'}
                             </span>
@@ -199,9 +200,8 @@ export default function Projects() {
                                 ? 100
                                 : Math.min(100, Math.max(0, Number(project.completionPercent || 0)));
                             return (
-                            <div key={project.id} className="card" style={{
+                            <div key={project.id} className="card proj-card" style={{
                                 padding: 'var(--spacing-lg)',
-                                background: 'var(--bg-secondary)',
                                 border: project.projectSafeBalance < 0 ? '2px solid #ef4444' : '1px solid var(--border-color)',
                                 borderRadius: 'var(--radius-lg)',
                                 boxShadow: project.projectSafeBalance < 0 ? '0 0 15px rgba(239, 68, 68, 0.2)' : 'none'
@@ -210,8 +210,9 @@ export default function Projects() {
                                     <div className="flex flex-col">
                                         <h3>{project.name}</h3>
                                         {project.projectSafeBalance < 0 && (
-                                            <span style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                                ⚠️ {t('projects.negativeBalanceAlert') || 'عجز في خزينة المشروع'}
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#f87171', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                                <AlertTriangle size={13} />
+                                                {t('projects.negativeBalanceAlert') || 'عجز في خزينة المشروع'}
                                             </span>
                                         )}
                                     </div>
@@ -221,7 +222,7 @@ export default function Projects() {
                                             <svg width="40" height="40" style={{ transform: 'rotate(-90deg)' }}>
                                                 <circle cx="20" cy="20" r="16" fill="none" stroke="var(--bg-tertiary)" strokeWidth="4" />
                                                 <circle cx="20" cy="20" r="16" fill="none"
-                                                    stroke={completionPct >= 100 ? '#10b981' : completionPct >= 50 ? '#3b82f6' : '#f59e0b'}
+                                                    stroke={completionPct >= 100 ? '#10b981' : completionPct >= 50 ? 'var(--color-primary-light)' : '#f59e0b'}
                                                     strokeWidth="4"
                                                     strokeDasharray={`${(completionPct / 100) * 100.5} 100.5`}
                                                     strokeLinecap="round"
@@ -235,16 +236,14 @@ export default function Projects() {
                                             {t(`projects.status.${project.status.toLowerCase()}`)}
                                         </span>
                                         <button
-                                            className="btn btn-secondary btn-sm"
-                                            style={{ padding: '4px 8px' }}
+                                            className="icon-btn"
                                             onClick={() => openEditModal(project)}
                                             title={t('common.edit')}
                                         >
                                             <Pencil size={14} />
                                         </button>
                                         <button
-                                            className="btn btn-secondary btn-sm"
-                                            style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444' }}
+                                            className="icon-btn danger"
                                             onClick={() => handleDeleteClick(project)}
                                             title={t('common.delete')}
                                         >
@@ -254,31 +253,21 @@ export default function Projects() {
                                 </div>
                                 <p className="text-secondary mb-md">{project.description || t('common.noData')}</p>
                                 <div className="grid grid-2 gap-md mb-md">
-                                    <div className="p-sm rounded" style={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                                    }}>
-                                        <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '2px' }}>
+                                    <div className="stat-cell">
+                                        <label>
                                             {t('projects.safeBalance') || 'خزينة المشروع'}
-                                        </div>
-                                        <div style={{
-                                            fontSize: '1.1rem',
-                                            fontWeight: 700,
-                                            color: project.projectSafeBalance < 0 ? '#f87171' : '#34d399'
-                                        }}>
+                                        </label>
+                                        <b className={project.projectSafeBalance < 0 ? 'neg' : 'pos'}>
                                             {formatCurrency(project.projectSafeBalance)}
-                                        </div>
+                                        </b>
                                     </div>
-                                    <div className="p-sm rounded" style={{
-                                        background: '#1e293b',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                                    }}>
-                                        <div style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '2px' }}>
+                                    <div className="stat-cell">
+                                        <label>
                                             {t('projects.officeProfit') || 'أرباح المكتب'}
-                                        </div>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#60a5fa' }}>
+                                        </label>
+                                        <b className="acc">
                                             {formatCurrency(project.officeRevenue)}
-                                        </div>
+                                        </b>
                                     </div>
                                 </div>
 
@@ -286,22 +275,17 @@ export default function Projects() {
                                 <div style={{ marginBottom: 'var(--spacing-md)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
                                         <span>{isArabic ? 'المستخدم من الميزانية' : t('projects.budgetUsed', 'Budget Used')}: {budgetPct}%</span>
-                                        <span style={{ color: budgetBarColor, fontWeight: 700 }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: budgetBarColor, fontWeight: 700 }}>
+                                            <span className="dot" style={{ background: budgetBarColor }} />
                                             {budgetPct >= 90
-                                                ? (isArabic ? '🔴 حرج' : `🔴 ${t('projects.budgetCritical', 'Critical')}`)
+                                                ? (t('projects.budgetCritical', 'Critical'))
                                                 : budgetPct >= 70
-                                                    ? (isArabic ? '🟡 تحذير' : `🟡 ${t('projects.budgetWarning', 'Warning')}`)
-                                                    : (isArabic ? '🟢 ممتاز' : `🟢 ${t('projects.budgetHealthy', 'Healthy')}`)}
+                                                    ? (t('projects.budgetWarning', 'Warning'))
+                                                    : (t('projects.budgetHealthy', 'Healthy'))}
                                         </span>
                                     </div>
-                                    <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
-                                        <div style={{
-                                            height: '100%',
-                                            width: `${budgetPct}%`,
-                                            background: budgetBarColor,
-                                            borderRadius: 4,
-                                            transition: 'width 0.4s ease'
-                                        }} />
+                                    <div className="meter" style={{ '--w': `${budgetPct}%` }}>
+                                        <i style={{ width: `${budgetPct}%`, background: budgetBarColor }} />
                                     </div>
                                 </div>
 

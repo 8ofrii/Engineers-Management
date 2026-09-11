@@ -65,6 +65,7 @@ export default function FUIBentoGridDark() {
 
 export function BentoCard({
   dark = false,
+  isLight = false,
   className = "",
   eyebrow,
   title,
@@ -73,6 +74,7 @@ export function BentoCard({
   fade = [],
 }: {
   dark?: boolean;
+  isLight?: boolean;
   className?: string;
   eyebrow: React.ReactNode;
   title: React.ReactNode;
@@ -86,28 +88,48 @@ export function BentoCard({
       whileHover="active"
       variants={{ idle: {}, active: {} }}
       data-dark={dark ? "true" : undefined}
+      data-light={isLight ? "true" : undefined}
       className={clsx(
-        "group relative flex flex-col overflow-hidden rounded-2xl",
-        "bg-[#131b2e] transform-gpu border border-white/20 ring-1 ring-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.18)] transition-all duration-300 hover:border-orange-500/50 hover:ring-orange-500/30 hover:shadow-[0_20px_50px_rgba(249,115,22,0.18),inset_0_1px_0_rgba(255,255,255,0.25)] hover:-translate-y-1",
-        "data-[dark]:bg-gray-900 data-[dark]:ring-white/20",
+        "bento-card-root group relative flex flex-col overflow-hidden rounded-2xl transition-all duration-300 transform-gpu hover:-translate-y-1",
+        isLight
+          ? "bg-white border border-slate-200/90 ring-1 ring-slate-100 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,1)] hover:border-orange-400/80 hover:ring-orange-300/40 hover:shadow-[0_20px_45px_-10px_rgba(249,115,22,0.14)]"
+          : "bg-[#0e0e12] border border-white/15 ring-1 ring-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.1)] hover:border-orange-500/50 hover:ring-orange-500/30 hover:shadow-[0_20px_50px_rgba(249,115,22,0.18),inset_0_1px_0_rgba(255,255,255,0.2)]",
         className
       )}
     >
-      <div className="relative h-[19rem] sm:h-[22rem] shrink-0 overflow-hidden bg-slate-950/80 border-b border-white/10">
+      <div className={clsx(
+        "bento-graphic-pane relative h-[19rem] sm:h-[22rem] shrink-0 overflow-hidden border-b",
+        isLight ? "bg-slate-50 border-slate-200/80" : "bg-neutral-950/90 border-white/10"
+      )}>
         {graphic}
         {fade.includes("top") && (
-          <div className="absolute inset-0 bg-gradient-to-b from-[#131b2e]/60 to-transparent opacity-60 pointer-events-none" />
+          <div className={clsx(
+            "absolute inset-0 bg-gradient-to-b opacity-60 pointer-events-none",
+            isLight ? "from-white/80 to-transparent" : "from-[#0e0e12]/70 to-transparent"
+          )} />
         )}
         {fade.includes("bottom") && (
-          <div className="absolute inset-0 bg-gradient-to-t from-[#131b2e]/90 to-transparent opacity-80 pointer-events-none" />
+          <div className={clsx(
+            "absolute inset-0 bg-gradient-to-t opacity-80 pointer-events-none",
+            isLight ? "from-white to-transparent" : "from-[#0e0e12]/95 to-transparent"
+          )} />
         )}
       </div>
-      <div className="relative p-6 sm:p-8 z-20 isolate bg-gradient-to-b from-[#131b2e] to-[#0c1220] text-white">
+      <div className={clsx(
+        "bento-text-pane relative p-6 sm:p-8 z-20 isolate",
+        isLight ? "bg-white text-slate-900" : "bg-gradient-to-b from-[#0e0e12] to-[#08080a] text-white"
+      )}>
         <div className="mb-2">{eyebrow}</div>
-        <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-orange-300 transition-colors duration-300">
+        <h3 className={clsx(
+          "text-xl sm:text-2xl font-bold tracking-tight transition-colors duration-300",
+          isLight ? "text-slate-900 group-hover:text-orange-600" : "text-white group-hover:text-orange-300"
+        )}>
           {title}
         </h3>
-        <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-300">
+        <p className={clsx(
+          "mt-2 text-xs sm:text-sm leading-relaxed",
+          isLight ? "text-slate-600" : "text-slate-300"
+        )}>
           {description}
         </p>
       </div>

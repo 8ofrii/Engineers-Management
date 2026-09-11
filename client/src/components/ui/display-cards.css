@@ -1,0 +1,47 @@
+/* DisplayCards surface — landing tokens (dark ember / cafe light). */
+.dcard {
+  position: relative;
+  width: 28rem;
+  max-width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--line2);
+  background: rgba(18, 18, 22, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  user-select: none;
+  transition: filter 0.5s ease, border-color 0.3s ease;
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.6);
+}
+body.light-mode .dcard {
+  background: rgba(247, 241, 229, 0.9);
+  box-shadow: 0 24px 50px -28px rgba(60, 45, 20, 0.35);
+}
+.dcard:hover { border-color: var(--accent); z-index: 5; }
+.dcard-top { display: flex; align-items: center; gap: 10px; }
+.dcard-ico {
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  background: rgba(255, 90, 31, 0.12);
+  border: 1px solid rgba(255, 90, 31, 0.35);
+  color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.dcard-title { font-size: 15px; font-weight: 750; letter-spacing: -0.01em; margin: 0; color: var(--text); }
+.dcard-desc { font-size: 13px; line-height: 1.55; color: var(--muted); margin: 0; }
+.dcard-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); margin: 0; }
+/* back-of-stack treatment: grayscale + veil, lifted on hover */
+.dcard.dim { filter: grayscale(1); }
+.dcard.dim::after {
+  content: '';
+  position: absolute; inset: 0; border-radius: inherit;
+  background: var(--bg); opacity: 0.36;
+  transition: opacity 0.5s ease; pointer-events: none;
+}
+.dcard.dim:hover { filter: grayscale(0); }
+.dcard.dim:hover::after { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .dcard, .dcard.dim::after { transition: none; }
+}

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { authAPI } from '../services/api';
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, Loader2, Globe, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import SkyToggle from '../components/ui/sky-toggle';
 import './Auth.css';
 
 export default function Login() {
@@ -27,6 +28,13 @@ export default function Login() {
 
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [theme, setTheme] = useState(() => localStorage.getItem('theme_preset') || 'dark');
+    const light = theme === 'light';
+
+    useEffect(() => {
+        document.body.classList.toggle('light-mode', light);
+        localStorage.setItem('theme_preset', theme);
+    }, [theme, light]);
 
     // 2FA challenge state
     const [twoFactor, setTwoFactor] = useState(null);
@@ -177,12 +185,9 @@ export default function Login() {
         }
     };
 
-    // Direct Google OAuth 2.0 Redirect
+    // Google OAuth via backend (sets state cookie, then redirects to Google)
     const handleGoogleSignIn = () => {
-        const clientId = '685331176998-ve7827qr2u5ts6a4enk1in2d1t378irm.apps.googleusercontent.com';
-        const redirectUri = `${window.location.origin}/api/auth/google/callback`;
-        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&prompt=select_account&access_type=offline`;
-        window.location.href = googleAuthUrl;
+        window.location.href = '/api/auth/google';
     };
 
     // 2FA challenge view
@@ -193,7 +198,7 @@ export default function Login() {
                 <div className="auth-content">
                     <div className="auth-card">
                         <div className="auth-header">
-                            <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                            <div style={{ width: 64, height: 64, borderRadius: 16, background: 'rgba(255, 90, 31, 0.12)', color: '#ff5a1f', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                                 <ShieldCheck size={36} />
                             </div>
                             <h1>{t('auth.twoFactorTitle') || 'Two-Factor Code'}</h1>
@@ -228,7 +233,7 @@ export default function Login() {
                                 type="button"
                                 onClick={() => { setTwoFactor(null); setTwoFactorCode(''); }}
                                 className="btn"
-                                style={{ marginTop: '12px', background: 'transparent', color: 'var(--color-primary)', width: '100%' }}
+                                style={{ marginTop: '12px', background: 'transparent', color: '#ff8a50', width: '100%' }}
                             >
                                 {t('common.cancel') || 'Cancel'}
                             </button>
@@ -243,22 +248,29 @@ export default function Login() {
         <div className="auth-container">
             <div className="auth-background"></div>
 
-            {/* Top Bar with Language Switcher */}
+            {/* Top Bar with brand + theme + language */}
             <div className="auth-top-bar">
-                <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
-                    <span>{isAr ? '← الرئيسية' : '← Home'}</span>
-                </Link>
-                <button type="button" className="auth-lang-btn" onClick={toggleLanguage}>
-                    <Globe size={16} />
-                    <span>{isAr ? 'English' : 'العربية'}</span>
-                </button>
+                <div className="auth-top-bar-inner">
+                    <Link to="/" className="auth-brand">
+                        <img src="/hesaby_logo_lockup.svg" alt="Hesaby.ai" className="auth-brand-lockup logo-for-dark" />
+                        <img src="/hesaby_logo_lockup_light.svg" alt="Hesaby.ai" className="auth-brand-lockup logo-for-light" />
+                    </Link>
+                    <div className="auth-top-actions">
+                        <Link to="/" className="auth-home-link">{isAr ? 'الرئيسية' : 'Home'}</Link>
+                        <SkyToggle dark={!light} onToggle={() => setTheme(light ? 'dark' : 'light')} label={isAr ? (light ? 'التحويل للوضع الليلي' : 'التحويل للوضع الفاتح') : (light ? 'Switch to dark mode' : 'Switch to light mode')} />
+                        <button type="button" className="auth-lang-btn" onClick={toggleLanguage}>
+                            <Globe size={14} />
+                            <span>{isAr ? 'English' : 'العربية'}</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div className="auth-content">
                 <div className="auth-card">
                     <div className="auth-header">
                         <img 
-                            src="/hesaby_logo_icon.png" 
+                            src="/hesaby_logo_icon.svg" 
                             alt="Hesaby ERP Logo" 
                             className="auth-logo-img" 
                             onError={(e) => { e.target.style.display = 'none'; }}
@@ -350,7 +362,7 @@ export default function Login() {
                                     <Link 
                                         to={`/signup?email=${encodeURIComponent(formData.email)}`}
                                         style={{ 
-                                            color: '#3b82f6', 
+                                            color: '#ff8a50', 
                                             fontWeight: 700, 
                                             textDecoration: 'none', 
                                             display: 'inline-flex', 
@@ -358,7 +370,7 @@ export default function Login() {
                                             gap: '4px',
                                             padding: '2px 6px',
                                             borderRadius: '4px',
-                                            background: 'rgba(59, 130, 246, 0.1)'
+                                            background: 'rgba(255, 90, 31, 0.1)'
                                         }}
                                     >
                                         <span>{isAr ? 'إنشاء حساب جديد' : 'Sign up now'}</span>
@@ -375,7 +387,7 @@ export default function Login() {
                                     <Lock size={16} />
                                     {t('auth.password')}
                                 </label>
-                                <Link to="/forgot-password" style={{ fontSize: '12px', color: 'var(--color-primary)', textDecoration: 'none' }}>
+                                <Link to="/forgot-password" style={{ fontSize: '12px', color: '#ff8a50', textDecoration: 'none' }}>
                                     {t('auth.forgotPassword') || (isAr ? 'نسيت كلمة المرور؟' : 'Forgot Password?')}
                                 </Link>
                             </div>
@@ -442,12 +454,12 @@ export default function Login() {
                                     <Link 
                                         to="/forgot-password"
                                         style={{ 
-                                            color: '#3b82f6', 
+                                            color: '#ff8a50', 
                                             fontWeight: 700, 
                                             textDecoration: 'none',
                                             padding: '2px 6px',
                                             borderRadius: '4px',
-                                            background: 'rgba(59, 130, 246, 0.1)'
+                                            background: 'rgba(255, 90, 31, 0.1)'
                                         }}
                                     >
                                         <span>{isAr ? 'إعادة تعيين كلمة المرور' : 'Reset password'}</span>

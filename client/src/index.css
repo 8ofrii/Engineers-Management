@@ -10,6 +10,10 @@
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   /* Color Palette - Modern Executive Theme */
   --color-primary: #3b82f6;
