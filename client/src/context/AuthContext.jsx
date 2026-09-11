@@ -12,7 +12,14 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => {
+        try {
+            const saved = localStorage.getItem('user');
+            return saved ? JSON.parse(saved) : null;
+        } catch (_) {
+            return null;
+        }
+    });
     const [loading, setLoading] = useState(true);
     const [token, setToken] = useState(localStorage.getItem('token'));
 

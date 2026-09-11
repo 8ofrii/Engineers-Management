@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Upload, User, Building2, UserCircle, AlertCircle, Eye, EyeOff, CheckCircle, Trash2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { X, Upload, User, Building2, UserCircle, AlertCircle, Eye, EyeOff, CheckCircle, Trash2, AlertTriangle, ShieldAlert, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import api, { tenantAPI, authAPI } from '../services/api';
@@ -33,6 +33,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
     const [companyData, setCompanyData] = useState({ name: '', address: '', phone: '', email: '' });
     const [companyLogo, setCompanyLogo] = useState(null);
     const [companyLogoPreview, setCompanyLogoPreview] = useState(null);
+    const [uploadingCompanyLogo, setUploadingCompanyLogo] = useState(false);
 
     // Danger Zone Deletion State
     const [showDeleteCompanyConfirm, setShowDeleteCompanyConfirm] = useState(false);
@@ -179,11 +180,47 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleCompanyLogoChange = (e) => {
+    const handleCompanyLogoChange = async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            setCompanyLogo(file);
-            setCompanyLogoPreview(URL.createObjectURL(file));
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Please select a valid image file.' });
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: 'Image size must not exceed 5MB.' });
+            return;
+        }
+
+        setCompanyLogo(file);
+        setCompanyLogoPreview(URL.createObjectURL(file));
+        setUploadingCompanyLogo(true);
+
+        try {
+            const data = new FormData();
+            data.append('logo', file);
+            if (companyData.name) data.append('name', companyData.name);
+            if (companyData.address) data.append('address', companyData.address);
+            if (companyData.phone) data.append('phone', companyData.phone);
+            if (companyData.email) data.append('email', companyData.email);
+
+            const res = await tenantAPI.updateSettings(data);
+            const newLogo = res.data?.data?.logo;
+            if (newLogo) {
+                setCompanyLogoPreview(getImageUrl(newLogo));
+            }
+
+            const me = await api.get('/auth/me');
+            updateUser(me.data.data);
+            setSuccessMessage('Company logo updated successfully');
+        } catch (err) {
+            console.error(err);
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || 'Failed to upload company logo' });
+        } finally {
+            setUploadingCompanyLogo(false);
+            e.target.value = '';
         }
     };
 
@@ -776,11 +813,12 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                                                     <Building2 size={40} color="#9ca3af" />
                                                 )}
                                             </div>
-                                            <label className="btn btn-secondary" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <Upload size={16} /> Upload Logo
-                                                <input type="file" accept="image/*" onChange={handleCompanyLogoChange} style={{ display: 'none' }} />
+                                            <label className="btn btn-secondary" style={{ cursor: uploadingCompanyLogo ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: uploadingCompanyLogo ? 0.7 : 1 }}>
+                                                {uploadingCompanyLogo ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
+                                                {uploadingCompanyLogo ? 'Uploading...' : 'Upload Logo'}
+                                                <input type="file" accept="image/*" onChange={handleCompanyLogoChange} disabled={uploadingCompanyLogo} style={{ display: 'none' }} />
                                             </label>
-                                            <p style={{ fontSize: '12px', color: '#6b7280' }}>Recommended: Square PNG, max 2MB</p>
+                                            <p style={{ fontSize: '12px', color: '#6b7280' }}>Recommended: Square PNG, max 5MB</p>
                                         </div>
                                     </div>
 

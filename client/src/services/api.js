@@ -16,6 +16,10 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        // When sending FormData, delete Content-Type so browser/axios sets the correct multipart/form-data boundary
+        if (config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
+        }
         return config;
     },
     (error) => Promise.reject(error)
@@ -57,9 +61,7 @@ export const authAPI = {
     forgotPassword: (data) => api.post('/auth/forgot-password', data),
     resetPassword: (token, data) => api.put(`/auth/reset-password/${token}`, data),
     getMe: () => api.get('/auth/me'),
-    updateProfile: (formData) => api.put('/auth/profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    }),
+    updateProfile: (formData) => api.put('/auth/profile', formData),
     deleteAccount: (data) => api.delete('/auth/account', { data }),
     twoFactor: {
         status: () => api.get('/auth/2fa/status'),
@@ -317,9 +319,7 @@ export const chatAPI = {
 // Tenant API — settings + approval thresholds (admin-only)
 export const tenantAPI = {
     getSettings: () => api.get('/tenant'),
-    updateSettings: (formData) => api.put('/tenant', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    }),
+    updateSettings: (formData) => api.put('/tenant', formData),
     deleteCompany: (data) => api.delete('/tenant', { data }),
     getApprovalThresholds: () => api.get('/tenant/approval-thresholds'),
     updateApprovalThresholds: (thresholds) => api.put('/tenant/approval-thresholds', { thresholds })

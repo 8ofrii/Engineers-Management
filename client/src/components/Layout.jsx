@@ -128,10 +128,15 @@ export default function Layout({ children }) {
     };
 
     const [avatarError, setAvatarError] = useState(false);
+    const [companyLogoError, setCompanyLogoError] = useState(false);
 
     useEffect(() => {
         setAvatarError(false);
     }, [user?.profilePicture]);
+
+    useEffect(() => {
+        setCompanyLogoError(false);
+    }, [user?.companyLogo]);
 
     // Helper function to get full image URL (handles local uploads, proxy, and remote S3)
     const getImageUrl = (path) => {
@@ -246,11 +251,12 @@ export default function Layout({ children }) {
             <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
                 <div className="sidebar-header" style={{ position: 'relative' }}>
                     <div className="sidebar-logo">
-                        {user?.companyLogo ? (
+                        {user?.companyLogo && !companyLogoError ? (
                             <img
                                 src={getImageUrl(user.companyLogo)}
-                                alt="Logo"
-                                style={{ height: '40px', width: '40px', borderRadius: '12px', marginRight: '8px', objectFit: 'cover' }}
+                                alt={user?.company || "Company Logo"}
+                                onError={() => setCompanyLogoError(true)}
+                                style={{ height: '40px', width: '40px', borderRadius: '12px', flexShrink: 0, objectFit: 'cover' }}
                             />
                         ) : (
                             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, background: '#fff', overflow: 'hidden', flexShrink: 0 }}>

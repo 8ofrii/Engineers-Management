@@ -50,6 +50,10 @@ export default function CompanySettings() {
     const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
     const [deletingAccount, setDeletingAccount] = useState(false);
 
+    // Instant Upload States
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const [uploadingProfileImg, setUploadingProfileImg] = useState(false);
+
     const getImageUrl = (path) => {
         if (!path || typeof path !== 'string') return null;
         if (path.startsWith('blob:') || path.startsWith('data:')) return path;
@@ -107,19 +111,125 @@ export default function CompanySettings() {
         }
     };
 
-    const handleLogoChange = (e) => {
+    const handleLogoChange = async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            setLogo(file);
-            setLogoPreview(URL.createObjectURL(file));
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: isAr ? 'يرجى اختيار ملف صورة صالح (PNG, JPG, WebP)' : 'Please select a valid image file (PNG, JPG, WebP).'
+            });
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: isAr ? 'حجم الصورة يجب ألا يتجاوز 5 ميجابايت' : 'Image size must not exceed 5MB.'
+            });
+            return;
+        }
+
+        setLogo(file);
+        setLogoPreview(URL.createObjectURL(file));
+        setUploadingLogo(true);
+
+        try {
+            const data = new FormData();
+            data.append('logo', file);
+            if (companyData.name) data.append('name', companyData.name);
+            if (companyData.address) data.append('address', companyData.address);
+            if (companyData.phone) data.append('phone', companyData.phone);
+            if (companyData.email) data.append('email', companyData.email);
+
+            const res = await tenantAPI.updateSettings(data);
+            const savedLogo = res.data?.data?.logo;
+            if (savedLogo) {
+                setLogoPreview(getImageUrl(savedLogo));
+            }
+
+            const me = await authAPI.getMe();
+            updateUser(me.data.data);
+
+            showAlert({
+                type: 'success',
+                title: isAr ? 'تم حفظ الشعار' : 'Logo Updated',
+                message: isAr ? 'تم رفع وحفظ شعار الشركة بنجاح وتطبيقه في أعلى النظام.' : 'Company logo uploaded and saved successfully across the system.'
+            });
+        } catch (err) {
+            console.error('Failed to auto-upload logo:', err);
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: err.response?.data?.message || (isAr ? 'فشل رفع الشعار' : 'Failed to upload company logo')
+            });
+        } finally {
+            setUploadingLogo(false);
+            e.target.value = '';
         }
     };
 
-    const handleProfileImgChange = (e) => {
+    const handleProfileImgChange = async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            setProfileImg(file);
-            setProfilePreview(URL.createObjectURL(file));
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: isAr ? 'يرجى اختيار ملف صورة صالح' : 'Please select a valid image file.'
+            });
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: isAr ? 'حجم الصورة يجب ألا يتجاوز 5 ميجابايت' : 'Image size must not exceed 5MB.'
+            });
+            return;
+        }
+
+        setProfileImg(file);
+        setProfilePreview(URL.createObjectURL(file));
+        setUploadingProfileImg(true);
+
+        try {
+            const data = new FormData();
+            data.append('profilePicture', file);
+            if (profileData.name) data.append('name', profileData.name);
+            if (profileData.email) data.append('email', profileData.email);
+            if (profileData.phone) data.append('phone', profileData.phone);
+            if (profileData.company) data.append('company', profileData.company);
+
+            const res = await authAPI.updateProfile(data);
+            const updatedUser = res.data?.data;
+            if (updatedUser) {
+                updateUser(updatedUser);
+                if (updatedUser.profilePicture) {
+                    setProfilePreview(getImageUrl(updatedUser.profilePicture));
+                }
+            }
+
+            showAlert({
+                type: 'success',
+                title: isAr ? 'تم تحديث الصورة الشخصية' : 'Profile Picture Updated',
+                message: isAr ? 'تم حفظ وتطبيق صورتك الشخصية بنجاح.' : 'Profile picture uploaded and saved successfully.'
+            });
+        } catch (err) {
+            console.error('Failed to auto-upload profile picture:', err);
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: err.response?.data?.message || (isAr ? 'فشل رفع الصورة' : 'Failed to upload profile picture')
+            });
+        } finally {
+            setUploadingProfileImg(false);
+            e.target.value = '';
         }
     };
 
@@ -144,6 +254,7 @@ export default function CompanySettings() {
             });
             const me = await authAPI.getMe();
             updateUser(me.data.data);
+            setLogo(null);
         } catch (err) {
             showAlert({ 
                 type: 'error', 
@@ -435,10 +546,19 @@ export default function CompanySettings() {
                                                 <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
                                                     {isAr ? 'يظهر في أعلى النظام، التقارير المطبوعة، وفواتير العملاء. يفضل صيغة PNG بدقة عالية.' : 'Appears across the top header, generated PDF reports, and customer invoices.'}
                                                 </p>
-                                                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                    <Upload size={14} />
-                                                    {isAr ? 'رفع شعار جديد' : 'Upload New Logo'}
-                                                    <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} />
+                                                <label
+                                                    className="btn btn-secondary btn-sm"
+                                                    style={{
+                                                        cursor: uploadingLogo ? 'not-allowed' : 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        opacity: uploadingLogo ? 0.7 : 1
+                                                    }}
+                                                >
+                                                    {uploadingLogo ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
+                                                    {uploadingLogo ? (isAr ? 'جاري الرفع...' : 'Uploading...') : (isAr ? 'رفع شعار جديد' : 'Upload New Logo')}
+                                                    <input type="file" accept="image/*" onChange={handleLogoChange} disabled={uploadingLogo} style={{ display: 'none' }} />
                                                 </label>
                                             </div>
                                         </div>
@@ -641,10 +761,19 @@ export default function CompanySettings() {
                                                 <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
                                                     {isAr ? 'صورتك الرمزية المعروضة في المحادثات وسجل التدقيق.' : 'Your avatar shown across chat, assignments, and audit events.'}
                                                 </p>
-                                                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                    <Upload size={14} />
-                                                    {isAr ? 'تغيير الصورة' : 'Change Avatar'}
-                                                    <input type="file" accept="image/*" onChange={handleProfileImgChange} style={{ display: 'none' }} />
+                                                <label
+                                                    className="btn btn-secondary btn-sm"
+                                                    style={{
+                                                        cursor: uploadingProfileImg ? 'not-allowed' : 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        opacity: uploadingProfileImg ? 0.7 : 1
+                                                    }}
+                                                >
+                                                    {uploadingProfileImg ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
+                                                    {uploadingProfileImg ? (isAr ? 'جاري الرفع...' : 'Uploading...') : (isAr ? 'تغيير الصورة' : 'Change Avatar')}
+                                                    <input type="file" accept="image/*" onChange={handleProfileImgChange} disabled={uploadingProfileImg} style={{ display: 'none' }} />
                                                 </label>
                                             </div>
                                         </div>

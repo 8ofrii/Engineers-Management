@@ -59,6 +59,13 @@ export const updateTenant = async (req, res, next) => {
             data: updateData
         });
 
+        if (name) {
+            await prisma.user.updateMany({
+                where: { tenantId: req.user.tenantId },
+                data: { company: name.trim() }
+            });
+        }
+
         res.status(200).json({
             success: true,
             data: tenant,
