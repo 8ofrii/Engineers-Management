@@ -212,14 +212,55 @@ export default function Landing() {
           <Link to={user?'/billing':'/signup'} className={cn('hx-btn',p.pop?'hx-btn-fire':'hx-btn-ghost')} style={{width:'100%'}}>{ent?T('Talk to us','كلمنا'):p.price===0?T('Start free','ابدأ مجانًا'):T('Choose plan','اختر الباقة')}</Link></div>);})}</div>
       </section>
 
-      <section className="hx-inner hx-sec"><LampContainer className="rv min-h-[560px] rounded-[26px] border border-[var(--line2)] lamp-tight">
+      <section className="hx-inner hx-sec"><LampContainer className="rv min-h-[540px] sm:min-h-[580px] rounded-[26px] border border-[var(--line2)] lamp-tight">
         <motion.div
-          initial={{ opacity: 0.5, y: 60 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.8, ease: "easeInOut" }}
-          className="flex flex-col items-center text-center lamp-ink"
+          transition={{ delay: 0.2, duration: 0.7, ease: "easeInOut" }}
+          className="flex flex-col items-center text-center lamp-ink w-full max-w-3xl mx-auto"
         >
-          <div style={{display:'flex',justifyContent:'center',marginBottom:18}}><span className="hx-logo-chip" style={{width:52,height:52,borderRadius:14}}><img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{width:40,height:40}} /></span></div>
+          {/* Luminous Lamp Fixture with Logo Badge — Shines DOWNWARD */}
+          <div className="relative flex items-center justify-center w-full mb-7 sm:mb-8">
+            {/* Left Glowing Beam */}
+            <motion.div
+              initial={{ width: "3rem", opacity: 0.3 }}
+              whileInView={{ width: "9rem", opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.8, ease: "easeInOut" }}
+              className="h-[2px] rounded-full bg-gradient-to-r from-transparent via-amber-300 to-orange-400 shadow-[0_0_14px_3px_rgba(255,140,50,0.85)]"
+            />
+            
+            {/* Center Logo Chip */}
+            <div className="mx-3.5 relative z-20">
+              <span className="hx-logo-chip shadow-[0_0_24px_rgba(255,120,40,0.5)]" style={{width:52,height:52,borderRadius:14,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                <img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{width:38,height:38}} />
+              </span>
+            </div>
+
+            {/* Right Glowing Beam */}
+            <motion.div
+              initial={{ width: "3rem", opacity: 0.3 }}
+              whileInView={{ width: "9rem", opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.8, ease: "easeInOut" }}
+              className="h-[2px] rounded-full bg-gradient-to-l from-transparent via-amber-300 to-orange-400 shadow-[0_0_14px_3px_rgba(255,140,50,0.85)]"
+            />
+
+            {/* Downward light cone radiating strictly DOWN onto the headline */}
+            <div
+              aria-hidden="true"
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 w-[36rem] max-w-[90vw] h-[280px] pointer-events-none opacity-85 z-0"
+              style={{
+                background: "linear-gradient(180deg, rgba(255,145,45,0.40) 0%, rgba(255,100,25,0.13) 45%, rgba(255,70,10,0.01) 80%, transparent 100%)",
+                clipPath: "polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%)",
+                filter: "blur(20px)",
+              }}
+            />
+            {/* Core Hotspot beneath the fixture */}
+            <div
+              aria-hidden="true"
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[18rem] h-[36px] rounded-full bg-orange-400/50 blur-md pointer-events-none z-0"
+            />
+          </div>
+
           <h2 className="hx-h2" style={{color:'#f5f4f0'}}>{T('Your next project deserves clean books from day one.','مشروعك الجاي يستاهل دفاتر نضيفة من أول يوم.')}</h2>
           <p className="hx-lead" style={{maxWidth:600,marginInline:'auto',color:'#a8a29e'}}>{T('Bring one live project this week — its receipts, its reports, its custody and its bank lines. By Friday you\'ll know the true cost, the safe balance and your earned fee, down to the last pound.','أحضر مشروع واحد حي الأسبوع ده — فواتيره وتقاريره وعهدته وكشف حسابه. وبحلول الجمعة هتعرف التكلفة الحقيقية ورصيد الخزينة وأتعابك المستحقة، لآخر جنيه.')}</p>
           <div className="hx-ctas"><Link to={user?'/dashboard':'/signup'} className="hx-btn hx-btn-fire" style={{padding:'15px 34px',fontSize:15}}>{T('Start free — no card needed','ابدأ مجانًا — من غير كارت')}</Link></div>

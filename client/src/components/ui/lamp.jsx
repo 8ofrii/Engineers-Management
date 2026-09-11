@@ -2,16 +2,11 @@ import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-/* Aceternity-style lamp, retinted from cyan to Hesaby ember orange.
-   JS port (no TS), "use client" removed — this is Vite, not Next.
-   NOTE: Tailwind v3 has no `bg-gradient-conic` utility; the class is
-   harmless there — the inline conic-gradient background does the work. */
-
 export function LampDemo({ titleA = "Run your next project", titleB = "on Hesaby." }) {
   return (
     <LampContainer>
       <motion.h1
-        initial={{ opacity: 0.5, y: 100 }}
+        initial={{ opacity: 0.5, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.8, ease: "easeInOut" }}
         className="mt-8 bg-gradient-to-br from-slate-100 to-slate-400 py-4 bg-clip-text text-center text-4xl font-medium tracking-tight text-transparent md:text-7xl"
@@ -26,66 +21,30 @@ export const LampContainer = ({ children, className }) => {
   return (
     <div
       className={cn(
-        "relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--lampbase,#020617)] w-full rounded-md z-0",
+        "relative flex min-h-[540px] sm:min-h-[580px] w-full flex-col items-center justify-center overflow-hidden bg-[var(--lampbase,#07090e)] rounded-[26px] z-0",
         className
       )}
     >
-      <div className="relative flex w-full flex-1 scale-y-125 items-center justify-center isolate z-0 ">
-        <motion.div
-          initial={{ opacity: 0.5, width: "15rem" }}
-          whileInView={{ opacity: 1, width: "30rem" }}
-          transition={{ delay: 0.3, duration: 0.8, ease: "easeInOut" }}
-          style={{
-            backgroundImage: `conic-gradient(var(--conic-position), var(--tw-gradient-stops))`,
-          }}
-          className="absolute inset-auto right-1/2 h-56 overflow-visible w-[30rem] bg-gradient-conic from-orange-500 via-transparent to-transparent text-white [--conic-position:from_70deg_at_center_top]"
-        >
-          <div className="absolute  w-[100%] left-0 bg-[var(--lampbase,#020617)] h-40 bottom-0 z-20 [mask-image:linear-gradient(to_top,white,transparent)]" />
-          <div className="absolute  w-40 h-[100%] left-0 bg-[var(--lampbase,#020617)]  bottom-0 z-20 [mask-image:linear-gradient(to_right,white,transparent)]" />
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0.5, width: "15rem" }}
-          whileInView={{ opacity: 1, width: "30rem" }}
-          transition={{ delay: 0.3, duration: 0.8, ease: "easeInOut" }}
-          style={{
-            backgroundImage: `conic-gradient(var(--conic-position), var(--tw-gradient-stops))`,
-          }}
-          className="absolute inset-auto left-1/2 h-56 w-[30rem] bg-gradient-conic from-transparent via-transparent to-orange-500 text-white [--conic-position:from_290deg_at_center_top]"
-        >
-          <div className="absolute  w-40 h-[100%] right-0 bg-[var(--lampbase,#020617)]  bottom-0 z-20 [mask-image:linear-gradient(to_left,white,transparent)]" />
-          <div className="absolute  w-[100%] right-0 bg-[var(--lampbase,#020617)] h-40 bottom-0 z-20 [mask-image:linear-gradient(to_top,white,transparent)]" />
-        </motion.div>
-        <div className="absolute top-1/2 h-48 w-full translate-y-12 scale-x-150 bg-[var(--lampbase,#020617)] blur-2xl"></div>
-        <div className="absolute top-1/2 z-50 h-48 w-full bg-transparent opacity-10 backdrop-blur-md"></div>
-        <div className="absolute inset-auto z-50 h-36 w-[28rem] -translate-y-[7rem] rounded-full bg-orange-500 opacity-50 blur-3xl"></div>
-        <motion.div
-          initial={{ width: "8rem" }}
-          whileInView={{ width: "16rem" }}
-          transition={{ delay: 0.3, duration: 0.8, ease: "easeInOut" }}
-          className="absolute inset-auto z-30 h-36 w-64 -translate-y-[6.5rem] rounded-full bg-orange-400 blur-2xl"
-        ></motion.div>
-        <motion.div
-          initial={{ width: "15rem" }}
-          whileInView={{ width: "30rem" }}
-          transition={{ delay: 0.3, duration: 0.8, ease: "easeInOut" }}
-          className="absolute inset-auto z-50 h-[3px] w-[30rem] -translate-y-[2.5rem] rounded-full bg-orange-300 shadow-[0_0_18px_4px_rgba(255,140,50,0.9),0_0_60px_12px_rgba(255,110,40,0.45)]"
-        ></motion.div>
-        {/* light cone falling from the bar onto the content */}
-        <div
-          aria-hidden
-          className="absolute inset-auto z-40 h-64 w-[30rem] -translate-y-[1rem] opacity-70 blur-2xl"
-          style={{
-            background: "linear-gradient(180deg, rgba(255,150,60,0.55) 0%, rgba(255,110,40,0.18) 55%, transparent 100%)",
-            clipPath: "polygon(36% 0, 64% 0, 100% 100%, 0% 100%)",
-          }}
-        ></div>
+      {/* Background ambient lighting — purely downward, zero upward spill */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+        {/* Top subtle rim highlight */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-orange-500/35 to-transparent" />
+        
+        {/* Soft atmospheric ceiling glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[28rem] h-[60px] rounded-full bg-orange-500/15 blur-2xl pointer-events-none" />
 
-        <div className="absolute inset-auto z-40 h-44 w-full -translate-y-[15rem] bg-[var(--lampbase,#020617)] "></div>
+        {/* Ambient warmth behind the headline text */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[34rem] h-[240px] rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+
+        {/* Bottom smooth fade to card base */}
+        <div className="absolute bottom-0 inset-x-0 h-20 bg-gradient-to-t from-[var(--lampbase,#07090e)] to-transparent pointer-events-none" />
       </div>
 
-      <div className="relative z-50 flex -translate-y-80 flex-col items-center px-5">
+      {/* Content wrapper: Strictly vertically centered with balanced padding */}
+      <div className="relative z-10 flex w-full flex-col items-center justify-center px-5 py-12 sm:py-16 my-auto">
         {children}
       </div>
     </div>
   );
 };
+
