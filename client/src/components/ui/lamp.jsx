@@ -52,12 +52,12 @@ export const LampContainer = ({
         {/* ================================================================ */}
         <div className="relative flex items-center justify-center w-full mb-7 sm:mb-8 z-20">
           
-          {/* Left Glowing Lamp Wing */}
+          {/* Left Glowing Lamp Wing: Solid brightest neon amber, no gradient */}
           <motion.div
             initial={{ width: "3rem", opacity: 0.4 }}
             whileInView={{ width: "12rem", opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.8, ease: "easeInOut" }}
-            className="h-[3px] sm:h-1 rounded-full bg-gradient-to-r from-transparent via-amber-300 to-orange-400 shadow-[0_0_16px_3px_rgba(255,140,50,0.9),0_0_4px_#fff]"
+            className="h-[3px] sm:h-1 rounded-full bg-amber-300 shadow-[0_0_18px_3px_rgba(251,191,36,0.95),0_0_6px_#fef08a]"
           />
 
           {/* Center Hesaby [H] Medallion */}
@@ -90,12 +90,12 @@ export const LampContainer = ({
             </div>
           </div>
 
-          {/* Right Glowing Lamp Wing */}
+          {/* Right Glowing Lamp Wing: Solid brightest neon amber, no gradient */}
           <motion.div
             initial={{ width: "3rem", opacity: 0.4 }}
             whileInView={{ width: "12rem", opacity: 1 }}
             transition={{ delay: 0.2, duration: 0.8, ease: "easeInOut" }}
-            className="h-[3px] sm:h-1 rounded-full bg-gradient-to-l from-transparent via-amber-300 to-orange-400 shadow-[0_0_16px_3px_rgba(255,140,50,0.9),0_0_4px_#fff]"
+            className="h-[3px] sm:h-1 rounded-full bg-amber-300 shadow-[0_0_18px_3px_rgba(251,191,36,0.95),0_0_6px_#fef08a]"
           />
 
           {/* ================================================================ */}
