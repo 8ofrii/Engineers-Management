@@ -959,19 +959,28 @@ export default function Billing() {
                             </div>
 
                             <button
-                                className="btn btn-primary"
+                                type="button"
                                 style={{
                                     background: '#10b981',
                                     borderColor: '#10b981',
-                                    padding: '10px 20px',
+                                    color: '#ffffff',
+                                    padding: '10px 22px',
                                     fontSize: '0.9rem',
                                     fontWeight: 700,
-                                    boxShadow: '0 2px 10px rgba(16, 185, 129, 0.3)',
-                                    pointerEvents: 'none'
+                                    borderRadius: 10,
+                                    border: '1px solid #10b981',
+                                    boxShadow: '0 2px 10px rgba(16, 185, 129, 0.35)',
+                                    pointerEvents: 'none',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    whiteSpace: 'nowrap'
                                 }}
                             >
-                                <Zap size={15} />
-                                {t('billing.browseAddOns', 'Select Add-On Packs')}
+                                <Zap size={15} color="#ffffff" style={{ stroke: '#ffffff', color: '#ffffff' }} />
+                                <span style={{ color: '#ffffff' }}>
+                                    {t('billing.browseAddOns', 'Browse Add-On Packs')}
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -1108,14 +1117,17 @@ export default function Billing() {
                                             </div>
 
                                             <button
-                                                className={`btn ${addon.popular ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                                                className={`btn ${addon.popular ? '' : 'btn-secondary'} btn-sm`}
                                                 style={{
                                                     background: addon.popular ? '#10b981' : undefined,
                                                     borderColor: addon.popular ? '#10b981' : undefined,
                                                     color: addon.popular ? '#ffffff' : undefined,
                                                     minWidth: 100,
                                                     padding: '8px 14px',
-                                                    fontWeight: 700
+                                                    fontWeight: 700,
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 6
                                                 }}
                                                 onClick={async () => {
                                                     await handleBuyAddOn(addon.key);
@@ -1123,11 +1135,13 @@ export default function Billing() {
                                                 disabled={isAction}
                                             >
                                                 {isAction ? (
-                                                    <Loader2 size={14} className="spin" />
+                                                    <Loader2 size={14} className="spin" color={addon.popular ? '#ffffff' : undefined} />
                                                 ) : (
-                                                    <Zap size={14} />
+                                                    <Zap size={14} color={addon.popular ? '#ffffff' : undefined} />
                                                 )}
-                                                {t('billing.buyNow', 'Buy Now')}
+                                                <span style={{ color: addon.popular ? '#ffffff' : undefined }}>
+                                                    {t('billing.buyNow', 'Buy Now')}
+                                                </span>
                                             </button>
                                         </div>
                                     </div>
