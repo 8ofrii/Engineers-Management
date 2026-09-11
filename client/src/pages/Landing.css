@@ -61,7 +61,8 @@ background-size:72px 72px;mask-image:radial-gradient(ellipse 80% 62% at 50% 34%,
 .hx-h1{margin:26px 0 0;font-size:clamp(2.9rem,7vw,5.3rem);font-weight:800;letter-spacing:-.05em;line-height:.98;}
 .hx-h1 span{display:block;} .hx-h1 .ac{color:var(--accent);}
 [dir=rtl] .hx-h1{letter-spacing:0;line-height:1.25;}
-.hx-sub{margin:24px auto 0;max-width:620px;font-size:16.5px;line-height:1.65;color:var(--muted);}
+.hx-hero-rewind{margin:30px auto 14px;display:flex;justify-content:center;align-items:center;padding-bottom:16px;}
+.hx-sub{margin:20px auto 0;max-width:620px;font-size:16.5px;line-height:1.65;color:var(--muted);}
 .hx-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:34px;}
 .hx-micro{margin-top:18px;font-size:13px;color:var(--muted);}
 /* dashboard frame — Qronos style */
