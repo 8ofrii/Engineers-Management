@@ -1,9 +1,20 @@
+@font-face {
+  font-family: 'Israr Syria';
+  src: url('/fonts/israr-syria.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Hesaby V3 — Cinematic (SalesHook + Qronos + Halo). Dark ember default, paper light. */
 .hx { --bg:#050505; --panel:#0c0c0e; --panel2:#121214; --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
 --text:#f5f4f0; --muted:#a8a29e; --faint:#6b6660; --accent:#ff5a1f; --accent-d:#c2410c;
 --glow:0 8px 40px rgba(255,90,31,.45); --nav:rgba(5,5,5,.72);
 min-height:100vh; background:var(--bg); color:var(--text);
-font-family:'Inter Tight',Inter,Cairo,system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:clip; }
+font-family:'Inter Tight',Inter,'Alexandria','Cairo',system-ui,sans-serif; -webkit-font-smoothing:antialiased; overflow-x:clip; }
+[dir=rtl] .hx {
+  font-family: 'Alexandria', 'Israr Syria', 'Cairo', system-ui, sans-serif;
+}
 .hx-light { --bg:#ece5d6; --panel:#f7f1e5; --panel2:#eee5d1; --line:#d8cbaf; --line2:#bfae87;
 --text:#1c1710; --muted:#6b5f4d; --faint:#a29379; --accent:#c2410c; --accent-d:#9a3412;
 --glow:0 8px 28px rgba(194,65,12,.28); --nav:rgba(236,229,214,.86); }
@@ -60,7 +71,34 @@ background-size:72px 72px;mask-image:radial-gradient(ellipse 80% 62% at 50% 34%,
 @keyframes pl{50%{opacity:.4;}}
 .hx-h1{margin:26px 0 0;font-size:clamp(2.9rem,7vw,5.3rem);font-weight:800;letter-spacing:-.05em;line-height:.98;}
 .hx-h1 span{display:block;} .hx-h1 .ac{color:var(--accent);}
-[dir=rtl] .hx-h1{letter-spacing:0;line-height:1.25;}
+[dir=rtl] .hx-h1,
+[dir=rtl] .hx-h2,
+[dir=rtl] .hx-h3,
+[dir=rtl] .hx-eyebrow {
+  font-family: 'Israr Syria', 'Alexandria', sans-serif;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+[dir=rtl] .hx-h1 {
+  line-height: 1.15;
+  font-size: clamp(3rem, 7.5vw, 5.5rem);
+}
+[dir=rtl] .hx-sub,
+[dir=rtl] .hx-lead,
+[dir=rtl] .hx-p,
+[dir=rtl] .hx-tab,
+[dir=rtl] .hx-btn,
+[dir=rtl] .hx-kpi,
+[dir=rtl] .hx-cell,
+[dir=rtl] .hx-note,
+[dir=rtl] .hx-rowline,
+[dir=rtl] .hx-feats,
+[dir=rtl] .hx-plan,
+[dir=rtl] .hx-price,
+[dir=rtl] .hx-micro,
+[dir=rtl] .hx-micro2 {
+  font-family: 'Alexandria', 'Cairo', system-ui, sans-serif;
+}
 .hx-sub{margin:24px auto 0;max-width:620px;font-size:16.5px;line-height:1.65;color:var(--muted);}
 .hx-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:34px;}
 .hx-micro{margin-top:18px;font-size:13px;color:var(--muted);}
