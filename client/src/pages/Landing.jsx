@@ -154,7 +154,7 @@ export default function Landing() {
           <h1 className="hx-h1"><span>{T('Snap a receipt.','فاتورة؟')}</span><span>{T('It posts itself.','صوت؟ صورة؟')}</span><span className="hx-hw"><HandwritingText text={T('Your site has a brain now.','كله بحسابه')} arabic={isRTL} replayKey={`${i18n.language}-${theme}`} /></span></h1>
           <p className="hx-sub">{T('Hesaby turns site chaos into clean books: photograph an invoice on the scaffold and it lands in the right project safe with vendor, VAT and audit trail — before you climb down. Daily reports, custody, approvals and bank matching all run on the same ledger, so month-end closing runs smoothly without pressure or surprises.','حسابي بيحوّل فوضى الموقع لدفاتر نضيفة: صوّر الفاتورة وانت على السقالة، وهتنزل في خزينة المشروع الصح بالمورّد والضريبة وسجل التدقيق — قبل ما تنزل انت. التقارير اليومية والعهد والاعتمادات والمطابقة البنكية كلهم على نفس الدفتر، فإقفال آخر الشهر يبطّل يكون ضغط وتوتر ومفاجآت.')}</p>
           <div className="hx-ctas"><Link to={user?'/dashboard':'/signup'} className="hx-btn hx-btn-fire">{T('Start free','ابدأ مجانًا')}</Link><a href="#preview" onClick={(e)=>go(e,'preview')} className="hx-btn hx-btn-ghost"><Play size={14}/>{T('See it in action','شوفه شغّال')}</a></div>
-          <div className="hx-micro">{T('Free forever for 1 project · Arabic-first AI · Works offline on site','مجاني للأبد لمشروع واحد · ذكاء اصطناعي عربي أولًا · شغّال في الموقع من غير نت')}</div>
+          <div className="hx-micro">{T('No credit card required · Ready in minutes · Built for Egyptian contracting','بدون بطاقة بنكية · تجربة فورية جاهزة في دقائق · مصمم لشركات المقاولات في مصر')}</div>
         </div>
 
         <div className="hx-inner hx-frame-wrap" id="preview">
@@ -223,7 +223,7 @@ export default function Landing() {
           <h2 className="hx-h2" style={{color:'#f5f4f0'}}>{T('Your next project deserves clean books from day one.','مشروعك الجاي يستاهل دفاتر نضيفة من أول يوم.')}</h2>
           <p className="hx-lead" style={{maxWidth:600,marginInline:'auto',color:'#a8a29e'}}>{T('Bring one live project this week — its receipts, its reports, its custody and its bank lines. By Friday you\'ll know the true cost, the safe balance and your earned fee, down to the last pound.','أحضر مشروع واحد حي الأسبوع ده — فواتيره وتقاريره وعهدته وكشف حسابه. وبحلول الجمعة هتعرف التكلفة الحقيقية ورصيد الخزينة وأتعابك المستحقة، لآخر جنيه.')}</p>
           <div className="hx-ctas"><Link to={user?'/dashboard':'/signup'} className="hx-btn hx-btn-fire" style={{padding:'15px 34px',fontSize:15}}>{T('Start free — no card needed','ابدأ مجانًا — من غير كارت')}</Link></div>
-          <p className="hx-micro2">{T('Free for 1 project · Arabic-first · Cancel anytime','مجاني لمشروع واحد · عربي أولًا · إلغاء في أي وقت')}</p>
+          <p className="hx-micro2">{T('No credit card required · Instant setup · Zero commitment','بدون بطاقة بنكية · تشغيل فوري · بدون أي التزام')}</p>
         </motion.div>
       </LampContainer></section>
       <footer className="hx-footer"><div className="hx-inner hx-foot"><span style={{display:'inline-flex',alignItems:'center',gap:10}}><span className="hx-logo-chip" style={{width:28,height:28,borderRadius:8}}><img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{width:20,height:20}} /></span><b style={{color:'var(--text)'}}>Hesaby</b> — {T('Your site, properly recorded.','موقعك، مسجّل صح.')}</span><span>© {new Date().getFullYear()} · EN / عربي</span></div></footer>
