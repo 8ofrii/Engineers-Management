@@ -11,7 +11,6 @@ import { AuroraBackground } from '@/components/ui/aurora-background';
 import DisplayCards from '@/components/ui/display-cards';
 import { LampContainer } from '@/components/ui/lamp';
 import TubeNav from '@/components/ui/tubelight-navbar';
-import TextRewind from '@/components/ui/text-rewind';
 import { motion, MotionConfig } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import './Landing.css';
@@ -146,9 +145,6 @@ export default function Landing() {
       <div className="hx-stage"><div className="hx-ember"/><div className="hx-grain"/>
         <div className="hx-inner hx-hero">
           <h1 className="hx-h1"><span>{T('Snap a receipt.','فاتورة؟')}</span><span>{T('It posts itself.','صوت؟ صورة؟')}</span><span className="hx-hw"><HandwritingText text={T('Your site has a brain now.','كله بحسابه')} arabic={isRTL} replayKey={`${i18n.language}-${theme}`} /></span></h1>
-          <div className="hx-hero-rewind">
-            <TextRewind text="HESABY.AI" />
-          </div>
           <p className="hx-sub">{T('Hesaby turns site chaos into clean books: photograph an invoice on the scaffold and it lands in the right project safe with vendor, VAT and audit trail — before you climb down. Daily reports, custody, approvals and bank matching all run on the same ledger, so month-end closing runs smoothly without pressure or surprises.','حسابي بيحوّل فوضى الموقع لدفاتر نضيفة: صوّر الفاتورة وانت على السقالة، وهتنزل في خزينة المشروع الصح بالمورّد والضريبة وسجل التدقيق — قبل ما تنزل انت. التقارير اليومية والعهد والاعتمادات والمطابقة البنكية كلهم على نفس الدفتر، فإقفال آخر الشهر يبطّل يكون ضغط وتوتر ومفاجآت.')}</p>
           <div className="hx-ctas"><Link to={user?'/dashboard':'/signup'} className="hx-btn hx-btn-fire">{T('Start free','ابدأ مجانًا')}</Link><a href="#preview" onClick={(e)=>go(e,'preview')} className="hx-btn hx-btn-ghost"><Play size={14}/>{T('See it in action','شوفه شغّال')}</a></div>
           <div className="hx-micro">{T('Free forever for 1 project · Arabic-first AI · Works offline on site','مجاني للأبد لمشروع واحد · ذكاء اصطناعي عربي أولًا · شغّال في الموقع من غير نت')}</div>
