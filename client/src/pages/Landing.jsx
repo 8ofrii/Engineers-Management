@@ -46,6 +46,13 @@ export default function Landing() {
   const isRTL = i18n.language === 'ar';
   const T = (en, ar) => (isRTL ? ar : en);
   useEffect(() => { 
+    const p = new URLSearchParams(window.location.search).get('lang');
+    if (p && (p === 'ar' || p === 'en') && p !== i18n.language) {
+      i18n.changeLanguage(p);
+      document.documentElement.dir = p === 'ar' ? 'rtl' : 'ltr';
+    }
+  }, [i18n]);
+  useEffect(() => { 
     document.body.classList.toggle('light-mode', light); 
     localStorage.setItem('theme_preset', theme); 
     localStorage.setItem('theme_preset_v3', theme);
