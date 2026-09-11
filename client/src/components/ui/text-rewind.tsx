@@ -15,65 +15,40 @@ export interface AnimatedTextProps {
         fourth?: string;
         glow?: string;
     };
-    variant?: "retro" | "hesaby" | "monochrome";
-    rtl?: boolean;
 }
-
-const PRESET_SHADOWS = {
-    retro: {
-        first: "#07bccc",
-        second: "#e601c0",
-        third: "#e9019a",
-        fourth: "#f40468",
-        glow: "rgba(244, 4, 104, 0.4)",
-    },
-    hesaby: {
-        first: "#ff8a50",
-        second: "#ff5a1f",
-        third: "#ea580c",
-        fourth: "#c2410c",
-        glow: "rgba(255, 90, 31, 0.4)",
-    },
-    monochrome: {
-        first: "#a1a1aa",
-        second: "#71717a",
-        third: "#52525b",
-        fourth: "#3f3f46",
-        glow: "rgba(0, 0, 0, 0.25)",
-    },
-};
 
 export function TextRewind({
     text = "HESABY.AI",
     children,
     className = "",
-    variant = "hesaby",
-    rtl = false,
-    shadowColors,
+    shadowColors = {
+        first: "#07bccc",
+        second: "#e601c0",
+        third: "#e9019a",
+        fourth: "#f40468",
+        glow: "#f40468",
+    },
 }: AnimatedTextProps) {
-    const colors = shadowColors || PRESET_SHADOWS[variant] || PRESET_SHADOWS.hesaby;
-    const sign = rtl ? -1 : 1;
-
     const textShadowStyle = {
-        textShadow: `${sign * 8}px 8px 0px ${colors.first}, 
-                     ${sign * 14}px 14px 0px ${colors.second}, 
-                     ${sign * 20}px 20px 0px ${colors.third}, 
-                     ${sign * 26}px 26px 0px ${colors.fourth}, 
-                     ${sign * 38}px 38px 10px ${colors.glow}`,
+        textShadow: `10px 10px 0px ${shadowColors.first}, 
+                     15px 15px 0px ${shadowColors.second}, 
+                     20px 20px 0px ${shadowColors.third}, 
+                     25px 25px 0px ${shadowColors.fourth}, 
+                     45px 45px 10px ${shadowColors.glow}`,
     };
 
     const noShadowStyle = {
         textShadow: "none",
-        transform: `translate(${sign * 4}px, 4px)`,
+        transform: "translate(6px, 6px)",
     };
 
     return (
         <div className="w-full flex items-center justify-center select-none">
             <motion.div
                 className={cn(
-                    "inline-block cursor-pointer text-2xl sm:text-3xl font-extrabold",
-                    "transition-all duration-200 ease-out tracking-widest",
-                    "text-[var(--text)] italic uppercase",
+                    "cursor-pointer text-3xl sm:text-4xl font-extrabold tracking-widest",
+                    "text-black dark:text-white italic uppercase",
+                    "transition-all duration-200 ease-in-out",
                     className
                 )}
                 style={textShadowStyle}

@@ -147,7 +147,7 @@ export default function Landing() {
         <div className="hx-inner hx-hero">
           <h1 className="hx-h1"><span>{T('Snap a receipt.','فاتورة؟')}</span><span>{T('It posts itself.','صوت؟ صورة؟')}</span><span className="hx-hw"><HandwritingText text={T('Your site has a brain now.','كله بحسابه')} arabic={isRTL} replayKey={`${i18n.language}-${theme}`} /></span></h1>
           <div className="hx-hero-rewind">
-            <TextRewind text="HESABY.AI" variant="hesaby" rtl={isRTL} className="text-2xl sm:text-3xl font-black tracking-[0.22em]" />
+            <TextRewind text="HESABY.AI" />
           </div>
           <p className="hx-sub">{T('Hesaby turns site chaos into clean books: photograph an invoice on the scaffold and it lands in the right project safe with vendor, VAT and audit trail — before you climb down. Daily reports, custody, approvals and bank matching all run on the same ledger, so month-end closing runs smoothly without pressure or surprises.','حسابي بيحوّل فوضى الموقع لدفاتر نضيفة: صوّر الفاتورة وانت على السقالة، وهتنزل في خزينة المشروع الصح بالمورّد والضريبة وسجل التدقيق — قبل ما تنزل انت. التقارير اليومية والعهد والاعتمادات والمطابقة البنكية كلهم على نفس الدفتر، فإقفال آخر الشهر يبطّل يكون ضغط وتوتر ومفاجآت.')}</p>
           <div className="hx-ctas"><Link to={user?'/dashboard':'/signup'} className="hx-btn hx-btn-fire">{T('Start free','ابدأ مجانًا')}</Link><a href="#preview" onClick={(e)=>go(e,'preview')} className="hx-btn hx-btn-ghost"><Play size={14}/>{T('See it in action','شوفه شغّال')}</a></div>
