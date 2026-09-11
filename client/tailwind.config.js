@@ -19,6 +19,9 @@ export default {
     },
     theme: {
         extend: {
+            backgroundImage: {
+                'gradient-conic': 'conic-gradient(var(--conic-position), var(--tw-gradient-stops))',
+            },
             colors: {
                 'surface-container-highest': '#e0e3e5',
                 'secondary-fixed-dim': '#bec6e0',
