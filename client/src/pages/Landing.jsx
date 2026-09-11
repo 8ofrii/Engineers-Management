@@ -34,14 +34,22 @@ export default function Landing() {
   const [plans] = useState(PLANS);
   const [cycle, setCycle] = useState('monthly');
   const [tab, setTab] = useState('ocr');
-  const [theme, setTheme] = useState(() => (localStorage.getItem('theme_preset') === 'light' ? 'light' : 'dark'));
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme_preset_v3');
+    if (!saved) return 'light';
+    return saved === 'dark' ? 'dark' : 'light';
+  });
   const light = theme === 'light';
   const [amt, setAmt] = useState(25000);
   const [sel, setSel] = useState(0);
   const [posted, setPosted] = useState(false);
   const isRTL = i18n.language === 'ar';
   const T = (en, ar) => (isRTL ? ar : en);
-  useEffect(() => { document.body.classList.toggle('light-mode', light); localStorage.setItem('theme_preset', theme); }, [theme, light]);
+  useEffect(() => { 
+    document.body.classList.toggle('light-mode', light); 
+    localStorage.setItem('theme_preset', theme); 
+    localStorage.setItem('theme_preset_v3', theme);
+  }, [theme, light]);
   useEffect(() => { billingAPI.listPlans().catch(() => {}); }, []);
   /* scroll reveals: .rv elements fade/rise in once when scrolled into view */
   const rootRef = useRef(null);

@@ -28,12 +28,17 @@ export default function Login() {
 
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [theme, setTheme] = useState(() => localStorage.getItem('theme_preset') || 'dark');
+    const [theme, setTheme] = useState(() => {
+        const saved = localStorage.getItem('theme_preset_v3');
+        if (!saved) return 'light';
+        return saved === 'dark' ? 'dark' : 'light';
+    });
     const light = theme === 'light';
 
     useEffect(() => {
         document.body.classList.toggle('light-mode', light);
         localStorage.setItem('theme_preset', theme);
+        localStorage.setItem('theme_preset_v3', theme);
     }, [theme, light]);
 
     // 2FA challenge state

@@ -66,8 +66,9 @@ export default function Layout({ children }) {
         return localStorage.getItem('sidebar_collapsed') === 'true';
     });
     const [activeTheme, setActiveTheme] = useState(() => {
-        const saved = localStorage.getItem('theme_preset');
-        return saved === 'light' ? 'light' : 'monochrome';
+        const saved = localStorage.getItem('theme_preset_v3');
+        if (!saved) return 'light';
+        return saved === 'monochrome' || saved === 'dark' ? 'monochrome' : 'light';
     });
     const [profileModalOpen, setProfileModalOpen] = useState(false);
     const [twoFactorModalOpen, setTwoFactorModalOpen] = useState(false);
@@ -119,6 +120,7 @@ export default function Layout({ children }) {
             document.body.setAttribute('data-theme', 'monochrome');
         }
         localStorage.setItem('theme_preset', activeTheme);
+        localStorage.setItem('theme_preset_v3', activeTheme);
     }, [activeTheme]);
 
     const toggleTheme = () => {
