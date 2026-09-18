@@ -584,7 +584,7 @@ export const getMe = async (req, res, next) => {
 // @access  Private
 export const updateProfile = async (req, res, next) => {
     try {
-        const { name, email, phone, company, currentPassword, newPassword } = req.body;
+        const { name, email, phone, phones, company, currentPassword, newPassword } = req.body;
         const userId = req.user.id;
 
         // Get current user
@@ -613,7 +613,34 @@ export const updateProfile = async (req, res, next) => {
             }
             updateData.email = email;
         }
-        if (phone !== undefined) updateData.phone = phone;
+
+        if (phones !== undefined || phone !== undefined) {
+            let cleanPhones = [];
+            if (Array.isArray(phones)) {
+                cleanPhones = phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            } else if (typeof phones === 'string') {
+                try {
+                    const parsed = JSON.parse(phones);
+                    if (Array.isArray(parsed)) {
+                        cleanPhones = parsed.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+                    } else if (phones.trim()) {
+                        cleanPhones = [phones.trim()];
+                    }
+                } catch {
+                    if (phones.trim()) cleanPhones = [phones.trim()];
+                }
+            }
+            if (cleanPhones.length === 0 && phone) {
+                cleanPhones = [phone.trim()].filter(Boolean);
+            }
+            if (cleanPhones.length > 0) {
+                updateData.phones = cleanPhones;
+                updateData.phone = cleanPhones[0];
+            } else {
+                updateData.phones = [];
+                updateData.phone = null;
+            }
+        }
         if (company !== undefined) updateData.company = company;
 
         // Handle profile picture upload

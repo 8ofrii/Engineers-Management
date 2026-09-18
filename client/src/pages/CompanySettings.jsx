@@ -9,6 +9,7 @@ import {
 import { useAlert } from '../context/AlertContext';
 import { useTranslation } from 'react-i18next';
 import Layout from '../components/Layout';
+import MultiPhoneInput from '../components/MultiPhoneInput';
 
 export default function CompanySettings() {
     const { user, updateUser, logout } = useAuth();
@@ -22,14 +23,14 @@ export default function CompanySettings() {
 
     // Company State
     const [companyData, setCompanyData] = useState({
-        name: '', address: '', phone: '', email: ''
+        name: '', address: '', phone: '', email: '', phones: ['']
     });
     const [logo, setLogo] = useState(null);
     const [logoPreview, setLogoPreview] = useState(null);
 
     // Profile State
     const [profileData, setProfileData] = useState({
-        name: '', email: '', phone: '', company: '',
+        name: '', email: '', phone: '', company: '', phones: [''],
         currentPassword: '', newPassword: '', confirmPassword: ''
     });
     const [profileImg, setProfileImg] = useState(null);
@@ -78,10 +79,14 @@ export default function CompanySettings() {
 
             // Load Company
             const cData = companyRes.data?.data || {};
+            const cPhones = Array.isArray(cData.phones) && cData.phones.length > 0
+                ? cData.phones
+                : (cData.phone ? [cData.phone] : ['']);
             setCompanyData({
                 name: cData.name || '',
                 address: cData.address || '',
-                phone: cData.phone || '',
+                phone: cData.phone || cPhones[0] || '',
+                phones: cPhones,
                 email: cData.email || ''
             });
             if (cData.logo) {
@@ -90,10 +95,14 @@ export default function CompanySettings() {
 
             // Load User
             const uData = userRes.data?.data || {};
+            const uPhones = Array.isArray(uData.phones) && uData.phones.length > 0
+                ? uData.phones
+                : (uData.phone ? [uData.phone] : ['']);
             setProfileData({
                 name: uData.name || '',
                 email: uData.email || '',
-                phone: uData.phone || '',
+                phone: uData.phone || uPhones[0] || '',
+                phones: uPhones,
                 company: uData.company || '',
                 currentPassword: '',
                 newPassword: '',
@@ -142,7 +151,10 @@ export default function CompanySettings() {
             data.append('logo', file);
             if (companyData.name) data.append('name', companyData.name);
             if (companyData.address) data.append('address', companyData.address);
-            if (companyData.phone) data.append('phone', companyData.phone);
+            const cleanPhones = (companyData.phones || []).map(p => (p || '').trim()).filter(Boolean);
+            const primaryPhone = cleanPhones[0] || companyData.phone || '';
+            if (primaryPhone) data.append('phone', primaryPhone);
+            if (cleanPhones.length > 0) data.append('phones', JSON.stringify(cleanPhones));
             if (companyData.email) data.append('email', companyData.email);
 
             const res = await tenantAPI.updateSettings(data);
@@ -203,7 +215,10 @@ export default function CompanySettings() {
             data.append('profilePicture', file);
             if (profileData.name) data.append('name', profileData.name);
             if (profileData.email) data.append('email', profileData.email);
-            if (profileData.phone) data.append('phone', profileData.phone);
+            const cleanUserPhones = (profileData.phones || []).map(p => (p || '').trim()).filter(Boolean);
+            const primaryUserPhone = cleanUserPhones[0] || profileData.phone || '';
+            if (primaryUserPhone) data.append('phone', primaryUserPhone);
+            if (cleanUserPhones.length > 0) data.append('phones', JSON.stringify(cleanUserPhones));
             if (profileData.company) data.append('company', profileData.company);
 
             const res = await authAPI.updateProfile(data);
@@ -242,7 +257,10 @@ export default function CompanySettings() {
             const data = new FormData();
             data.append('name', companyData.name);
             data.append('address', companyData.address);
-            data.append('phone', companyData.phone);
+            const cleanPhones = (companyData.phones || []).map(p => (p || '').trim()).filter(Boolean);
+            const primaryPhone = cleanPhones[0] || companyData.phone || '';
+            data.append('phone', primaryPhone);
+            data.append('phones', JSON.stringify(cleanPhones));
             data.append('email', companyData.email);
             if (logo) data.append('logo', logo);
 
@@ -285,7 +303,10 @@ export default function CompanySettings() {
             const data = new FormData();
             data.append('name', profileData.name);
             data.append('email', profileData.email);
-            data.append('phone', profileData.phone || '');
+            const cleanUserPhones = (profileData.phones || []).map(p => (p || '').trim()).filter(Boolean);
+            const primaryUserPhone = cleanUserPhones[0] || profileData.phone || '';
+            data.append('phone', primaryUserPhone);
+            data.append('phones', JSON.stringify(cleanUserPhones));
             data.append('company', profileData.company || '');
 
             if (profileData.currentPassword && profileData.newPassword) {
@@ -603,20 +624,20 @@ export default function CompanySettings() {
                                                 </div>
                                             </div>
 
-                                            <div className="form-group" style={{ margin: 0 }}>
-                                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--text-primary)' }}>
-                                                    {isAr ? 'رقم الهاتف الرسمي' : 'Official Phone Number'}
-                                                </label>
-                                                <div style={{ position: 'relative' }}>
-                                                    <input
-                                                        type="text"
-                                                        className="form-control"
-                                                        value={companyData.phone}
-                                                        onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
-                                                        placeholder="+20 100 000 0000"
-                                                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
-                                                    />
-                                                </div>
+                                            <div style={{ gridColumn: '1 / -1' }}>
+                                                <MultiPhoneInput
+                                                    phones={companyData.phones}
+                                                    onChange={(newPhones) => {
+                                                        setCompanyData(prev => ({
+                                                            ...prev,
+                                                            phones: newPhones,
+                                                            phone: newPhones[0] || ''
+                                                        }));
+                                                    }}
+                                                    label={isAr ? 'أرقام الهاتف الرسمية للشركة' : 'Official Company Phone Numbers'}
+                                                    placeholder={isAr ? 'مثال: +20 100 000 0000' : 'e.g. +20 100 000 0000'}
+                                                    maxPhones={5}
+                                                />
                                             </div>
 
                                             <div className="form-group" style={{ margin: 0 }}>
@@ -813,16 +834,19 @@ export default function CompanySettings() {
                                                 />
                                             </div>
 
-                                            <div className="form-group" style={{ margin: 0 }}>
-                                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--text-primary)' }}>
-                                                    {isAr ? 'رقم الهاتف الشخصي' : 'Phone Number'}
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    className="form-control"
-                                                    value={profileData.phone}
-                                                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                                                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                                            <div style={{ gridColumn: '1 / -1' }}>
+                                                <MultiPhoneInput
+                                                    phones={profileData.phones}
+                                                    onChange={(newPhones) => {
+                                                        setProfileData(prev => ({
+                                                            ...prev,
+                                                            phones: newPhones,
+                                                            phone: newPhones[0] || ''
+                                                        }));
+                                                    }}
+                                                    label={isAr ? 'أرقام الهاتف الشخصية' : 'Personal Phone Numbers'}
+                                                    placeholder={isAr ? 'مثال: +20 100 000 0000' : 'e.g. +20 100 000 0000'}
+                                                    maxPhones={5}
                                                 />
                                             </div>
 

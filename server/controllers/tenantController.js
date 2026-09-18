@@ -19,9 +19,16 @@ export const getTenant = async (req, res, next) => {
             });
         }
 
+        const normalizedTenant = {
+            ...tenant,
+            phones: Array.isArray(tenant.phones) && tenant.phones.length > 0
+                ? tenant.phones
+                : (tenant.phone ? [tenant.phone] : [])
+        };
+
         res.status(200).json({
             success: true,
-            data: tenant
+            data: normalizedTenant
         });
     } catch (error) {
         next(error);
@@ -33,7 +40,7 @@ export const getTenant = async (req, res, next) => {
 // @access  Private (Admin Only)
 export const updateTenant = async (req, res, next) => {
     try {
-        const { name, address, phone, email } = req.body;
+        const { name, address, phone, phones, email } = req.body;
 
         // Check if user is Admin
         if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
@@ -46,8 +53,35 @@ export const updateTenant = async (req, res, next) => {
         const updateData = {};
         if (name) updateData.name = name.trim();
         if (address !== undefined) updateData.address = address ? address.trim() : null;
-        if (phone !== undefined) updateData.phone = phone ? phone.trim() : null;
         if (email !== undefined) updateData.email = email ? email.trim() : null;
+
+        // Handle multiple phones
+        let cleanPhones = [];
+        if (Array.isArray(phones)) {
+            cleanPhones = phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+        } else if (typeof phones === 'string') {
+            try {
+                const parsed = JSON.parse(phones);
+                if (Array.isArray(parsed)) {
+                    cleanPhones = parsed.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+                } else if (phones.trim()) {
+                    cleanPhones = [phones.trim()];
+                }
+            } catch {
+                if (phones.trim()) cleanPhones = [phones.trim()];
+            }
+        }
+        if (cleanPhones.length === 0 && phone) {
+            cleanPhones = [phone.trim()].filter(Boolean);
+        }
+
+        if (cleanPhones.length > 0) {
+            updateData.phones = cleanPhones;
+            updateData.phone = cleanPhones[0];
+        } else if (phones !== undefined || phone !== undefined) {
+            updateData.phones = [];
+            updateData.phone = null;
+        }
 
         // Handle Logo Upload
         if (req.file) {
@@ -68,7 +102,12 @@ export const updateTenant = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            data: tenant,
+            data: {
+                ...tenant,
+                phones: Array.isArray(tenant.phones) && tenant.phones.length > 0
+                    ? tenant.phones
+                    : (tenant.phone ? [tenant.phone] : [])
+            },
             message: 'Company settings updated successfully'
         });
     } catch (error) {

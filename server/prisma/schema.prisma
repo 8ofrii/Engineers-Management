@@ -16,6 +16,7 @@ model Tenant {
   logo                String?
   address             String?
   phone               String?
+  phones              String[]             @default([])
   email               String?
   /// Multi-level approval thresholds. Array of { maxAmount, minRole }.
   /// First tier whose maxAmount >= transaction amount (or maxAmount=null
