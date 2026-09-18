@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import * as transactionV2 from './transactionControllerV2.js';
 import { auditFromReq } from '../lib/audit.js';
+import { deleteByUrl } from '../lib/storage.js';
 
 // @desc    Get unique cost centers
 // @route   GET /api/transactions/cost-centers
@@ -285,7 +286,7 @@ export const transferCustody = async (req, res, next) => {
                 }
             });
 
-            return { senderBalance: updatedSender.currentCustodyBalance, receiverBalance: updatedReceiver.currentCustodyBalance };
+            return { id: txOut.id, senderBalance: updatedSender.currentCustodyBalance, receiverBalance: updatedReceiver.currentCustodyBalance };
         });
 
         res.status(200).json({
@@ -924,7 +925,11 @@ export const uploadReceipt = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Not authorized to attach a receipt to this transaction' });
         }
 
-        const url = req.file.location || `/uploads/images/${req.file.filename}`;
+        const url = req.file.location || `/uploads/receipts/${req.file.filename}`;
+
+        if (tx.receiptPhotoUrl && tx.receiptPhotoUrl !== url) {
+            await deleteByUrl(tx.receiptPhotoUrl).catch(() => {});
+        }
 
         const updated = await prisma.transaction.update({
             where: { id },

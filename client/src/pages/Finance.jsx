@@ -367,7 +367,7 @@ export default function Finance() {
                 {badgeEl}
                 {receiptUrl && (
                     <a
-                        href={receiptUrl.startsWith('http') ? receiptUrl : `/uploads/${receiptUrl.replace(/^(\/|uploads\/)/, '')}`}
+                        href={receiptUrl.startsWith('http') ? receiptUrl : `/uploads/${receiptUrl.replace(/^(\/?uploads\/|\/+)/, '')}`}
                         target="_blank"
                         rel="noreferrer"
                         className="btn-icon-sm"

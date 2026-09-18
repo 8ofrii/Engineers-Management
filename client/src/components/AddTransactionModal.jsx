@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText } from 'lucide-react';
+import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText, FileSpreadsheet, ExternalLink, File } from 'lucide-react';
 import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI, documentsAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
@@ -215,6 +215,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             paidByClientContact: '',
             toEngineerId: ''
         });
+        setAttachmentFile(null);
+        setAttachmentPreview(null);
+        setExistingReceiptUrl(null);
+        setIsDragging(false);
         setErrors({});
     };
 
@@ -296,8 +300,16 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     projectCostItemId: initialData.projectCostItemId || '',
                     toEngineerId: ''
                 });
+                setAttachmentFile(null);
+                setAttachmentPreview(null);
+                setExistingReceiptUrl(initialData.receiptPhotoUrl || null);
+                setIsDragging(false);
 
             } else {
+                setAttachmentFile(null);
+                setAttachmentPreview(null);
+                setExistingReceiptUrl(null);
+                setIsDragging(false);
                 // Check if there is a saved draft in localStorage
                 const savedDraft = getFormDraft(TRANSACTION_DRAFT_KEY);
                 if (savedDraft && typeof savedDraft === 'object') {
@@ -840,21 +852,34 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     };
 
     const renderAttachmentUploader = () => {
-        if (!['BANK_TRANSFER', 'CHECK'].includes(formData.paymentMethod)) {
-            return null;
-        }
-
         const isCheck = formData.paymentMethod === 'CHECK';
+        const isBank = formData.paymentMethod === 'BANK_TRANSFER';
+        const isCash = formData.paymentMethod === 'CASH';
+
         const title = isCheck
             ? (isRTL ? 'صورة الشيك / المرفق' : 'Check Attachment / Photo')
-            : (isRTL ? 'إيصال التحويل البنكي / إنستاباي' : 'Bank Transaction / InstaPay Receipt');
-        const subtitle = isRTL
-            ? 'اضغط هنا أو اسحب الملف لرفع صورة الإيصال أو الشيك (JPG, PNG, PDF)'
-            : 'Click or drag & drop receipt / check copy (JPG, PNG, PDF)';
+            : isBank
+            ? (isRTL ? 'إيصال التحويل البنكي / إنستاباي' : 'Bank Transaction / InstaPay Receipt')
+            : isCash
+            ? (isRTL ? 'صورة الفاتورة / الإيصال الورقي' : 'Cash Receipt / Invoice Copy')
+            : (isRTL ? 'المرفقات / صورة الإيصال أو الفاتورة' : 'Attachment / Receipt or Invoice Proof');
 
-        const handleFileChange = (e) => {
-            const file = e.target.files?.[0];
+        const subtitle = isRTL
+            ? 'اضغط هنا أو اسحب الملف لرفع المرفق (صور، PDF، ملفات CSV، إكسيل، أو مستندات)'
+            : 'Click or drag & drop receipt / document (Images, PDFs, CSV, Excel, Word, Docs)';
+
+        const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+
+        const handleFileSelection = (file) => {
             if (!file) return;
+            if (file.size > MAX_FILE_SIZE) {
+                showAlert({
+                    type: 'warning',
+                    title: isRTL ? 'حجم الملف كبير' : 'File Too Large',
+                    message: isRTL ? 'الحد الأقصى لحجم الملف المرفوع هو 25 ميجابايت.' : 'Maximum allowed file size is 25 MB.'
+                });
+                return;
+            }
             setAttachmentFile(file);
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
@@ -865,19 +890,16 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             }
         };
 
+        const handleFileChange = (e) => {
+            const file = e.target.files?.[0];
+            handleFileSelection(file);
+        };
+
         const handleDrop = (e) => {
             e.preventDefault();
             setIsDragging(false);
             const file = e.dataTransfer?.files?.[0];
-            if (!file) return;
-            setAttachmentFile(file);
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (ev) => setAttachmentPreview(ev.target.result);
-                reader.readAsDataURL(file);
-            } else {
-                setAttachmentPreview(null);
-            }
+            handleFileSelection(file);
         };
 
         const handleRemove = () => {
@@ -885,6 +907,33 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             setAttachmentPreview(null);
             setExistingReceiptUrl(null);
         };
+
+        const getFileInfo = () => {
+            let name = attachmentFile?.name || '';
+            let ext = '';
+            let sizeStr = '';
+
+            if (attachmentFile) {
+                ext = (name.split('.').pop() || '').toLowerCase();
+                const sizeKB = attachmentFile.size / 1024;
+                sizeStr = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(2)} MB` : `${sizeKB.toFixed(1)} KB`;
+            } else if (existingReceiptUrl) {
+                const parts = existingReceiptUrl.split('/');
+                name = parts[parts.length - 1]?.split('?')[0] || (isRTL ? 'مرفق سابق' : 'Stored Attachment');
+                ext = (name.split('.').pop() || '').toLowerCase();
+                sizeStr = isRTL ? 'ملف محفوظ مسبقاً' : 'Existing Attachment';
+            }
+
+            const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp', 'svg'].includes(ext) || attachmentFile?.type?.startsWith('image/');
+            const isPdf = ext === 'pdf' || attachmentFile?.type === 'application/pdf';
+            const isSpreadsheet = ['csv', 'xlsx', 'xls'].includes(ext) || attachmentFile?.type?.includes('csv') || attachmentFile?.type?.includes('spreadsheet') || attachmentFile?.type?.includes('excel');
+            const isDoc = ['doc', 'docx', 'txt', 'rtf'].includes(ext) || attachmentFile?.type?.includes('word') || attachmentFile?.type?.includes('text');
+
+            return { name, ext: ext.toUpperCase() || 'FILE', sizeStr, isImg, isPdf, isSpreadsheet, isDoc };
+        };
+
+        const fileInfo = (attachmentFile || existingReceiptUrl) ? getFileInfo() : null;
+        const ACCEPT_TYPES = "image/*,application/pdf,.csv,.xlsx,.xls,.doc,.docx,.txt,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
 
         return (
             <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '6px' }}>
@@ -905,9 +954,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         gap: '12px'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
-                            {attachmentPreview || existingReceiptUrl ? (
+                            {fileInfo?.isImg && (attachmentPreview || existingReceiptUrl) ? (
                                 <img
-                                    src={attachmentPreview || existingReceiptUrl}
+                                    src={attachmentPreview || (existingReceiptUrl.startsWith('http') ? existingReceiptUrl : `/uploads/${existingReceiptUrl.replace(/^(\/|uploads\/)/, '')}`)}
                                     alt="Receipt preview"
                                     style={{
                                         width: '48px',
@@ -918,30 +967,95 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         flexShrink: 0
                                     }}
                                 />
+                            ) : fileInfo?.isPdf ? (
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(239, 68, 68, 0.12)',
+                                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                                    color: '#ef4444',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <FileText size={20} />
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 'bold', marginTop: '1px' }}>PDF</span>
+                                </div>
+                            ) : fileInfo?.isSpreadsheet ? (
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(16, 185, 129, 0.12)',
+                                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                                    color: '#10b981',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <FileSpreadsheet size={20} />
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '1px' }}>{fileInfo.ext}</span>
+                                </div>
                             ) : (
                                 <div style={{
                                     width: '48px',
                                     height: '48px',
                                     borderRadius: '6px',
-                                    background: 'var(--bg-tertiary)',
+                                    background: 'rgba(59, 130, 246, 0.12)',
+                                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                                    color: '#3b82f6',
                                     display: 'flex',
+                                    flexDirection: 'column',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     flexShrink: 0
                                 }}>
-                                    <FileText size={22} style={{ color: 'var(--color-primary)' }} />
+                                    <FileText size={20} />
+                                    <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '1px' }}>{fileInfo?.ext || 'DOC'}</span>
                                 </div>
                             )}
+
                             <div style={{ overflow: 'hidden' }}>
-                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                    {attachmentFile?.name || (isRTL ? 'المرفق المرفوع مسبقاً' : 'Attached Receipt')}
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={fileInfo?.name}>
+                                    {fileInfo?.name}
                                 </p>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                    {attachmentFile ? `${(attachmentFile.size / 1024).toFixed(1)} KB` : (isRTL ? 'اضغط تغيير لرفع ملف جديد' : 'Click replace to upload new')}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                        {fileInfo?.sizeStr}
+                                    </span>
+                                    <span style={{
+                                        fontSize: '0.65rem',
+                                        padding: '1px 5px',
+                                        borderRadius: '4px',
+                                        background: 'var(--bg-tertiary)',
+                                        border: '1px solid var(--border-color)',
+                                        fontWeight: 600
+                                    }}>
+                                        {fileInfo?.ext}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                            {existingReceiptUrl && !attachmentFile && (
+                                <a
+                                    href={existingReceiptUrl.startsWith('http') ? existingReceiptUrl : `/uploads/${existingReceiptUrl.replace(/^(\/|uploads\/)/, '')}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn btn-sm btn-ghost"
+                                    style={{ textDecoration: 'none', padding: '5px 8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    title={isRTL ? 'معاينة / فتح' : 'View / Open'}
+                                >
+                                    <ExternalLink size={14} />
+                                    <span>{isRTL ? 'عرض' : 'View'}</span>
+                                </a>
+                            )}
                             <label
                                 className="btn btn-sm btn-ghost"
                                 style={{ cursor: 'pointer', margin: 0, padding: '5px 10px', fontSize: '0.8rem' }}
@@ -949,7 +1063,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 {isRTL ? 'تغيير' : 'Change'}
                                 <input
                                     type="file"
-                                    accept="image/*,application/pdf"
+                                    accept={ACCEPT_TYPES}
                                     onChange={handleFileChange}
                                     style={{ display: 'none' }}
                                 />
@@ -975,25 +1089,41 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            padding: '16px 14px',
+                            padding: '18px 14px',
                             borderRadius: '8px',
                             border: isDragging ? '2px dashed var(--color-primary)' : '2px dashed var(--border-color)',
-                            background: isDragging ? 'hsla(220, 80%, 50%, 0.05)' : 'var(--bg-secondary)',
+                            background: isDragging ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-secondary)',
                             cursor: 'pointer',
                             transition: 'all 0.2s ease',
                             textAlign: 'center'
                         }}
                     >
-                        <Upload size={24} style={{ color: isDragging ? 'var(--color-primary)' : 'var(--text-secondary)', marginBottom: '6px' }} />
-                        <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                        <Upload size={26} style={{ color: isDragging ? 'var(--color-primary)' : 'var(--text-secondary)', marginBottom: '8px' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
                             {title}
                         </span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '3px' }}>
                             {subtitle}
                         </span>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            marginTop: '8px',
+                            flexWrap: 'wrap',
+                            justifyContent: 'center',
+                            fontSize: '0.7rem',
+                            color: 'var(--text-tertiary)'
+                        }}>
+                            <span style={{ background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>📷 JPG/PNG/WebP</span>
+                            <span style={{ background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>📑 PDF</span>
+                            <span style={{ background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>📊 CSV/Excel</span>
+                            <span style={{ background: 'var(--bg-tertiary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>📝 Word/Text</span>
+                            <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>≤ 25 MB</span>
+                        </div>
                         <input
                             type="file"
-                            accept="image/*,application/pdf"
+                            accept={ACCEPT_TYPES}
                             onChange={handleFileChange}
                             style={{ display: 'none' }}
                         />
@@ -1746,6 +1876,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             />
                                             {errors.amount && <span className="error-message">{errors.amount}</span>}
                                         </div>
+
+                                        {renderAttachmentUploader()}
                                     </div>
                                 </div>
                             </>
@@ -1841,6 +1973,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             />
                                             {errors.amount && <span className="error-message">{errors.amount}</span>}
                                         </div>
+
+                                        {renderAttachmentUploader()}
                                     </div>
                                 </div>
                             </>

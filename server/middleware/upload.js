@@ -15,9 +15,10 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.join(__dirname, '..');
 const audioDir = path.join(rootDir, 'uploads', 'audio');
 const imageDir = path.join(rootDir, 'uploads', 'images');
+const receiptDir = path.join(rootDir, 'uploads', 'receipts');
 
 // Ensure directories exist
-[audioDir, imageDir].forEach(dir => {
+[audioDir, imageDir, receiptDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
@@ -132,6 +133,87 @@ const receiptMemoryUpload = multer({
     limits: { fileSize: 15 * 1024 * 1024 } // 15 MB to comfortably allow scanned PDF invoices
 });
 
-export { upload, audioUpload, receiptMemoryUpload };
+// --- Persistent Receipt / Invoice Media Upload ---
+// Supports pictures, PDFs, CSV, Excel, Word, and text documents
+const RECEIPT_EXT_MAP = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/heic': '.heic',
+    'image/heif': '.heif',
+    'image/bmp': '.bmp',
+    'image/tiff': '.tiff',
+    'image/svg+xml': '.svg',
+    'application/pdf': '.pdf',
+    'text/csv': '.csv',
+    'application/csv': '.csv',
+    'text/comma-separated-values': '.csv',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'text/plain': '.txt',
+    'application/rtf': '.rtf',
+    'text/rtf': '.rtf'
+};
+
+const ALLOWED_RECEIPT_EXTENSIONS = new Set([
+    '.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif', '.bmp', '.tiff', '.svg',
+    '.pdf',
+    '.csv', '.xls', '.xlsx',
+    '.doc', '.docx', '.txt', '.rtf'
+]);
+
+const getSafeReceiptExt = (file) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (ALLOWED_RECEIPT_EXTENSIONS.has(ext)) {
+        return ext;
+    }
+    return RECEIPT_EXT_MAP[file.mimetype] || '.bin';
+};
+
+const localReceiptStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, receiptDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'receipt-' + uniqueSuffix + getSafeReceiptExt(file));
+    }
+});
+
+const s3ReceiptStorage = multerS3({
+    s3: s3,
+    bucket: BUCKET_NAME,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    metadata: function (req, file, cb) {
+        cb(null, { fieldName: file.fieldname });
+    },
+    key: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'receipts/receipt-' + uniqueSuffix + getSafeReceiptExt(file));
+    }
+});
+
+const receiptUpload = multer({
+    storage: useS3 ? s3ReceiptStorage : localReceiptStorage,
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const isMimeAllowed = Boolean(RECEIPT_EXT_MAP[file.mimetype]) || file.mimetype?.startsWith('image/');
+        const isExtAllowed = ALLOWED_RECEIPT_EXTENSIONS.has(ext);
+
+        if (isMimeAllowed || isExtAllowed) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Allowed formats: images (JPG, PNG, WebP, HEIC), PDF, CSV, Excel, Word, Text'), false);
+        }
+    },
+    limits: { fileSize: 25 * 1024 * 1024 }
+});
+
+export { upload, audioUpload, receiptMemoryUpload, receiptUpload };
 export default audioUpload;
+
 
