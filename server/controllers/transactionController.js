@@ -869,6 +869,14 @@ export const deleteTransaction = async (req, res, next) => {
                     tenantId: req.user.tenantId
                 }
             });
+
+            // Clean up any uploaded media evidence associated with this transaction
+            if (transaction.receiptPhotoUrl) {
+                await deleteByUrl(transaction.receiptPhotoUrl).catch(() => {});
+            }
+            if (transaction.voiceNoteUrl) {
+                await deleteByUrl(transaction.voiceNoteUrl).catch(() => {});
+            }
         });
 
         await auditFromReq(req, {
@@ -944,6 +952,61 @@ export const uploadReceipt = async (req, res, next) => {
         });
 
         res.status(200).json({ success: true, data: { id: updated.id, receiptPhotoUrl: updated.receiptPhotoUrl } });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Attach (or replace) a voice note on an existing transaction.
+// @route   PATCH /api/transactions/:id/voice
+// @access  Private (creator / manager / admin) — multipart with file=audio
+export const uploadVoiceNote = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No audio file uploaded' });
+        }
+
+        const { id } = req.params;
+        const tx = await prisma.transaction.findFirst({
+            where: { id, tenantId: req.user.tenantId }
+        });
+        if (!tx) {
+            return res.status(404).json({ success: false, message: 'Transaction not found' });
+        }
+
+        const canEdit =
+            tx.createdBy === req.user.id ||
+            ['PROJECT_MANAGER', 'ADMIN', 'SUPER_ADMIN'].includes(req.user.role);
+        if (!canEdit) {
+            return res.status(403).json({ success: false, message: 'Not authorized to attach a voice note to this transaction' });
+        }
+
+        const url = req.file.location || `/uploads/audio/voice-drafts/${req.file.filename}`;
+
+        if (tx.voiceNoteUrl && tx.voiceNoteUrl !== url) {
+            await deleteByUrl(tx.voiceNoteUrl).catch(() => {});
+        }
+
+        const updated = await prisma.transaction.update({
+            where: { id },
+            data: {
+                voiceNoteUrl: url,
+                aiRawText: req.body.transcript || tx.aiRawText
+            }
+        });
+
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'Transaction',
+            entityId: id,
+            metadata: { field: 'voiceNoteUrl', from: tx.voiceNoteUrl || null, to: url }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: { id: updated.id, voiceNoteUrl: updated.voiceNoteUrl },
+            message: 'Voice note attached successfully'
+        });
     } catch (error) {
         next(error);
     }
@@ -1026,7 +1089,11 @@ export const updateTransaction = async (req, res, next) => {
                     paidByClientContact: paidByClientContact !== undefined ? (paidByClientContact || null) : undefined,
                     supplierId: supplierId !== undefined ? (supplierId || null) : undefined,
                     workmanId: workmanId !== undefined ? (workmanId || null) : undefined,
-                    clientId: clientId !== undefined ? (clientId || null) : undefined
+                    clientId: clientId !== undefined ? (clientId || null) : undefined,
+                    voiceNoteUrl: req.body.voiceNoteUrl !== undefined ? (req.body.voiceNoteUrl || null) : undefined,
+                    receiptPhotoUrl: req.body.receiptPhotoUrl !== undefined ? (req.body.receiptPhotoUrl || null) : undefined,
+                    aiRawText: req.body.aiRawText !== undefined ? (req.body.aiRawText || null) : undefined,
+                    aiExtractedData: req.body.aiExtractedData !== undefined ? req.body.aiExtractedData : undefined
                 }
             });
 

@@ -241,8 +241,7 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
 
         try {
             setSaving(true);
-            // Mirror AddTransactionModal's payload — V1.2 profit engine reads
-            // these fields. Only include filled ones; empty strings break Zod.
+            const isVoice = draft?.source === 'VOICE' || (draft?.originalMediaMime && draft?.originalMediaMime.startsWith('audio/'));
             const payload = {
                 type: 'EXPENSE',
                 amount: Number(form.amount),
@@ -259,7 +258,11 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                 itemName: form.itemName || undefined,
                 unit: form.unit || undefined,
                 quantity: form.quantity ? Number(form.quantity) : undefined,
-                unitPrice: form.unitPrice ? Number(form.unitPrice) : undefined
+                unitPrice: form.unitPrice ? Number(form.unitPrice) : undefined,
+                voiceNoteUrl: isVoice ? draft?.originalMediaUrl : undefined,
+                receiptPhotoUrl: !isVoice ? draft?.originalMediaUrl : undefined,
+                aiRawText: draft?.transcript || (typeof draft?.rawExtraction?.summary === 'string' ? draft.rawExtraction.summary : undefined),
+                aiExtractedData: draft?.rawExtraction || undefined
             };
 
             const txRes = await transactionsAPI.create(payload);

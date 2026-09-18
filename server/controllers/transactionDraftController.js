@@ -148,6 +148,30 @@ export const commitDraft = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Transaction not found in your tenant' });
     }
 
+    // Attach media evidence from draft to transaction if not already set
+    const isVoice = draft.source === 'VOICE' || (draft.originalMediaMime && draft.originalMediaMime.startsWith('audio/'));
+    const txUpdates = {};
+    if (draft.originalMediaUrl) {
+        if (isVoice && !tx.voiceNoteUrl) {
+            txUpdates.voiceNoteUrl = draft.originalMediaUrl;
+        } else if (!isVoice && !tx.receiptPhotoUrl) {
+            txUpdates.receiptPhotoUrl = draft.originalMediaUrl;
+        }
+    }
+    if (draft.transcript && !tx.aiRawText) {
+        txUpdates.aiRawText = draft.transcript;
+    }
+    if (draft.rawExtraction && !tx.aiExtractedData) {
+        txUpdates.aiExtractedData = draft.rawExtraction;
+    }
+
+    if (Object.keys(txUpdates).length > 0) {
+        await prisma.transaction.update({
+            where: { id: tx.id },
+            data: txUpdates
+        });
+    }
+
     const updated = await prisma.transactionDraft.update({
         where: { id: draft.id },
         data: {
@@ -161,7 +185,11 @@ export const commitDraft = async (req, res) => {
         action: 'COMMIT',
         entity: 'TransactionDraft',
         entityId: draft.id,
-        metadata: { transactionId: tx.id }
+        metadata: {
+            transactionId: tx.id,
+            source: draft.source,
+            hasMedia: !!draft.originalMediaUrl
+        }
     });
 
     res.json({ success: true, data: updated });

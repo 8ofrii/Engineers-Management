@@ -148,7 +148,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('Content-Security-Policy', "default-src 'none'");
         const ext = path.extname(filePath).toLowerCase();
-        if (!['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+        // Allow images, audio, video, and PDF to be streamed / displayed inline
+        if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.webm', '.mp3', '.wav', '.m4a', '.ogg', '.aac', '.mp4', '.pdf'].includes(ext)) {
+            res.setHeader('Content-Disposition', 'inline');
+        } else {
             res.setHeader('Content-Disposition', 'attachment');
         }
     }

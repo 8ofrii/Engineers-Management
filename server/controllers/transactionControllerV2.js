@@ -112,7 +112,11 @@ export const createTransactionV2 = async (req, res, next) => {
             beneficiary,
             transactionTo,
             transactionFrom,
-            physicalAccount
+            physicalAccount,
+            voiceNoteUrl,
+            receiptPhotoUrl,
+            aiRawText,
+            aiExtractedData
         } = req.body;
 
         // Validate required fields
@@ -183,6 +187,10 @@ export const createTransactionV2 = async (req, res, next) => {
                         transactionTo: transactionTo || null,
                         transactionFrom: transactionFrom || null,
                         physicalAccount: physicalAccount || null,
+                        voiceNoteUrl: voiceNoteUrl || null,
+                        receiptPhotoUrl: receiptPhotoUrl || null,
+                        aiRawText: aiRawText || null,
+                        aiExtractedData: aiExtractedData || null,
                         tenantId: req.user.tenantId
                     }
                 });
@@ -247,6 +255,10 @@ export const createTransactionV2 = async (req, res, next) => {
                         transactionTo: transactionTo || null,
                         transactionFrom: transactionFrom || null,
                         physicalAccount: physicalAccount || null,
+                        voiceNoteUrl: voiceNoteUrl || null,
+                        receiptPhotoUrl: receiptPhotoUrl || null,
+                        aiRawText: aiRawText || null,
+                        aiExtractedData: aiExtractedData || null,
                         tenantId: req.user.tenantId
                     }
                 });

@@ -43,7 +43,11 @@ export const createTransaction = async (req, res, next) => {
             transactionFrom,
             costCenter,
             physicalAccount,
-            paidByClientContact
+            paidByClientContact,
+            voiceNoteUrl,
+            receiptPhotoUrl,
+            aiRawText,
+            aiExtractedData
         } = req.body;
 
         // Validate required fields
@@ -99,6 +103,10 @@ export const createTransaction = async (req, res, next) => {
                         paidByClientContact: paidByClientContact || null,
                         physicalAccount: physicalAccount || null,
                         costCenter: costCenter || null,
+                        voiceNoteUrl: voiceNoteUrl || null,
+                        receiptPhotoUrl: receiptPhotoUrl || null,
+                        aiRawText: aiRawText || null,
+                        aiExtractedData: aiExtractedData || null,
                         tenantId: req.user.tenantId
                     }
                 });
@@ -164,6 +172,10 @@ export const createTransaction = async (req, res, next) => {
                         paymentMethod: paymentMethod || 'CASH',
                         invoiceNumber: invoiceNumber || null,
                         isOfficeExpense: isOfficeExpense || false,
+                        voiceNoteUrl: voiceNoteUrl || null,
+                        receiptPhotoUrl: receiptPhotoUrl || null,
+                        aiRawText: aiRawText || null,
+                        aiExtractedData: aiExtractedData || null,
                         tenantId: req.user.tenantId
                     }
                 });

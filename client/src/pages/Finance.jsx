@@ -2,12 +2,13 @@ import { useState, useEffect, Fragment } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight, Eye, Mic, Image as ImageIcon, Sparkles } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import RefundConfirmationModal from '../components/RefundConfirmationModal';
+import TransactionDetailModal from '../components/TransactionDetailModal';
 import { useFormat } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 
@@ -37,6 +38,15 @@ export default function Finance() {
     const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
     const [transactionToRefund, setTransactionToRefund] = useState(null);
     const [isRefunding, setIsRefunding] = useState(false);
+
+    // Detail & Media Evidence state
+    const [selectedDetailTx, setSelectedDetailTx] = useState(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+    const handleOpenDetail = (tx) => {
+        setSelectedDetailTx(tx);
+        setIsDetailModalOpen(true);
+    };
 
     const [workmen, setWorkmen] = useState([]);
     const [projects, setProjects] = useState([]);
@@ -331,7 +341,7 @@ export default function Finance() {
         });
     };
 
-    const renderPaymentMethod = (method, receiptUrl = null) => {
+    const renderPaymentMethod = (method, txOrUrl = null) => {
         if (!method) return <span className="text-secondary">-</span>;
         let label = method;
         const badgeStyle = { fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', fontWeight: '500' };
@@ -362,32 +372,105 @@ export default function Finance() {
                 badgeEl = <span className="badge badge-secondary" style={badgeStyle}>{label}</span>;
         }
 
+        const txObj = typeof txOrUrl === 'object' && txOrUrl !== null ? txOrUrl : null;
+        const legacyUrl = typeof txOrUrl === 'string' ? txOrUrl : (txObj?.receiptPhotoUrl || null);
+        const hasVoice = Boolean(txObj?.voiceNoteUrl);
+        const hasReceipt = Boolean(legacyUrl);
+        const hasAi = Boolean(txObj?.aiRawText || txObj?.aiExtractedData);
+
         return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 {badgeEl}
-                {receiptUrl && (
-                    <a
-                        href={receiptUrl.startsWith('http') ? receiptUrl : `/uploads/${receiptUrl.replace(/^(\/?uploads\/|\/+)/, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
+
+                {/* Voice Note Pill */}
+                {hasVoice && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetail(txObj);
+                        }}
                         className="btn-icon-sm"
                         style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '2px 6px',
+                            gap: '4px',
+                            padding: '2px 7px',
                             fontSize: '0.72rem',
-                            color: 'var(--color-primary)',
-                            background: 'hsla(220, 80%, 50%, 0.1)',
+                            color: '#a855f7',
+                            background: 'rgba(168, 85, 247, 0.12)',
                             borderRadius: '4px',
-                            textDecoration: 'none',
-                            border: '1px solid hsla(220, 80%, 50%, 0.2)'
+                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            cursor: 'pointer',
+                            fontWeight: '600'
                         }}
-                        title={isArabic ? 'عرض المرفق / الإيصال' : 'View Attachment / Receipt'}
+                        title={isArabic ? 'استماع للملاحظة الصوتية وتفاصيلها' : 'Play Voice Note & Details'}
                     >
-                        <ExternalLink size={12} style={{ marginRight: isArabic ? 0 : 3, marginLeft: isArabic ? 3 : 0 }} />
-                        {isArabic ? 'مرفق' : 'Receipt'}
-                    </a>
+                        <Mic size={12} />
+                        <span>{isArabic ? 'صوتي' : 'Voice'}</span>
+                    </button>
+                )}
+
+                {/* Receipt Photo Pill */}
+                {hasReceipt && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (txObj) {
+                                handleOpenDetail(txObj);
+                            } else {
+                                window.open(legacyUrl.startsWith('http') ? legacyUrl : `/uploads/${legacyUrl.replace(/^(\/?uploads\/|\/+)/, '')}`, '_blank');
+                            }
+                        }}
+                        className="btn-icon-sm"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '2px 7px',
+                            fontSize: '0.72rem',
+                            color: '#3b82f6',
+                            background: 'rgba(59, 130, 246, 0.12)',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                        }}
+                        title={isArabic ? 'معاينة الإيصال وتفاصيله' : 'View Receipt & Details'}
+                    >
+                        <ImageIcon size={12} />
+                        <span>{isArabic ? 'إيصال' : 'Receipt'}</span>
+                    </button>
+                )}
+
+                {/* AI Extracted Text Pill */}
+                {!hasVoice && !hasReceipt && hasAi && txObj && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetail(txObj);
+                        }}
+                        className="btn-icon-sm"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '2px 6px',
+                            fontSize: '0.7rem',
+                            color: '#6366f1',
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(99, 102, 241, 0.25)',
+                            cursor: 'pointer',
+                            fontWeight: '500'
+                        }}
+                        title={isArabic ? 'بيانات مستخرجة بالذكاء الاصطناعي' : 'AI Extracted'}
+                    >
+                        <Sparkles size={11} />
+                        <span>AI</span>
+                    </button>
                 )}
             </div>
         );
@@ -902,22 +985,30 @@ export default function Finance() {
                                                         {renderPayerOrClient(tx)}
                                                     </td>
                                                     <td>
-                                                        {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
-                                                    </td>
-                                                    <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                                                        {fmtCurrency(tx.amount)}
-                                                    </td>
-                                                    <td>{tx.creator?.name || '-'}</td>
-                                                    <td>
-                                                        <div className="flex gap-sm justify-center">
-                                                            <button className="btn-icon-sm" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(tx.id)} title={t('common.approve') || 'Approve'}>
-                                                                <CheckCircle size={16} />
-                                                            </button>
-                                                            <button className="btn-icon-sm" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => handleReject(tx.id)} title={t('common.reject') || 'Reject'}>
-                                                                <XCircle size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
+                                                         {renderPaymentMethod(tx.paymentMethod, tx)}
+                                                     </td>
+                                                     <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                         {fmtCurrency(tx.amount)}
+                                                     </td>
+                                                     <td>{tx.creator?.name || '-'}</td>
+                                                     <td>
+                                                         <div className="flex gap-sm justify-center">
+                                                             <button
+                                                                 className="btn-icon-sm"
+                                                                 style={{ color: 'var(--color-primary)', borderColor: 'rgba(0, 113, 227, 0.3)' }}
+                                                                 onClick={() => handleOpenDetail(tx)}
+                                                                 title={isArabic ? 'عرض التفاصيل وأدلة الإثبات' : 'View Details & Evidence'}
+                                                             >
+                                                                 <Eye size={16} />
+                                                             </button>
+                                                             <button className="btn-icon-sm" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(tx.id)} title={t('common.approve') || 'Approve'}>
+                                                                 <CheckCircle size={16} />
+                                                             </button>
+                                                             <button className="btn-icon-sm" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => handleReject(tx.id)} title={t('common.reject') || 'Reject'}>
+                                                                 <XCircle size={16} />
+                                                             </button>
+                                                         </div>
+                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -1069,7 +1160,7 @@ export default function Finance() {
                                                                             {renderPayerOrClient(tx)}
                                                                         </td>
                                                                         <td>
-                                                                            {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
+                                                                            {renderPaymentMethod(tx.paymentMethod, tx)}
                                                                         </td>
                                                                         <td style={{ fontWeight: '700', color: 'var(--text-primary)', textDecoration: isCancelled ? 'line-through' : 'none' }}>
                                                                             {fmtCurrency(tx.amount)}
@@ -1081,6 +1172,14 @@ export default function Finance() {
                                                                         </td>
                                                                         <td>
                                                                             <div className="flex gap-sm justify-center">
+                                                                                <button
+                                                                                    className="btn-icon-sm"
+                                                                                    style={{ color: 'var(--color-primary)', borderColor: 'rgba(0, 113, 227, 0.3)' }}
+                                                                                    onClick={() => handleOpenDetail(tx)}
+                                                                                    title={isArabic ? 'عرض التفاصيل وأدلة الإثبات' : 'View Details & Evidence'}
+                                                                                >
+                                                                                    <Eye size={16} />
+                                                                                </button>
                                                                                 {isCancelled ? (
                                                                                     <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي من السجل' : 'Delete Permanently')}>
                                                                                         <Trash2 size={16} />
@@ -1237,6 +1336,18 @@ export default function Finance() {
                 onConfirm={handleConfirmRefund}
                 transaction={transactionToRefund}
                 isLoading={isRefunding}
+            />
+
+            <TransactionDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={() => {
+                    setIsDetailModalOpen(false);
+                    setSelectedDetailTx(null);
+                }}
+                transaction={selectedDetailTx}
+                onEdit={(tx) => openEditModal(tx)}
+                onRefund={(tx) => handleRefundClick(tx)}
+                canEdit={user?.role === 'ADMIN' || user?.role === 'PROJECT_MANAGER' || user?.id === selectedDetailTx?.createdBy}
             />
         </Layout>
     );

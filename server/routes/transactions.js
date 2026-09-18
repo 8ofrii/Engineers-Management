@@ -99,6 +99,9 @@ router.put('/:id', transactionController.updateTransaction);
 // Phase 3 — attach a receipt photo / document (multipart, field=file)
 router.patch('/:id/receipt', receiptUpload.single('file'), transactionController.uploadReceipt);
 
+// Attach a voice note (multipart, field=file)
+router.patch('/:id/voice', audioUpload.single('file'), transactionController.uploadVoiceNote);
+
 // Refund & Cancel transaction (reverses balances and marks CANCELLED)
 router.post(
     '/:id/refund',

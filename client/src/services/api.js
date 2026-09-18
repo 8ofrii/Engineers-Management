@@ -244,6 +244,12 @@ export const transactionsAPI = {
     analyze: (formData) => api.post('/transactions/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
+    uploadReceipt: (id, formData) => api.patch(`/transactions/${id}/receipt`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+    uploadVoice: (id, formData) => api.patch(`/transactions/${id}/voice`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    }),
     getCostCenters: () => api.get('/transactions/cost-centers')
 };
 
