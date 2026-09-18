@@ -457,6 +457,8 @@
         "projectNet": "Project Net",
         "companyShare": "Office Profit",
         "totalCompanyShare": "Total Office Profit",
+        "costPlusFee": "Cost-Plus Fee",
+        "includesManagementFee": "Includes Cost-Plus Fee",
         "description": "Description",
         "detailsAndAmount": "Details & Amount",
         "transactionDateTime": "Date & Time",

@@ -455,6 +455,8 @@
         "projectNet": "صافي المشروع",
         "companyShare": "ارباح المكتب",
         "totalCompanyShare": "إجمالي ارباح المكتب",
+        "costPlusFee": "أتعاب كوست بلس",
+        "includesManagementFee": "يتضمن أتعاب إدارة كوست بلس",
         "description": "الوصف / البيان",
         "detailsAndAmount": "التفاصيل والمبلغ",
         "transactionDateTime": "التاريخ",

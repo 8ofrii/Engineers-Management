@@ -238,6 +238,24 @@ export const createTransaction = async (req, res, next) => {
                             }
                         });
 
+                        // Explicit ledger transaction for management fee
+                        await tx.transaction.create({
+                            data: {
+                                type: 'EXPENSE',
+                                category: 'MANAGEMENT_FEE_TRANSFER',
+                                amount: profit,
+                                description: `Cost-Plus Management Fee (${feePercent}%) on ${amount} EGP expense (${description || ''})`,
+                                status: 'APPROVED',
+                                projectId,
+                                createdBy: actualPayer,
+                                transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+                                paymentMethod: 'OTHER',
+                                tenantId: req.user.tenantId,
+                                isOfficeExpense: false,
+                                notes: `PARENT_TX:${transaction.id}`
+                            }
+                        });
+
                         profitInfo = {
                             profit,
                             projectSafeAfter: Number(project.projectSafeBalance) - Number(amount) - profit,

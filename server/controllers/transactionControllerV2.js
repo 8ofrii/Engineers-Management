@@ -33,7 +33,7 @@ import { canAutoApprove, requiredRoleForAmount } from '../lib/approvalThresholds
  * @param {String} userId - The user creating the transaction
  * @returns {Object} { profit, projectSafeAfter, officeRevenueAfter }
  */
-const calculateAndTransferProfit = async (tx, project, expenseAmount, userId) => {
+const calculateAndTransferProfit = async (tx, project, expenseAmount, userId, parentTxId = null) => {
     const feePercent = Number(project.managementFeePercent) || 0;
     const profit = Number(expenseAmount) * (feePercent / 100);
 
@@ -63,7 +63,8 @@ const calculateAndTransferProfit = async (tx, project, expenseAmount, userId) =>
                 transactionDate: new Date(),
                 paymentMethod: 'OTHER',
                 tenantId: project.tenantId,
-                isOfficeExpense: false
+                isOfficeExpense: false,
+                notes: parentTxId ? `PARENT_TX:${parentTxId}` : null
             }
         });
 
@@ -316,7 +317,7 @@ export const createTransactionV2 = async (req, res, next) => {
                 // PROFIT CALCULATION
                 // If it's NOT an inventory purchase and is APPROVED, recognize profit immediately
                 if (!createBatch && !req.body.materialId) {
-                    profitInfo = await calculateAndTransferProfit(tx, updatedProject, amount, actualPayer);
+                    profitInfo = await calculateAndTransferProfit(tx, updatedProject, amount, actualPayer, transaction.id);
                 } else {
                     // Inventory Purchase: Create batch, defer profit, and recharge material stock
                     const parsedQty = Number(quantity) || (unitPrice && Number(unitPrice) > 0 ? Number(amount) / Number(unitPrice) : 0);

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
@@ -433,6 +433,73 @@ export default function Finance() {
         }
     };
 
+    const organizeTransactionsWithFees = (rawTxs, isAllTab) => {
+        if (!isAllTab) {
+            return rawTxs.map(tx => ({ ...tx, nestedFees: [] }));
+        }
+
+        // Separate management fees from other transactions
+        const feeTxs = rawTxs.filter(tx => tx.category === 'MANAGEMENT_FEE_TRANSFER');
+        const nonFeeTxs = rawTxs.filter(tx => tx.category !== 'MANAGEMENT_FEE_TRANSFER');
+
+        const structured = nonFeeTxs.map(tx => ({
+            ...tx,
+            nestedFees: []
+        }));
+
+        const matchedFeeIds = new Set();
+
+        // 1. Primary match: PARENT_TX:<id> in notes
+        feeTxs.forEach(feeTx => {
+            let parentId = null;
+            if (feeTx.notes) {
+                const match = feeTx.notes.match(/PARENT_TX:([a-zA-Z0-9_-]+)/);
+                if (match) parentId = match[1];
+            }
+
+            if (parentId) {
+                const parent = structured.find(p => p.id === parentId);
+                if (parent) {
+                    parent.nestedFees.push(feeTx);
+                    matchedFeeIds.add(feeTx.id);
+                }
+            }
+        });
+
+        // 2. Fallback heuristic for legacy/seed data: match parent expense by exact amount in description
+        feeTxs.forEach(feeTx => {
+            if (matchedFeeIds.has(feeTx.id)) return;
+
+            if (feeTx.description) {
+                const candidate = structured.find(p => {
+                    if (p.type !== 'EXPENSE' || (p.nestedFees && p.nestedFees.length > 0)) return false;
+                    const pAmt = Number(p.amount);
+                    if (isNaN(pAmt) || pAmt <= 0) return false;
+                    const desc = feeTx.description;
+                    return (
+                        desc.includes(`${pAmt} EGP`) ||
+                        desc.includes(`${Math.round(pAmt)} EGP`) ||
+                        desc.includes(`${pAmt.toLocaleString()} EGP`) ||
+                        desc.includes(`${pAmt.toFixed(2)} EGP`)
+                    );
+                });
+                if (candidate) {
+                    candidate.nestedFees.push(feeTx);
+                    matchedFeeIds.add(feeTx.id);
+                }
+            }
+        });
+
+        // 3. Keep orphan fees at top-level so no transactions are hidden or lost
+        const orphanFees = feeTxs
+            .filter(feeTx => !matchedFeeIds.has(feeTx.id))
+            .map(feeTx => ({ ...feeTx, nestedFees: [] }));
+
+        return [...structured, ...orphanFees].sort((a, b) => 
+            new Date(b.transactionDate || b.createdAt) - new Date(a.transactionDate || a.createdAt)
+        );
+    };
+
     return (
         <Layout>
             <div className="finance-page">
@@ -786,6 +853,16 @@ export default function Finance() {
                                     overflow: hidden;
                                     text-overflow: ellipsis;
                                 }
+                                .nested-fee-row td {
+                                    background: hsla(158, 64%, 52%, 0.04) !important;
+                                    border-bottom: 1px dashed rgba(16, 185, 129, 0.22) !important;
+                                    font-size: 0.8125rem !important;
+                                    padding: 11px 14px !important;
+                                    color: var(--text-secondary);
+                                }
+                                .nested-fee-row:hover td {
+                                    background: hsla(158, 64%, 52%, 0.09) !important;
+                                }
                             `}
                         </style>
 
@@ -937,71 +1014,190 @@ export default function Finance() {
                                                         <th style={{ width: '120px' }}>{t('common.actions')}</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody>
-                                                    {txs.map((tx) => {
-                                                        const isCancelled = tx.status === 'CANCELLED';
-                                                        return (
-                                                        <tr key={tx.id} style={isCancelled ? { opacity: 0.65, background: 'hsla(0, 0%, 50%, 0.05)' } : undefined}>
-                                                            <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
-                                                                <span dir="ltr" style={{ unicodeBidi: 'plaintext', display: 'inline-block' }}>
-                                                                    {formatDate(tx.transactionDate)}
-                                                                </span>
-                                                            </td>
-                                                            <td>
-                                                                {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (
-                                                                    <span className="badge" style={{ fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700 }}>
-                                                                        {t('finance.companyShare') || (isArabic ? 'ارباح المكتب' : 'Office Profit')}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                        {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
-                                                                    </span>
-                                                                )}
-                                                            </td>
-                                                            <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                                            <td style={{ maxWidth: '220px', textDecoration: isCancelled ? 'line-through' : 'none' }} className="truncate" title={tx.description}>
-                                                                {tx.description}
-                                                                {tx.projectCostItem && (
-                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
-                                                                        #{tx.projectCostItem.name}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td style={{ maxWidth: '180px' }} className="truncate">
-                                                                {renderPayerOrClient(tx)}
-                                                            </td>
-                                                            <td>
-                                                                {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
-                                                            </td>
-                                                            <td style={{ fontWeight: '700', color: 'var(--text-primary)', textDecoration: isCancelled ? 'line-through' : 'none' }}>
-                                                                {fmtCurrency(tx.amount)}
-                                                            </td>
-                                                            <td>
-                                                                <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : tx.status === 'CANCELLED' ? 'badge-secondary' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                    {t(`finance.status.${tx.status}`) || (tx.status === 'CANCELLED' ? (isArabic ? 'مسترد / ملغي' : 'Refunded / Cancelled') : tx.status?.replace('_', ' '))}
-                                                                </span>
-                                                            </td>
-                                                            <td>
-                                                                <div className="flex gap-sm justify-center">
-                                                                    {isCancelled ? (
-                                                                        <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي من السجل' : 'Delete Permanently')}>
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                    ) : (
-                                                                        <>
-                                                                            <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
-                                                                                <Pencil size={16} />
-                                                                            </button>
-                                                                            <button className="btn-icon-sm" style={{ color: '#d97706', borderColor: '#d97706' }} onClick={() => handleRefundClick(tx)} title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}>
-                                                                                <RotateCcw size={16} />
-                                                                            </button>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                        );
-                                                    })}
+                                                 <tbody>
+                                                    {(() => {
+                                                        const displayTxs = organizeTransactionsWithFees(txs, filterType === 'ALL');
+                                                        return displayTxs.map((tx) => {
+                                                            const isCancelled = tx.status === 'CANCELLED';
+                                                            const hasNestedFees = tx.nestedFees && tx.nestedFees.length > 0;
+                                                            return (
+                                                                <Fragment key={tx.id}>
+                                                                    <tr key={tx.id} style={isCancelled ? { opacity: 0.65, background: 'hsla(0, 0%, 50%, 0.05)' } : undefined}>
+                                                                        <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
+                                                                            <span dir="ltr" style={{ unicodeBidi: 'plaintext', display: 'inline-block' }}>
+                                                                                {formatDate(tx.transactionDate)}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>
+                                                                            {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (
+                                                                                <span className="badge" style={{ fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700 }}>
+                                                                                    {t('finance.companyShare') || (isArabic ? 'ارباح المكتب' : 'Office Profit')}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
+                                                                                    {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                                        <td style={{ maxWidth: '220px', textDecoration: isCancelled ? 'line-through' : 'none' }} className="truncate" title={tx.description}>
+                                                                            {tx.description}
+                                                                            {tx.projectCostItem && (
+                                                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
+                                                                                    #{tx.projectCostItem.name}
+                                                                                </div>
+                                                                            )}
+                                                                            {hasNestedFees && (
+                                                                                <div style={{ marginTop: '4px' }}>
+                                                                                    <span
+                                                                                        className="badge"
+                                                                                        style={{
+                                                                                            fontSize: '0.68rem',
+                                                                                            padding: '2px 6px',
+                                                                                            background: 'rgba(16, 185, 129, 0.12)',
+                                                                                            color: '#10b981',
+                                                                                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                                                                                            fontWeight: '600'
+                                                                                        }}
+                                                                                    >
+                                                                                        {t('finance.includesManagementFee') || (isArabic ? 'يتضمن أتعاب إدارة كوست بلس' : 'Includes Cost-Plus Fee')}
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td style={{ maxWidth: '180px' }} className="truncate">
+                                                                            {renderPayerOrClient(tx)}
+                                                                        </td>
+                                                                        <td>
+                                                                            {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
+                                                                        </td>
+                                                                        <td style={{ fontWeight: '700', color: 'var(--text-primary)', textDecoration: isCancelled ? 'line-through' : 'none' }}>
+                                                                            {fmtCurrency(tx.amount)}
+                                                                        </td>
+                                                                        <td>
+                                                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : tx.status === 'CANCELLED' ? 'badge-secondary' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
+                                                                                {t(`finance.status.${tx.status}`) || (tx.status === 'CANCELLED' ? (isArabic ? 'مسترد / ملغي' : 'Refunded / Cancelled') : tx.status?.replace('_', ' '))}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>
+                                                                            <div className="flex gap-sm justify-center">
+                                                                                {isCancelled ? (
+                                                                                    <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي من السجل' : 'Delete Permanently')}>
+                                                                                        <Trash2 size={16} />
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
+                                                                                            <Pencil size={16} />
+                                                                                        </button>
+                                                                                        <button className="btn-icon-sm" style={{ color: '#d97706', borderColor: '#d97706' }} onClick={() => handleRefundClick(tx)} title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}>
+                                                                                            <RotateCcw size={16} />
+                                                                                        </button>
+                                                                                    </>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+
+                                                                    {/* Nested Cost-Plus Management Fee Sub-Row (Always visible as requested) */}
+                                                                    {hasNestedFees && tx.nestedFees.map((feeTx) => {
+                                                                        const isFeeCancelled = feeTx.status === 'CANCELLED';
+                                                                        return (
+                                                                            <tr
+                                                                                key={feeTx.id}
+                                                                                className="nested-fee-row"
+                                                                                style={{
+                                                                                    borderInlineStart: '4px solid #10b981',
+                                                                                    ...(isFeeCancelled ? { opacity: 0.6, textDecoration: 'line-through' } : {})
+                                                                                }}
+                                                                            >
+                                                                                <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
+                                                                                    <div className="flex items-center gap-xs justify-center" style={{ color: 'var(--text-secondary)' }}>
+                                                                                        <CornerDownRight
+                                                                                            size={14}
+                                                                                            style={{
+                                                                                                color: '#10b981',
+                                                                                                flexShrink: 0,
+                                                                                                transform: isArabic ? 'scaleX(-1)' : 'none'
+                                                                                            }}
+                                                                                        />
+                                                                                        <span dir="ltr" style={{ unicodeBidi: 'plaintext', fontSize: '0.8rem' }}>
+                                                                                            {formatDate(feeTx.transactionDate || feeTx.createdAt)}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td>
+                                                                                    <span
+                                                                                        className="badge"
+                                                                                        style={{
+                                                                                            fontSize: '0.68rem',
+                                                                                            padding: '3px 8px',
+                                                                                            background: 'rgba(16, 185, 129, 0.15)',
+                                                                                            color: '#10b981',
+                                                                                            border: '1px solid rgba(16, 185, 129, 0.35)',
+                                                                                            fontWeight: 700
+                                                                                        }}
+                                                                                    >
+                                                                                        {t('finance.companyShare') || (isArabic ? 'أتعاب كوست بلس' : 'Cost-Plus Fee')}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                                    {t(`finance.categories.${feeTx.category?.toLowerCase()}`) || (isArabic ? 'أتعاب إدارة' : 'Management Fee')}
+                                                                                </td>
+                                                                                <td style={{ maxWidth: '220px', textDecoration: isFeeCancelled ? 'line-through' : 'none' }} className="truncate" title={feeTx.description}>
+                                                                                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                                                                                        {feeTx.description}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                                                                        {isArabic ? 'خصم من خزينة المشروع' : 'Project Safe'}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td>
+                                                                                    <span className="badge badge-secondary" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                                                                                        {isArabic ? 'تحويل أرباح' : 'Profit Transfer'}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td style={{ fontWeight: '700', color: '#10b981', textDecoration: isFeeCancelled ? 'line-through' : 'none' }}>
+                                                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                                                                        <span>+</span>
+                                                                                        {fmtCurrency(feeTx.amount)}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td>
+                                                                                    <span
+                                                                                        className={`badge ${feeTx.status === 'APPROVED' ? 'badge-success' : 'badge-secondary'}`}
+                                                                                        style={{ fontSize: '0.68rem', padding: '2px 8px' }}
+                                                                                    >
+                                                                                        {t(`finance.status.${feeTx.status}`) || (feeTx.status === 'CANCELLED' ? (isArabic ? 'مسترد / ملغي' : 'Refunded / Cancelled') : feeTx.status)}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td>
+                                                                                    <div className="flex gap-sm justify-center">
+                                                                                        {isFeeCancelled ? (
+                                                                                            <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(feeTx)} title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي من السجل' : 'Delete Permanently')}>
+                                                                                                <Trash2 size={16} />
+                                                                                            </button>
+                                                                                        ) : (
+                                                                                            <>
+                                                                                                <button className="btn-icon-sm" onClick={() => openEditModal(feeTx)} title={t('common.edit')}>
+                                                                                                    <Pencil size={16} />
+                                                                                                </button>
+                                                                                                <button className="btn-icon-sm" style={{ color: '#d97706', borderColor: '#d97706' }} onClick={() => handleRefundClick(feeTx)} title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}>
+                                                                                                    <RotateCcw size={16} />
+                                                                                                </button>
+                                                                                            </>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </Fragment>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </tbody>
                                             </table>
                                         </div>
