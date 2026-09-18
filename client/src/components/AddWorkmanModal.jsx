@@ -4,16 +4,23 @@ import { X } from 'lucide-react';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 import { useAlert } from '../context/AlertContext';
+import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
+import DraftBanner from './DraftBanner';
+import MultiPhoneInput from './MultiPhoneInput';
+
+const WORKMAN_DRAFT_KEY = 'hesaby_draft_workman';
 
 export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData = null }) {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         nameAr: '',
         trade: 'MASON',
         dailyRate: '',
         phone: '',
+        phones: [''],
         nationalId: '',
         nationalIdImage: '', // Base64 string
         customTrade: ''
@@ -23,45 +30,85 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
 
     useEffect(() => {
         if (initialData) {
+            const initPhones = Array.isArray(initialData.phones) && initialData.phones.length > 0
+                ? initialData.phones
+                : (initialData.phone ? [initialData.phone] : ['']);
             setFormData({
                 name: initialData.name || '',
                 nameAr: initialData.nameAr || '',
                 trade: initialData.trade || 'MASON',
                 dailyRate: initialData.dailyRate || '',
-                phone: initialData.phone || '',
+                phone: initialData.phone || initPhones[0] || '',
+                phones: initPhones,
                 nationalId: initialData.nationalId || '',
                 nationalIdImage: initialData.nationalIdImage || '',
                 customTrade: initialData.customTrade || ''
             });
-        } else {
-            setFormData({
-                name: '',
-                nameAr: '',
-                trade: 'MASON',
-                dailyRate: '',
-                phone: '',
-                nationalId: '',
-                nationalIdImage: '',
-                customTrade: ''
-            });
+            setHasRestoredDraft(false);
+        } else if (isOpen && !initialData) {
+            const draft = getFormDraft(WORKMAN_DRAFT_KEY);
+            if (draft) {
+                const draftPhones = Array.isArray(draft.phones) && draft.phones.length > 0
+                    ? draft.phones
+                    : (draft.phone ? [draft.phone] : ['']);
+                setFormData(prev => ({
+                    ...prev,
+                    ...draft,
+                    phones: draftPhones,
+                    phone: draft.phone || draftPhones[0] || ''
+                }));
+                setHasRestoredDraft(true);
+            } else {
+                setFormData({
+                    name: '',
+                    nameAr: '',
+                    trade: 'MASON',
+                    dailyRate: '',
+                    phone: '',
+                    phones: [''],
+                    nationalId: '',
+                    nationalIdImage: '',
+                    customTrade: ''
+                });
+                setHasRestoredDraft(false);
+            }
         }
     }, [initialData, isOpen]);
 
     const trades = [
         'CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER',
         'WELDER', 'LABORER', 'FOREMAN', 'CONCRETE', 'PLASTERER',
-        'FLOORING', 'GYPSUM', 'ALUMINUM', 'OTHER'
+        'FLOORING', 'GYPSUM', 'ALUMINUM', 'BLACKSMITH', 'OTHER'
     ];
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => {
+            const next = { ...prev, [name]: value };
+            if (!initialData) {
+                saveFormDraft(WORKMAN_DRAFT_KEY, next);
+            }
+            return next;
+        });
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
         }
+    };
+
+    const handleDiscardDraft = () => {
+        clearFormDraft(WORKMAN_DRAFT_KEY);
+        setFormData({
+            name: '',
+            nameAr: '',
+            trade: 'MASON',
+            dailyRate: '',
+            phone: '',
+            phones: [''],
+            nationalId: '',
+            nationalIdImage: '',
+            customTrade: ''
+        });
+        setHasRestoredDraft(false);
     };
 
     const handleFileChange = (e) => {
@@ -113,11 +160,12 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
             newErrors.name = t('common.required');
         }
 
-        if (!formData.dailyRate || parseFloat(formData.dailyRate) <= 0) {
-            newErrors.dailyRate = t('common.required');
+        if (formData.dailyRate && parseFloat(formData.dailyRate) < 0) {
+            newErrors.dailyRate = t('common.invalid', 'Invalid amount');
         }
 
-        if (!formData.phone.trim()) {
+        const primaryPhone = formData.phones?.[0]?.trim() || formData.phone?.trim();
+        if (!primaryPhone) {
             newErrors.phone = t('common.required');
         }
 
@@ -138,10 +186,19 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
         setLoading(true);
 
         try {
+            const cleanPhones = (formData.phones || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            const rate = formData.dailyRate !== '' && formData.dailyRate !== null && !isNaN(parseFloat(formData.dailyRate))
+                ? parseFloat(formData.dailyRate)
+                : null;
             await onSave({
                 ...formData,
-                dailyRate: parseFloat(formData.dailyRate)
+                dailyRate: rate,
+                phone: cleanPhones[0] || formData.phone?.trim() || null,
+                phones: cleanPhones
             });
+            if (!initialData) {
+                clearFormDraft(WORKMAN_DRAFT_KEY);
+            }
             handleClose();
         } catch (error) {
             console.error('Failed to save workman:', error);
@@ -160,16 +217,6 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
     };
 
     const handleClose = () => {
-        setFormData({
-            name: '',
-            nameAr: '',
-            trade: 'MASON',
-            dailyRate: '',
-            phone: '',
-            nationalId: '',
-            nationalIdImage: '',
-            customTrade: ''
-        });
         setErrors({});
         onClose();
     };
@@ -187,6 +234,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                 </div>
 
                 <form onSubmit={handleSubmit} className="modal-body">
+                    {hasRestoredDraft && <DraftBanner onDiscard={handleDiscardDraft} />}
                     <div className="form-grid">
                         <div className="form-group">
                             <label htmlFor="name">
@@ -256,7 +304,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
 
                         <div className="form-group">
                             <label htmlFor="dailyRate">
-                                {t('labor.dailyRate')} <span className="required">*</span>
+                                {t('labor.dailyRate')}
                             </label>
                             <CurrencyInput
                                 id="dailyRate"
@@ -269,20 +317,22 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                             {errors.dailyRate && <span className="error-message">{errors.dailyRate}</span>}
                         </div>
 
-                        <div className="form-group">
-                            <label htmlFor="phone">
-                                {t('labor.phone')} <span className="required">*</span>
-                            </label>
-                            <input
-                                type="tel"
-                                id="phone"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleChange}
-                                className={errors.phone ? 'error' : ''}
+                        <div style={{ gridColumn: 'span 2' }}>
+                            <MultiPhoneInput
+                                phones={formData.phones}
+                                onChange={(newPhones) => {
+                                    setFormData(prev => {
+                                        const next = { ...prev, phones: newPhones, phone: newPhones[0] || '' };
+                                        if (!initialData) saveFormDraft(WORKMAN_DRAFT_KEY, next);
+                                        return next;
+                                    });
+                                    if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
+                                }}
+                                label={t('labor.phone')}
+                                required
+                                error={errors.phone}
                                 placeholder="01012345678"
                             />
-                            {errors.phone && <span className="error-message">{errors.phone}</span>}
                         </div>
 
                         <div className="form-group">

@@ -35,8 +35,18 @@ export const ARABIC_CATEGORIES = [
     { key: 'TIPS', ar: 'اكراميات', en: 'Tips/Bonuses', group: 'SERVICES' },
     { key: 'TRANSPORT', ar: 'نقل', en: 'Transport', group: 'SERVICES' },
     { key: 'INSULATION_LABOR', ar: 'مصنعية عزل', en: 'Insulation Labor', group: 'LABOR' },
+    { key: 'BLACKSMITH_LABOR', ar: 'مصنعية حداد', en: 'Blacksmith/Steel Fixer Labor', group: 'LABOR' },
     { key: 'HVAC_PREP', ar: 'تاسيس تكيف', en: 'HVAC Prep', group: 'MATERIALS' },
-    { key: 'ALUMETAL', ar: 'الوميتال', en: 'Alumetal', group: 'MATERIALS' }
+    { key: 'ALUMETAL', ar: 'الوميتال', en: 'Alumetal', group: 'MATERIALS' },
+    { key: 'EQUIPMENT', ar: 'معدات', en: 'Equipment', group: 'SERVICES' },
+
+    // Contracting (مقاولات)
+    { key: 'CONTRACTING_CONCRETE', ar: 'مقاولة خرسانات', en: 'Concrete Subcontracting', group: 'CONTRACTING' },
+    { key: 'CONTRACTING_STOCKING', ar: 'مقاولة تشوين', en: 'Stocking Subcontracting', group: 'CONTRACTING' },
+    { key: 'CONTRACTING_DEMOLITION', ar: 'مقاولة هدم', en: 'Demolition Subcontracting', group: 'CONTRACTING' },
+    { key: 'CONTRACTING_MARBLE', ar: 'مقاولة رخام', en: 'Marble Subcontracting', group: 'CONTRACTING' },
+    { key: 'CONTRACTING_POOL', ar: 'مقاولة حمام سباحة', en: 'Swimming Pool Subcontracting', group: 'CONTRACTING' },
+    { key: 'CONTRACTING_LANDSCAPE', ar: 'مقاولة Landscape', en: 'Landscape Subcontracting', group: 'CONTRACTING' }
 ];
 
 /**
@@ -55,6 +65,7 @@ export const getCategoriesByGroup = () => {
     const grouped = {
         MATERIALS: [],
         LABOR: [],
+        CONTRACTING: [],
         SERVICES: []
     };
 

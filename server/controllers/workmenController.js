@@ -64,7 +64,18 @@ export const getOne = async (req, res, next) => {
 // @access  Private
 export const create = async (req, res, next) => {
     try {
-        const { name, nameAr, trade, customTrade, dailyRate, phone, nationalId, nationalIdImage } = req.body;
+        const { name, nameAr, trade, customTrade, dailyRate, phone, phones, nationalId, nationalIdImage } = req.body;
+
+        let normalizedPhones = [];
+        if (Array.isArray(phones)) {
+            normalizedPhones = phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+        } else if (phone) {
+            normalizedPhones = [phone.trim()];
+        }
+        const primaryPhone = normalizedPhones[0] || (phone ? phone.trim() : null);
+        if (primaryPhone && !normalizedPhones.includes(primaryPhone)) {
+            normalizedPhones = [primaryPhone, ...normalizedPhones];
+        }
 
         const workman = await prisma.workman.create({
             data: {
@@ -73,7 +84,8 @@ export const create = async (req, res, next) => {
                 trade,
                 customTrade,
                 dailyRate,
-                phone,
+                phone: primaryPhone,
+                phones: normalizedPhones,
                 nationalId,
                 nationalIdImage,
                 tenantId: req.user.tenantId // Critical: Assign to Tenant
@@ -101,7 +113,7 @@ export const create = async (req, res, next) => {
 // @access  Private
 export const update = async (req, res, next) => {
     try {
-        const { name, nameAr, trade, customTrade, dailyRate, phone, nationalId, nationalIdImage, isActive } = req.body;
+        const { name, nameAr, trade, customTrade, dailyRate, phone, phones, nationalId, nationalIdImage, isActive } = req.body;
 
         const before = await prisma.workman.findFirst({
             where: { id: req.params.id, tenantId: req.user.tenantId, deletedAt: null }
@@ -114,9 +126,19 @@ export const update = async (req, res, next) => {
             });
         }
 
+        const updateData = { name, nameAr, trade, customTrade, dailyRate, nationalId, nationalIdImage, isActive };
+        if (Array.isArray(phones)) {
+            const normalized = phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            updateData.phones = normalized;
+            updateData.phone = normalized[0] || null;
+        } else if (phone !== undefined) {
+            updateData.phone = phone ? phone.trim() : null;
+            updateData.phones = updateData.phone ? [updateData.phone] : [];
+        }
+
         const updatedWorkman = await prisma.workman.update({
             where: { id: req.params.id },
-            data: { name, nameAr, trade, customTrade, dailyRate, phone, nationalId, nationalIdImage, isActive }
+            data: updateData
         });
 
         await auditFromReq(req, {

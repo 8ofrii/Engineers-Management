@@ -22,6 +22,7 @@ export const getUsers = async (req, res) => {
                     select: { id: true, name: true }
                 },
                 phone: true,
+                phones: true,
                 profilePicture: true,
                 company: true,
                 permissions: true,
@@ -262,7 +263,7 @@ export const resendInvite = async (req, res) => {
 // Update User (Role/Details)
 export const updateUser = async (req, res) => {
     const { id } = req.params;
-    const { role, name, phone, permissions, password } = req.body;
+    const { role, name, phone, phones, permissions, password } = req.body;
 
     // Only SUPER_ADMIN may grant SUPER_ADMIN. Also forbid demoting an existing
     // SUPER_ADMIN unless the caller is one — otherwise an ADMIN could lock out
@@ -280,11 +281,18 @@ export const updateUser = async (req, res) => {
         }
     }
 
-    // Verify new phone isn't taken by another user
-    if (phone) {
+    let normalizedPhones = undefined;
+    let primaryPhone = phone !== undefined ? (phone ? phone.trim() : null) : undefined;
+    if (Array.isArray(phones)) {
+        normalizedPhones = phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+        primaryPhone = normalizedPhones[0] || null;
+    }
+
+    // Verify new primary phone isn't taken by another user if provided
+    if (primaryPhone) {
         const phoneExists = await prisma.user.findFirst({
             where: {
-                phone,
+                phone: primaryPhone,
                 tenantId: req.user.tenantId,
                 NOT: { id }
             }
@@ -297,10 +305,17 @@ export const updateUser = async (req, res) => {
     try {
         const before = await prisma.user.findFirst({
             where: { id, tenantId: req.user.tenantId },
-            select: { id: true, name: true, email: true, role: true, phone: true, permissions: true, isActive: true }
+            select: { id: true, name: true, email: true, role: true, phone: true, phones: true, permissions: true, isActive: true }
         });
 
-        const updateData = { role, name, phone, permissions };
+        const updateData = { role, name, permissions };
+        if (normalizedPhones !== undefined) {
+            updateData.phones = normalizedPhones;
+            updateData.phone = primaryPhone;
+        } else if (phone !== undefined) {
+            updateData.phone = primaryPhone;
+            updateData.phones = primaryPhone ? [primaryPhone] : [];
+        }
 
         if (password) {
             const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
@@ -325,7 +340,7 @@ export const updateUser = async (req, res) => {
             entity: 'User',
             entityId: user.id,
             before,
-            after: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone, permissions: user.permissions, isActive: user.isActive },
+            after: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone, phones: user.phones, permissions: user.permissions, isActive: user.isActive },
             metadata: isRoleChange ? { from: before?.role, to: role } : undefined
         });
 
@@ -368,7 +383,7 @@ export const deleteUser = async (req, res) => {
 
         // Check if user has associated history that requires soft-deletion
         const [hasTransactions, hasProjects, hasInvoices, hasDsrs, hasAuditLogs] = await Promise.all([
-            prisma.transaction.count({ where: { OR: [{ createdBy: id }, { approvedById: id }, { payerId: id }] } }),
+            prisma.transaction.count({ where: { OR: [{ createdBy: id }, { approvedBy: id }, { payerUserId: id }] } }),
             prisma.project.count({ where: { engineerId: id } }),
             prisma.invoice.count({ where: { createdBy: id } }),
             prisma.dailySiteReport.count({ where: { OR: [{ reportedBy: id }, { acknowledgedBy: id }] } }),

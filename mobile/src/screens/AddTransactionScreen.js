@@ -30,7 +30,9 @@ const CATEGORIES_EXPENSE = [
     'GYPSUM_MATERIALS', 'GYPSUM_LABOR',
     'CARPENTRY_MATERIALS', 'CARPENTRY_LABOR',
     'TRANSPORT', 'TIPS', 'DECOR', 'DRAWINGS',
-    'INSULATION_LABOR', 'HVAC_PREP', 'ALUMETAL',
+    'INSULATION_LABOR', 'BLACKSMITH_LABOR', 'HVAC_PREP', 'ALUMETAL',
+    'CONTRACTING', 'CONTRACTING_CONCRETE', 'CONTRACTING_STOCKING', 'CONTRACTING_DEMOLITION',
+    'CONTRACTING_MARBLE', 'CONTRACTING_POOL', 'CONTRACTING_LANDSCAPE',
     'MATERIALS', 'LABOR', 'EQUIPMENT', 'SERVICES', 'OTHER'
 ];
 
@@ -86,8 +88,16 @@ export default function AddTransactionScreen({ navigation, route }) {
             'DECOR': 'ديكورات وتكسيات',
             'DRAWINGS': 'رسومات وتراخيص هندسية',
             'INSULATION_LABOR': 'مصنعية وخامات عزل',
+            'BLACKSMITH_LABOR': 'مصنعية حداد',
             'HVAC_PREP': 'تجهيزات وتمديدات تكييف',
             'ALUMETAL': 'ألوميتال وواجهات',
+            'CONTRACTING': 'مقاولات',
+            'CONTRACTING_CONCRETE': 'مقاولة خرسانات',
+            'CONTRACTING_STOCKING': 'مقاولة تشوين',
+            'CONTRACTING_DEMOLITION': 'مقاولة هدم',
+            'CONTRACTING_MARBLE': 'مقاولة رخام',
+            'CONTRACTING_POOL': 'مقاولة حمام سباحة',
+            'CONTRACTING_LANDSCAPE': 'مقاولة Landscape',
             'MATERIALS': 'مواد بناء وتوريدات عامة',
             'LABOR': 'أجور عمالة',
             'EQUIPMENT': 'إيجار معدات وآلات',

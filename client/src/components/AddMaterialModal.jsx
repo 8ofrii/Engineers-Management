@@ -2,12 +2,17 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { suppliersAPI } from '../services/api';
+import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
+import DraftBanner from './DraftBanner';
 import './Modal.css';
+
+const MATERIAL_DRAFT_KEY = 'hesaby_draft_material';
 
 export default function AddMaterialModal({ isOpen, onClose, onSave, initialData = null }) {
     const { t, i18n } = useTranslation();
     const isAr = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const [suppliers, setSuppliers] = useState([]);
+    const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         nameAr: '',
@@ -21,10 +26,27 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
 
     const [errors, setErrors] = useState({});
 
+    const handleDiscardDraft = () => {
+        clearFormDraft(MATERIAL_DRAFT_KEY);
+        setHasRestoredDraft(false);
+        setFormData({
+            name: '',
+            nameAr: '',
+            description: '',
+            unit: 'TON',
+            stockLevel: '',
+            unitPrice: '',
+            reorderLevel: '',
+            supplierId: ''
+        });
+        setErrors({});
+    };
+
     useEffect(() => {
         if (isOpen) {
             loadSuppliers();
             if (initialData) {
+                setHasRestoredDraft(false);
                 setFormData({
                     name: initialData.name || '',
                     nameAr: initialData.nameAr || '',
@@ -36,20 +58,44 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                     supplierId: initialData.supplierId || ''
                 });
             } else {
-                setFormData({
-                    name: '',
-                    nameAr: '',
-                    description: '',
-                    unit: 'TON',
-                    stockLevel: '',
-                    unitPrice: '',
-                    reorderLevel: '',
-                    supplierId: ''
-                });
+                const savedDraft = getFormDraft(MATERIAL_DRAFT_KEY);
+                if (savedDraft && typeof savedDraft === 'object') {
+                    setFormData({
+                        name: savedDraft.name || '',
+                        nameAr: savedDraft.nameAr || '',
+                        description: savedDraft.description || '',
+                        unit: savedDraft.unit || 'TON',
+                        stockLevel: savedDraft.stockLevel !== undefined && savedDraft.stockLevel !== null ? savedDraft.stockLevel.toString() : '',
+                        unitPrice: savedDraft.unitPrice?.toString() || '',
+                        reorderLevel: savedDraft.reorderLevel?.toString() || '',
+                        supplierId: savedDraft.supplierId || ''
+                    });
+                    setHasRestoredDraft(true);
+                } else {
+                    setHasRestoredDraft(false);
+                    setFormData({
+                        name: '',
+                        nameAr: '',
+                        description: '',
+                        unit: 'TON',
+                        stockLevel: '',
+                        unitPrice: '',
+                        reorderLevel: '',
+                        supplierId: ''
+                    });
+                }
             }
             setErrors({});
         }
     }, [isOpen, initialData]);
+
+    useEffect(() => {
+        if (!isOpen || initialData) return;
+        const hasContent = formData.name || formData.nameAr || formData.description || formData.unitPrice || formData.stockLevel || formData.supplierId;
+        if (hasContent) {
+            saveFormDraft(MATERIAL_DRAFT_KEY, formData);
+        }
+    }, [formData, isOpen, initialData]);
 
     const loadSuppliers = async () => {
         try {
@@ -93,6 +139,10 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                 reorderLevel: formData.reorderLevel !== '' && formData.reorderLevel !== null ? parseFloat(formData.reorderLevel) : null,
                 supplierId: formData.supplierId || null
             };
+            if (!initialData) {
+                clearFormDraft(MATERIAL_DRAFT_KEY);
+                setHasRestoredDraft(false);
+            }
             onSave(payload);
         }
     };
@@ -110,6 +160,9 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                 </div>
 
                 <form onSubmit={handleSubmit} className="modal-body">
+                    {hasRestoredDraft && !initialData && (
+                        <DraftBanner onDiscard={handleDiscardDraft} />
+                    )}
                     <div className="form-section">
                         <div className="form-grid">
                             <div className="form-group">

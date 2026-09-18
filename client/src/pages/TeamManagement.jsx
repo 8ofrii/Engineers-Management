@@ -9,6 +9,7 @@ import { userAPI, rolesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import CustomAlert from '../components/CustomAlert';
+import MultiPhoneInput from '../components/MultiPhoneInput';
 import '../components/Modal.css';
 
 export default function TeamManagement() {
@@ -26,7 +27,7 @@ export default function TeamManagement() {
     const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
     const [selectedUser, setSelectedUser] = useState(null);
     const [formData, setFormData] = useState({
-        name: '', email: '', roleId: '', role: 'ENGINEER', password: '', phone: '', permissions: {}
+        name: '', email: '', roleId: '', role: 'ENGINEER', password: '', phone: '', phones: [''], permissions: {}
     });
     const [showPassword, setShowPassword] = useState(false);
 
@@ -192,12 +193,16 @@ export default function TeamManagement() {
         setModalMode(mode);
         setSelectedUser(user);
         if (mode === 'edit' && user) {
+            const userPhones = Array.isArray(user.phones) && user.phones.length > 0
+                ? user.phones
+                : (user.phone ? [user.phone] : ['']);
             setFormData({
                 name: user.name || '',
                 email: user.email || '',
                 role: user.role || 'ENGINEER',
                 roleId: user.roleId || '',
-                phone: user.phone || '',
+                phone: user.phone || userPhones[0] || '',
+                phones: userPhones,
                 password: '',
                 permissions: user.permissions || ROLE_DEFAULTS[user.role] || ROLE_DEFAULTS['ENGINEER']
             });
@@ -209,6 +214,7 @@ export default function TeamManagement() {
                 roleId: '',
                 password: '',
                 phone: '',
+                phones: [''],
                 permissions: ROLE_DEFAULTS['ENGINEER']
             });
         }
@@ -261,7 +267,12 @@ export default function TeamManagement() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const submitData = { ...formData };
+            const cleanPhones = (formData.phones || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            const submitData = {
+                ...formData,
+                phone: cleanPhones[0] || formData.phone?.trim() || undefined,
+                phones: cleanPhones
+            };
             submitData.permissions = flattenPermissions(submitData.permissions);
 
             if (!submitData.roleId) {
@@ -557,16 +568,26 @@ export default function TeamManagement() {
                                                             <Mail size={14} style={{ color: 'var(--text-tertiary)' }} />
                                                             <span>{user.email}</span>
                                                         </div>
-                                                        {user.phone ? (
-                                                            <div className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                                                                <Phone size={14} style={{ color: 'var(--text-tertiary)' }} />
-                                                                <span>{user.phone}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                                                                {isPending ? (isRTL ? 'سيتم إدخاله عند الانضمام' : 'Provided on joining') : '—'}
-                                                            </span>
-                                                        )}
+                                                        {(() => {
+                                                            const userPhones = (Array.isArray(user.phones) && user.phones.length > 0 ? user.phones : (user.phone ? [user.phone] : [])).filter(Boolean);
+                                                            if (userPhones.length > 0) {
+                                                                return (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                                        {userPhones.map((p, pIdx) => (
+                                                                            <div key={pIdx} className="flex gap-sm" style={{ alignItems: 'center', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                                                                <Phone size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                                                                                <a href={`tel:${p}`} style={{ color: 'inherit', textDecoration: 'none' }}>{p}</a>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                                                                    {isPending ? (isRTL ? 'سيتم إدخاله عند الانضمام' : 'Provided on joining') : '—'}
+                                                                </span>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </td>
 
@@ -735,14 +756,11 @@ export default function TeamManagement() {
 
                                         {/* Phone (Only when editing an active member) */}
                                         {modalMode === 'edit' && (
-                                            <div className="form-group">
-                                                <label style={{ fontWeight: 700 }}>{isRTL ? 'رقم الهاتف' : 'Phone Number'}</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.phone}
-                                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                                    placeholder="01012345678"
-                                                    style={{ direction: 'ltr' }}
+                                            <div className="form-group full-width">
+                                                <MultiPhoneInput
+                                                    phones={formData.phones || (formData.phone ? [formData.phone] : [''])}
+                                                    onChange={(newPhones) => setFormData(prev => ({ ...prev, phones: newPhones, phone: newPhones[0] || '' }))}
+                                                    label={isRTL ? 'أرقام الهاتف' : 'Phone Numbers'}
                                                 />
                                             </div>
                                         )}

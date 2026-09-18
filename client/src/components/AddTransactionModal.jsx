@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Wallet, Plus } from 'lucide-react';
-import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI } from '../services/api';
+import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText } from 'lucide-react';
+import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI, documentsAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
 import AddWorkmanModal from './AddWorkmanModal';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
+import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
+import DraftBanner from './DraftBanner';
+
+const TRANSACTION_DRAFT_KEY = 'hesaby_draft_transaction';
 
 export default function AddTransactionModal({ isOpen, onClose, onSubmit, initialData = null, user }) {
     const { t, i18n } = useTranslation();
@@ -73,6 +77,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [existingTransactionFroms, setExistingTransactionFroms] = useState([]);
     const [existingTransactionTos, setExistingTransactionTos] = useState([]);
     const [existingPhysicalAccounts, setExistingPhysicalAccounts] = useState([]);
+    const [existingItemNames, setExistingItemNames] = useState([]);
 
     const [customInputs, setCustomInputs] = useState({
         costCenter: false,
@@ -80,6 +85,12 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         transactionFrom: false,
         physicalAccount: false
     });
+
+    // Attachment / Proof for Bank Transfer & Check
+    const [attachmentFile, setAttachmentFile] = useState(null);
+    const [attachmentPreview, setAttachmentPreview] = useState(null);
+    const [existingReceiptUrl, setExistingReceiptUrl] = useState(null);
+    const [isDragging, setIsDragging] = useState(false);
 
 
     // Core State
@@ -126,6 +137,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [costItemMode, setCostItemMode] = useState('NEW'); // NEW | EXISTING
 
     const [errors, setErrors] = useState({});
+    const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
     // Switch tabs (Expense / Income / Usage / Transfer) AND wipe per-tab
     // form state so the next tab opens clean. Without this, fields filled
@@ -165,6 +177,42 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     // Dynamic Creation State
     const [isWorkmanModalOpen, setIsWorkmanModalOpen] = useState(false);
 
+    const handleDiscardDraft = () => {
+        clearFormDraft(TRANSACTION_DRAFT_KEY);
+        setHasRestoredDraft(false);
+        setMode('EXPENSE');
+        setSelectedProjectId('');
+        setSelectedProject(null);
+        setIsStockPurchase(false);
+        setMaterialBatches([]);
+        setSelectedBatchId('');
+        setSelectedBatch(null);
+        setCostItemMode('NEW');
+        setFormData({
+            amount: '',
+            description: '',
+            transactionDate: getLocalDateTime(),
+            category: '',
+            itemName: '',
+            unit: 'TON',
+            invoiceNumber: '',
+            transactionFrom: '',
+            transactionTo: '',
+            paymentMethod: 'CUSTODY_WALLET',
+            unitPrice: '',
+            quantity: '',
+            costCenter: '',
+            physicalAccount: '',
+            payerUserId: user?.id || '',
+            projectCostItemId: '',
+            workmanId: '',
+            clientId: '',
+            paidByClientContact: '',
+            toEngineerId: ''
+        });
+        setErrors({});
+    };
+
     // Initial Load & Edit Mode Setup
     useEffect(() => {
         if (isOpen) {
@@ -177,6 +225,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             loadMaterials();
             loadCostCenters();
             if (initialData) {
+                setHasRestoredDraft(false);
                 // Populate for Editing
                 setMode(initialData.type || 'EXPENSE');
                 // Handle nested project object (Prisma default) or flat ID
@@ -227,9 +276,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     category: initialData.category || '',
                     itemName: parsedDesc, // Use description as itemName for stock mode too
                     unit: parsedUnit,
+                    clientId: initialData.clientId || initialData.client?.id || '',
+                    paidByClientContact: initialData.paidByClientContact || '',
                     transactionFrom: initialData.transactionFrom || '',
                     transactionTo: initialData.transactionTo || '',
-                    paymentMethod: initialData.paymentMethod || 'CUSTODY_WALLET',
+                    paymentMethod: initialData.paymentMethod || (initialData.type === 'INCOME' ? 'BANK_TRANSFER' : 'CUSTODY_WALLET'),
                     unitPrice: parsedPrice,
                     quantity: parsedQty,
                     costCenter: initialData.costCenter || '',
@@ -241,38 +292,108 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 });
 
             } else {
-                // Reset for Create
-                setMode('EXPENSE');
-                setSelectedProjectId('');
-                setSelectedProject(null);
-                setIsStockPurchase(false);
-                setMaterialBatches([]);
-                setSelectedBatchId('');
-                setSelectedBatch(null);
-                setFormData({
-                    amount: '',
-                    description: '',
-                    transactionDate: getLocalDateTime(),
-                    category: '',
-                    itemName: '',
-                    unit: 'TON',
-                    invoiceNumber: '',
-                    transactionFrom: '',
-                    transactionTo: '',
-                    paymentMethod: 'CUSTODY_WALLET',
-                    unitPrice: '',
-                    quantity: '',
-                    costCenter: '',
-                    physicalAccount: '',
-                    payerUserId: user?.id || '',
-                    projectCostItemId: '',
-                    toEngineerId: ''
-                });
-                setCostItemMode('NEW');
+                // Check if there is a saved draft in localStorage
+                const savedDraft = getFormDraft(TRANSACTION_DRAFT_KEY);
+                if (savedDraft && typeof savedDraft === 'object') {
+                    if (savedDraft.mode) setMode(savedDraft.mode);
+                    if (savedDraft.selectedProjectId) {
+                        setSelectedProjectId(savedDraft.selectedProjectId);
+                        loadCostItems(savedDraft.selectedProjectId);
+                    }
+                    if (savedDraft.costItemMode) setCostItemMode(savedDraft.costItemMode);
+                    if (savedDraft.isStockPurchase !== undefined) setIsStockPurchase(savedDraft.isStockPurchase);
+                    if (savedDraft.selectedBatchId) setSelectedBatchId(savedDraft.selectedBatchId);
+
+                    setFormData({
+                        amount: savedDraft.formData?.amount || '',
+                        description: savedDraft.formData?.description || '',
+                        transactionDate: savedDraft.formData?.transactionDate || getLocalDateTime(),
+                        category: savedDraft.formData?.category || '',
+                        itemName: savedDraft.formData?.itemName || '',
+                        unit: savedDraft.formData?.unit || 'TON',
+                        invoiceNumber: savedDraft.formData?.invoiceNumber || '',
+                        transactionFrom: savedDraft.formData?.transactionFrom || '',
+                        transactionTo: savedDraft.formData?.transactionTo || '',
+                        paymentMethod: savedDraft.formData?.paymentMethod || 'CUSTODY_WALLET',
+                        unitPrice: savedDraft.formData?.unitPrice || '',
+                        quantity: savedDraft.formData?.quantity || '',
+                        costCenter: savedDraft.formData?.costCenter || '',
+                        physicalAccount: savedDraft.formData?.physicalAccount || '',
+                        payerUserId: savedDraft.formData?.payerUserId || user?.id || '',
+                        projectCostItemId: savedDraft.formData?.projectCostItemId || '',
+                        workmanId: savedDraft.formData?.workmanId || '',
+                        clientId: savedDraft.formData?.clientId || '',
+                        paidByClientContact: savedDraft.formData?.paidByClientContact || '',
+                        toEngineerId: savedDraft.formData?.toEngineerId || ''
+                    });
+                    setHasRestoredDraft(true);
+                } else {
+                    // Reset for Create
+                    setHasRestoredDraft(false);
+                    setMode('EXPENSE');
+                    setSelectedProjectId('');
+                    setSelectedProject(null);
+                    setIsStockPurchase(false);
+                    setMaterialBatches([]);
+                    setSelectedBatchId('');
+                    setSelectedBatch(null);
+                    setFormData({
+                        amount: '',
+                        description: '',
+                        transactionDate: getLocalDateTime(),
+                        category: '',
+                        itemName: '',
+                        unit: 'TON',
+                        invoiceNumber: '',
+                        transactionFrom: '',
+                        transactionTo: '',
+                        paymentMethod: 'CUSTODY_WALLET',
+                        unitPrice: '',
+                        quantity: '',
+                        costCenter: '',
+                        physicalAccount: '',
+                        payerUserId: user?.id || '',
+                        projectCostItemId: '',
+                        workmanId: '',
+                        clientId: '',
+                        paidByClientContact: '',
+                        toEngineerId: ''
+                    });
+                    setCostItemMode('NEW');
+                }
             }
             setErrors({});
         }
     }, [isOpen, initialData]);
+
+    // Auto-save form draft to localStorage whenever fields change in create mode
+    useEffect(() => {
+        if (!isOpen || initialData) return;
+        const hasContent = formData.amount ||
+            formData.description ||
+            formData.itemName ||
+            formData.invoiceNumber ||
+            formData.transactionFrom ||
+            formData.transactionTo ||
+            formData.costCenter ||
+            formData.physicalAccount ||
+            formData.workmanId ||
+            formData.clientId ||
+            formData.paidByClientContact ||
+            formData.toEngineerId ||
+            selectedProjectId;
+
+        if (hasContent) {
+            saveFormDraft(TRANSACTION_DRAFT_KEY, {
+                mode,
+                selectedProjectId,
+                costItemMode,
+                isStockPurchase,
+                selectedBatchId,
+                formData
+            });
+        }
+    }, [formData, selectedProjectId, mode, costItemMode, isStockPurchase, selectedBatchId, isOpen, initialData]);
 
     // Load Batches in USAGE mode or on open
     useEffect(() => {
@@ -384,6 +505,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 setExistingTransactionFroms(res.data.data.transactionFroms || []);
                 setExistingTransactionTos(res.data.data.transactionTos || []);
                 setExistingPhysicalAccounts(res.data.data.physicalAccounts || []);
+                setExistingItemNames(res.data.data.itemNames || []);
             }
         } catch (e) { console.error("Failed to load options", e); }
     };
@@ -393,6 +515,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         setSelectedProjectId(pId);
         const proj = projects.find(p => p.id === pId);
         setSelectedProject(proj || null);
+        if (proj?.client) {
+            setFormData(prev => ({
+                ...prev,
+                clientId: proj.client.id,
+                transactionFrom: prev.transactionFrom || proj.client.name
+            }));
+        }
         if (pId) {
             loadCostItems(pId);
         } else {
@@ -477,7 +606,6 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 if (!formData.projectCostItemId) newErrors.projectCostItemId = t('common.required');
             } else {
                 if (!formData.category) newErrors.category = t('common.required');
-                if (!formData.itemName) newErrors.itemName = t('common.required');
             }
         }
         else if (mode === 'INCOME') {
@@ -514,7 +642,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 const resolvedCategory = isMaterial ? 'MATERIALS' : (formData.category || 'MATERIALS');
                 const resolvedItemName = isMaterial
                     ? (formData.itemName || (chosenMaterial ? (isRTL ? (chosenMaterial.nameAr || chosenMaterial.name) : chosenMaterial.name) : 'خامة مخزنية'))
-                    : (costItemMode === 'NEW' ? formData.itemName : undefined);
+                    : undefined;
 
                 payload = {
                     type: 'EXPENSE',
@@ -539,19 +667,23 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 };
             }
             else if (mode === 'INCOME') {
+                const resolvedClientId = formData.clientId || selectedProject?.client?.id || undefined;
+                const chosenClient = clients.find(c => c.id === resolvedClientId);
+                const clientName = chosenClient?.name || selectedProject?.client?.name || formData.transactionFrom || undefined;
+
                 payload = {
                     type: 'INCOME',
                     category: 'PAYMENT',
                     amount: Number(formData.amount),
                     projectId: selectedProjectId,
                     projectCostItemId: formData.projectCostItemId || undefined,
-                    payerUserId: formData.payerUserId || user?.id,
                     description: formData.description?.trim() || t('finance.categories.payment') || 'Client Payment',
                     transactionDate: formData.transactionDate,
-                    clientId: selectedProject?.client?.id,
-                    paymentMethod: formData.paymentMethod,
+                    clientId: resolvedClientId,
+                    paidByClientContact: formData.paidByClientContact?.trim() || undefined,
+                    paymentMethod: formData.paymentMethod || 'BANK_TRANSFER',
                     physicalAccount: formData.physicalAccount || undefined,
-                    transactionFrom: formData.transactionFrom || undefined,
+                    transactionFrom: clientName,
                     costCenter: formData.costCenter || undefined,
                     invoiceNumber: formData.invoiceNumber
                 };
@@ -575,22 +707,39 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 };
             }
 
+            let resTx = null;
             if (initialData && initialData.id && mode !== 'USAGE' && mode !== 'TRANSFER') {
                 // UPDATE MODE
-                await transactionsAPI.update(initialData.id, payload);
+                resTx = await transactionsAPI.update(initialData.id, payload);
             } else {
                 // CREATE MODE
                 if (mode === 'USAGE') {
-                    await materialUsageAPI.recordUsageV2(payload);
+                    resTx = await materialUsageAPI.recordUsageV2(payload);
                 } else if (mode === 'TRANSFER') {
-                    await transactionsAPI.transferCustody(payload);
+                    resTx = await transactionsAPI.transferCustody(payload);
                 } else {
                     // Both Income and Expense use V2 logic for profit splitting
-                    await transactionsAPI.createV2(payload);
+                    resTx = await transactionsAPI.createV2(payload);
+                }
+            }
+
+            // Upload attachment (receipt / check copy / transfer proof) if provided
+            const targetTxId = initialData?.id || resTx?.data?.data?.id || resTx?.data?.id;
+            if (targetTxId && attachmentFile) {
+                try {
+                    const fd = new FormData();
+                    fd.append('file', attachmentFile);
+                    await documentsAPI.uploadReceipt(targetTxId, fd);
+                } catch (uploadErr) {
+                    console.error("Attachment upload failed", uploadErr);
                 }
             }
 
             if (onSubmit) onSubmit();
+            if (!initialData) {
+                clearFormDraft(TRANSACTION_DRAFT_KEY);
+                setHasRestoredDraft(false);
+            }
             onClose();
         } catch (error) {
             console.error("Submission Failed", error);
@@ -600,35 +749,36 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         }
     };
 
-    const calculateSplit = () => {
-        if (!formData.amount || !selectedProject || selectedProject.revenueModel !== 'EXECUTION_COST_PLUS') return null;
-        const total = Number(formData.amount);
-        const feePercent = Number(selectedProject.managementFeePercent) || 0;
-        const officeProfit = (total * feePercent) / 100;
-        const opsFund = total - officeProfit;
-        return { opsFund, officeProfit, feePercent };
-    };
-
-    const renderDropdownWithCustom = (name, label, options, placeholder) => {
-        const isCustom = customInputs[name];
+    const renderDropdownWithCustom = (name, label, options, placeholder, required = false, onSelect = null, error = null, containerStyle = {}) => {
+        const hasValueNotInOptions = !!(formData[name] && !options.some(opt => opt.value === formData[name]));
+        const isCustom = customInputs[name] || hasValueNotInOptions;
 
         const handleSelectChange = (e) => {
-            if (e.target.value === '__NEW__') {
+            const val = e.target.value;
+            if (val === '__NEW__') {
                 setCustomInputs(prev => ({ ...prev, [name]: true }));
                 setFormData(prev => ({ ...prev, [name]: '' }));
+                if (onSelect) onSelect('__NEW__', null);
             } else {
                 handleChange(e);
+                if (onSelect) {
+                    const foundOpt = options.find(o => o.value === val);
+                    onSelect(val, foundOpt);
+                }
             }
         };
 
         const handleCancelCustom = () => {
             setCustomInputs(prev => ({ ...prev, [name]: false }));
             setFormData(prev => ({ ...prev, [name]: '' }));
+            if (onSelect) onSelect('', null);
         };
 
         return (
-            <div className="form-group">
-                <label>{label}</label>
+            <div className="form-group" style={containerStyle}>
+                <label>
+                    {label} {required && <span className="required">*</span>}
+                </label>
                 {isCustom ? (
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <input
@@ -636,28 +786,205 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             value={formData[name]}
                             onChange={handleChange}
                             placeholder={placeholder}
+                            className={error ? 'error' : ''}
                             style={{ flex: 1 }}
                         />
-                        <button type="button" onClick={handleCancelCustom} className="btn-icon" style={{ padding: '0 8px', color: '#ef4444', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                        <button
+                            type="button"
+                            onClick={handleCancelCustom}
+                            className="btn-icon"
+                            title={t('common.cancel') || 'Cancel'}
+                            style={{ padding: '0 8px', color: '#ef4444', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', border: '1px solid var(--border-color)' }}
+                        >
                             <X size={18} />
                         </button>
                     </div>
                 ) : (
-                    <select name={name} value={formData[name]} onChange={handleSelectChange}>
+                    <select
+                        name={name}
+                        value={formData[name]}
+                        onChange={handleSelectChange}
+                        className={error ? 'error' : ''}
+                    >
                         <option value="">-- {t('common.select') || 'Select'} --</option>
                         {options.map((opt, i) => (
                             <option key={`${name}-${i}`} value={opt.value}>
                                 {opt.label}
                             </option>
                         ))}
-                        <option value="__NEW__" style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>+ {t('common.add_new') || 'Add New'}</option>
+                        <option value="__NEW__" style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                            + {t('common.add_new') || (isRTL ? 'إضافة جديد...' : 'Add New...')}
+                        </option>
                     </select>
                 )}
+                {error && <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>{error}</span>}
             </div>
         );
     };
 
-    const incomeSplit = calculateSplit();
+    const renderAttachmentUploader = () => {
+        if (!['BANK_TRANSFER', 'CHECK'].includes(formData.paymentMethod)) {
+            return null;
+        }
+
+        const isCheck = formData.paymentMethod === 'CHECK';
+        const title = isCheck
+            ? (isRTL ? 'صورة الشيك / المرفق' : 'Check Attachment / Photo')
+            : (isRTL ? 'إيصال التحويل البنكي / إنستاباي' : 'Bank Transaction / InstaPay Receipt');
+        const subtitle = isRTL
+            ? 'اضغط هنا أو اسحب الملف لرفع صورة الإيصال أو الشيك (JPG, PNG, PDF)'
+            : 'Click or drag & drop receipt / check copy (JPG, PNG, PDF)';
+
+        const handleFileChange = (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setAttachmentFile(file);
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => setAttachmentPreview(ev.target.result);
+                reader.readAsDataURL(file);
+            } else {
+                setAttachmentPreview(null);
+            }
+        };
+
+        const handleDrop = (e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const file = e.dataTransfer?.files?.[0];
+            if (!file) return;
+            setAttachmentFile(file);
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => setAttachmentPreview(ev.target.result);
+                reader.readAsDataURL(file);
+            } else {
+                setAttachmentPreview(null);
+            }
+        };
+
+        const handleRemove = () => {
+            setAttachmentFile(null);
+            setAttachmentPreview(null);
+            setExistingReceiptUrl(null);
+        };
+
+        return (
+            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                    <Paperclip size={16} style={{ color: 'var(--color-primary)' }} />
+                    {title}
+                </label>
+
+                {attachmentFile || existingReceiptUrl ? (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        gap: '12px'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
+                            {attachmentPreview || existingReceiptUrl ? (
+                                <img
+                                    src={attachmentPreview || existingReceiptUrl}
+                                    alt="Receipt preview"
+                                    style={{
+                                        width: '48px',
+                                        height: '48px',
+                                        objectFit: 'cover',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color)',
+                                        flexShrink: 0
+                                    }}
+                                />
+                            ) : (
+                                <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '6px',
+                                    background: 'var(--bg-tertiary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <FileText size={22} style={{ color: 'var(--color-primary)' }} />
+                                </div>
+                            )}
+                            <div style={{ overflow: 'hidden' }}>
+                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                    {attachmentFile?.name || (isRTL ? 'المرفق المرفوع مسبقاً' : 'Attached Receipt')}
+                                </p>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                    {attachmentFile ? `${(attachmentFile.size / 1024).toFixed(1)} KB` : (isRTL ? 'اضغط تغيير لرفع ملف جديد' : 'Click replace to upload new')}
+                                </span>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                            <label
+                                className="btn btn-sm btn-ghost"
+                                style={{ cursor: 'pointer', margin: 0, padding: '5px 10px', fontSize: '0.8rem' }}
+                            >
+                                {isRTL ? 'تغيير' : 'Change'}
+                                <input
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    onChange={handleFileChange}
+                                    style={{ display: 'none' }}
+                                />
+                            </label>
+                            <button
+                                type="button"
+                                onClick={handleRemove}
+                                className="btn-icon"
+                                title={isRTL ? 'حذف' : 'Remove'}
+                                style={{ padding: '6px', color: '#ef4444', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <label
+                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={handleDrop}
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '16px 14px',
+                            borderRadius: '8px',
+                            border: isDragging ? '2px dashed var(--color-primary)' : '2px dashed var(--border-color)',
+                            background: isDragging ? 'hsla(220, 80%, 50%, 0.05)' : 'var(--bg-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            textAlign: 'center'
+                        }}
+                    >
+                        <Upload size={24} style={{ color: isDragging ? 'var(--color-primary)' : 'var(--text-secondary)', marginBottom: '6px' }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                            {title}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            {subtitle}
+                        </span>
+                        <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            onChange={handleFileChange}
+                            style={{ display: 'none' }}
+                        />
+                    </label>
+                )}
+            </div>
+        );
+    };
 
     if (!isOpen) return null;
 
@@ -737,6 +1064,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 </div>
 
                 <form onSubmit={handleSubmit} className="modal-body">
+                    {hasRestoredDraft && !initialData && (
+                        <DraftBanner onDiscard={handleDiscardDraft} />
+                    )}
                     <div style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr auto',
@@ -813,10 +1143,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             />
                         </div>
 
-                        {/* Transaction Payer - Inside primary card as per user image */}
-                        {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'PROJECT_MANAGER') && (mode === 'EXPENSE' || mode === 'INCOME') && (
+                        {/* Transaction Payer - Inside primary card for expenses */}
+                        {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'PROJECT_MANAGER') && (mode === 'EXPENSE') && (
                             <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0, marginTop: 'var(--spacing-sm)' }}>
-                                <label style={{ fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>{t('finance.paidBy') || 'مين اللي دفع؟'}</label>
+                                <label style={{ fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>{t('finance.paidBy') || 'مين اللي دفع من الشركة؟'}</label>
                                 <select
                                     name="payerUserId"
                                     value={formData.payerUserId}
@@ -971,40 +1301,29 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             </>
                                         )}
 
-                                        {/* Option 3: Category & Item Name (If New Item) */}
+                                        {/* Option 3: Category (If Direct Category Expense) */}
                                         {costItemMode === 'NEW' && (
-                                            <>
-                                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                                    <label>{t('finance.category')} <span className="required">*</span></label>
-                                                    <select
-                                                        name="category"
-                                                        value={formData.category}
-                                                        onChange={handleChange}
-                                                        className={errors.category ? 'error' : ''}
-                                                    >
-                                                        <option value="">-- {t('finance.selectCategory')} --</option>
-                                                        {categories.map(group => (
-                                                            <optgroup key={group.group} label={isRTL ? group.groupNameAr : (group.groupNameEn || group.groupNameAr)}>
-                                                                {group.items.map(item => (
-                                                                    <option key={item.key} value={item.key}>
-                                                                        {isRTL ? item.ar : (item.en || item.ar)}
-                                                                    </option>
-                                                                ))}
-                                                            </optgroup>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                                    <label>{t('finance.itemName')} ({t('finance.newCostItem')}) <span className="required">*</span></label>
-                                                    <input
-                                                        name="itemName"
-                                                        value={formData.itemName}
-                                                        onChange={handleChange}
-                                                        placeholder={t('finance.itemNamePlaceholder')}
-                                                        className={errors.itemName ? 'error' : ''}
-                                                    />
-                                                </div>
-                                            </>
+                                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                                <label>{t('finance.category')} <span className="required">*</span></label>
+                                                <select
+                                                    name="category"
+                                                    value={formData.category}
+                                                    onChange={handleChange}
+                                                    className={errors.category ? 'error' : ''}
+                                                >
+                                                    <option value="">-- {t('finance.selectCategory')} --</option>
+                                                    {categories.map(group => (
+                                                        <optgroup key={group.group} label={isRTL ? group.groupNameAr : (group.groupNameEn || group.groupNameAr)}>
+                                                            {group.items.map(item => (
+                                                                <option key={item.key} value={item.key}>
+                                                                    {isRTL ? item.ar : (item.en || item.ar)}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    ))}
+                                                </select>
+                                                {errors.category && <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>{errors.category}</span>}
+                                            </div>
                                         )}
 
                                         {renderDropdownWithCustom(
@@ -1025,30 +1344,23 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             </select>
                                         </div>
 
-                                        <div className="form-group">
-                                            <label>{t('finance.transactionTo')}</label>
-                                            <select
-                                                name="transactionTo"
-                                                value={formData.transactionTo}
-                                                onChange={handleChange}
-                                            >
-                                                <option value="">-- {t('common.select') || 'Select'} --</option>
-                                                {[
-                                                    ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
-                                                    ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
-                                                    ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
-                                                    ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
-                                                    ...existingTransactionTos.map(tt => ({ value: tt, label: tt }))
-                                                ].reduce((acc, current) => {
-                                                    const x = acc.find(item => item.value === current.value);
-                                                    if (!x) { return acc.concat([current]); } else { return acc; }
-                                                }, []).map((opt, i) => (
-                                                    <option key={`txTo-${i}`} value={opt.value}>
-                                                        {opt.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                        {renderDropdownWithCustom(
+                                            "transactionTo",
+                                            t('finance.transactionTo'),
+                                            [
+                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
+                                                ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
+                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
+                                                ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+                                                ...existingTransactionTos.map(tt => ({ value: tt, label: tt }))
+                                            ].reduce((acc, current) => {
+                                                const x = acc.find(item => item.value === current.value);
+                                                if (!x) { return acc.concat([current]); } else { return acc; }
+                                            }, []),
+                                            isRTL ? "أدخل اسم المستلم / العامل / الفني..." : "e.g. Worker name, Assistant, Vendor staff..."
+                                        )}
+
+                                        {renderAttachmentUploader()}
 
                                         {/* Workman Selection (Only for Labor Categories) */}
                                         {(() => {
@@ -1153,34 +1465,67 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             <>
                                 <div className="form-section">
                                     <div className="form-grid">
-                                        {renderDropdownWithCustom(
-                                            "transactionFrom",
-                                            t('finance.transactionFrom'),
-                                            [
-                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
-                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
-                                                ...existingTransactionFroms.map(tf => ({ value: tf, label: tf }))
-                                            ].reduce((acc, current) => {
-                                                const x = acc.find(item => item.value === current.value);
-                                                if (!x) { return acc.concat([current]); } else { return acc; }
-                                            }, []),
-                                            t('finance.clientName')
-                                        )}
                                         <div className="form-group">
-                                            <label>{t('finance.paymentMethod')}</label>
-                                            <select name="paymentMethod" value={formData.paymentMethod} onChange={handleChange}>
-                                                <option value="CASH">{t('finance.methods.cash')}</option>
-                                                <option value="CHECK">{t('finance.methods.check')}</option>
-                                                <option value="BANK_TRANSFER">{t('finance.methods.bankTransfer')}</option>
-                                                <option value="CREDIT_CARD">{t('finance.methods.creditCard')}</option>
+                                            <label style={{ fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
+                                                {t('clients.title', 'الجهة الدافعة (العميل)')} <span className="required">*</span>
+                                            </label>
+                                            <select
+                                                name="clientId"
+                                                value={formData.clientId || selectedProject?.client?.id || ''}
+                                                onChange={(e) => {
+                                                    const cId = e.target.value;
+                                                    const chosen = clients.find(c => c.id === cId);
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        clientId: cId,
+                                                        transactionFrom: chosen ? chosen.name : prev.transactionFrom
+                                                    }));
+                                                }}
+                                                style={{ fontSize: '0.95rem', padding: '10px', width: '100%' }}
+                                            >
+                                                <option value="">-- {t('clients.selectClient', 'اختر العميل')} --</option>
+                                                {clients.map(c => (
+                                                    <option key={c.id} value={c.id}>
+                                                        {c.name} {c.company ? `(${c.company})` : ''}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
+
+                                        <div className="form-group">
+                                            <label style={{ fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
+                                                {isRTL ? 'اسم القائم بالدفع من طرف العميل / المفوض' : 'Who Paid (Client Representative)'}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="paidByClientContact"
+                                                value={formData.paidByClientContact || ''}
+                                                onChange={handleChange}
+                                                placeholder={isRTL ? 'مثال: م/ يوسف للشيخ أو المحاسب أحمد' : 'e.g. Eng. Youssef / Rep'}
+                                                style={{ fontSize: '0.95rem', padding: '10px', width: '100%' }}
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label style={{ fontSize: '0.85rem', marginBottom: '4px', fontWeight: 'bold' }}>
+                                                {t('finance.paymentMethod', 'طريقة الدفع')}
+                                            </label>
+                                            <select name="paymentMethod" value={formData.paymentMethod} onChange={handleChange} style={{ fontSize: '0.95rem', padding: '10px', width: '100%' }}>
+                                                <option value="BANK_TRANSFER">{t('finance.methods.bankTransfer', isRTL ? 'تحويل بنكي / إنستاباي' : 'Bank Transaction / InstaPay')}</option>
+                                                <option value="CASH">{t('finance.methods.cash', 'نقداً (كاش)')}</option>
+                                                <option value="CHECK">{t('finance.methods.check', 'شيك')}</option>
+                                                <option value="CREDIT_CARD">{t('finance.methods.creditCard', 'بطاقة ائتمان')}</option>
+                                            </select>
+                                        </div>
+
                                         {renderDropdownWithCustom(
                                             "physicalAccount",
                                             `${t('finance.physicalAccount')} (Safe)`,
                                             existingPhysicalAccounts.map(pa => ({ value: pa, label: pa })),
                                             "e.g. Main Safe"
                                         )}
+
+                                        {renderAttachmentUploader()}
                                     </div>
                                 </div>
 
@@ -1198,15 +1543,26 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         {errors.amount && <span className="error-message">{errors.amount}</span>}
                                     </div>
 
-                                    {incomeSplit && (
-                                        <div className="splitter-container mb-md" style={{ marginTop: '16px' }}>
-                                            <div style={{ display: 'flex', height: '32px', borderRadius: '8px', overflow: 'hidden', fontSize: '12px', color: 'white', fontWeight: 'bold' }}>
-                                                <div style={{ width: `${100 - incomeSplit.feePercent}%`, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    {t('finance.ops')}: {incomeSplit.opsFund.toFixed(0)}
-                                                </div>
-                                                <div style={{ width: `${incomeSplit.feePercent}%`, background: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                    {t('dashboard.profit')}: {incomeSplit.officeProfit.toFixed(0)}
-                                                </div>
+                                    {selectedProject && selectedProject.revenueModel === 'EXECUTION_COST_PLUS' && (
+                                        <div style={{
+                                            marginTop: '16px',
+                                            padding: '14px 18px',
+                                            background: 'rgba(59, 130, 246, 0.08)',
+                                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                                            borderRadius: '10px',
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: '12px'
+                                        }}>
+                                            <div style={{ fontSize: '1.3rem', marginTop: '1px' }}>💡</div>
+                                            <div style={{ fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
+                                                <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '3px' }}>
+                                                    {isRTL ? 'إيداع كامل في خزينة المشروع التشغيلية (100%)' : '100% Credited to Project Safe'}
+                                                </strong>
+                                                {isRTL
+                                                    ? `كامل مبلغ الإيداع المستلم يُضاف إلى رصيد خزينة/عهدة المشروع لتغطية بنود وتكاليف التنفيذ. وتُحسب نسبة أتعاب الإدارة والإشراف (${selectedProject.managementFeePercent || 15}%) آلياً من المصروفات الفعلية المنفذة في المشروع.`
+                                                    : `100% of this payment will be credited to the project operational safe. The management fee (${selectedProject.managementFeePercent || 15}%) is automatically calculated and transferred upon actual project expenditures.`
+                                                }
                                             </div>
                                         </div>
                                     )}

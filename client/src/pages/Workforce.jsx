@@ -158,6 +158,7 @@ export default function Workforce() {
         'CARPENTER': { bg: '#2E7D32', text: 'white', border: '#2E7D32' }, // Green 800
         'GYPSUM': { bg: '#7B1FA2', text: 'white', border: '#7B1FA2' }, // Purple 700
         'ALUMINUM': { bg: '#546E7A', text: 'white', border: '#546E7A' }, // Blue Grey 600
+        'BLACKSMITH': { bg: '#37474F', text: 'white', border: '#37474F' }, // Charcoal / Steel
         'WELDER': { bg: '#F57C00', text: 'white', border: '#F57C00' }, // Orange 700
         'LABORER': { bg: '#795548', text: 'white', border: '#795548' }, // Brown 500
         'FOREMAN': { bg: '#303F9F', text: 'white', border: '#303F9F' }, // Indigo 700
@@ -444,12 +445,40 @@ export default function Workforce() {
                                 <div className="divider"></div>
 
                                 <div style={{ display: 'grid', gap: '8px', fontSize: '14px' }}>
-                                    {workman.phone && (
-                                        <div className="flex gap-sm" style={{ color: 'var(--text-secondary)' }}>
-                                            <Phone size={16} />
-                                            <span>{workman.phone}</span>
-                                        </div>
-                                    )}
+                                    {(() => {
+                                        const workmanPhones = Array.isArray(workman.phones) && workman.phones.length > 0
+                                            ? workman.phones.filter(Boolean)
+                                            : (workman.phone ? [workman.phone] : []);
+                                        if (workmanPhones.length === 0) return null;
+                                        return (
+                                            <div className="flex gap-sm" style={{ color: 'var(--text-secondary)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                                <Phone size={16} style={{ marginTop: '3px', flexShrink: 0 }} />
+                                                <div className="flex gap-xs" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                                                    {workmanPhones.map((p, idx) => (
+                                                        <a
+                                                            key={idx}
+                                                            href={`tel:${p}`}
+                                                            style={{
+                                                                direction: 'ltr',
+                                                                display: 'inline-block',
+                                                                color: 'inherit',
+                                                                textDecoration: 'none',
+                                                                background: 'var(--bg-secondary)',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '4px',
+                                                                fontSize: '12px',
+                                                                fontWeight: 500
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                                                        >
+                                                            {p}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                     {workman.nationalId && (
                                         <div className="flex gap-sm" style={{ color: 'var(--text-secondary)' }}>
                                             <CreditCard size={16} />

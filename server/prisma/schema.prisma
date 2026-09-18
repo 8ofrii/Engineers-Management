@@ -62,6 +62,7 @@ model User {
   role                  UserRole          @default(ENGINEER)
   company               String?
   phone                 String?
+  phones                String[]          @default([])
   isActive              Boolean           @default(true)
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
@@ -102,7 +103,7 @@ model User {
   bankStatements        BankStatement[]
 
   @@unique([email, tenantId])
-  @@unique([phone, tenantId])
+  @@index([phone, tenantId])
   @@map("users")
 }
 
@@ -132,8 +133,9 @@ model Role {
 model Client {
   id              String        @id @default(uuid())
   name            String
-  email           String
+  email           String?
   phone           String
+  phones          String[]      @default([])
   company         String?
   taxId           String?
   status          ClientStatus  @default(ACTIVE)
@@ -163,6 +165,7 @@ model Supplier {
   name         String
   email        String
   phone        String
+  phones       String[]         @default([])
   company      String?
   category     SupplierCategory @default(OTHER)
   customCategory String?
@@ -327,8 +330,9 @@ model Workman {
   nameAr           String?
   trade            WorkmanTrade
   customTrade      String?
-  dailyRate        Decimal           @db.Decimal(10, 2)
+  dailyRate        Decimal?          @db.Decimal(10, 2)
   phone            String?
+  phones           String[]          @default([])
   nationalId       String?
   nationalIdImage  String?           @db.Text
   isActive         Boolean           @default(true)
@@ -416,6 +420,7 @@ model Transaction {
   costCenter        String?
   transactionTo     String?
   transactionFrom   String?
+  paidByClientContact String?
   physicalAccount   String?
   draft             TransactionDraft?
   // Phase 6.3 — set when this transaction was matched to a bank-statement row
@@ -760,6 +765,7 @@ enum WorkmanTrade {
   FLOORING
   GYPSUM
   ALUMINUM
+  BLACKSMITH
 }
 
 enum WorkmanshipStatus {
@@ -815,6 +821,14 @@ enum TransactionCategory {
   INSULATION_LABOR
   HVAC_PREP
   ALUMETAL
+  BLACKSMITH_LABOR
+  CONTRACTING
+  CONTRACTING_CONCRETE
+  CONTRACTING_STOCKING
+  CONTRACTING_DEMOLITION
+  CONTRACTING_MARBLE
+  CONTRACTING_POOL
+  CONTRACTING_LANDSCAPE
 }
 
 enum PaymentMethod {

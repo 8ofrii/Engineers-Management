@@ -11,6 +11,7 @@ const baseSupplier = z.object({
     name: z.string().min(1).max(200),
     email: z.string().email().max(254).or(z.literal('')).optional(),
     phone: z.string().max(30).or(z.literal('')).optional(),
+    phones: z.array(z.string().max(30)).optional().default([]),
     company: z.string().max(200).optional().nullable(),
     category: SupplierCategory.optional(),
     taxId: z.string().max(50).optional().nullable(),

@@ -6,9 +6,11 @@ const WorkmanTrade = z.enum([
     'GYPSUM', 'ALUMINUM'
 ]);
 
-const decimalString = z.union([z.number(), z.string()])
-    .refine(v => v !== '' && !Number.isNaN(Number(v)), 'Must be a number')
-    .transform(v => Number(v));
+const optionalDecimal = z.union([z.number(), z.string()])
+    .refine(v => v === '' || v === null || v === undefined || !Number.isNaN(Number(v)), 'Must be a number')
+    .transform(v => (v === '' || v === null || v === undefined ? null : Number(v)))
+    .optional()
+    .nullable();
 
 // nationalIdImage may be a base64 data URL (large). Body parser caps at 20mb.
 const baseWorkman = z.object({
@@ -16,8 +18,9 @@ const baseWorkman = z.object({
     nameAr: z.string().max(200).optional().nullable(),
     trade: WorkmanTrade,
     customTrade: z.string().max(100).optional().nullable(),
-    dailyRate: decimalString,
-    phone: z.string().min(3).max(30).optional().nullable(),
+    dailyRate: optionalDecimal,
+    phone: z.string().max(30).optional().nullable(),
+    phones: z.array(z.string().max(30)).optional().default([]),
     nationalId: z.string().max(50).optional().nullable(),
     nationalIdImage: z.string().optional().nullable()
 });

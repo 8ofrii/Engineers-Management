@@ -2,11 +2,17 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
+import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
+import DraftBanner from './DraftBanner';
+import MultiPhoneInput from './MultiPhoneInput';
 import './Modal.css';
+
+const SUPPLIER_DRAFT_KEY = 'hesaby_draft_supplier';
 
 export default function AddSupplierModal({ isOpen, onClose, onSave, initialData = null }) {
     const { t } = useTranslation();
     const { showAlert } = useAlert();
+    const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         category: 'OTHER',
@@ -14,37 +20,90 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
         contactName: '',
         email: '',
         phone: '',
+        phones: [''],
         street: '',
         notes: ''
     });
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
 
+    const handleDiscardDraft = () => {
+        clearFormDraft(SUPPLIER_DRAFT_KEY);
+        setHasRestoredDraft(false);
+        setFormData({
+            name: '',
+            category: 'OTHER',
+            customCategory: '',
+            contactName: '',
+            email: '',
+            phone: '',
+            phones: [''],
+            street: '',
+            notes: ''
+        });
+        setErrors({});
+    };
+
     useEffect(() => {
         if (initialData) {
+            setHasRestoredDraft(false);
+            const initPhones = Array.isArray(initialData.phones) && initialData.phones.length > 0
+                ? initialData.phones
+                : (initialData.phone ? [initialData.phone] : ['']);
             setFormData({
                 name: initialData.name || '',
                 category: initialData.category || 'OTHER',
                 customCategory: initialData.customCategory || '',
                 contactName: initialData.contactName || '',
                 email: initialData.email || '',
-                phone: initialData.phone || '',
+                phone: initialData.phone || initPhones[0] || '',
+                phones: initPhones,
                 street: initialData.street || '',
                 notes: initialData.notes || ''
             });
-        } else {
-            setFormData({
-                name: '',
-                category: 'OTHER',
-                customCategory: '',
-                contactName: '',
-                email: '',
-                phone: '',
-                street: '',
-                notes: ''
-            });
+        } else if (isOpen) {
+            const savedDraft = getFormDraft(SUPPLIER_DRAFT_KEY);
+            if (savedDraft && typeof savedDraft === 'object') {
+                const draftPhones = Array.isArray(savedDraft.phones) && savedDraft.phones.length > 0
+                    ? savedDraft.phones
+                    : (savedDraft.phone ? [savedDraft.phone] : ['']);
+                setFormData({
+                    name: savedDraft.name || '',
+                    category: savedDraft.category || 'OTHER',
+                    customCategory: savedDraft.customCategory || '',
+                    contactName: savedDraft.contactName || '',
+                    email: savedDraft.email || '',
+                    phone: savedDraft.phone || draftPhones[0] || '',
+                    phones: draftPhones,
+                    street: savedDraft.street || '',
+                    notes: savedDraft.notes || ''
+                });
+                setHasRestoredDraft(true);
+            } else {
+                setHasRestoredDraft(false);
+                setFormData({
+                    name: '',
+                    category: 'OTHER',
+                    customCategory: '',
+                    contactName: '',
+                    email: '',
+                    phone: '',
+                    phones: [''],
+                    street: '',
+                    notes: ''
+                });
+            }
         }
+        setErrors({});
     }, [initialData, isOpen]);
+
+    useEffect(() => {
+        if (!isOpen || initialData) return;
+        const hasContent = formData.name || formData.phone || formData.phones?.some(Boolean) || formData.email || formData.contactName || formData.street || formData.notes;
+        if (hasContent) {
+            saveFormDraft(SUPPLIER_DRAFT_KEY, formData);
+        }
+    }, [formData, isOpen, initialData]);
 
     const categories = [
         'CONCRETE', 'STEEL', 'CEMENT', 'BRICKS',
@@ -70,7 +129,8 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             newErrors.name = t('common.required');
         }
 
-        if (!formData.phone.trim()) {
+        const primaryPhone = formData.phones?.[0]?.trim() || formData.phone?.trim();
+        if (!primaryPhone) {
             newErrors.phone = t('common.required');
         }
 
@@ -89,7 +149,17 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
         setLoading(true);
 
         try {
-            await onSave(formData);
+            const cleanPhones = (formData.phones || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            const payload = {
+                ...formData,
+                phone: cleanPhones[0] || formData.phone?.trim() || '',
+                phones: cleanPhones
+            };
+            await onSave(payload);
+            if (!initialData) {
+                clearFormDraft(SUPPLIER_DRAFT_KEY);
+                setHasRestoredDraft(false);
+            }
             handleClose();
         } catch (error) {
             console.error('Failed to save supplier:', error);
@@ -125,6 +195,9 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                 </div>
 
                 <form onSubmit={handleSubmit} className="modal-body">
+                    {hasRestoredDraft && !initialData && (
+                        <DraftBanner onDiscard={handleDiscardDraft} />
+                    )}
                     <div className="form-grid">
                         <div className="form-group full-width">
                             <label htmlFor="name">
@@ -177,20 +250,22 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 {errors.customCategory && <span className="error-message">{errors.customCategory}</span>}
                             </div>
                         )}
-                        <div className="form-group">
-                            <label htmlFor="phone">
-                                {t('suppliers.fields.phone', 'Phone Number')} <span className="required">*</span>
-                            </label>
-                            <input
-                                type="tel"
-                                id="phone"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleChange}
-                                className={errors.phone ? 'error' : ''}
+                        <div style={{ gridColumn: 'span 2' }}>
+                            <MultiPhoneInput
+                                phones={formData.phones}
+                                onChange={(newPhones) => {
+                                    setFormData(prev => {
+                                        const next = { ...prev, phones: newPhones, phone: newPhones[0] || '' };
+                                        if (!initialData) saveFormDraft(SUPPLIER_DRAFT_KEY, next);
+                                        return next;
+                                    });
+                                    if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
+                                }}
+                                label={t('suppliers.fields.phone', 'Phone Number')}
+                                required
+                                error={errors.phone}
                                 placeholder={t('suppliers.placeholders.phone', '+20 123 456 7890')}
                             />
-                            {errors.phone && <span className="error-message">{errors.phone}</span>}
                         </div>
 
                         <div className="form-group">

@@ -27,16 +27,19 @@ const passwordSchema = z.string().superRefine((val, ctx) => {
 
 export const inviteUserSchema = z.object({
     email: z.string().email('Invalid email address').max(254),
-    password: passwordSchema.optional(),
+    password: z.preprocess(val => (val === '' || val === null ? undefined : val), passwordSchema.optional()),
     role: UserRole.optional().default('ENGINEER'),
     roleId: z.string().uuid().optional().nullable(),
     permissions: z.array(z.string().max(100)).max(200).optional().default([]),
-    name: z.string().max(120).optional().nullable()
+    name: z.string().max(120).optional().nullable(),
+    phone: z.string().max(30).optional().nullable(),
+    phones: z.array(z.string().max(30)).optional().default([])
 });
 
 export const updateUserSchema = z.object({
     name: z.string().min(1).max(120).optional(),
-    phone: z.string().min(3).max(30).optional(),
+    phone: z.string().max(30).optional().nullable(),
+    phones: z.array(z.string().max(30)).optional(),
     role: UserRole.optional(),
     permissions: z.array(z.string().max(100)).max(200).optional()
 });

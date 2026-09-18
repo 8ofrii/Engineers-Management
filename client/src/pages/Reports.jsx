@@ -13,6 +13,7 @@ import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
+import { exportToXLSX } from '../utils/excelExport';
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#64748b'];
 
@@ -131,35 +132,75 @@ export default function Reports() {
         };
     });
 
-    const handleExportCSV = () => {
-        const rows = [
-            ['Hesaby ERP — Executive Financial Report'],
-            ['Generated At', new Date().toLocaleString()],
-            ['Project Filter', selectedProjectId === 'ALL' ? 'All Projects' : projects.find(p => p.id === selectedProjectId)?.name || selectedProjectId],
+    const handleExportXLSX = () => {
+        const projectName = selectedProjectId === 'ALL'
+            ? (isArabic ? 'جميع المشاريع' : 'All Projects')
+            : projects.find(p => p.id === selectedProjectId)?.name || selectedProjectId;
+
+        // Sheet 1: Executive Summary & KPIs
+        const summaryRows = [
+            [isArabic ? 'حسابي ERP — التقرير المالي التنفيذي' : 'Hesaby ERP — Executive Financial Report'],
+            [isArabic ? 'تاريخ التقرير:' : 'Generated At:', new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-US')],
+            [isArabic ? 'المشروع المحدد:' : 'Project Filter:', projectName],
             [],
-            ['KPI Summary', 'Amount (EGP)'],
-            ['Total Collected Income', approvedIncomes],
-            ['Total Site Expenses', approvedExpenses],
-            ['Net Operational Cash', netBalance],
-            ['Office Profit', totalProfitRecognized],
-            [],
-            ['Project Breakdown', 'Budget', 'Total Income', 'Actual Spent', 'Safe Balance', 'Office Profit', 'Budget Burn %']
+            [isArabic ? 'المؤشر المالي' : 'Financial KPI', isArabic ? 'المبلغ (جنيه مصري)' : 'Amount (EGP)'],
+            [isArabic ? 'إجمالي الإيرادات المحصلة' : 'Total Collected Income', Number(approvedIncomes.toFixed(2))],
+            [isArabic ? 'إجمالي مصروفات المواقع' : 'Total Site Expenses', Number(approvedExpenses.toFixed(2))],
+            [isArabic ? 'صافي السيولة النقدية' : 'Net Operational Cash', Number(netBalance.toFixed(2))],
+            [isArabic ? 'أرباح المكتب' : 'Office Profit', Number(totalProfitRecognized.toFixed(2))],
+        ];
+
+        // Sheet 2: Project Breakdown
+        const breakdownRows = [
+            [
+                isArabic ? 'اسم المشروع' : 'Project Name',
+                isArabic ? 'الميزانية التقديرية' : 'Budget',
+                isArabic ? 'إجمالي المقبوضات' : 'Total Income',
+                isArabic ? 'المصروف الفعلي' : 'Actual Spent',
+                isArabic ? 'رصيد العهدة/الخزينة' : 'Safe Balance',
+                isArabic ? 'أرباح المكتب' : 'Office Profit',
+                isArabic ? 'نسبة استهلاك الميزانية' : 'Budget Burn Rate %'
+            ]
         ];
 
         projectBreakdown.forEach(p => {
-            rows.push([p.name, p.budget, p.income, p.spent, p.safe, p.profit, `${p.burnRate}%`]);
+            breakdownRows.push([
+                p.name,
+                p.budget,
+                p.income,
+                p.spent,
+                p.safe,
+                p.profit,
+                `${p.burnRate}%`
+            ]);
         });
 
-        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `hesaby-financial-report-${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        // Sheet 3: Expenses by Category
+        const categoryRows = [
+            [
+                isArabic ? 'بند التكلفة / التصنيف' : 'Expense Category',
+                isArabic ? 'إجمالي المصروف (جنيه)' : 'Total Spent (EGP)',
+                isArabic ? 'النسبة من الإجمالي' : 'Share of Total %'
+            ]
+        ];
+
+        categoryData.forEach(c => {
+            const catName = isArabic
+                ? (t(`finance.categories.${c.name.toLowerCase().replace(/ /g, '_')}`) || c.name)
+                : (c.name);
+            const pct = approvedExpenses > 0 ? ((c.value / approvedExpenses) * 100).toFixed(1) : '0.0';
+            categoryRows.push([catName, Number(c.value.toFixed(2)), `${pct}%`]);
+        });
+
+        exportToXLSX({
+            filename: `hesaby-financial-report-${new Date().toISOString().slice(0, 10)}.xlsx`,
+            sheets: [
+                { sheetName: isArabic ? 'الملخص التنفيذي' : 'Executive Summary', data: summaryRows },
+                { sheetName: isArabic ? 'تفاصيل المشاريع' : 'Project Breakdown', data: breakdownRows },
+                { sheetName: isArabic ? 'توزيع المصروفات' : 'Expense Categories', data: categoryRows }
+            ],
+            isRTL: isArabic
+        });
     };
 
     if (loading) {
@@ -191,8 +232,8 @@ export default function Reports() {
                         <button className="btn btn-secondary" onClick={() => window.print()}>
                             <Printer size={16} /> {isArabic ? 'طباعة' : 'Print'}
                         </button>
-                        <button className="btn btn-primary" onClick={handleExportCSV}>
-                            <Download size={16} /> {isArabic ? 'تصدير إكسيل (CSV)' : 'Export Report (CSV)'}
+                        <button className="btn btn-primary" onClick={handleExportXLSX}>
+                            <Download size={16} /> {isArabic ? 'تصدير إكسيل (XLSX)' : 'Export Excel (XLSX)'}
                         </button>
                     </div>
                 </div>

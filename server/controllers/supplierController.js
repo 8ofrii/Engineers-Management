@@ -61,8 +61,18 @@ export const getSupplier = async (req, res, next) => {
 export const createSupplier = async (req, res, next) => {
     try {
         const data = { ...req.body, tenantId: req.user.tenantId };
+        if (Array.isArray(data.phones)) {
+            data.phones = data.phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            if (!data.phone && data.phones.length > 0) {
+                data.phone = data.phones[0];
+            } else if (data.phone && !data.phones.includes(data.phone.trim())) {
+                data.phones = [data.phone.trim(), ...data.phones];
+            }
+        } else if (data.phone) {
+            data.phones = [data.phone.trim()];
+        }
         if (!data.email) data.email = "-";
-        if (!data.phone) data.phone = "-";
+        if (!data.phone) data.phone = data.phones?.[0] || "-";
 
         const supplier = await prisma.supplier.create({
             data: data
@@ -100,9 +110,21 @@ export const updateSupplier = async (req, res, next) => {
             });
         }
 
+        const data = { ...req.body };
+        if (Array.isArray(data.phones)) {
+            data.phones = data.phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            if (!data.phone && data.phones.length > 0) {
+                data.phone = data.phones[0];
+            } else if (data.phone && !data.phones.includes(data.phone.trim())) {
+                data.phones = [data.phone.trim(), ...data.phones];
+            }
+        } else if (data.phone !== undefined) {
+            data.phones = data.phone ? [data.phone.trim()] : [];
+        }
+
         const updated = await prisma.supplier.update({
             where: { id: req.params.id },
-            data: req.body
+            data: data
         });
 
         await auditFromReq(req, {

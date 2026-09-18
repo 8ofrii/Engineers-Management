@@ -142,10 +142,40 @@ export default function Suppliers() {
                                     <Mail size={16} />
                                     <span>{supplier.email || '-'}</span>
                                 </div>
-                                <div className="flex gap-sm text-secondary">
-                                    <Phone size={16} />
-                                    <span>{supplier.phone}</span>
-                                </div>
+                                {(() => {
+                                    const supplierPhones = Array.isArray(supplier.phones) && supplier.phones.length > 0
+                                        ? supplier.phones.filter(Boolean)
+                                        : (supplier.phone ? [supplier.phone] : []);
+                                    if (supplierPhones.length === 0) return null;
+                                    return (
+                                        <div className="flex gap-sm text-secondary" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                            <Phone size={16} style={{ marginTop: '3px', flexShrink: 0 }} />
+                                            <div className="flex gap-xs" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                                                {supplierPhones.map((p, idx) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={`tel:${p}`}
+                                                        style={{
+                                                            direction: 'ltr',
+                                                            display: 'inline-block',
+                                                            color: 'inherit',
+                                                            textDecoration: 'none',
+                                                            background: 'var(--bg-secondary)',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 500
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                                                    >
+                                                        {p}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>

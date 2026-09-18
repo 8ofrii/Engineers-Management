@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import { useFormat } from '../utils/format';
+import { exportToXLSX } from '../utils/excelExport';
 
 export default function Finance() {
     const { t, i18n } = useTranslation();
@@ -56,7 +57,9 @@ export default function Finance() {
         try {
             setLoading(true);
             const params = {};
-            if (filterType !== 'ALL') params.type = filterType;
+            if (filterType !== 'ALL' && filterType !== 'COMPANY_SHARE' && filterType !== 'MY_LEDGER') {
+                params.type = filterType;
+            }
 
             const response = await transactionsAPI.getAll(params);
             let allTx = response?.data?.data || [];
@@ -64,8 +67,22 @@ export default function Finance() {
             // If MY_LEDGER is selected, filter everything where user is involved
             if (filterType === 'MY_LEDGER') {
                 allTx = allTx.filter(tx => tx.creator?.id === user.id || tx.payerUserId === user.id || tx.toEngineerId === user.id);
-            } else if (filterType !== 'ALL') {
-                allTx = allTx.filter(tx => tx.type === filterType);
+            } else if (filterType === 'COMPANY_SHARE') {
+                // Specifically filter auto-added management fees / company share transactions
+                allTx = allTx.filter(tx => 
+                    tx.category === 'MANAGEMENT_FEE_TRANSFER' || 
+                    (tx.description && (
+                        tx.description.toLowerCase().includes('management fee') ||
+                        tx.description.includes('أتعاب الإدارة') ||
+                        tx.description.includes('أتعاب') ||
+                        tx.description.includes('نسبة الشركة')
+                    ))
+                );
+            } else if (filterType === 'EXPENSE') {
+                // Pure site expenses (exclude internal management fee ledger records)
+                allTx = allTx.filter(tx => tx.type === 'EXPENSE' && tx.category !== 'MANAGEMENT_FEE_TRANSFER');
+            } else if (filterType === 'INCOME') {
+                allTx = allTx.filter(tx => tx.type === 'INCOME');
             }
 
             // Filter by project
@@ -181,7 +198,184 @@ export default function Finance() {
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
-        return new Date(dateString).toLocaleDateString();
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return '-';
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}/${month}/${day}`;
+    };
+
+    const handleExportTransactionsXLSX = () => {
+        if (!transactions || transactions.length === 0) {
+            showAlert({
+                type: 'info',
+                title: isArabic ? 'لا توجد بيانات' : 'No Data',
+                message: isArabic ? 'لا توجد معاملات متاحة للتصدير' : 'No transactions available to export'
+            });
+            return;
+        }
+
+        const rows = [
+            [
+                isArabic ? 'التاريخ' : 'Date',
+                isArabic ? 'نوع المعاملة' : 'Type',
+                isArabic ? 'المشروع' : 'Project',
+                isArabic ? 'التصنيف' : 'Category',
+                isArabic ? 'البيان / الوصف' : 'Description',
+                isArabic ? 'البند المرتبط' : 'Cost Item / Band',
+                isArabic ? 'الجهة الدافعة / العميل' : 'Payer / Client',
+                isArabic ? 'المستلم / إلى' : 'Recipient / To',
+                isArabic ? 'طريقة الدفع' : 'Payment Method',
+                isArabic ? 'المبلغ (جنيه)' : 'Amount (EGP)',
+                isArabic ? 'الحالة' : 'Status',
+                isArabic ? 'الخزينة / الحساب' : 'Physical Account / Safe',
+                isArabic ? 'مركز التكلفة' : 'Cost Center',
+                isArabic ? 'المسجل بواسطة' : 'Created By'
+            ]
+        ];
+
+        transactions.forEach(tx => {
+            const txType = tx.category === 'MANAGEMENT_FEE_TRANSFER'
+                ? (isArabic ? 'أرباح المكتب' : 'Office Profit')
+                : (tx.type === 'INCOME' ? (isArabic ? 'إيراد' : 'Income') : (isArabic ? 'مصروف' : 'Expense'));
+
+            const status = tx.status === 'APPROVED'
+                ? (isArabic ? 'معتمد' : 'Approved')
+                : (tx.status === 'REJECTED' ? (isArabic ? 'مرفوض' : 'Rejected') : (isArabic ? 'بانتظار الاعتماد' : 'Pending'));
+
+            const pMethod = tx.paymentMethod === 'BANK_TRANSFER'
+                ? (isArabic ? 'تحويل بنكي / إنستاباي' : 'Bank Transaction / InstaPay')
+                : (tx.paymentMethod === 'CASH'
+                    ? (isArabic ? 'نقداً (كاش)' : 'Cash')
+                    : (tx.paymentMethod === 'CHECK'
+                        ? (isArabic ? 'شيك' : 'Check')
+                        : (tx.paymentMethod === 'CUSTODY_WALLET' ? (isArabic ? 'عهدة مهندس' : 'Custody Wallet') : (tx.paymentMethod || ''))));
+
+            const catLabel = isArabic
+                ? (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '')
+                : (tx.category || '');
+
+            rows.push([
+                formatDate(tx.transactionDate || tx.createdAt),
+                txType,
+                tx.project?.name || (isArabic ? 'عام / غير محدد' : 'General'),
+                catLabel,
+                tx.description || '',
+                tx.projectCostItem?.name || '',
+                tx.paidByClientContact || tx.transactionFrom || tx.client?.name || '',
+                tx.transactionTo || tx.workman?.name || '',
+                pMethod,
+                Number(Number(tx.amount || 0).toFixed(2)),
+                status,
+                tx.physicalAccount || '',
+                tx.costCenter || '',
+                tx.creator?.name || ''
+            ]);
+        });
+
+        exportToXLSX({
+            filename: `hesaby-transactions-${new Date().toISOString().slice(0, 10)}.xlsx`,
+            sheets: [
+                {
+                    sheetName: isArabic ? 'سجل المعاملات' : 'Transactions',
+                    data: rows
+                }
+            ],
+            isRTL: isArabic
+        });
+    };
+
+    const renderPaymentMethod = (method, receiptUrl = null) => {
+        if (!method) return <span className="text-secondary">-</span>;
+        let label = method;
+        const badgeStyle = { fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', fontWeight: '500' };
+
+        let badgeEl = null;
+        switch (method) {
+            case 'BANK_TRANSFER':
+                label = t('finance.methods.bankTransfer') || (isArabic ? 'تحويل بنكي / إنستاباي' : 'Bank Transaction / InstaPay');
+                badgeEl = <span className="badge badge-primary" style={badgeStyle}>🏦 {label}</span>;
+                break;
+            case 'CASH':
+                label = t('finance.methods.cash') || (isArabic ? 'نقداً (كاش)' : 'Cash');
+                badgeEl = <span className="badge badge-success" style={badgeStyle}>💵 {label}</span>;
+                break;
+            case 'CHECK':
+                label = t('finance.methods.check') || (isArabic ? 'شيك' : 'Check');
+                badgeEl = <span className="badge badge-warning" style={badgeStyle}>📝 {label}</span>;
+                break;
+            case 'CREDIT_CARD':
+                label = t('finance.methods.creditCard') || (isArabic ? 'بطاقة ائتمان' : 'Credit Card');
+                badgeEl = <span className="badge badge-secondary" style={badgeStyle}>💳 {label}</span>;
+                break;
+            case 'CUSTODY_WALLET':
+                label = t('finance.methods.custodyWallet') || (isArabic ? 'عهدة مهندس' : 'Custody Wallet');
+                badgeEl = <span className="badge badge-secondary" style={badgeStyle}>💼 {label}</span>;
+                break;
+            default:
+                badgeEl = <span className="badge badge-secondary" style={badgeStyle}>{label}</span>;
+        }
+
+        return (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                {badgeEl}
+                {receiptUrl && (
+                    <a
+                        href={receiptUrl.startsWith('http') ? receiptUrl : `/uploads/${receiptUrl.replace(/^(\/|uploads\/)/, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={isArabic ? 'عرض المرفق / الإيصال' : 'View Attachment / Receipt'}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: '2px 6px',
+                            fontSize: '0.7rem',
+                            background: 'hsla(220, 80%, 50%, 0.12)',
+                            color: 'var(--color-primary)',
+                            border: '1px solid var(--color-primary)',
+                            borderRadius: '5px',
+                            textDecoration: 'none',
+                            fontWeight: '600'
+                        }}
+                    >
+                        <Paperclip size={12} />
+                        {isArabic ? 'مرفق' : 'Receipt'}
+                    </a>
+                )}
+            </div>
+        );
+    };
+
+    const renderPayerOrClient = (tx) => {
+        if (tx.type === 'INCOME') {
+            const clientName = tx.client?.name || tx.project?.client?.name || '';
+            const payerRep = tx.paidByClientContact || (tx.transactionFrom && tx.transactionFrom !== clientName ? tx.transactionFrom : '');
+            if (clientName && payerRep) {
+                return (
+                    <div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{clientName}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <span>👤 {isArabic ? 'المفوض:' : 'By:'} {payerRep}</span>
+                        </div>
+                    </div>
+                );
+            }
+            if (clientName) return <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{clientName}</span>;
+            if (payerRep) return <span style={{ fontWeight: '600' }}>{payerRep}</span>;
+            return <span className="text-secondary">-</span>;
+        } else {
+            const payer = tx.payer?.name || tx.user?.name || '';
+            const recipient = tx.supplier?.name || tx.transactionTo || '';
+            return (
+                <div>
+                    {payer && <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{payer}</div>}
+                    {recipient && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'إلى:' : 'To:'} {recipient}</div>}
+                    {!payer && !recipient && <span className="text-secondary">-</span>}
+                </div>
+            );
+        }
     };
 
     return (
@@ -235,10 +429,22 @@ export default function Finance() {
                             </div>
                         )}
                     </div>
-                    <button className="btn btn-primary" onClick={openCreateModal}>
-                        <Plus size={20} />
-                        {t('finance.newTransaction')}
-                    </button>
+                    <div className="flex gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={handleExportTransactionsXLSX}
+                            disabled={transactions.length === 0}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                            title={isArabic ? 'تصدير المعاملات المعروضة حالياً إلى ملف إكسيل' : 'Export current transactions to Excel'}
+                        >
+                            <Download size={18} />
+                            {isArabic ? 'تصدير إكسيل (XLSX)' : 'Export Excel (XLSX)'}
+                        </button>
+                        <button className="btn btn-primary" onClick={openCreateModal}>
+                            <Plus size={20} />
+                            {t('finance.newTransaction')}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Filters Section - Enhanced Design */}
@@ -379,6 +585,24 @@ export default function Finance() {
                                     }}
                                 >
                                     {t('finance.expense')}
+                                </button>
+                                <button
+                                    className={`btn btn-sm ${filterType === 'COMPANY_SHARE' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setFilterType('COMPANY_SHARE')}
+                                    style={{
+                                        borderRadius: 'var(--radius-full)',
+                                        padding: '4px 16px',
+                                        fontSize: 'var(--font-size-sm)',
+                                        fontWeight: '600',
+                                        transition: 'all var(--transition-base)',
+                                        ...(filterType === 'COMPANY_SHARE' ? {
+                                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                                            borderColor: '#10b981',
+                                            color: '#ffffff'
+                                        } : {})
+                                    }}
+                                >
+                                    {t('finance.companyShare') || (isArabic ? 'أرباح المكتب' : 'Office Profit')}
                                 </button>
                                 <button
                                     className={`btn btn-sm ${filterType === 'MY_LEDGER' ? 'btn-primary' : 'btn-secondary'}`}
@@ -589,6 +813,8 @@ export default function Finance() {
                                             impact = Number(tx.amount);
                                         }
                                         return sum + impact;
+                                    } else if (filterType === 'COMPANY_SHARE') {
+                                        return sum + Number(tx.amount || 0);
                                     } else {
                                         // Standard project logic
                                         return sum + (tx.type === 'INCOME' ? Number(tx.amount) : -Number(tx.amount));
@@ -615,13 +841,18 @@ export default function Finance() {
                                                     </Link>
                                                 ) : projectName}</h3>
                                             <div className="project-summary">
-                                                {filterType === 'MY_LEDGER' ? (t('finance.myNetCustody') || 'صافي العهدة') : (t('finance.projectNet') || 'صافي المشروع')}:
+                                                {filterType === 'MY_LEDGER'
+                                                    ? (t('finance.myNetCustody') || 'صافي العهدة')
+                                                    : filterType === 'COMPANY_SHARE'
+                                                    ? (t('finance.totalCompanyShare') || (isArabic ? 'إجمالي أرباح المكتب' : 'Total Office Profit'))
+                                                    : (t('finance.projectNet') || 'صافي المشروع')}:
                                                 <span style={{
                                                     marginLeft: '8px',
+                                                    marginRight: '8px',
                                                     fontWeight: 'bold',
-                                                    color: totalAmount >= 0 ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 200, 200, 1)'
+                                                    color: (filterType === 'COMPANY_SHARE' || totalAmount >= 0) ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 200, 200, 1)'
                                                 }}>
-                                                    {fmtCurrency(totalAmount)}
+                                                    {fmtCurrency(Math.abs(totalAmount))}
                                                 </span>
                                             </div>
                                         </div>
@@ -632,6 +863,8 @@ export default function Finance() {
                                                     <th>{t('common.type')}</th>
                                                     <th>{t('finance.category')}</th>
                                                     <th>{t('finance.description')}</th>
+                                                    <th>{t('finance.payerOrClient') || 'الجهة الدافعة / المفوض'}</th>
+                                                    <th>{t('finance.paymentMethod') || 'طريقة الدفع'}</th>
                                                     <th>{t('finance.amount')}</th>
                                                     <th>{t('common.status')}</th>
                                                     <th style={{ width: '120px' }}>{t('common.actions')}</th>
@@ -640,20 +873,36 @@ export default function Finance() {
                                             <tbody>
                                                 {txs.map((tx) => (
                                                     <tr key={tx.id}>
-                                                        <td style={{ fontWeight: '500' }}>{formatDate(tx.transactionDate)}</td>
-                                                        <td>
-                                                            <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
+                                                        <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
+                                                             <span dir="ltr" style={{ unicodeBidi: 'plaintext', display: 'inline-block' }}>
+                                                                {formatDate(tx.transactionDate)}
                                                             </span>
                                                         </td>
+                                                        <td>
+                                                            {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (
+                                                                <span className="badge" style={{ fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700 }}>
+                                                                    {t('finance.companyShare') || (isArabic ? 'أرباح المكتب' : 'Office Profit')}
+                                                                </span>
+                                                            ) : (
+                                                                <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
+                                                                    {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
+                                                                </span>
+                                                            )}
+                                                        </td>
                                                         <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                                        <td style={{ maxWidth: '250px' }} className="truncate" title={tx.description}>
+                                                        <td style={{ maxWidth: '220px' }} className="truncate" title={tx.description}>
                                                             {tx.description}
                                                             {tx.projectCostItem && (
                                                                 <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
                                                                     #{tx.projectCostItem.name}
                                                                 </div>
                                                             )}
+                                                        </td>
+                                                        <td style={{ maxWidth: '180px' }} className="truncate">
+                                                            {renderPayerOrClient(tx)}
+                                                        </td>
+                                                        <td>
+                                                            {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
                                                         </td>
                                                         <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
                                                             {fmtCurrency(tx.amount)}

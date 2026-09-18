@@ -63,9 +63,26 @@ export const getClient = async (req, res, next) => {
 // @access  Private
 export const createClient = async (req, res, next) => {
     try {
+        const body = { ...req.body };
+        if (Array.isArray(body.phones)) {
+            body.phones = body.phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            if (!body.phone && body.phones.length > 0) {
+                body.phone = body.phones[0];
+            } else if (body.phone && !body.phones.includes(body.phone.trim())) {
+                body.phones = [body.phone.trim(), ...body.phones];
+            }
+        } else if (body.phone) {
+            body.phones = [body.phone.trim()];
+        }
+        if (!body.phone && body.phones?.[0]) {
+            body.phone = body.phones[0];
+        } else if (!body.phone) {
+            body.phone = '';
+        }
+
         const client = await prisma.client.create({
             data: {
-                ...req.body,
+                ...body,
                 tenantId: req.user.tenantId // Critical: Assign to Tenant
             }
         });
@@ -102,9 +119,21 @@ export const updateClient = async (req, res, next) => {
             });
         }
 
+        const body = { ...req.body };
+        if (Array.isArray(body.phones)) {
+            body.phones = body.phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            if (!body.phone && body.phones.length > 0) {
+                body.phone = body.phones[0];
+            } else if (body.phone && !body.phones.includes(body.phone.trim())) {
+                body.phones = [body.phone.trim(), ...body.phones];
+            }
+        } else if (body.phone !== undefined) {
+            body.phones = body.phone ? [body.phone.trim()] : [];
+        }
+
         const updatedClient = await prisma.client.update({
             where: { id: req.params.id },
-            data: req.body
+            data: body
         });
 
         await auditFromReq(req, {

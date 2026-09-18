@@ -427,6 +427,7 @@
         "category": "نوع البند",
         "selectCategory": "اختر التصنيف",
         "selectProject": "اختر المشروع",
+        "payerContact": "الدافع / جهة الاتصال",
         "transactionFrom": "المورّد / الدافع",
         "transactionFromPlaceholder": "اسم الدافع / المورد",
         "transactionTo": "المستلم",
@@ -513,7 +514,8 @@
             "check": "شيك",
             "bankTransfer": "تحويل بنكي",
             "creditCard": "فيزا",
-            "custodyWallet": "من العهدة"
+            "custodyWallet": "من العهدة",
+            "other": "أخرى"
         },
         "uom_options": {
             "ton": "طن",
@@ -527,6 +529,7 @@
         },
         "debit": "مدين",
         "credit": "دائن",
+        "myNetCustody": "صافي العهدة",
         "status": {
             "APPROVED": "معتمد",
             "PENDING_APPROVAL": "قيد الاعتماد",

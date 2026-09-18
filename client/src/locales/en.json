@@ -429,6 +429,7 @@
         "category": "Cost Category",
         "selectCategory": "Select Category",
         "selectProject": "Select Project",
+        "payerContact": "Payer / Client Contact",
         "transactionFrom": "Transaction From",
         "transactionFromPlaceholder": "Paid By / Vendor",
         "transactionTo": "Transaction To",
@@ -515,7 +516,8 @@
             "check": "Check",
             "bankTransfer": "Bank Transfer",
             "creditCard": "Credit Card",
-            "custodyWallet": "Custody Wallet"
+            "custodyWallet": "Custody Wallet",
+            "other": "Other"
         },
         "uom_options": {
             "ton": "Ton",
@@ -529,6 +531,7 @@
         },
         "debit": "Debit",
         "credit": "Credit",
+        "myNetCustody": "My Net Custody",
         "status": {
             "APPROVED": "Approved",
             "PENDING_APPROVAL": "Pending Approval",

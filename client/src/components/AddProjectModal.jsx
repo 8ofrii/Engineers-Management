@@ -6,6 +6,10 @@ import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 import AddClientModal from './AddClientModal';
 import { useAlert } from '../context/AlertContext';
+import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
+import DraftBanner from './DraftBanner';
+
+const PROJECT_DRAFT_KEY = 'hesaby_draft_project';
 
 export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData = null }) {
     const { t, i18n } = useTranslation();
@@ -13,6 +17,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
     const { showAlert } = useAlert();
     const [clients, setClients] = useState([]);
     const [engineers, setEngineers] = useState([]);
+    const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -57,24 +62,32 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     engineerId: initialData.engineerId || initialData.engineer?.id || '',
                     completionPercent: isCompleted ? 100 : (initialData.completionPercent ?? 0)
                 });
+                setHasRestoredDraft(false);
             } else {
-                setFormData({
-                    name: '',
-                    description: '',
-                    status: 'PLANNING',
-                    projectType: 'OTHER',
-                    location: '',
-                    startDate: '',
-                    endDate: '',
-                    budget: '',
-                    revenueModel: 'EXECUTION_COST_PLUS',
-                    managementFeePercent: '20',
-                    totalContractValue: '',
-                    paymentTerms: 'Net 30',
-                    clientId: '',
-                    engineerId: '',
-                    completionPercent: 0
-                });
+                const draft = getFormDraft(PROJECT_DRAFT_KEY);
+                if (draft) {
+                    setFormData(prev => ({ ...prev, ...draft }));
+                    setHasRestoredDraft(true);
+                } else {
+                    setFormData({
+                        name: '',
+                        description: '',
+                        status: 'PLANNING',
+                        projectType: 'OTHER',
+                        location: '',
+                        startDate: '',
+                        endDate: '',
+                        budget: '',
+                        revenueModel: 'EXECUTION_COST_PLUS',
+                        managementFeePercent: '20',
+                        totalContractValue: '',
+                        paymentTerms: 'Net 30',
+                        clientId: '',
+                        engineerId: '',
+                        completionPercent: 0
+                    });
+                    setHasRestoredDraft(false);
+                }
             }
         }
     }, [isOpen, initialData]);
@@ -116,11 +129,36 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     next.status = 'IN_PROGRESS';
                 }
             }
+            if (!initialData) {
+                saveFormDraft(PROJECT_DRAFT_KEY, next);
+            }
             return next;
         });
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
         }
+    };
+
+    const handleDiscardDraft = () => {
+        clearFormDraft(PROJECT_DRAFT_KEY);
+        setFormData({
+            name: '',
+            description: '',
+            status: 'PLANNING',
+            projectType: 'OTHER',
+            location: '',
+            startDate: '',
+            endDate: '',
+            budget: '',
+            revenueModel: 'EXECUTION_COST_PLUS',
+            managementFeePercent: '20',
+            totalContractValue: '',
+            paymentTerms: 'Net 30',
+            clientId: '',
+            engineerId: '',
+            completionPercent: 0
+        });
+        setHasRestoredDraft(false);
     };
 
     const validate = () => {
@@ -143,29 +181,15 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
     const handleSubmit = (e) => {
         e.preventDefault();
         if (validate()) {
+            if (!initialData) {
+                clearFormDraft(PROJECT_DRAFT_KEY);
+            }
             onSubmit(formData);
             handleClose();
         }
     };
 
     const handleClose = () => {
-        setFormData({
-            name: '',
-            description: '',
-            status: 'PLANNING',
-            projectType: 'OTHER',
-            location: '',
-            startDate: '',
-            endDate: '',
-            budget: '',
-            revenueModel: 'EXECUTION_COST_PLUS',
-            managementFeePercent: '20',
-            totalContractValue: '',
-            paymentTerms: 'Net 30',
-            clientId: '',
-            engineerId: '',
-            completionPercent: 0
-        });
         setErrors({});
         onClose();
     };
@@ -183,6 +207,8 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                 </div>
 
                 <form onSubmit={handleSubmit} className="modal-body">
+                    {hasRestoredDraft && <DraftBanner onDiscard={handleDiscardDraft} />}
+
                     {/* Basic Information */}
                     <div className="form-section">
                         <h3 className="section-title">{t('projects.modal.sections.basic')}</h3>

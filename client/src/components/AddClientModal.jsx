@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
+import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
+import DraftBanner from './DraftBanner';
+import MultiPhoneInput from './MultiPhoneInput';
 import './Modal.css';
+
+const CLIENT_DRAFT_KEY = 'hesaby_draft_client';
 
 export default function AddClientModal({ isOpen, onClose, onSubmit, initialData = null }) {
     const { t } = useTranslation();
+    const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         phone: '',
+        phones: [''],
         company: '',
         taxId: '',
         status: 'ACTIVE',
@@ -22,10 +29,14 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
 
     useEffect(() => {
         if (isOpen && initialData) {
+            const initPhones = Array.isArray(initialData.phones) && initialData.phones.length > 0
+                ? initialData.phones
+                : (initialData.phone ? [initialData.phone] : ['']);
             setFormData({
                 name: initialData.name || '',
                 email: initialData.email || '',
-                phone: initialData.phone || '',
+                phone: initialData.phone || initPhones[0] || '',
+                phones: initPhones,
                 company: initialData.company || '',
                 taxId: initialData.taxId || '',
                 status: initialData.status || 'ACTIVE',
@@ -35,21 +46,38 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                 zipCode: initialData.zipCode || '',
                 country: initialData.country || ''
             });
+            setHasRestoredDraft(false);
         } else if (isOpen && !initialData) {
-            // Reset form when opening in "Add" mode
-            setFormData({
-                name: '',
-                email: '',
-                phone: '',
-                company: '',
-                taxId: '',
-                status: 'ACTIVE',
-                street: '',
-                city: '',
-                state: '',
-                zipCode: '',
-                country: ''
-            });
+            // Check for saved draft in browser storage
+            const draft = getFormDraft(CLIENT_DRAFT_KEY);
+            if (draft) {
+                const draftPhones = Array.isArray(draft.phones) && draft.phones.length > 0
+                    ? draft.phones
+                    : (draft.phone ? [draft.phone] : ['']);
+                setFormData(prev => ({
+                    ...prev,
+                    ...draft,
+                    phones: draftPhones,
+                    phone: draft.phone || draftPhones[0] || ''
+                }));
+                setHasRestoredDraft(true);
+            } else {
+                setFormData({
+                    name: '',
+                    email: '',
+                    phone: '',
+                    phones: [''],
+                    company: '',
+                    taxId: '',
+                    status: 'ACTIVE',
+                    street: '',
+                    city: '',
+                    state: '',
+                    zipCode: '',
+                    country: ''
+                });
+                setHasRestoredDraft(false);
+            }
         }
     }, [isOpen, initialData]);
 
@@ -57,46 +85,26 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => {
+            const next = { ...prev, [name]: value };
+            if (!initialData) {
+                saveFormDraft(CLIENT_DRAFT_KEY, next);
+            }
+            return next;
+        });
         // Clear error when user types
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
         }
     };
 
-    const validate = () => {
-        const newErrors = {};
-
-        if (!formData.name.trim()) newErrors.name = t('clients.modal.fields.name') + ' is required';
-        if (!formData.email.trim()) newErrors.email = t('clients.modal.fields.email') + ' is required';
-        else if (!/\S+@\S+\.\S+/.test(formData.email.trim())) newErrors.email = t('clients.modal.fields.email') + ' is invalid';
-        if (!formData.phone.trim()) newErrors.phone = t('clients.modal.fields.phone') + ' is required';
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (validate()) {
-            // Drop empty optional strings so the schema's optional+nullable fields
-            // see undefined rather than '', avoiding e.g. "" failing email().
-            const payload = Object.fromEntries(
-                Object.entries(formData).filter(([, v]) => v !== '' && v !== null && v !== undefined)
-            );
-            onSubmit(payload);
-            handleClose();
-        }
-    };
-
-    const handleClose = () => {
+    const handleDiscardDraft = () => {
+        clearFormDraft(CLIENT_DRAFT_KEY);
         setFormData({
             name: '',
             email: '',
             phone: '',
+            phones: [''],
             company: '',
             taxId: '',
             status: 'ACTIVE',
@@ -106,6 +114,48 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
             zipCode: '',
             country: ''
         });
+        setHasRestoredDraft(false);
+    };
+
+    const validate = () => {
+        const newErrors = {};
+
+        if (!formData.name.trim()) newErrors.name = t('clients.modal.fields.name') + ' is required';
+        if (formData.email && formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email.trim())) {
+            newErrors.email = t('clients.modal.fields.email') + ' is invalid';
+        }
+        const primaryPhone = formData.phones?.[0]?.trim() || formData.phone?.trim();
+        if (!primaryPhone) newErrors.phone = t('clients.modal.fields.phone') + ' is required';
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (validate()) {
+            const cleanPhones = (formData.phones || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            const dataToClean = {
+                ...formData,
+                phone: cleanPhones[0] || formData.phone?.trim() || '',
+                phones: cleanPhones
+            };
+            const payload = Object.fromEntries(
+                Object.entries(dataToClean).map(([k, v]) => [
+                    k,
+                    typeof v === 'string' && v.trim() === '' ? (initialData ? null : undefined) : (typeof v === 'string' ? v.trim() : v)
+                ])
+            );
+            if (!initialData) {
+                Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+                clearFormDraft(CLIENT_DRAFT_KEY);
+            }
+            onSubmit(payload);
+            handleClose();
+        }
+    };
+
+    const handleClose = () => {
         setErrors({});
         onClose();
     };
@@ -123,6 +173,8 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                 </div>
 
                 <form onSubmit={handleSubmit} className="modal-body">
+                    {hasRestoredDraft && <DraftBanner onDiscard={handleDiscardDraft} />}
+
                     {/* Basic Information */}
                     <div className="form-section">
                         <h3 className="section-title">{t('clients.modal.sections.basic')}</h3>
@@ -154,7 +206,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                             </div>
 
                             <div className="form-group">
-                                <label htmlFor="email">{t('clients.modal.fields.email')} <span className="required">*</span></label>
+                                <label htmlFor="email">{t('clients.modal.fields.email')}</label>
                                 <input
                                     type="email"
                                     id="email"
@@ -167,18 +219,22 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                                 {errors.email && <span className="error-message">{errors.email}</span>}
                             </div>
 
-                            <div className="form-group">
-                                <label htmlFor="phone">{t('clients.modal.fields.phone')} <span className="required">*</span></label>
-                                <input
-                                    type="tel"
-                                    id="phone"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    className={errors.phone ? 'error' : ''}
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <MultiPhoneInput
+                                    phones={formData.phones}
+                                    onChange={(newPhones) => {
+                                        setFormData(prev => {
+                                            const next = { ...prev, phones: newPhones, phone: newPhones[0] || '' };
+                                            if (!initialData) saveFormDraft(CLIENT_DRAFT_KEY, next);
+                                            return next;
+                                        });
+                                        if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
+                                    }}
+                                    label={t('clients.modal.fields.phone')}
+                                    required
+                                    error={errors.phone}
                                     placeholder={t('clients.modal.placeholders.phone')}
                                 />
-                                {errors.phone && <span className="error-message">{errors.phone}</span>}
                             </div>
 
                             <div className="form-group">
