@@ -41,10 +41,52 @@ export const getProjects = async (req, res, next) => {
             }
         });
 
+        // Reconcile project ledger metrics to guarantee 100% mathematical accuracy across ERP
+        const txAggregates = await prisma.transaction.groupBy({
+            by: ['projectId', 'type', 'category'],
+            where: {
+                tenantId: req.user.tenantId,
+                status: 'APPROVED',
+                projectId: { not: null }
+            },
+            _sum: {
+                amount: true
+            }
+        });
+
+        const projectLedgerMap = {};
+        txAggregates.forEach(agg => {
+            if (!agg.projectId) return;
+            if (!projectLedgerMap[agg.projectId]) {
+                projectLedgerMap[agg.projectId] = { siteCost: 0, profit: 0, income: 0, hasTx: true };
+            }
+            const amt = Number(agg._sum.amount || 0);
+            if (agg.type === 'INCOME') {
+                projectLedgerMap[agg.projectId].income += amt;
+            } else if (agg.type === 'EXPENSE') {
+                if (agg.category === 'MANAGEMENT_FEE_TRANSFER') {
+                    projectLedgerMap[agg.projectId].profit += amt;
+                } else {
+                    projectLedgerMap[agg.projectId].siteCost += amt;
+                }
+            }
+        });
+
+        const reconciledProjects = projects.map(p => {
+            const ledger = projectLedgerMap[p.id];
+            if (ledger && ledger.hasTx) {
+                const safeBal = ledger.income - ledger.siteCost - ledger.profit;
+                p.actualCost = ledger.siteCost;
+                p.officeRevenue = ledger.profit;
+                p.projectSafeBalance = safeBal;
+            }
+            return p;
+        });
+
         res.status(200).json({
             success: true,
-            count: projects.length,
-            data: projects
+            count: reconciledProjects.length,
+            data: reconciledProjects
         });
     } catch (error) {
         next(error);
@@ -83,6 +125,40 @@ export const getProject = async (req, res, next) => {
                 success: false,
                 message: 'Not authorized to access this project'
             });
+        }
+
+        // Reconcile single project ledger metrics
+        const pAggs = await prisma.transaction.groupBy({
+            by: ['type', 'category'],
+            where: {
+                projectId: project.id,
+                tenantId: req.user.tenantId,
+                status: 'APPROVED'
+            },
+            _sum: {
+                amount: true
+            }
+        });
+
+        if (pAggs.length > 0) {
+            let siteCost = 0;
+            let profit = 0;
+            let income = 0;
+            pAggs.forEach(agg => {
+                const amt = Number(agg._sum.amount || 0);
+                if (agg.type === 'INCOME') {
+                    income += amt;
+                } else if (agg.type === 'EXPENSE') {
+                    if (agg.category === 'MANAGEMENT_FEE_TRANSFER') {
+                        profit += amt;
+                    } else {
+                        siteCost += amt;
+                    }
+                }
+            });
+            project.actualCost = siteCost;
+            project.officeRevenue = profit;
+            project.projectSafeBalance = income - siteCost - profit;
         }
 
         res.status(200).json({

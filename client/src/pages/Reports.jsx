@@ -67,21 +67,23 @@ export default function Reports() {
         return true;
     });
 
-    // KPI Calculations
+    // KPI Calculations (Strictly synchronized with Project Card metrics)
     const approvedIncomes = filteredTransactions
         .filter(t => (t.type === 'INCOME' || t.type === 'income') && (t.status === 'APPROVED' || !t.status))
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
+    // Site Construction Expenses (materials, labor, services) - excludes internal management fee profit transfers
     const approvedExpenses = filteredTransactions
-        .filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && (t.status === 'APPROVED' || !t.status))
+        .filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && (t.status === 'APPROVED' || !t.status) && t.category !== 'MANAGEMENT_FEE_TRANSFER')
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-    const netBalance = approvedIncomes - approvedExpenses;
 
     // Management Fee Profit recognized
     const totalProfitRecognized = filteredTransactions
-        .filter(t => t.category === 'MANAGEMENT_FEE_TRANSFER')
+        .filter(t => t.category === 'MANAGEMENT_FEE_TRANSFER' && (t.status === 'APPROVED' || !t.status))
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+    // Net Operational Cash = Incomes - Site Expenses - Office Profit transferred (matches Project Safe Balance)
+    const netBalance = approvedIncomes - approvedExpenses - totalProfitRecognized;
 
     // Expenses by Category Data for Pie & Bar Charts
     const categoryMap = {};
@@ -105,18 +107,18 @@ export default function Reports() {
         if (!monthlyCashFlowMap[monthKey]) {
             monthlyCashFlowMap[monthKey] = { month: monthKey, Income: 0, Expense: 0 };
         }
-        if (t.type === 'INCOME') monthlyCashFlowMap[monthKey].Income += Number(t.amount || 0);
-        if (t.type === 'EXPENSE') monthlyCashFlowMap[monthKey].Expense += Number(t.amount || 0);
+        if (t.type === 'INCOME' || t.type === 'income') monthlyCashFlowMap[monthKey].Income += Number(t.amount || 0);
+        if ((t.type === 'EXPENSE' || t.type === 'expense') && t.category !== 'MANAGEMENT_FEE_TRANSFER') monthlyCashFlowMap[monthKey].Expense += Number(t.amount || 0);
     });
     const cashFlowData = Object.values(monthlyCashFlowMap);
 
     // Project Performance Breakdown Table
     const projectBreakdown = projects.map(p => {
-        const pTx = transactions.filter(t => t.projectId === p.id && t.status === 'APPROVED');
-        const pIncome = pTx.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount || 0), 0);
-        const pSpent = pTx.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount || 0), 0);
-        const pSafe = Number(p.projectSafeBalance || (pIncome - pSpent));
-        const pProfit = Number(p.officeRevenue || 0);
+        const pTx = transactions.filter(t => t.projectId === p.id && (t.status === 'APPROVED' || !t.status));
+        const pIncome = pTx.filter(t => t.type === 'INCOME' || t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+        const pSpent = pTx.filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && t.category !== 'MANAGEMENT_FEE_TRANSFER').reduce((s, t) => s + Number(t.amount || 0), 0);
+        const pProfit = pTx.filter(t => t.category === 'MANAGEMENT_FEE_TRANSFER').reduce((s, t) => s + Number(t.amount || 0), 0);
+        const pSafe = p.projectSafeBalance != null ? Number(p.projectSafeBalance) : (pIncome - pSpent - pProfit);
         const budget = Number(p.budget || 0);
         const burnRate = budget > 0 ? ((pSpent / budget) * 100).toFixed(1) : '0.0';
 
