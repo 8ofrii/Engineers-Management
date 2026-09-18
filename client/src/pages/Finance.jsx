@@ -1010,33 +1010,58 @@ export default function Finance() {
 
                                 /* Parent & Nested Fee Row Architecture */
                                 .parent-with-fee {
-                                    border-bottom: 1px dashed rgba(16, 185, 129, 0.22) !important;
+                                    border-bottom: 1px dashed rgba(16, 185, 129, 0.25) !important;
+                                }
+                                .parent-with-fee td {
+                                    border-bottom: 1px dashed rgba(16, 185, 129, 0.25) !important;
                                 }
                                 .parent-with-fee td:first-child {
-                                    border-inline-start: 3px solid #10b981;
+                                    border-inline-start: 3px solid #10b981 !important;
                                 }
                                 .nested-fee-row {
-                                    background: linear-gradient(90deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.01) 100%) !important;
+                                    background: rgba(16, 185, 129, 0.025) !important;
+                                }
+                                .nested-fee-row:hover {
+                                    background: rgba(16, 185, 129, 0.055) !important;
                                 }
                                 .nested-fee-row td {
-                                    padding-top: 8px !important;
-                                    padding-bottom: 8px !important;
+                                    padding-top: 3px !important;
+                                    padding-bottom: 3px !important;
+                                    height: 28px !important;
                                     border-bottom: 1px solid var(--border-color) !important;
-                                    font-size: 0.8rem !important;
+                                    font-size: 0.72rem !important;
+                                    line-height: 1.2 !important;
                                 }
                                 .nested-fee-row td:first-child {
-                                    border-inline-start: 3px solid #10b981;
+                                    border-inline-start: 3px solid #10b981 !important;
                                 }
                                 .nested-fee-category {
                                     color: #10b981;
                                     font-weight: 600;
+                                    font-size: 0.72rem !important;
                                 }
                                 .nested-fee-amount {
                                     color: #10b981;
-                                    font-weight: 700;
+                                    font-weight: 600;
+                                    font-size: 0.74rem !important;
                                 }
                                 .nested-fee-tree {
                                     color: #10b981;
+                                }
+                                .nested-fee-row .tx-action-group {
+                                    padding: 1px 2px;
+                                    border-radius: 4px;
+                                    gap: 2px;
+                                    background: rgba(0, 0, 0, 0.15);
+                                }
+                                .nested-fee-row .tx-action-btn {
+                                    width: 20px;
+                                    height: 20px;
+                                    border-radius: 4px;
+                                    opacity: 0.75;
+                                }
+                                .nested-fee-row .tx-action-btn:hover {
+                                    opacity: 1;
                                 }
 
                                 /* Project Summary & Net Values */
@@ -1246,11 +1271,17 @@ export default function Finance() {
                                 body.light-mode .parent-with-fee {
                                     border-bottom: 1px dashed rgba(5, 150, 105, 0.3) !important;
                                 }
+                                body.light-mode .parent-with-fee td {
+                                    border-bottom: 1px dashed rgba(5, 150, 105, 0.3) !important;
+                                }
                                 body.light-mode .parent-with-fee td:first-child {
                                     border-inline-start: 3px solid #059669 !important;
                                 }
                                 body.light-mode .nested-fee-row {
-                                    background: rgba(16, 185, 129, 0.06) !important;
+                                    background: rgba(16, 185, 129, 0.035) !important;
+                                }
+                                body.light-mode .nested-fee-row:hover {
+                                    background: rgba(16, 185, 129, 0.07) !important;
                                 }
                                 body.light-mode .nested-fee-row td:first-child {
                                     border-inline-start: 3px solid #059669 !important;
@@ -1263,14 +1294,19 @@ export default function Finance() {
                                 }
                                 body.light-mode .nested-fee-category {
                                     color: #065f46 !important;
-                                    font-weight: 700 !important;
+                                    font-weight: 600 !important;
+                                    font-size: 0.72rem !important;
                                 }
                                 body.light-mode .nested-fee-amount {
                                     color: #065f46 !important;
-                                    font-weight: 800 !important;
+                                    font-weight: 700 !important;
+                                    font-size: 0.74rem !important;
                                 }
                                 body.light-mode .nested-fee-tree {
                                     color: #059669 !important;
+                                }
+                                body.light-mode .nested-fee-row .tx-action-group {
+                                    background: rgba(0, 0, 0, 0.04);
                                 }
 
                                 /* Light Mode Status Badges */
@@ -1571,7 +1607,7 @@ export default function Finance() {
                                                                                 )}
                                                                                 {hasNestedFees && (
                                                                                     <span className="fee-included-tag" title={isArabic ? 'يتضمن أتعاب إدارة كوست بلس (+10%)' : 'Includes Cost-Plus Fee (+10%)'}>
-                                                                                        +10% Fee
+                                                                                        {isArabic ? '+10% أتعاب' : '+10% Fee'}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
@@ -1651,42 +1687,44 @@ export default function Finance() {
                                                                                 style={isFeeCancelled ? { opacity: 0.5, textDecoration: 'line-through' } : undefined}
                                                                             >
                                                                                 {/* 1. Date with Tree Branch Connector */}
-                                                                                <td style={{ textAlign: 'start', whiteSpace: 'nowrap', paddingInlineStart: '22px' }}>
+                                                                                <td style={{ textAlign: 'start', whiteSpace: 'nowrap', paddingInlineStart: '32px' }}>
                                                                                     <div className="flex items-center gap-xs nested-fee-tree">
                                                                                         <CornerDownRight
-                                                                                            size={14}
+                                                                                            size={11}
+                                                                                            strokeWidth={2.5}
                                                                                             style={{
                                                                                                 flexShrink: 0,
                                                                                                 transform: isArabic ? 'scaleX(-1)' : 'none'
                                                                                             }}
                                                                                         />
-                                                                                        <span dir="ltr" style={{ unicodeBidi: 'plaintext', fontSize: '0.78rem', opacity: 0.85 }}>
+                                                                                        <span dir="ltr" style={{ unicodeBidi: 'plaintext', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
                                                                                             {formatDate(feeTx.transactionDate || feeTx.createdAt)}
                                                                                         </span>
                                                                                     </div>
                                                                                 </td>
 
-                                                                                {/* 2. Type: Office Profit Pill */}
+                                                                                {/* 2. Type: Office Profit Micro Pill */}
                                                                                 <td style={{ textAlign: 'center' }}>
-                                                                                    <span className="badge-type-pill profit" style={{ height: '20px', fontSize: '0.64rem', minWidth: '68px' }}>
+                                                                                    <span className="badge-type-pill profit" style={{ height: '16px', fontSize: '0.56rem', minWidth: 'auto', padding: '0 5px', fontWeight: '700', borderRadius: '3px', lineHeight: '16px' }}>
                                                                                         {isArabic ? 'أرباح مكتب' : 'PROFIT'}
                                                                                     </span>
                                                                                 </td>
 
-                                                                                {/* 3. Category: Cost-Plus Fee */}
-                                                                                <td style={{ textAlign: 'start', fontSize: '0.8rem' }} className="nested-fee-category">
+                                                                                {/* 3. Category: Cost-Plus Fee with Sub-tree Indicator */}
+                                                                                <td style={{ textAlign: 'start', fontSize: '0.71rem' }} className="nested-fee-category">
+                                                                                    <span style={{ opacity: 0.55, marginInlineEnd: '4px' }}>↳</span>
                                                                                     {isArabic ? 'أتعاب كوست بلس (+10%)' : 'Cost-Plus Fee (+10%)'}
                                                                                 </td>
 
-                                                                                {/* 4. Description: Transferred to Office Profit */}
-                                                                                <td style={{ textAlign: 'start', fontSize: '0.78rem', color: 'var(--text-secondary)', maxWidth: '240px' }}>
+                                                                                {/* 4. Description: Subordinate Auto-deducted Note */}
+                                                                                <td style={{ textAlign: 'start', fontSize: '0.68rem', color: 'var(--text-tertiary)', fontStyle: 'italic', maxWidth: '240px' }}>
                                                                                     <div className="truncate" title={feeTx.description}>
-                                                                                        {isArabic ? 'خصم من خزينة المشروع إلى حساب أرباح المكتب' : 'Transferred from project safe to office profit'}
+                                                                                        {isArabic ? 'خصم تلقائي لأرباح المكتب من الخزينة' : 'Auto-deducted office fee from safe'}
                                                                                     </div>
                                                                                 </td>
 
                                                                                 {/* 5. Safe Routing */}
-                                                                                <td style={{ textAlign: 'start', fontSize: '0.75rem', color: 'var(--text-tertiary)', maxWidth: '165px' }}>
+                                                                                <td style={{ textAlign: 'start', fontSize: '0.66rem', color: 'var(--text-tertiary)', maxWidth: '165px' }}>
                                                                                     <div className="truncate">
                                                                                         {isArabic ? 'خزينة المشروع ➔ أرباح المكتب' : 'Project Safe ➔ Office'}
                                                                                     </div>
@@ -1694,13 +1732,13 @@ export default function Finance() {
 
                                                                                 {/* 6. Method */}
                                                                                 <td style={{ textAlign: 'start' }}>
-                                                                                    <span className="badge-method-pill custody" style={{ height: '20px', fontSize: '0.68rem' }}>
+                                                                                    <span className="badge-method-pill custody" style={{ height: '16px', fontSize: '0.58rem', padding: '0 5px', borderRadius: '3px', lineHeight: '16px' }}>
                                                                                         {isArabic ? 'تحويل أرباح' : 'Profit Transfer'}
                                                                                     </span>
                                                                                 </td>
 
-                                                                                {/* 7. Amount: Emerald Bold Right-Aligned */}
-                                                                                <td style={{ textAlign: 'end', fontWeight: '700', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                                                                {/* 7. Amount: Compact Emerald Right-Aligned */}
+                                                                                <td style={{ textAlign: 'end', fontWeight: '600', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', fontSize: '0.74rem' }}>
                                                                                     <span className="nested-fee-amount">
                                                                                         + {fmtCurrency(feeTx.amount)}
                                                                                     </span>
@@ -1708,7 +1746,7 @@ export default function Finance() {
 
                                                                                 {/* 8. Status */}
                                                                                 <td style={{ textAlign: 'center' }}>
-                                                                                    <span className={`badge ${feeTx.status === 'APPROVED' ? 'badge-success' : 'badge-secondary'}`} style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px' }}>
+                                                                                    <span className={`badge ${feeTx.status === 'APPROVED' ? 'badge-success' : 'badge-secondary'}`} style={{ fontSize: '0.56rem', padding: '1px 5px', height: '14px', borderRadius: '3px', display: 'inline-flex', alignItems: 'center' }}>
                                                                                         {t(`finance.status.${feeTx.status}`) || feeTx.status}
                                                                                     </span>
                                                                                 </td>
@@ -1722,7 +1760,7 @@ export default function Finance() {
                                                                                                 onClick={() => handleDeleteClick(feeTx)}
                                                                                                 title={t('common.deletePermanently')}
                                                                                             >
-                                                                                                <Trash2 size={13} />
+                                                                                                <Trash2 size={11} />
                                                                                             </button>
                                                                                         ) : (
                                                                                             <>
@@ -1731,14 +1769,14 @@ export default function Finance() {
                                                                                                     onClick={() => openEditModal(feeTx)}
                                                                                                     title={t('common.edit')}
                                                                                                 >
-                                                                                                    <Pencil size={13} />
+                                                                                                    <Pencil size={11} />
                                                                                                 </button>
                                                                                                 <button
                                                                                                     className="tx-action-btn refund"
                                                                                                     onClick={() => handleRefundClick(feeTx)}
                                                                                                     title={t('finance.refund') || 'Refund'}
                                                                                                 >
-                                                                                                    <RotateCcw size={13} />
+                                                                                                    <RotateCcw size={11} />
                                                                                                 </button>
                                                                                             </>
                                                                                         )}
