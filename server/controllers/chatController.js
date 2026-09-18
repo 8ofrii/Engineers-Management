@@ -232,21 +232,30 @@ LANGUAGE RULE — STRICT:
                                     });
 
                                     if (project) {
-                                        const totalSpent = project.transactions.filter(t => t.type === 'EXPENSE').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                                        const totalSpent = project.transactions.filter(t => t.type === 'EXPENSE' && t.category !== 'MANAGEMENT_FEE_TRANSFER').reduce((sum, t) => sum + Number(t.amount || 0), 0);
+                                        const totalProfit = project.transactions.filter(t => t.category === 'MANAGEMENT_FEE_TRANSFER').reduce((sum, t) => sum + Number(t.amount || 0), 0);
                                         const totalRevenue = project.transactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + Number(t.amount || 0), 0);
-                                        summaryText = `بخصوص مشروع ${project.name}:\n- الميزانية: ${project.budget} ج.م\n- إجمالي المصاريف: ${totalSpent} ج.م\n- الدفعات المستلمة: ${totalRevenue} ج.م\n- المتبقي في الميزانية: ${Number(project.budget) - totalSpent} ج.م`;
+                                        summaryText = `بخصوص مشروع ${project.name}:\n- الميزانية: ${Number(project.budget || 0).toLocaleString()} ج.م\n- إجمالي المصاريف: ${totalSpent.toLocaleString()} ج.م\n- أرباح المكتب: ${totalProfit.toLocaleString()} ج.م\n- الدفعات المستلمة: ${totalRevenue.toLocaleString()} ج.م\n- المتبقي في الميزانية: ${(Number(project.budget || 0) - totalSpent).toLocaleString()} ج.م`;
                                     } else {
                                         summaryText = "لم أجد مشروعاً بهذا الاسم، يرجى التأكد من اسم المشروع.";
                                     }
                                 } else {
                                     const stats = await prisma.transaction.groupBy({
-                                        by: ['type'],
+                                        by: ['type', 'category'],
                                         where: { tenantId: req.user.tenantId, status: 'APPROVED' },
                                         _sum: { amount: true }
                                     });
-                                    const income = stats.find(s => s.type === 'INCOME')?._sum.amount || 0;
-                                    const expense = stats.find(s => s.type === 'EXPENSE')?._sum.amount || 0;
-                                    summaryText = `إجمالي العمليات المالية:\n- إجمالي الإيرادات: ${income} ج.م\n- إجمالي المصاريف: ${expense} ج.م\n- الرصيد الصافي: ${Number(income) - Number(expense)} ج.م`;
+                                    let income = 0, expense = 0, profit = 0;
+                                    stats.forEach(s => {
+                                        const amt = Number(s._sum.amount || 0);
+                                        if (s.type === 'INCOME') income += amt;
+                                        else if (s.type === 'EXPENSE') {
+                                            if (s.category === 'MANAGEMENT_FEE_TRANSFER') profit += amt;
+                                            else expense += amt;
+                                        }
+                                    });
+                                    const net = income - expense - profit;
+                                    summaryText = `إجمالي العمليات المالية:\n- إجمالي الإيرادات: ${income.toLocaleString()} ج.م\n- إجمالي المصاريف: ${expense.toLocaleString()} ج.م\n- أرباح المكتب: ${profit.toLocaleString()} ج.م\n- الرصيد الصافي: ${net.toLocaleString()} ج.م`;
                                 }
                                 aiResponse = summaryText;
                                 toolData = { action: 'FETCH_SUMMARY', params: args, data: summaryText };
@@ -357,19 +366,26 @@ LANGUAGE RULE — STRICT:
                     else if (lower.includes('ملخص') || lower.includes('summary') || lower.includes('total') || lower.includes('balance') || lower.includes('رصيد')) {
                         const [stats, projectsCount] = await Promise.all([
                             prisma.transaction.groupBy({
-                                by: ['type'],
+                                by: ['type', 'category'],
                                 where: { tenantId: req.user.tenantId, status: 'APPROVED' },
                                 _sum: { amount: true }
                             }),
                             prisma.project.count({ where: { tenantId: req.user.tenantId } })
                         ]);
-                        const income = stats.find(s => s.type === 'INCOME')?._sum.amount || 0;
-                        const expense = stats.find(s => s.type === 'EXPENSE')?._sum.amount || 0;
-                        const net = Number(income) - Number(expense);
+                        let income = 0, expense = 0, profit = 0;
+                        stats.forEach(s => {
+                            const amt = Number(s._sum.amount || 0);
+                            if (s.type === 'INCOME') income += amt;
+                            else if (s.type === 'EXPENSE') {
+                                if (s.category === 'MANAGEMENT_FEE_TRANSFER') profit += amt;
+                                else expense += amt;
+                            }
+                        });
+                        const net = income - expense - profit;
                         
                         aiResponse = isEnglish
-                            ? `📊 Financial Overview:\n- Total Income: ${Number(income).toLocaleString()} EGP\n- Total Expenses: ${Number(expense).toLocaleString()} EGP\n- Net Cashflow: ${net.toLocaleString()} EGP\n- Active Projects: ${projectsCount}`
-                            : `📊 الملخص المالي للنظام:\n- إجمالي الإيرادات: ${Number(income).toLocaleString()} ج.م\n- إجمالي المصروفات: ${Number(expense).toLocaleString()} ج.م\n- الرصيد الصافي: ${net.toLocaleString()} ج.م\n- عدد المشاريع: ${projectsCount} مشاريع.`;
+                            ? `📊 Financial Overview:\n- Total Income: ${income.toLocaleString()} EGP\n- Total Expenses: ${expense.toLocaleString()} EGP\n- Office Profit: ${profit.toLocaleString()} EGP\n- Net Cashflow: ${net.toLocaleString()} EGP\n- Active Projects: ${projectsCount}`
+                            : `📊 الملخص المالي للنظام:\n- إجمالي الإيرادات: ${income.toLocaleString()} ج.م\n- إجمالي المصروفات: ${expense.toLocaleString()} ج.م\n- أرباح المكتب: ${profit.toLocaleString()} ج.م\n- الرصيد الصافي: ${net.toLocaleString()} ج.م\n- عدد المشاريع: ${projectsCount} مشاريع.`;
                         toolData = { action: 'FETCH_SUMMARY', data: aiResponse };
                     }
                     // 9. Greeting / Help

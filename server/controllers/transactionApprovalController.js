@@ -225,7 +225,15 @@ export const approveTransaction = async (req, res, next) => {
             });
 
             // LINK 2: Handle EXPENSE transactions with logic V1.2
-            if (transaction.type === 'EXPENSE') {
+            if (transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
+                await tx.project.update({
+                    where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                    data: {
+                        projectSafeBalance: { decrement: transaction.amount },
+                        officeRevenue: { increment: transaction.amount }
+                    }
+                });
+            } else if (transaction.type === 'EXPENSE') {
                 const isInventory = transaction.category === 'MATERIALS' || transaction.category === 'ELECTRICITY_MATERIALS' || transaction.category === 'PLUMBING_MATERIALS' || transaction.category === 'PAINTING_MATERIALS' || transaction.category === 'CERAMIC_MATERIALS' || transaction.category === 'CARPENTRY_MATERIALS';
 
                 // Deduct from Project Safe (Drafts skipped this on creation)

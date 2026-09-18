@@ -181,7 +181,18 @@ export const createTransaction = async (req, res, next) => {
                 });
 
                 // Deduct from Project Safe or Office Expenses
-                if (isOfficeExpense) {
+                if (category === 'MANAGEMENT_FEE_TRANSFER') {
+                    await tx.project.update({
+                        where: {
+                            id: projectId,
+                            tenantId: req.user.tenantId
+                        },
+                        data: {
+                            projectSafeBalance: { decrement: Number(amount) },
+                            officeRevenue: { increment: Number(amount) }
+                        }
+                    });
+                } else if (isOfficeExpense) {
                     await tx.project.update({
                         where: {
                             id: projectId,

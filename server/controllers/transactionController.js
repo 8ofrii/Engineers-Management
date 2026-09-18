@@ -359,16 +359,30 @@ export const getStats = async (req, res, next) => {
             where: whereClause
         });
 
-        const byType = transactions.reduce((acc, t) => {
-            const typeKey = t.type.toUpperCase();
-            const existing = acc.find(item => item._id === typeKey);
-            if (existing) {
-                existing.total += Number(t.amount);
-            } else {
-                acc.push({ _id: typeKey, total: Number(t.amount) });
+        let expenseTotal = 0;
+        let incomeTotal = 0;
+        let profitTotal = 0;
+
+        transactions.forEach(t => {
+            const amt = Number(t.amount || 0);
+            if (t.type === 'INCOME') {
+                incomeTotal += amt;
+            } else if (t.type === 'EXPENSE') {
+                if (t.category === 'MANAGEMENT_FEE_TRANSFER') {
+                    profitTotal += amt;
+                } else {
+                    expenseTotal += amt;
+                }
             }
-            return acc;
-        }, []);
+        });
+
+        const byType = [
+            { _id: 'INCOME', total: incomeTotal },
+            { _id: 'EXPENSE', total: expenseTotal }
+        ];
+        if (profitTotal > 0) {
+            byType.push({ _id: 'OFFICE_PROFIT', total: profitTotal });
+        }
 
         // The dashboard's "Expenses by Category" chart consumes byCategory,
         // so only EXPENSE transactions belong here. Filter out income (PAYMENT)
@@ -565,7 +579,18 @@ export const refundTransaction = async (req, res, next) => {
 
         await prisma.$transaction(async (tx) => {
             // 1. Handle Financial Reversals based on status
-            if (transaction.type === 'EXPENSE') {
+            if (transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
+                // Direct refund or cancellation of a standalone MANAGEMENT_FEE_TRANSFER entry
+                if (transaction.projectId) {
+                    await tx.project.update({
+                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                        data: {
+                            officeRevenue: { decrement: transaction.amount },
+                            projectSafeBalance: { increment: transaction.amount }
+                        }
+                    });
+                }
+            } else if (transaction.type === 'EXPENSE') {
                 if (transaction.paymentMethod === 'CUSTODY_WALLET') {
                     if (transaction.status === 'DRAFT' || transaction.status === 'PENDING_APPROVAL') {
                         await tx.user.update({
@@ -653,17 +678,6 @@ export const refundTransaction = async (req, res, next) => {
                         where: { id: transaction.workmanId, tenantId: req.user.tenantId },
                         data: { totalPaid: { decrement: transaction.amount } }
                     }).catch(() => {});
-                }
-            } else if (transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
-                // Direct refund of a standalone MANAGEMENT_FEE_TRANSFER entry
-                if (transaction.projectId) {
-                    await tx.project.update({
-                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
-                        data: {
-                            officeRevenue: { decrement: transaction.amount },
-                            projectSafeBalance: { increment: transaction.amount }
-                        }
-                    });
                 }
             } else if (transaction.type === 'INCOME') {
                 if (transaction.status === 'APPROVED' && transaction.projectId) {
@@ -786,7 +800,17 @@ export const deleteTransaction = async (req, res, next) => {
             }
 
             // 1. Handle Reversals based on status
-            if (transaction.type === 'EXPENSE') {
+            if (transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
+                if (transaction.projectId) {
+                    await tx.project.update({
+                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                        data: {
+                            officeRevenue: { decrement: transaction.amount },
+                            projectSafeBalance: { increment: transaction.amount }
+                        }
+                    });
+                }
+            } else if (transaction.type === 'EXPENSE') {
                 if (transaction.paymentMethod === 'CUSTODY_WALLET') {
                     if (transaction.status === 'DRAFT' || transaction.status === 'PENDING_APPROVAL') {
                         await tx.user.update({
@@ -1116,8 +1140,19 @@ export const updateTransaction = async (req, res, next) => {
                         });
                     }
 
-                    // Update Project Costs (if linked to project and is Expense)
-                    if (transaction.projectId && transaction.type === 'EXPENSE') {
+                    // Update Project Costs or Office Profit
+                    if (transaction.projectId && transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
+                        await tx.project.update({
+                            where: {
+                                id: transaction.projectId,
+                                tenantId: req.user.tenantId
+                            },
+                            data: {
+                                officeRevenue: { increment: diff },
+                                projectSafeBalance: { decrement: diff }
+                            }
+                        });
+                    } else if (transaction.projectId && transaction.type === 'EXPENSE') {
                         await tx.project.update({
                             where: {
                                 id: transaction.projectId,

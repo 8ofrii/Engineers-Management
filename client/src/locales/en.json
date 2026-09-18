@@ -141,7 +141,8 @@
         "todaySummary": "Today's Summary",
         "dsrToday": "DSRs Today",
         "incomeToday": "Today's Income",
-        "expenseToday": "Today's Expenses"
+        "expenseToday": "Today's Expenses",
+        "office_profit": "Office Profit"
     },
     "projects": {
         "title": "Projects",

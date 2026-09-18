@@ -64,7 +64,11 @@ export default function Dashboard() {
                 .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
             const expense = transactions
-                .filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && (t.status === 'APPROVED' || !t.status))
+                .filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && (t.status === 'APPROVED' || !t.status) && t.category !== 'MANAGEMENT_FEE_TRANSFER')
+                .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+            const officeProfit = transactions
+                .filter(t => t.category === 'MANAGEMENT_FEE_TRANSFER' && (t.status === 'APPROVED' || !t.status))
                 .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
             setStats({
@@ -77,7 +81,8 @@ export default function Dashboard() {
                 transactions: {
                     income,
                     expense,
-                    balance: income - expense
+                    profit: officeProfit,
+                    balance: income - expense - officeProfit
                 }
             });
 
@@ -91,7 +96,9 @@ export default function Dashboard() {
                 return txDate === today;
             });
             const todayIncome = todayTxs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount || 0), 0);
-            const todayExpense = todayTxs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount || 0), 0);
+            const todayExpense = todayTxs
+                .filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && t.category !== 'MANAGEMENT_FEE_TRANSFER')
+                .reduce((s, t) => s + Number(t.amount || 0), 0);
             const activeProjects = projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'in-progress').length;
 
             // Try to get today's DSRs
@@ -315,10 +322,18 @@ export default function Dashboard() {
                             </div>
                             <div className="card-body">
                                 <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={transactionStats.byType.map(item => ({
-                                        ...item,
-                                        displayName: t(`dashboard.${item._id.toLowerCase()}`) || item._id
-                                    }))}>
+                                    <BarChart data={(transactionStats?.byType || []).map(item => {
+                                        let name = item._id;
+                                        if (item._id === 'INCOME') name = isArabic ? 'الإيرادات' : 'Income';
+                                        else if (item._id === 'EXPENSE') name = isArabic ? 'المصروفات' : 'Expenses';
+                                        else if (item._id === 'OFFICE_PROFIT') name = isArabic ? 'أرباح المكتب' : 'Office Profit';
+                                        else name = t(`dashboard.${item._id.toLowerCase()}`) || item._id;
+
+                                        return {
+                                            ...item,
+                                            displayName: name
+                                        };
+                                    })}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
                                         <XAxis dataKey="displayName" stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} />
                                         <YAxis stroke="var(--text-tertiary)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value / 1000}k`} />

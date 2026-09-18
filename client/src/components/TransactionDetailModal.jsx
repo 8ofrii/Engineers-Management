@@ -5,7 +5,7 @@ import {
     FileText, CheckCircle2, Clock, AlertCircle, Copy, Check,
     Image as ImageIcon, TrendingUp, TrendingDown, Building, User,
     Wallet, Calendar, Tag, Maximize2, Printer, Edit3, ArrowUpRight,
-    ArrowDownLeft, CornerDownRight, RotateCcw
+    ArrowDownLeft, CornerDownRight, RotateCcw, Briefcase
 } from 'lucide-react';
 import './TransactionDetailModal.css';
 
@@ -54,8 +54,9 @@ export default function TransactionDetailModal({
     if (!isOpen || !transaction) return null;
 
     const tx = transaction;
+    const isProfit = tx.category === 'MANAGEMENT_FEE_TRANSFER';
     const isIncome = tx.type === 'INCOME';
-    const isExpense = tx.type === 'EXPENSE';
+    const isExpense = tx.type === 'EXPENSE' && !isProfit;
     const isCancelled = tx.status === 'CANCELLED';
     const isApproved = tx.status === 'APPROVED';
     const isPending = tx.status === 'PENDING_APPROVAL';
@@ -155,15 +156,17 @@ export default function TransactionDetailModal({
                 {/* MODAL HEADER */}
                 <div className="tx-detail-header">
                     <div className="flex items-center gap-md">
-                        <div className={`tx-type-avatar ${isIncome ? 'income' : 'expense'}`}>
-                            {isIncome ? <ArrowDownLeft size={22} /> : <ArrowUpRight size={22} />}
+                        <div className={`tx-type-avatar ${isProfit ? 'profit' : isIncome ? 'income' : 'expense'}`}>
+                            {isProfit ? <Briefcase size={22} /> : isIncome ? <ArrowDownLeft size={22} /> : <ArrowUpRight size={22} />}
                         </div>
                         <div>
                             <div className="flex items-center gap-sm">
                                 <span className="tx-detail-title">
-                                    {isIncome
-                                        ? (isArabic ? 'سند قبض / إيراد' : 'Income Transaction')
-                                        : (isArabic ? 'سند صرف / مصروف' : 'Expense Transaction')}
+                                    {isProfit
+                                        ? (isArabic ? 'تحويل أرباح إدارة / مكتب' : 'Office Profit Transfer')
+                                        : isIncome
+                                            ? (isArabic ? 'سند قبض / إيراد' : 'Income Transaction')
+                                            : (isArabic ? 'سند صرف / مصروف' : 'Expense Transaction')}
                                 </span>
                                 <span className={`badge ${isApproved ? 'badge-success' : isPending ? 'badge-warning' : isCancelled ? 'badge-secondary' : 'badge-primary'}`}>
                                     {isApproved && <CheckCircle2 size={12} className="inline-icon" />}
@@ -191,9 +194,13 @@ export default function TransactionDetailModal({
                 {/* MODAL BODY */}
                 <div className="tx-detail-body">
                     {/* HERO AMOUNT BANNER */}
-                    <div className={`tx-hero-banner ${isIncome ? 'income' : 'expense'}`}>
+                    <div className={`tx-hero-banner ${isProfit ? 'profit' : isIncome ? 'income' : 'expense'}`}>
                         <div className="tx-hero-amount-label">
-                            {isIncome ? (isArabic ? 'إجمالي المقبوضات' : 'Received Amount') : (isArabic ? 'إجمالي المصروفات' : 'Spent Amount')}
+                            {isProfit
+                                ? (isArabic ? 'أرباح المكتب' : 'Office Profit')
+                                : isIncome
+                                    ? (isArabic ? 'إجمالي المقبوضات' : 'Received Amount')
+                                    : (isArabic ? 'إجمالي المصروفات' : 'Spent Amount')}
                         </div>
                         <div className={`tx-hero-amount ${isCancelled ? 'cancelled' : ''}`}>
                             {fmtCurrency(tx.amount)}

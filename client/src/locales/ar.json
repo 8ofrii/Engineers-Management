@@ -142,7 +142,8 @@
         "todaySummary": "ملخص اليوم",
         "dsrToday": "تقارير اليوم",
         "incomeToday": "إيرادات اليوم",
-        "expenseToday": "مصروفات اليوم"
+        "expenseToday": "مصروفات اليوم",
+        "office_profit": "أرباح المكتب"
     },
     "projects": {
         "title": "إدارة المشاريع",

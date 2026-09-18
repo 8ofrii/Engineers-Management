@@ -478,6 +478,40 @@ export const getProjectFinancials = async (req, res, next) => {
             });
         }
 
+        // Reconcile project ledger metrics to guarantee actualCost excludes office profits
+        const pAggs = await prisma.transaction.groupBy({
+            by: ['type', 'category'],
+            where: {
+                projectId: project.id,
+                tenantId: req.user.tenantId,
+                status: 'APPROVED'
+            },
+            _sum: {
+                amount: true
+            }
+        });
+
+        if (pAggs.length > 0) {
+            let siteCost = 0;
+            let profit = 0;
+            let income = 0;
+            pAggs.forEach(agg => {
+                const amt = Number(agg._sum.amount || 0);
+                if (agg.type === 'INCOME') {
+                    income += amt;
+                } else if (agg.type === 'EXPENSE') {
+                    if (agg.category === 'MANAGEMENT_FEE_TRANSFER') {
+                        profit += amt;
+                    } else {
+                        siteCost += amt;
+                    }
+                }
+            });
+            project.actualCost = siteCost;
+            project.officeRevenue = profit;
+            project.projectSafeBalance = income - siteCost - profit;
+        }
+
         // Calculate custody holdings for this project
         // Sum all approved custody transactions grouped by engineer
         const custodyByEngineer = {};

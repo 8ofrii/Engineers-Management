@@ -75,7 +75,7 @@ export default function DashboardScreen({ navigation }) {
                 .reduce((s, tx) => s + Number(tx.amount || 0), 0);
 
             const todayExpenseSum = txList
-                .filter(tx => (tx.type === 'EXPENSE' || tx.type === 'expense') && (tx.transactionDate || tx.createdAt || '').slice(0, 10) === todayStr && tx.status === 'APPROVED')
+                .filter(tx => (tx.type === 'EXPENSE' || tx.type === 'expense') && tx.category !== 'MANAGEMENT_FEE_TRANSFER' && (tx.transactionDate || tx.createdAt || '').slice(0, 10) === todayStr && tx.status === 'APPROVED')
                 .reduce((s, tx) => s + Number(tx.amount || 0), 0);
 
             setTodaySummary({
