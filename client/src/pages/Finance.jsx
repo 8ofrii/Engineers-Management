@@ -237,7 +237,7 @@ export default function Finance() {
 
         transactions.forEach(tx => {
             const txType = tx.category === 'MANAGEMENT_FEE_TRANSFER'
-                ? (isArabic ? 'أرباح المكتب' : 'Office Profit')
+                ? (isArabic ? 'ارباح المكتب' : 'Office Profit')
                 : (tx.type === 'INCOME' ? (isArabic ? 'إيراد' : 'Income') : (isArabic ? 'مصروف' : 'Expense'));
 
             const status = tx.status === 'APPROVED'
@@ -380,7 +380,7 @@ export default function Finance() {
 
     return (
         <Layout>
-            <div className="container">
+            <div className="finance-page">
                 {/* Header Section */}
                 <div className="flex-between mb-xl">
                     <div>
@@ -602,7 +602,7 @@ export default function Finance() {
                                         } : {})
                                     }}
                                 >
-                                    {t('finance.companyShare') || (isArabic ? 'أرباح المكتب' : 'Office Profit')}
+                                    {t('finance.companyShare') || (isArabic ? 'ارباح المكتب' : 'Office Profit')}
                                 </button>
                                 <button
                                     className={`btn btn-sm ${filterType === 'MY_LEDGER' ? 'btn-primary' : 'btn-secondary'}`}
@@ -744,43 +744,45 @@ export default function Finance() {
                                         <span className="badge badge-warning" style={{ borderRadius: '50%', padding: '2px 8px' }}>{pendingTransactions.length}</span>
                                     </h3>
                                 </div>
-                                <table className="transaction-table">
-                                    <thead>
-                                        <tr>
-                                            <th>{t('common.date')}</th>
-                                            <th>{t('finance.project')}</th>
-                                            <th>{t('finance.category')}</th>
-                                            <th>{t('finance.description')}</th>
-                                            <th>{t('finance.amount')}</th>
-                                            <th>{t('finance.createdBy') || 'بواسطة'}</th>
-                                            <th style={{ width: '120px' }}>{t('common.actions')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pendingTransactions.map((tx) => (
-                                            <tr key={tx.id} style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
-                                                <td style={{ fontWeight: '500' }}>{formatDate(tx.transactionDate)}</td>
-                                                <td>{tx.project?.name || '-'}</td>
-                                                <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                                <td style={{ maxWidth: '200px' }} className="truncate" title={tx.description}>{tx.description}</td>
-                                                <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                                                    {fmtCurrency(tx.amount)}
-                                                </td>
-                                                <td>{tx.creator?.name || '-'}</td>
-                                                <td>
-                                                    <div className="flex gap-sm justify-center">
-                                                        <button className="btn-icon-sm" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(tx.id)} title={t('common.approve') || 'Approve'}>
-                                                            <CheckCircle size={16} />
-                                                        </button>
-                                                        <button className="btn-icon-sm" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => handleReject(tx.id)} title={t('common.reject') || 'Reject'}>
-                                                            <XCircle size={16} />
-                                                        </button>
-                                                    </div>
-                                                </td>
+                                <div style={{ overflowX: 'auto', width: '100%' }}>
+                                    <table className="transaction-table">
+                                        <thead>
+                                            <tr>
+                                                <th>{t('common.date')}</th>
+                                                <th>{t('finance.project')}</th>
+                                                <th>{t('finance.category')}</th>
+                                                <th>{t('finance.description')}</th>
+                                                <th>{t('finance.amount')}</th>
+                                                <th>{t('finance.createdBy') || 'بواسطة'}</th>
+                                                <th style={{ width: '120px' }}>{t('common.actions')}</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {pendingTransactions.map((tx) => (
+                                                <tr key={tx.id} style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
+                                                    <td style={{ fontWeight: '500' }}>{formatDate(tx.transactionDate)}</td>
+                                                    <td>{tx.project?.name || '-'}</td>
+                                                    <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                    <td style={{ maxWidth: '200px' }} className="truncate" title={tx.description}>{tx.description}</td>
+                                                    <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                        {fmtCurrency(tx.amount)}
+                                                    </td>
+                                                    <td>{tx.creator?.name || '-'}</td>
+                                                    <td>
+                                                        <div className="flex gap-sm justify-center">
+                                                            <button className="btn-icon-sm" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(tx.id)} title={t('common.approve') || 'Approve'}>
+                                                                <CheckCircle size={16} />
+                                                            </button>
+                                                            <button className="btn-icon-sm" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => handleReject(tx.id)} title={t('common.reject') || 'Reject'}>
+                                                                <XCircle size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
 
@@ -844,7 +846,7 @@ export default function Finance() {
                                                 {filterType === 'MY_LEDGER'
                                                     ? (t('finance.myNetCustody') || 'صافي العهدة')
                                                     : filterType === 'COMPANY_SHARE'
-                                                    ? (t('finance.totalCompanyShare') || (isArabic ? 'إجمالي أرباح المكتب' : 'Total Office Profit'))
+                                                    ? (t('finance.totalCompanyShare') || (isArabic ? 'إجمالي ارباح المكتب' : 'Total Office Profit'))
                                                     : (t('finance.projectNet') || 'صافي المشروع')}:
                                                 <span style={{
                                                     marginLeft: '8px',
@@ -856,76 +858,78 @@ export default function Finance() {
                                                 </span>
                                             </div>
                                         </div>
-                                        <table className="transaction-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>{t('common.date')}</th>
-                                                    <th>{t('common.type')}</th>
-                                                    <th>{t('finance.category')}</th>
-                                                    <th>{t('finance.description')}</th>
-                                                    <th>{t('finance.payerOrClient') || 'الجهة الدافعة / المفوض'}</th>
-                                                    <th>{t('finance.paymentMethod') || 'طريقة الدفع'}</th>
-                                                    <th>{t('finance.amount')}</th>
-                                                    <th>{t('common.status')}</th>
-                                                    <th style={{ width: '120px' }}>{t('common.actions')}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {txs.map((tx) => (
-                                                    <tr key={tx.id}>
-                                                        <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
-                                                             <span dir="ltr" style={{ unicodeBidi: 'plaintext', display: 'inline-block' }}>
-                                                                {formatDate(tx.transactionDate)}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (
-                                                                <span className="badge" style={{ fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700 }}>
-                                                                    {t('finance.companyShare') || (isArabic ? 'أرباح المكتب' : 'Office Profit')}
-                                                                </span>
-                                                            ) : (
-                                                                <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                    {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                                        <td style={{ maxWidth: '220px' }} className="truncate" title={tx.description}>
-                                                            {tx.description}
-                                                            {tx.projectCostItem && (
-                                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
-                                                                    #{tx.projectCostItem.name}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        <td style={{ maxWidth: '180px' }} className="truncate">
-                                                            {renderPayerOrClient(tx)}
-                                                        </td>
-                                                        <td>
-                                                            {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
-                                                        </td>
-                                                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                                                            {fmtCurrency(tx.amount)}
-                                                        </td>
-                                                        <td>
-                                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                {t(`finance.status.${tx.status}`) || tx.status?.replace('_', ' ')}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <div className="flex gap-sm justify-center">
-                                                                <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
-                                                                    <Pencil size={16} />
-                                                                </button>
-                                                                <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.delete')}>
-                                                                    <Trash2 size={16} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
+                                        <div style={{ overflowX: 'auto', width: '100%' }}>
+                                            <table className="transaction-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>{t('common.date')}</th>
+                                                        <th>{t('common.type')}</th>
+                                                        <th>{t('finance.category')}</th>
+                                                        <th>{t('finance.description')}</th>
+                                                        <th>{t('finance.payerOrClient') || 'الجهة الدافعة / المفوض'}</th>
+                                                        <th>{t('finance.paymentMethod') || 'طريقة الدفع'}</th>
+                                                        <th>{t('finance.amount')}</th>
+                                                        <th>{t('common.status')}</th>
+                                                        <th style={{ width: '120px' }}>{t('common.actions')}</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    {txs.map((tx) => (
+                                                        <tr key={tx.id}>
+                                                            <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
+                                                                <span dir="ltr" style={{ unicodeBidi: 'plaintext', display: 'inline-block' }}>
+                                                                    {formatDate(tx.transactionDate)}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (
+                                                                    <span className="badge" style={{ fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700 }}>
+                                                                        {t('finance.companyShare') || (isArabic ? 'ارباح المكتب' : 'Office Profit')}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
+                                                                        {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                            <td style={{ maxWidth: '220px' }} className="truncate" title={tx.description}>
+                                                                {tx.description}
+                                                                {tx.projectCostItem && (
+                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
+                                                                        #{tx.projectCostItem.name}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ maxWidth: '180px' }} className="truncate">
+                                                                {renderPayerOrClient(tx)}
+                                                            </td>
+                                                            <td>
+                                                                {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
+                                                            </td>
+                                                            <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                                {fmtCurrency(tx.amount)}
+                                                            </td>
+                                                            <td>
+                                                                <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
+                                                                    {t(`finance.status.${tx.status}`) || tx.status?.replace('_', ' ')}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <div className="flex gap-sm justify-center">
+                                                                    <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
+                                                                        <Pencil size={16} />
+                                                                    </button>
+                                                                    <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.delete')}>
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 );
                             });

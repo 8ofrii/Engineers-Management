@@ -253,6 +253,7 @@
 /* Main Content */
 .main-content {
     flex: 1;
+    min-width: 0;
     margin-left: var(--sidebar-width);
     display: flex;
     flex-direction: column;
@@ -317,6 +318,7 @@
 
 .content {
     flex: 1;
+    min-width: 0;
     padding: var(--spacing-lg);
     background: var(--bg-primary);
     border-radius: var(--radius-xl) 0 0 0;
@@ -324,6 +326,12 @@
     border-left: 1px solid var(--border-color);
     margin-top: 2px;
     box-shadow: inset 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+[dir="rtl"] .content {
+    border-left: none;
+    border-right: 1px solid var(--border-color);
+    border-radius: 0 var(--radius-xl) 0 0;
 }
 
 /* Mobile Responsive */
@@ -430,6 +438,7 @@
 [dir="rtl"] .main-content {
     margin-left: 0;
     margin-right: var(--sidebar-width);
+    min-width: 0;
 }
 
 [dir="rtl"] .sidebar.sidebar-collapsed {

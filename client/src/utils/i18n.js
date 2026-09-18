@@ -28,4 +28,16 @@ i18n
         }
     });
 
+i18n.on('languageChanged', (lng) => {
+    localStorage.setItem('language', lng);
+    const isAr = (lng || '').startsWith('ar');
+    document.documentElement.dir = isAr ? 'rtl' : 'ltr';
+    document.documentElement.lang = isAr ? 'ar' : 'en';
+});
+
+const currentLang = i18n.language || localStorage.getItem('language') || 'ar';
+const isInitialAr = currentLang.startsWith('ar');
+document.documentElement.dir = isInitialAr ? 'rtl' : 'ltr';
+document.documentElement.lang = isInitialAr ? 'ar' : 'en';
+
 export default i18n;

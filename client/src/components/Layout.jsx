@@ -150,10 +150,13 @@ export default function Layout({ children }) {
         return cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
     };
 
+    const isArabic = (i18n.language || '').startsWith('ar');
+
     useEffect(() => {
         // Set RTL direction for Arabic
-        document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
-    }, [i18n.language]);
+        document.documentElement.dir = isArabic ? 'rtl' : 'ltr';
+        document.documentElement.lang = isArabic ? 'ar' : 'en';
+    }, [isArabic]);
 
     const [collapsedGroups, setCollapsedGroups] = useState(() => {
         try {
@@ -178,7 +181,7 @@ export default function Layout({ children }) {
     };
 
     const toggleLanguage = () => {
-        const newLang = i18n.language === 'en' ? 'ar' : 'en';
+        const newLang = isArabic ? 'en' : 'ar';
         i18n.changeLanguage(newLang);
     };
 
@@ -271,9 +274,9 @@ export default function Layout({ children }) {
                         type="button"
                         className="sidebar-collapse-btn"
                         onClick={toggleSidebarCollapse}
-                        title={i18n.language === 'ar' ? 'تصغير القائمة الجانبية' : 'Minimize Sidebar / Fullscreen Tab'}
+                        title={isArabic ? 'تصغير القائمة الجانبية' : 'Minimize Sidebar / Fullscreen Tab'}
                     >
-                        {i18n.language === 'ar' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                        {isArabic ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
                     </button>
 
                     <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>
@@ -610,20 +613,20 @@ export default function Layout({ children }) {
                         <SkyToggle
                             dark={activeTheme !== 'light'}
                             onToggle={toggleTheme}
-                            label={activeTheme === 'light' ? (i18n.language === 'ar' ? 'التحويل للوضع الليلي' : 'Switch to Dark Mode') : (i18n.language === 'ar' ? 'التحويل للوضع الفاتح' : 'Switch to Light Mode')}
+                            label={activeTheme === 'light' ? (isArabic ? 'التحويل للوضع الليلي' : 'Switch to Dark Mode') : (isArabic ? 'التحويل للوضع الفاتح' : 'Switch to Light Mode')}
                         />
 
                         {/* Clean & Simple Language Toggle Button with Globe Icon */}
                         <button
                             className="theme-toggle"
                             onClick={toggleLanguage}
-                            title={i18n.language === 'ar' ? 'Switch to English' : 'التحويل إلى اللغة العربية'}
+                            title={isArabic ? 'Switch to English' : 'التحويل إلى اللغة العربية'}
                             aria-label="Toggle language"
                             style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 10px' }}
                         >
                             <Globe size={18} />
                             <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px' }}>
-                                {i18n.language === 'en' ? 'AR' : 'EN'}
+                                {isArabic ? 'EN' : 'AR'}
                             </span>
                         </button>
 

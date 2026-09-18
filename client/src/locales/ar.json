@@ -439,6 +439,8 @@
         "unitPrice": "سعر الوحدة",
         "amount": "المبلغ (ج.م)",
         "projectNet": "صافي المشروع",
+        "companyShare": "ارباح المكتب",
+        "totalCompanyShare": "إجمالي ارباح المكتب",
         "description": "الوصف / البيان",
         "detailsAndAmount": "التفاصيل والمبلغ",
         "transactionDateTime": "التاريخ",
