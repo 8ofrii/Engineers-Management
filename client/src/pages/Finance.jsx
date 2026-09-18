@@ -1027,6 +1027,38 @@ export default function Finance() {
                                 .nested-fee-row td:first-child {
                                     border-inline-start: 3px solid #10b981;
                                 }
+                                .nested-fee-category {
+                                    color: #10b981;
+                                    font-weight: 600;
+                                }
+                                .nested-fee-amount {
+                                    color: #10b981;
+                                    font-weight: 700;
+                                }
+                                .nested-fee-tree {
+                                    color: #10b981;
+                                }
+
+                                /* Project Summary & Net Values */
+                                .project-net-val {
+                                    margin-left: 8px;
+                                    margin-right: 8px;
+                                    font-weight: 800;
+                                }
+                                .project-net-val.positive {
+                                    color: #34d399;
+                                }
+                                .project-net-val.negative {
+                                    color: #f87171;
+                                }
+
+                                /* Table Amount */
+                                .tx-amount.income {
+                                    color: #34d399;
+                                }
+                                .tx-amount.expense {
+                                    color: var(--text-primary);
+                                }
 
                                 /* Standardized Action Button Group */
                                 .tx-action-group {
@@ -1084,6 +1116,230 @@ export default function Finance() {
                                     color: #f87171;
                                     background: rgba(239, 68, 68, 0.15);
                                     border-color: rgba(239, 68, 68, 0.3);
+                                }
+
+                                /* =========================================================
+                                   LIGHT MODE (HIGH CONTRAST — NO LIGHT TEXT ON LIGHT BG!)
+                                   ========================================================= */
+                                body.light-mode .project-header {
+                                    background: #f5eedf !important;
+                                    border-bottom: 1px solid #d8cbaf !important;
+                                }
+                                body.light-mode .project-title {
+                                    color: #1c1710 !important;
+                                }
+                                body.light-mode .project-summary {
+                                    color: #4a3f31 !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .project-net-val.positive {
+                                    color: #065f46 !important;
+                                    font-weight: 800 !important;
+                                }
+                                body.light-mode .project-net-val.negative {
+                                    color: #991b1b !important;
+                                    font-weight: 800 !important;
+                                }
+
+                                /* Light Mode Table Headers & Cells */
+                                body.light-mode .transaction-table th {
+                                    background: #ede4d0 !important;
+                                    color: #3b3123 !important;
+                                    border-bottom: 2px solid #cfbe9f !important;
+                                    font-weight: 800 !important;
+                                }
+                                body.light-mode .transaction-table td {
+                                    border-bottom: 1px solid #e5dcce !important;
+                                    color: #1c1710 !important;
+                                }
+                                body.light-mode .transaction-table tbody tr.tx-row:hover {
+                                    background: rgba(60, 45, 20, 0.035) !important;
+                                }
+                                body.light-mode .tx-amount.income {
+                                    color: #065f46 !important;
+                                    font-weight: 800 !important;
+                                }
+                                body.light-mode .tx-amount.expense {
+                                    color: #1c1710 !important;
+                                    font-weight: 800 !important;
+                                }
+
+                                /* Light Mode Type Pills — Deep Saturated Contrast */
+                                body.light-mode .badge-type-pill.expense {
+                                    background: #fee2e2 !important;
+                                    color: #991b1b !important;
+                                    border: 1px solid #fca5a5 !important;
+                                    font-weight: 800 !important;
+                                }
+                                body.light-mode .badge-type-pill.income {
+                                    background: #d1fae5 !important;
+                                    color: #065f46 !important;
+                                    border: 1px solid #6ee7b7 !important;
+                                    font-weight: 800 !important;
+                                }
+                                body.light-mode .badge-type-pill.profit {
+                                    background: #cffafe !important;
+                                    color: #155e75 !important;
+                                    border: 1px solid #67e8f9 !important;
+                                    font-weight: 800 !important;
+                                }
+
+                                /* Light Mode Payment Method Badges */
+                                body.light-mode .badge-method-pill.bank {
+                                    background: #dbeafe !important;
+                                    color: #1e40af !important;
+                                    border: 1px solid #93c5fd !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge-method-pill.cash {
+                                    background: #fef3c7 !important;
+                                    color: #854d0e !important;
+                                    border: 1px solid #fde68a !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge-method-pill.check {
+                                    background: #f3e8ff !important;
+                                    color: #6b21a8 !important;
+                                    border: 1px solid #d8b4fe !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge-method-pill.card {
+                                    background: #e0e7ff !important;
+                                    color: #3730a3 !important;
+                                    border: 1px solid #a5b4fc !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge-method-pill.custody {
+                                    background: #e2e8f0 !important;
+                                    color: #1e293b !important;
+                                    border: 1px solid #cbd5e1 !important;
+                                    font-weight: 700 !important;
+                                }
+
+                                /* Light Mode Media Buttons */
+                                body.light-mode .badge-media-btn.voice {
+                                    background: #f3e8ff !important;
+                                    color: #6b21a8 !important;
+                                    border: 1px solid #d8b4fe !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge-media-btn.voice:hover {
+                                    background: #e9d5ff !important;
+                                }
+                                body.light-mode .badge-media-btn.receipt {
+                                    background: #dbeafe !important;
+                                    color: #1e40af !important;
+                                    border: 1px solid #93c5fd !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge-media-btn.receipt:hover {
+                                    background: #bfdbfe !important;
+                                }
+                                body.light-mode .badge-media-btn.ai {
+                                    background: #e0e7ff !important;
+                                    color: #3730a3 !important;
+                                    border: 1px solid #a5b4fc !important;
+                                    font-weight: 700 !important;
+                                }
+
+                                /* Light Mode Nested Fees */
+                                body.light-mode .parent-with-fee {
+                                    border-bottom: 1px dashed rgba(5, 150, 105, 0.3) !important;
+                                }
+                                body.light-mode .parent-with-fee td:first-child {
+                                    border-inline-start: 3px solid #059669 !important;
+                                }
+                                body.light-mode .nested-fee-row {
+                                    background: rgba(16, 185, 129, 0.06) !important;
+                                }
+                                body.light-mode .nested-fee-row td:first-child {
+                                    border-inline-start: 3px solid #059669 !important;
+                                }
+                                body.light-mode .fee-included-tag {
+                                    background: #d1fae5 !important;
+                                    color: #065f46 !important;
+                                    border: 1px solid #6ee7b7 !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .nested-fee-category {
+                                    color: #065f46 !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .nested-fee-amount {
+                                    color: #065f46 !important;
+                                    font-weight: 800 !important;
+                                }
+                                body.light-mode .nested-fee-tree {
+                                    color: #059669 !important;
+                                }
+
+                                /* Light Mode Status Badges */
+                                body.light-mode .badge.badge-success {
+                                    background: #d1fae5 !important;
+                                    color: #065f46 !important;
+                                    border: 1px solid #a7f3d0 !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge.badge-warning {
+                                    background: #fef3c7 !important;
+                                    color: #92400e !important;
+                                    border: 1px solid #fde68a !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge.badge-danger {
+                                    background: #fee2e2 !important;
+                                    color: #991b1b !important;
+                                    border: 1px solid #fca5a5 !important;
+                                    font-weight: 700 !important;
+                                }
+                                body.light-mode .badge.badge-secondary {
+                                    background: #e2e8f0 !important;
+                                    color: #334155 !important;
+                                    border: 1px solid #cbd5e1 !important;
+                                    font-weight: 700 !important;
+                                }
+
+                                /* Light Mode Action Buttons */
+                                body.light-mode .tx-action-group {
+                                    background: rgba(60, 45, 20, 0.04) !important;
+                                    border-color: rgba(60, 45, 20, 0.12) !important;
+                                }
+                                body.light-mode .tx-action-btn {
+                                    color: #574e3f !important;
+                                }
+                                body.light-mode .tx-action-btn:hover {
+                                    background: rgba(60, 45, 20, 0.08) !important;
+                                    color: #1c1710 !important;
+                                }
+                                body.light-mode .tx-action-btn.view:hover {
+                                    background: #dbeafe !important;
+                                    color: #1e40af !important;
+                                    border-color: #93c5fd !important;
+                                }
+                                body.light-mode .tx-action-btn.edit:hover {
+                                    background: #e0e7ff !important;
+                                    color: #3730a3 !important;
+                                    border-color: #a5b4fc !important;
+                                }
+                                body.light-mode .tx-action-btn.refund:hover {
+                                    background: #fef3c7 !important;
+                                    color: #92400e !important;
+                                    border-color: #fde68a !important;
+                                }
+                                body.light-mode .tx-action-btn.delete:hover {
+                                    background: #fee2e2 !important;
+                                    color: #991b1b !important;
+                                    border-color: #fca5a5 !important;
+                                }
+                                body.light-mode .tx-action-btn.approve:hover {
+                                    background: #d1fae5 !important;
+                                    color: #065f46 !important;
+                                    border-color: #6ee7b7 !important;
+                                }
+                                body.light-mode .tx-action-btn.reject:hover {
+                                    background: #fee2e2 !important;
+                                    color: #991b1b !important;
+                                    border-color: #fca5a5 !important;
                                 }
 
                                 .truncate {
@@ -1232,12 +1488,7 @@ export default function Finance() {
                                                     : filterType === 'COMPANY_SHARE'
                                                     ? (t('finance.totalCompanyShare') || (isArabic ? 'إجمالي ارباح المكتب' : 'Total Office Profit'))
                                                     : (t('finance.projectNet') || 'صافي المشروع')}:
-                                                <span style={{
-                                                    marginLeft: '8px',
-                                                    marginRight: '8px',
-                                                    fontWeight: 'bold',
-                                                    color: (filterType === 'COMPANY_SHARE' || totalAmount >= 0) ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 200, 200, 1)'
-                                                }}>
+                                                <span className={`project-net-val ${totalAmount >= 0 ? 'positive' : 'negative'}`}>
                                                     {fmtCurrency(Math.abs(totalAmount))}
                                                 </span>
                                             </div>
@@ -1338,7 +1589,7 @@ export default function Finance() {
 
                                                                         {/* 7. Amount */}
                                                                         <td style={{ textAlign: 'end', fontWeight: '700', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', textDecoration: isCancelled ? 'line-through' : 'none' }}>
-                                                                            <span style={{ color: tx.type === 'INCOME' ? '#34d399' : 'var(--text-primary)' }}>
+                                                                            <span className={`tx-amount ${tx.type === 'INCOME' ? 'income' : 'expense'}`}>
                                                                                 {tx.type === 'INCOME' ? '+ ' : ''}{fmtCurrency(tx.amount)}
                                                                             </span>
                                                                         </td>
@@ -1401,7 +1652,7 @@ export default function Finance() {
                                                                             >
                                                                                 {/* 1. Date with Tree Branch Connector */}
                                                                                 <td style={{ textAlign: 'start', whiteSpace: 'nowrap', paddingInlineStart: '22px' }}>
-                                                                                    <div className="flex items-center gap-xs" style={{ color: '#10b981' }}>
+                                                                                    <div className="flex items-center gap-xs nested-fee-tree">
                                                                                         <CornerDownRight
                                                                                             size={14}
                                                                                             style={{
@@ -1423,7 +1674,7 @@ export default function Finance() {
                                                                                 </td>
 
                                                                                 {/* 3. Category: Cost-Plus Fee */}
-                                                                                <td style={{ textAlign: 'start', fontSize: '0.8rem', color: '#10b981', fontWeight: '600' }}>
+                                                                                <td style={{ textAlign: 'start', fontSize: '0.8rem' }} className="nested-fee-category">
                                                                                     {isArabic ? 'أتعاب كوست بلس (+10%)' : 'Cost-Plus Fee (+10%)'}
                                                                                 </td>
 
@@ -1449,8 +1700,10 @@ export default function Finance() {
                                                                                 </td>
 
                                                                                 {/* 7. Amount: Emerald Bold Right-Aligned */}
-                                                                                <td style={{ textAlign: 'end', fontWeight: '700', color: '#10b981', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                                                                                    + {fmtCurrency(feeTx.amount)}
+                                                                                <td style={{ textAlign: 'end', fontWeight: '700', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                                                                    <span className="nested-fee-amount">
+                                                                                        + {fmtCurrency(feeTx.amount)}
+                                                                                    </span>
                                                                                 </td>
 
                                                                                 {/* 8. Status */}
