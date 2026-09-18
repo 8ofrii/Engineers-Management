@@ -163,6 +163,7 @@
         "officeProfit": "أرباح المكتب",
         "negativeBalanceAlert": "عجز في خزينة المشروع",
         "viewTransactions": "عرض المعاملات",
+        "viewDocuments": "الوثائق والعقود",
         "status": {
             "planning": "تخطيط",
             "inProgress": "شغال",
@@ -181,7 +182,8 @@
                 "basic": "المعلومات الأساسية",
                 "timeline": "المواعيد",
                 "completion": "نسبة إنجاز المشروع",
-                "financial": "الحسابات"
+                "financial": "الحسابات",
+                "contracts": "عقد المشروع والوثائق القانونية"
             },
             "fields": {
                 "name": "اسم المشروع",
@@ -197,14 +199,19 @@
                 "budget": "الميزانية (ج.م)",
                 "managementFee": "نسبة الإدارة (%)",
                 "contractValue": "إجمالي قيمة العقد (ج.م)",
-                "paymentTerms": "نظام الدفع"
+                "paymentTerms": "نظام الدفع",
+                "contractFile": "ملف العقد أو الوثيقة القانونية",
+                "contractTitle": "عنوان الوثيقة",
+                "contractDescription": "ملاحظات أو وصف الوثيقة"
             },
             "hints": {
                 "designOnly": "حساب التصميم بالمساحة",
                 "costPlus": "التكلفة + نسبة الإدارة",
                 "lumpSum": "مقاولة مقطوعية",
                 "feeRange": "في الغالب بتكون من 15% لـ 25%",
-                "contractValue": "إجمالي المبلغ اللي اتفقنا عليه"
+                "contractValue": "إجمالي المبلغ اللي اتفقنا عليه",
+                "contractUpload": "ارفع ملف العقد، الاتفاقية أو التصريح (PDF أو Word أو صورة حتى 25 ميجابايت)",
+                "dragDropFile": "اضغط هنا أو اسحب الملف لرفعه"
             },
             "options": {
                 "selectEngineer": "اختر المهندس المسؤول",

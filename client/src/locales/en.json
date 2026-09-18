@@ -162,6 +162,7 @@
         "officeProfit": "Office Profit",
         "negativeBalanceAlert": "Negative Safe Balance",
         "viewTransactions": "View Transactions",
+        "viewDocuments": "Documents & Contracts",
         "status": {
             "planning": "Planning",
             "inProgress": "In Progress",
@@ -180,7 +181,8 @@
                 "basic": "Basic Information",
                 "timeline": "Timeline",
                 "completion": "Project Completion",
-                "financial": "Financial Details"
+                "financial": "Financial Details",
+                "contracts": "Contract & Legal Documents"
             },
             "fields": {
                 "name": "Project Name",
@@ -196,14 +198,19 @@
                 "budget": "Budget (EGP)",
                 "managementFee": "Management Fee (%)",
                 "contractValue": "Total Contract Value (EGP)",
-                "paymentTerms": "Payment Terms"
+                "paymentTerms": "Payment Terms",
+                "contractFile": "Project Contract / Legal Document",
+                "contractTitle": "Document Title",
+                "contractDescription": "Document Notes"
             },
             "hints": {
                 "designOnly": "Design fees based on area",
                 "costPlus": "Expenses + Management fee percentage",
                 "lumpSum": "Fixed contract price",
                 "feeRange": "Typical range: 15-25%",
-                "contractValue": "Total agreed contract amount"
+                "contractValue": "Total agreed contract amount",
+                "contractUpload": "Upload project contract, agreement, or permit (PDF, Word, or Image up to 25MB)",
+                "dragDropFile": "Click or drag & drop to upload file"
             },
             "options": {
                 "selectEngineer": "Select Assigned Engineer",

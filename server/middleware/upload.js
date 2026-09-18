@@ -16,9 +16,10 @@ const rootDir = path.join(__dirname, '..');
 const audioDir = path.join(rootDir, 'uploads', 'audio');
 const imageDir = path.join(rootDir, 'uploads', 'images');
 const receiptDir = path.join(rootDir, 'uploads', 'receipts');
+const documentDir = path.join(rootDir, 'uploads', 'documents');
 
 // Ensure directories exist
-[audioDir, imageDir, receiptDir].forEach(dir => {
+[audioDir, imageDir, receiptDir, documentDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
@@ -197,5 +198,46 @@ const receiptUpload = multer({
     limits: { fileSize: 25 * 1024 * 1024 }
 });
 
-export { upload, audioUpload, receiptMemoryUpload, receiptUpload };
+// Document storage (Contracts, legal documentation, permits, drawings, etc.)
+const localDocumentStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, documentDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'doc-' + uniqueSuffix + getSafeReceiptExt(file));
+    }
+});
+
+const s3DocumentStorage = multerS3({
+    s3: getS3(),
+    bucket: BUCKET,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    metadata: function (req, file, cb) {
+        cb(null, { fieldName: file.fieldname });
+    },
+    key: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'documents/doc-' + uniqueSuffix + getSafeReceiptExt(file));
+    }
+});
+
+const documentUpload = multer({
+    storage: useS3 ? s3DocumentStorage : localDocumentStorage,
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase();
+        const isMimeAllowed = Boolean(RECEIPT_EXT_MAP[file.mimetype]) || file.mimetype?.startsWith('image/');
+        const isExtAllowed = ALLOWED_RECEIPT_EXTENSIONS.has(ext);
+
+        if (isMimeAllowed || isExtAllowed) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Allowed formats: PDF, Word (DOC/DOCX), Images (JPG, PNG, WebP), Text'), false);
+        }
+    },
+    limits: { fileSize: 25 * 1024 * 1024 }
+});
+
+export { upload, audioUpload, receiptMemoryUpload, receiptUpload, documentUpload };
 export default audioUpload;
+

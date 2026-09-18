@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Camera, Upload, Trash2, ArrowLeft, MapPin, X, Filter } from 'lucide-react';
+import { Camera, Upload, Trash2, ArrowLeft, MapPin, X, Filter, ExternalLink, FileText } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
@@ -78,16 +78,21 @@ export default function ProjectDocuments() {
     const onFilePicked = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            showAlert({ type: 'error', title: 'Invalid file', message: 'Only images are supported (JPEG, PNG, GIF, WebP)' });
+        const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.doc', '.docx', '.txt'];
+        const ext = '.' + file.name.split('.').pop().toLowerCase();
+        if (!file.type.startsWith('image/') && !allowedExts.includes(ext) && file.type !== 'application/pdf') {
+            showAlert({ type: 'error', title: 'Invalid file', message: 'Supported formats: Images (JPG, PNG, WebP), PDF, and Word documents' });
             return;
         }
-        if (file.size > 5 * 1024 * 1024) {
-            showAlert({ type: 'error', title: 'Too large', message: 'Maximum 5 MB per image' });
+        if (file.size > 25 * 1024 * 1024) {
+            showAlert({ type: 'error', title: 'Too large', message: 'Maximum 25 MB per document' });
             return;
         }
         setPendingFile(file);
         setUploadName(file.name.replace(/\.[^.]+$/, ''));
+        if (['.pdf', '.doc', '.docx'].includes(ext) && uploadCategory === 'PHOTO_PROGRESS') {
+            setUploadCategory('CONTRACT');
+        }
     };
 
     const cancelUpload = () => {
@@ -189,26 +194,39 @@ export default function ProjectDocuments() {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept="image/*"
+                                accept="image/*,.pdf,.doc,.docx,.txt"
                                 onChange={onFilePicked}
                                 style={{ display: 'none' }}
                             />
                             <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
-                                <Camera size={16} /> Choose photo or document
+                                <Upload size={16} /> Choose document or photo
                             </button>
                             <p className="text-secondary" style={{ fontSize: 12, marginTop: 8 }}>
-                                JPEG, PNG, GIF, or WebP — max 5 MB
+                                PDF, Word (DOC/DOCX), JPEG, PNG, or WebP — max 25 MB
                             </p>
                         </div>
                     ) : (
                         <div>
                             <div className="grid grid-2" style={{ gap: 16, alignItems: 'start' }}>
                                 <div>
-                                    <img
-                                        src={URL.createObjectURL(pendingFile)}
-                                        alt="preview"
-                                        style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 8, border: '1px solid var(--border-color)' }}
-                                    />
+                                    {pendingFile.type.startsWith('image/') ? (
+                                        <img
+                                            src={URL.createObjectURL(pendingFile)}
+                                            alt="preview"
+                                            style={{ maxWidth: '100%', maxHeight: 280, borderRadius: 8, border: '1px solid var(--border-color)' }}
+                                        />
+                                    ) : (
+                                        <div style={{
+                                            padding: '40px 20px',
+                                            borderRadius: 8,
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-tertiary)',
+                                            textAlign: 'center'
+                                        }}>
+                                            <FileText size={48} style={{ color: 'var(--color-primary-light)', margin: '0 auto 8px' }} />
+                                            <div style={{ fontWeight: 600, fontSize: 14 }}>{pendingFile.name}</div>
+                                        </div>
+                                    )}
                                     <p className="text-secondary" style={{ fontSize: 12, marginTop: 4 }}>
                                         {pendingFile.name} · {fmtSize(pendingFile.size)}
                                     </p>
@@ -300,8 +318,26 @@ export default function ProjectDocuments() {
                                         onClick={() => setLightbox(doc)}
                                     />
                                 ) : (
-                                    <div style={{ aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6' }}>
-                                        <span style={{ fontSize: 48 }}>{cat.icon}</span>
+                                    <div
+                                        style={{
+                                            aspectRatio: '1',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            background: 'var(--bg-tertiary, #f3f4f6)',
+                                            cursor: 'pointer',
+                                            padding: 16,
+                                            textAlign: 'center',
+                                            transition: 'opacity 0.2s ease'
+                                        }}
+                                        onClick={() => window.open(fullUrl(doc.url), '_blank', 'noopener,noreferrer')}
+                                        title="Click to open or download file"
+                                    >
+                                        <span style={{ fontSize: 44, marginBottom: 8 }}>{cat.icon}</span>
+                                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary-light)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                            <ExternalLink size={12} /> Open Document
+                                        </span>
                                     </div>
                                 )}
                                 <div style={{ padding: 12 }}>
@@ -325,8 +361,27 @@ export default function ProjectDocuments() {
                                             </button>
                                         )}
                                     </div>
-                                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
-                                        {doc.uploader?.name || 'Unknown'} · {fmtDate(doc.uploadedAt)}
+                                    <div className="flex-between" style={{ marginTop: 6, alignItems: 'center' }}>
+                                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                            {doc.uploader?.name || 'Unknown'} · {fmtDate(doc.uploadedAt)}
+                                        </div>
+                                        <a
+                                            href={fullUrl(doc.url)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                fontSize: '11px',
+                                                color: 'var(--color-primary-light)',
+                                                fontWeight: 600,
+                                                textDecoration: 'none'
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <ExternalLink size={11} /> View
+                                        </a>
                                     </div>
                                     {(doc.latitude != null && doc.longitude != null) && (
                                         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>

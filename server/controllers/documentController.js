@@ -1,9 +1,17 @@
+import path from 'path';
 import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
 
 // Map an uploaded multer file → its public URL. Mirrors the pattern used
-// elsewhere (S3 sets `file.location`; local fallback uses /uploads/images/<filename>).
-const fileToUrl = (file) => file?.location || (file?.filename ? `/uploads/images/${file.filename}` : null);
+// elsewhere (S3 sets `file.location`; local fallback uses /uploads/<folder>/<filename>).
+const fileToUrl = (file) => {
+    if (file?.location) return file.location;
+    if (file?.filename) {
+        const folder = file.destination ? path.basename(file.destination) : 'documents';
+        return `/uploads/${folder}/${file.filename}`;
+    }
+    return null;
+};
 
 // @desc    List documents for a project (most-recent first).
 // @route   GET /api/projects/:projectId/documents

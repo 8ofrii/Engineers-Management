@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { documentUpload } from '../middleware/upload.js';
 import { validate } from '../middleware/validate.js';
 import { z } from 'zod';
 import { listDocuments, uploadDocument, deleteDocument } from '../controllers/documentController.js';
@@ -28,7 +28,7 @@ const idParam = z.object({
 projectDocsRouter.get('/:projectId', validate({ params: projectIdParam }), listDocuments);
 projectDocsRouter.post(
     '/:projectId',
-    upload.single('file'),
+    documentUpload.single('file'),
     validate({ params: projectIdParam }),
     uploadDocument
 );

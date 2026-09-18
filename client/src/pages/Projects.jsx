@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { projectsAPI } from '../services/api';
-import { FolderKanban, Plus, Pencil, Trash2, Receipt, X, AlertTriangle } from 'lucide-react';
+import { projectsAPI, documentsAPI } from '../services/api';
+import { FolderKanban, Plus, Pencil, Trash2, Receipt, X, AlertTriangle, FileText } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import Layout from '../components/Layout';
 import AddProjectModal from '../components/AddProjectModal';
@@ -64,23 +64,50 @@ export default function Projects() {
 
     const { currency: formatCurrency } = useFormat();
 
-    const handleSaveProject = async (projectData) => {
+    const handleSaveProject = async (projectData, contractData = null) => {
         try {
+            let targetProjectId = null;
             if (editingProject) {
                 await projectsAPI.update(editingProject.id, projectData);
+                targetProjectId = editingProject.id;
                 showAlert({
                     type: 'success',
                     title: t('common.success'),
-                    message: 'Project updated successfully'
+                    message: isArabic ? 'تم تحديث المشروع بنجاح' : 'Project updated successfully'
                 });
             } else {
-                await projectsAPI.create(projectData);
+                const res = await projectsAPI.create(projectData);
+                targetProjectId = res.data?.data?.id;
                 showAlert({
                     type: 'success',
                     title: t('common.success'),
-                    message: 'Project created successfully'
+                    message: isArabic ? 'تم إنشاء المشروع بنجاح' : 'Project created successfully'
                 });
             }
+
+            // If a contract or legal document was attached, upload it
+            if (targetProjectId && contractData?.file) {
+                try {
+                    const docForm = new FormData();
+                    docForm.append('file', contractData.file);
+                    docForm.append('name', contractData.name || contractData.file.name);
+                    docForm.append('category', contractData.category || 'CONTRACT');
+                    if (contractData.description) {
+                        docForm.append('description', contractData.description);
+                    }
+                    await documentsAPI.upload(targetProjectId, docForm);
+                } catch (docErr) {
+                    console.error('Failed to upload contract document:', docErr);
+                    showAlert({
+                        type: 'warning',
+                        title: isArabic ? 'تنبيه في رفع العقد' : 'Contract Upload Notice',
+                        message: isArabic
+                            ? 'تم إنشاء المشروع بنجاح، لكن تعذر رفع ملف العقد. يمكنك إضافته من صفحة وثائق المشروع.'
+                            : 'Project was created successfully, but uploading the contract file failed. You can add it from Project Documents.'
+                    });
+                }
+            }
+
             loadProjects();
         } catch (error) {
             console.error('Failed to save project:', error);
@@ -320,22 +347,47 @@ export default function Projects() {
                                     </div>
                                 </div>
 
-                                {/* View Transactions Button */}
-                                <button
-                                    className="btn btn-secondary"
-                                    style={{
-                                        marginTop: 'var(--spacing-md)',
-                                        width: '100%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: 'var(--spacing-sm)'
-                                    }}
-                                    onClick={() => viewProjectTransactions(project.id, project.name)}
-                                >
-                                    <Receipt size={16} />
-                                    {t('projects.viewTransactions')}
-                                </button>
+                                {/* Action Buttons: Documents & Transactions */}
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '10px',
+                                    marginTop: 'var(--spacing-md)'
+                                }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '6px',
+                                            padding: '8px 12px',
+                                            fontSize: '0.85rem'
+                                        }}
+                                        onClick={() => navigate(`/projects/${project.id}/documents`)}
+                                        title={t('projects.viewDocuments') || 'Documents & Contracts'}
+                                    >
+                                        <FileText size={15} style={{ color: 'var(--color-primary-light)' }} />
+                                        <span>{t('projects.viewDocuments') || 'Documents'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '6px',
+                                            padding: '8px 12px',
+                                            fontSize: '0.85rem'
+                                        }}
+                                        onClick={() => viewProjectTransactions(project.id, project.name)}
+                                    >
+                                        <Receipt size={15} />
+                                        <span>{t('projects.viewTransactions')}</span>
+                                    </button>
+                                </div>
                             </div>
                             );
                         })}

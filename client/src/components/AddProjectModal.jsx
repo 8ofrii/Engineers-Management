@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, Upload, FileText, Trash2 } from 'lucide-react';
 import { clientsAPI, userAPI } from '../services/api';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
@@ -18,6 +18,11 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
     const [clients, setClients] = useState([]);
     const [engineers, setEngineers] = useState([]);
     const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+    const [contractFile, setContractFile] = useState(null);
+    const [contractTitle, setContractTitle] = useState('');
+    const [contractDescription, setContractDescription] = useState('');
+    const fileInputRef = useRef(null);
+
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -89,6 +94,10 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     setHasRestoredDraft(false);
                 }
             }
+            setContractFile(null);
+            setContractTitle('');
+            setContractDescription('');
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     }, [isOpen, initialData]);
 
@@ -178,19 +187,56 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
         return Object.keys(newErrors).length === 0;
     };
 
+    const formatFileSize = (bytes) => {
+        if (!bytes) return '';
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    const getDocIconColor = (filename) => {
+        const ext = filename?.split('.').pop()?.toLowerCase();
+        if (ext === 'pdf') return '#ef4444';
+        if (['doc', 'docx'].includes(ext)) return '#2563eb';
+        if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return '#10b981';
+        return '#f59e0b';
+    };
+
+    const handleFileSelected = (file) => {
+        if (file.size > 25 * 1024 * 1024) {
+            showAlert({
+                type: 'error',
+                title: isArabic ? 'الملف كبير جداً' : 'File Too Large',
+                message: isArabic ? 'الحد الأقصى لحجم الملف هو 25 ميجابايت' : 'Maximum file size allowed is 25 MB'
+            });
+            return;
+        }
+        setContractFile(file);
+        setContractTitle(file.name.replace(/\.[^.]+$/, ''));
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (validate()) {
             if (!initialData) {
                 clearFormDraft(PROJECT_DRAFT_KEY);
             }
-            onSubmit(formData);
+            onSubmit(formData, contractFile ? {
+                file: contractFile,
+                name: contractTitle.trim() || contractFile.name,
+                description: contractDescription.trim() || undefined,
+                category: 'CONTRACT'
+            } : null);
             handleClose();
         }
     };
 
     const handleClose = () => {
         setErrors({});
+        setContractFile(null);
+        setContractTitle('');
+        setContractDescription('');
+        if (fileInputRef.current) fileInputRef.current.value = '';
         onClose();
     };
 
@@ -506,6 +552,157 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                             {formData.revenueModel === 'EXECUTION_COST_PLUS' && t('projects.modal.hints.costPlus')}
                             {formData.revenueModel === 'EXECUTION_LUMP_SUM' && t('projects.modal.hints.lumpSum')}
                         </small>
+                    </div>
+
+                    {/* Contract & Legal Documents */}
+                    <div className="form-section">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <h3 className="section-title" style={{ margin: 0 }}>
+                                {t('projects.modal.sections.contracts') || 'Contract & Legal Documents'}
+                            </h3>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>
+                                {isArabic ? 'اختياري (يمكن إضافته لاحقاً)' : 'Optional (Can be added later)'}
+                            </span>
+                        </div>
+
+                        {!contractFile ? (
+                            <div
+                                onClick={() => fileInputRef.current?.click()}
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const file = e.dataTransfer.files?.[0];
+                                    if (file) handleFileSelected(file);
+                                }}
+                                style={{
+                                    border: '2px dashed var(--border-color, #374151)',
+                                    borderRadius: '12px',
+                                    padding: '24px 20px',
+                                    textAlign: 'center',
+                                    cursor: 'pointer',
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-primary, #ff5a1f)'}
+                                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border-color, #374151)'}
+                            >
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.txt"
+                                    style={{ display: 'none' }}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleFileSelected(file);
+                                    }}
+                                />
+                                <div style={{
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: '50%',
+                                    background: 'rgba(255, 90, 31, 0.1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    margin: '0 auto 10px',
+                                    color: 'var(--color-primary-light, #ff7a45)'
+                                }}>
+                                    <Upload size={22} />
+                                </div>
+                                <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                                    {t('projects.modal.hints.dragDropFile') || 'Click or drag & drop to upload contract file'}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                                    {t('projects.modal.hints.contractUpload') || 'Supported formats: PDF, Word (DOC/DOCX), or Images up to 25 MB'}
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{
+                                background: 'var(--bg-tertiary, #1e293b)',
+                                border: '1px solid var(--border-color, #374151)',
+                                borderRadius: '12px',
+                                padding: '16px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                        <div style={{
+                                            width: 40,
+                                            height: 40,
+                                            borderRadius: '8px',
+                                            background: getDocIconColor(contractFile.name),
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0,
+                                            color: '#fff',
+                                            fontWeight: 700,
+                                            fontSize: '0.8rem'
+                                        }}>
+                                            <FileText size={22} />
+                                        </div>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{
+                                                fontWeight: 600,
+                                                fontSize: '0.92rem',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                maxWidth: '380px'
+                                            }}>
+                                                {contractFile.name}
+                                            </div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                {formatFileSize(contractFile.size)} • <span style={{ color: '#10b981', fontWeight: 600 }}>{isArabic ? 'جاهز للرفع مع المشروع' : 'Ready to attach'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        className="icon-btn danger"
+                                        onClick={() => {
+                                            setContractFile(null);
+                                            setContractTitle('');
+                                            setContractDescription('');
+                                            if (fileInputRef.current) fileInputRef.current.value = '';
+                                        }}
+                                        title={isArabic ? 'إلغاء الملف' : 'Remove File'}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+
+                                <div className="form-grid mt-md" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                                    <div className="form-group">
+                                        <label htmlFor="contractTitle" style={{ fontSize: '0.82rem' }}>
+                                            {t('projects.modal.fields.contractTitle') || 'Document Title'}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="contractTitle"
+                                            value={contractTitle}
+                                            onChange={(e) => setContractTitle(e.target.value)}
+                                            placeholder={contractFile.name}
+                                            style={{ padding: '8px 10px', fontSize: '0.88rem' }}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label htmlFor="contractDescription" style={{ fontSize: '0.82rem' }}>
+                                            {t('projects.modal.fields.contractDescription') || 'Document Notes'}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            id="contractDescription"
+                                            value={contractDescription}
+                                            onChange={(e) => setContractDescription(e.target.value)}
+                                            placeholder={isArabic ? 'ملاحظات حول العقد أو البنود' : 'Optional notes about this document'}
+                                            style={{ padding: '8px 10px', fontSize: '0.88rem' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="modal-footer">
