@@ -113,7 +113,7 @@ while ($true) {
         $minioHealthy = $false
         $minioErr = ""
         try {
-            $minioRes = Invoke-WebRequest -Uri "http://127.0.0.1:9000/minio/health/live" -Method Get -TimeoutSec 5 -ErrorAction Stop
+            $minioRes = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:9000/minio/health/live" -Method Get -TimeoutSec 5 -ErrorAction Stop
             if ($minioRes.StatusCode -eq 200) {
                 $minioHealthy = $true
                 $minioFailCount = 0
