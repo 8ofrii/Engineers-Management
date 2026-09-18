@@ -1,0 +1,304 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link [ref=e6] [cursor=pointer]:
+        - /url: /
+        - img "Hesaby.ai" [ref=e7]
+      - navigation "Sections" [ref=e9]:
+        - button "Product" [ref=e10] [cursor=pointer]
+        - button "Modules" [ref=e12] [cursor=pointer]
+        - button "Why Hesaby" [ref=e13] [cursor=pointer]
+        - button "Pricing" [ref=e14] [cursor=pointer]
+      - generic [ref=e15]:
+        - switch "Switch to dark mode" [ref=e16] [cursor=pointer]
+        - button "عربي" [ref=e26] [cursor=pointer]
+        - link "Log in" [ref=e31] [cursor=pointer]:
+          - /url: /login
+        - link "Start free" [ref=e32] [cursor=pointer]:
+          - /url: /signup
+  - generic [ref=e33]:
+    - generic [ref=e34]:
+      - heading "Snap a receipt. It posts itself. Your site has a brain now." [level=1] [ref=e35]:
+        - generic [ref=e36]: Snap a receipt.
+        - generic [ref=e37]: It posts itself.
+        - generic "Your site has a brain now." [ref=e39]:
+          - generic [aria-hidden] [ref=e40]:
+            - generic [ref=e41]: "Y"
+            - generic [ref=e42]: o
+            - generic [ref=e43]: u
+            - generic [ref=e44]: r
+            - generic [ref=e46]: s
+            - generic [ref=e47]: i
+            - generic [ref=e48]: t
+            - generic [ref=e49]: e
+            - generic [ref=e51]: h
+            - generic [ref=e52]: a
+            - generic [ref=e53]: s
+            - generic [ref=e55]: a
+            - generic [ref=e57]: b
+            - generic [ref=e58]: r
+            - generic [ref=e59]: a
+            - generic [ref=e60]: i
+            - generic [ref=e61]: "n"
+            - generic [ref=e63]: "n"
+            - generic [ref=e64]: o
+            - generic [ref=e65]: w
+            - generic [ref=e66]: .
+      - paragraph [ref=e67]: "Hesaby turns site chaos into clean books: photograph an invoice on the scaffold and it lands in the right project safe with vendor, VAT and audit trail — before you climb down. Daily reports, custody, approvals and bank matching all run on the same ledger, so month-end closing runs smoothly without pressure or surprises."
+      - generic [ref=e68]:
+        - link "Start free" [ref=e69] [cursor=pointer]:
+          - /url: /signup
+        - link "See it in action" [ref=e70] [cursor=pointer]:
+          - /url: "#preview"
+      - generic [ref=e73]: No credit card required · Ready in minutes · Built for Egyptian contracting
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]: Interactive demo
+        - heading "Test-drive the site ledger right here." [level=2] [ref=e77]
+        - paragraph [ref=e78]: No dummy data or video loops — this is the actual engine. Scan a real invoice, move site safes, file a diary, or run a bank match. Pick a tab and see.
+      - generic [ref=e79]:
+        - button "Receipt OCR" [ref=e80] [cursor=pointer]
+        - button "Safes" [ref=e84] [cursor=pointer]
+        - button "Site reports" [ref=e87] [cursor=pointer]
+        - button "Bank match" [ref=e93] [cursor=pointer]
+        - button "Approvals" [ref=e98] [cursor=pointer]
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - generic [ref=e108]: hesaby.ai/app/ocr
+          - generic [ref=e109]: LIVE
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - heading "Photograph it. It reads itself." [level=3] [ref=e113]
+            - paragraph [ref=e114]: "Point your phone at any Arabic or English invoice — the AI pulls vendor name, tax registration, line items and the 14% VAT split in seconds, no typing. Pick a scenario below, then hit approve: the money leaves the project safe, VAT posts to the tax ledger, and an audit trail seals itself shut."
+            - generic [ref=e115]:
+              - button "Ezz Steel" [ref=e116] [cursor=pointer]
+              - button "Lafarge" [ref=e117] [cursor=pointer]
+              - button "Fuel receipt" [ref=e118] [cursor=pointer]
+            - button "Approve & post" [ref=e119] [cursor=pointer]
+            - paragraph [ref=e123]: Every scan shows a confidence score. Low-confidence fields get flagged — nothing posts silently.
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - generic [ref=e126]: Ezz Steel → Al-Amal Tower
+              - generic [ref=e127]: 99.8%
+            - generic [ref=e128]:
+              - strong [ref=e129]: "Items:"
+              - text: 4t rebar 16/12mm
+            - generic [ref=e130]:
+              - generic [ref=e131]:
+                - generic [ref=e132]: Total
+                - text: 185,000 EGP
+              - generic [ref=e133]:
+                - generic [ref=e134]: VAT 14%
+                - text: 25,900 EGP
+              - generic [ref=e135]:
+                - generic [ref=e136]: Project safe
+                - text: Al-Amal Tower
+              - generic [ref=e137]:
+                - generic [ref=e138]: Posting
+                - text: Safe + VAT ledger + trail
+  - generic [ref=e139]:
+    - generic [ref=e140]:
+      - generic [ref=e141]: Modules
+      - heading "Five tools, one set of numbers." [level=2] [ref=e142]
+      - paragraph [ref=e143]: Receipt, safe, report, payroll, stock — they all read and write the same balances. A receipt scanned at noon becomes a safe movement, a payroll line and a tax entry by evening, and the numbers always agree.
+    - generic [ref=e144]:
+      - generic [ref=e145]:
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - generic [ref=e149]: Ezz Steel · Al-Amal
+            - generic [ref=e150]: 185,000
+          - generic [ref=e151]:
+            - generic [ref=e152]: VAT 14% · posted
+            - generic [ref=e153]: 25,900
+          - generic [ref=e154]:
+            - generic [ref=e155]: Audit trail
+            - generic [ref=e156]: Sealed
+        - generic [ref=e158]:
+          - text: Receipt OCR
+          - heading "Invoices that type themselves" [level=4] [ref=e159]
+          - paragraph [ref=e160]: Arabic and English invoices scanned in seconds — vendor, tax ID, line items, 14% VAT — then posted to the right safe with a sealed audit trail. No data entry team, no Friday scramble.
+      - generic [ref=e161]:
+        - generic [ref=e163]:
+          - generic [ref=e164]:
+            - generic [ref=e165]: Available across sites
+            - generic [ref=e166]: 2,480,500
+          - generic [ref=e167]:
+            - generic [ref=e168]: Office earned · 15%
+            - generic [ref=e169]: 367,500
+          - generic [ref=e170]:
+            - generic [ref=e171]: Last auto-move
+            - generic [ref=e172]: +3,675
+        - generic [ref=e174]:
+          - text: Safes & custody
+          - heading "Balances you'd bet your margin on" [level=4] [ref=e175]
+          - paragraph [ref=e176]: Project safes fenced per site, engineer custody capped by role, office supervision fees moved on approval. The owner sees site cost and office profit separately — live, not month-end.
+      - generic [ref=e177]:
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - generic [ref=e181]: Labor present
+            - generic [ref=e182]: "34"
+          - generic [ref=e183]:
+            - generic [ref=e184]: Concrete poured
+            - generic [ref=e185]: 60 m³
+          - generic [ref=e186]:
+            - generic [ref=e187]: Consultant
+            - generic [ref=e188]: Signed 4:40 PM
+        - generic [ref=e190]:
+          - text: DSR
+          - heading "Site diary in two minutes flat" [level=4] [ref=e191]
+          - paragraph [ref=e192]: Weather, headcounts, deliveries, pours and consultant e-sign — filed one-handed from the scaffold and locked to the project ledger same day.
+      - generic [ref=e193]:
+        - generic [ref=e195]:
+          - generic [ref=e196]:
+            - generic [ref=e197]: "Rebar draw #4"
+            - generic [ref=e198]: 45,000
+          - generic [ref=e199]:
+            - generic [ref=e200]: Advances deducted
+            - generic [ref=e201]: 9,200
+          - generic [ref=e202]:
+            - generic [ref=e203]: Status
+            - generic [ref=e204]: Locked
+        - generic [ref=e206]:
+          - text: Payroll & draws
+          - heading "Wages settled, zero disputes" [level=4] [ref=e207]
+          - paragraph [ref=e208]: Craft rates, day counts, advances and deductions computed once per cycle, then sealed into contractor draws anyone can audit. Clear numbers, zero ambiguity.
+      - generic [ref=e209]:
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - generic [ref=e213]: Rebar 16mm on hand
+            - generic [ref=e214]: 18.5t
+          - generic [ref=e215]:
+            - generic [ref=e216]: Site safety level
+            - generic [ref=e217]: 5.0t
+          - generic [ref=e218]:
+            - generic [ref=e219]: This week used
+            - generic [ref=e220]: 6.2t
+        - generic [ref=e222]:
+          - text: Inventory
+          - heading "Stock tracked to the last ton" [level=4] [ref=e223]
+          - paragraph [ref=e224]: Cement and rebar deliveries matched against actual pour consumption per work item, with safety thresholds per site — waste shows up as a number, not a rumor.
+  - generic [ref=e225]:
+    - generic [ref=e226]:
+      - generic [ref=e227]: The real cost
+      - heading "You're bleeding money between the scaffold and the desk." [level=2] [ref=e228]
+      - paragraph [ref=e229]: Four leaks that drain contractor profit every single week — and what Hesaby plugs in their place.
+    - generic [ref=e231]:
+      - generic [ref=e232]:
+        - paragraph [ref=e238]: The receipt vanishes in site pockets
+        - paragraph [ref=e239]: Paper invoices crumple, fade and vanish in dusty site pockets before Friday settlement. Snap it on the scaffold — it posts with vendor, tax ID and VAT before you reach the ground floor.
+        - paragraph [ref=e240]: Every Friday
+      - generic [ref=e241]:
+        - paragraph [ref=e251]: Three versions of the truth
+        - paragraph [ref=e252]: The site runs version 3, the office runs version 5, and the bank matches neither. One live ledger both sides read — safe balances update the second spend is approved.
+        - paragraph [ref=e253]: v3 vs v5
+      - generic [ref=e254]:
+        - paragraph [ref=e260]: “Who approved this?” on WhatsApp
+        - paragraph [ref=e261]: A 150,000 EGP delivery nobody has record of authorizing. Role thresholds with a timestamped trail — engineer, manager, executive — no approvals lost in chat threads.
+        - paragraph [ref=e262]: 150,000 EGP
+      - generic [ref=e263]:
+        - paragraph [ref=e269]: Margin shock at handover
+        - paragraph [ref=e270]: You find out the 10% margin shrank to 4% six months too late. Supervision fees move to office revenue on every approval — net margin is visible every single day.
+        - paragraph [ref=e271]: 10% → 4%
+  - generic [ref=e273]:
+    - generic [ref=e274]:
+      - generic [ref=e275]: Built for the field
+      - heading "Made for sun, dust and tough job sites." [level=2] [ref=e276]
+      - paragraph [ref=e277]: "The full ledger lives in the engineer's pocket: high-contrast field mode you can read under direct sun, one-hand voice and photo capture, live custody balance before you spend a pound, and an offline queue that syncs the moment signal comes back. The office sees everything — without a single phone call."
+      - generic [ref=e278]:
+        - generic [ref=e279]: iOS & Android · one-hand capture
+        - generic [ref=e282]: Offline queue · auto-sync
+    - generic [ref=e287]:
+      - generic [ref=e288]:
+        - generic [ref=e289]: Hesaby Field · Al-Amal
+        - generic [ref=e290]: Online
+      - generic [ref=e291]:
+        - generic [ref=e292]: My custody left
+        - text: 86,400 EGP
+      - generic [ref=e293]:
+        - generic [ref=e294]: Project safe
+        - text: 2,450,000 EGP
+      - generic [ref=e295]:
+        - generic [ref=e296]:
+          - generic [ref=e297]: Ready-mix · today 11:20
+          - generic [ref=e298]: "-24,500"
+        - generic [ref=e299]:
+          - generic [ref=e300]: "Rebar batch #12 · yesterday"
+          - generic [ref=e301]: "-85,000"
+  - generic [ref=e302]:
+    - generic [ref=e303]:
+      - generic [ref=e304]: Pricing
+      - heading "Transparent, flexible pricing that grows with your business." [level=2] [ref=e305]
+      - paragraph [ref=e306]: Run your first project free — no time limit, no credit card. Choose the plan and capacity that best fit your team's operational needs, with 20% savings on annual billing.
+      - generic [ref=e307]:
+        - button "Monthly" [ref=e308] [cursor=pointer]
+        - button "Annual −20%" [ref=e309] [cursor=pointer]
+    - generic [ref=e310]:
+      - generic [ref=e311]:
+        - heading "Free Plan" [level=3] [ref=e312]
+        - paragraph [ref=e313]: Test Hesaby on one real site. No credit card, no time limit.
+        - generic [ref=e314]: Free
+        - list [ref=e315]:
+          - listitem [ref=e316]: Up to 2 active projects
+          - listitem [ref=e319]: 2 engineer seats
+          - listitem [ref=e322]: 150 AI receipt scans / mo
+          - listitem [ref=e325]: Full DSR site diaries
+          - listitem [ref=e328]: Site custody & mobile app
+        - link "Start free" [ref=e331] [cursor=pointer]:
+          - /url: /signup
+      - generic [ref=e332]:
+        - heading "Premium Plan POPULAR" [level=3] [ref=e333]:
+          - text: Premium Plan
+          - generic [ref=e334]: POPULAR
+        - paragraph [ref=e335]: For growing contractors needing live safe tracking and real-time site control.
+        - generic [ref=e336]:
+          - text: EGP 2,450
+          - generic [ref=e337]: / mo
+        - list [ref=e338]:
+          - listitem [ref=e339]: Up to 10 active projects
+          - listitem [ref=e342]: 15 multi-role team seats
+          - listitem [ref=e345]: 2,500 AI receipt scans & voice notes
+          - listitem [ref=e348]: Multi-tier financial approvals
+          - listitem [ref=e351]: Daily wages, draws & stock
+        - link "Choose plan" [ref=e354] [cursor=pointer]:
+          - /url: /signup
+      - generic [ref=e355]:
+        - heading "Business Plan" [level=3] [ref=e356]
+        - paragraph [ref=e357]: For established contractors running multi-site operations with Egyptian VAT & isolated safes.
+        - generic [ref=e358]:
+          - text: EGP 4,450
+          - generic [ref=e359]: / mo
+        - list [ref=e360]:
+          - listitem [ref=e361]: Up to 30 active projects
+          - listitem [ref=e364]: 40 team seats & custom roles
+          - listitem [ref=e367]: 6,000 AI extractions & actions
+          - listitem [ref=e370]: Site-fenced safes & 14% Egyptian VAT
+          - listitem [ref=e373]: Bank reconciliation & sealed audit log
+        - link "Choose plan" [ref=e376] [cursor=pointer]:
+          - /url: /signup
+      - generic [ref=e377]:
+        - heading "Enterprise Plan" [level=3] [ref=e378]
+        - paragraph [ref=e379]: Dedicated infrastructure, custom SLAs, and unlimited capacity for large developers.
+        - generic [ref=e380]: Custom
+        - list [ref=e381]:
+          - listitem [ref=e382]: Unlimited projects & subcontracts
+          - listitem [ref=e385]: Unlimited team seats & custom RBAC
+          - listitem [ref=e388]: Dedicated isolated database instance
+          - listitem [ref=e391]: Unlimited AI volume & custom SLA
+          - listitem [ref=e394]: Direct ERP API & dedicated support engineer
+        - link "Talk to us" [ref=e397] [cursor=pointer]:
+          - /url: /signup
+  - generic [ref=e400]:
+    - img "Hesaby" [ref=e406]
+    - generic [ref=e409]:
+      - heading "Your next project deserves clean books from day one." [level=2] [ref=e410]
+      - paragraph [ref=e411]: Bring one live project this week — its receipts, its reports, its custody and its bank lines. By Friday you'll know the true cost, the safe balance and your earned fee, down to the last pound.
+      - link "Start free — no card needed" [ref=e413] [cursor=pointer]:
+        - /url: /signup
+      - paragraph [ref=e414]: No credit card required · Instant setup · Zero commitment
+  - contentinfo [ref=e415]:
+    - generic [ref=e416]:
+      - generic [ref=e417]:
+        - img "Hesaby" [ref=e419]
+        - generic [ref=e420]: Hesaby
+        - text: — Your site, properly recorded.
+      - generic [ref=e421]: © 2026 · EN / عربي

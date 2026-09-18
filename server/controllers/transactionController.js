@@ -7,7 +7,7 @@ import { auditFromReq } from '../lib/audit.js';
 // @access  Private
 export const getCostCenters = async (req, res, next) => {
     try {
-        const [costCenterRows, transactionFromRows, physicalAccountRows, transactionToRows] = await Promise.all([
+        const [costCenterRows, transactionFromRows, physicalAccountRows, transactionToRows, beneficiaryRows] = await Promise.all([
             prisma.transaction.findMany({
                 where: { tenantId: req.user.tenantId, costCenter: { not: null } },
                 select: { costCenter: true },
@@ -27,6 +27,11 @@ export const getCostCenters = async (req, res, next) => {
                 where: { tenantId: req.user.tenantId, transactionTo: { not: null } },
                 select: { transactionTo: true },
                 distinct: ['transactionTo']
+            }),
+            prisma.transaction.findMany({
+                where: { tenantId: req.user.tenantId, beneficiary: { not: null } },
+                select: { beneficiary: true },
+                distinct: ['beneficiary']
             })
         ]);
 
@@ -36,7 +41,8 @@ export const getCostCenters = async (req, res, next) => {
                 costCenters: costCenterRows.map(t => t.costCenter).filter(Boolean),
                 transactionFroms: transactionFromRows.map(t => t.transactionFrom).filter(Boolean),
                 physicalAccounts: physicalAccountRows.map(t => t.physicalAccount).filter(Boolean),
-                transactionTos: transactionToRows.map(t => t.transactionTo).filter(Boolean)
+                transactionTos: transactionToRows.map(t => t.transactionTo).filter(Boolean),
+                beneficiaries: beneficiaryRows.map(t => t.beneficiary).filter(Boolean)
             }
         });
     } catch (error) {
@@ -946,9 +952,9 @@ export const updateTransaction = async (req, res, next) => {
             paymentMethod, projectId,
             // Extended fields
             itemName, unit, quantity, unitPrice,
-            transactionFrom, transactionTo, costCenter,
+            beneficiary, transactionFrom, transactionTo, costCenter,
             invoiceNumber, payerUserId, projectCostItemId,
-            clientId, supplierId, workmanId
+            clientId, supplierId, workmanId, physicalAccount, paidByClientContact
         } = req.body;
 
         let transaction = await prisma.transaction.findFirst({
@@ -1006,7 +1012,16 @@ export const updateTransaction = async (req, res, next) => {
                     projectId,
                     invoiceNumber,
                     payerUserId,
-                    projectCostItemId
+                    projectCostItemId,
+                    beneficiary: beneficiary !== undefined ? (beneficiary || null) : undefined,
+                    transactionTo: transactionTo !== undefined ? (transactionTo || null) : undefined,
+                    transactionFrom: transactionFrom !== undefined ? (transactionFrom || null) : undefined,
+                    costCenter: costCenter !== undefined ? (costCenter || null) : undefined,
+                    physicalAccount: physicalAccount !== undefined ? (physicalAccount || null) : undefined,
+                    paidByClientContact: paidByClientContact !== undefined ? (paidByClientContact || null) : undefined,
+                    supplierId: supplierId !== undefined ? (supplierId || null) : undefined,
+                    workmanId: workmanId !== undefined ? (workmanId || null) : undefined,
+                    clientId: clientId !== undefined ? (clientId || null) : undefined
                 }
             });
 

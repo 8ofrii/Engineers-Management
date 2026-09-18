@@ -76,11 +76,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [existingCostCenters, setExistingCostCenters] = useState([]);
     const [existingTransactionFroms, setExistingTransactionFroms] = useState([]);
     const [existingTransactionTos, setExistingTransactionTos] = useState([]);
+    const [existingBeneficiaries, setExistingBeneficiaries] = useState([]);
     const [existingPhysicalAccounts, setExistingPhysicalAccounts] = useState([]);
     const [existingItemNames, setExistingItemNames] = useState([]);
 
     const [customInputs, setCustomInputs] = useState({
         costCenter: false,
+        beneficiary: false,
         transactionTo: false,
         transactionFrom: false,
         physicalAccount: false
@@ -115,6 +117,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         materialId: '',
         itemName: '',
         unit: 'TON',
+        beneficiary: '',
         transactionFrom: '',
         transactionTo: '',
         paymentMethod: 'CUSTODY_WALLET',
@@ -154,6 +157,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 category: '',
                 itemName: '',
                 unit: 'TON',
+                beneficiary: '',
                 transactionFrom: '',
                 transactionTo: '',
                 paymentMethod: 'CUSTODY_WALLET',
@@ -196,6 +200,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             itemName: '',
             unit: 'TON',
             invoiceNumber: '',
+            beneficiary: '',
             transactionFrom: '',
             transactionTo: '',
             paymentMethod: 'CUSTODY_WALLET',
@@ -278,6 +283,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     unit: parsedUnit,
                     clientId: initialData.clientId || initialData.client?.id || '',
                     paidByClientContact: initialData.paidByClientContact || '',
+                    beneficiary: initialData.beneficiary || initialData.supplier?.name || initialData.workman?.name || '',
                     transactionFrom: initialData.transactionFrom || '',
                     transactionTo: initialData.transactionTo || '',
                     paymentMethod: initialData.paymentMethod || (initialData.type === 'INCOME' ? 'BANK_TRANSFER' : 'CUSTODY_WALLET'),
@@ -312,6 +318,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         itemName: savedDraft.formData?.itemName || '',
                         unit: savedDraft.formData?.unit || 'TON',
                         invoiceNumber: savedDraft.formData?.invoiceNumber || '',
+                        beneficiary: savedDraft.formData?.beneficiary || '',
                         transactionFrom: savedDraft.formData?.transactionFrom || '',
                         transactionTo: savedDraft.formData?.transactionTo || '',
                         paymentMethod: savedDraft.formData?.paymentMethod || 'CUSTODY_WALLET',
@@ -345,6 +352,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         itemName: '',
                         unit: 'TON',
                         invoiceNumber: '',
+                        beneficiary: '',
                         transactionFrom: '',
                         transactionTo: '',
                         paymentMethod: 'CUSTODY_WALLET',
@@ -373,6 +381,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             formData.description ||
             formData.itemName ||
             formData.invoiceNumber ||
+            formData.beneficiary ||
             formData.transactionFrom ||
             formData.transactionTo ||
             formData.costCenter ||
@@ -504,6 +513,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 setExistingCostCenters(res.data.data.costCenters || []);
                 setExistingTransactionFroms(res.data.data.transactionFroms || []);
                 setExistingTransactionTos(res.data.data.transactionTos || []);
+                setExistingBeneficiaries(res.data.data.beneficiaries || []);
                 setExistingPhysicalAccounts(res.data.data.physicalAccounts || []);
                 setExistingItemNames(res.data.data.itemNames || []);
             }
@@ -600,6 +610,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
         if (mode === 'EXPENSE') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
+            if (!formData.beneficiary?.trim() && !formData.workmanId && !formData.supplierId) {
+                newErrors.beneficiary = t('finance.beneficiaryRequired') || (isRTL ? 'يرجى تحديد أو إدخال اسم المستفيد' : 'Beneficiary is required');
+            }
             if (costItemMode === 'MATERIAL') {
                 if (!formData.materialId) newErrors.materialId = t('common.required');
             } else if (costItemMode === 'EXISTING') {
@@ -644,6 +657,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     ? (formData.itemName || (chosenMaterial ? (isRTL ? (chosenMaterial.nameAr || chosenMaterial.name) : chosenMaterial.name) : 'خامة مخزنية'))
                     : undefined;
 
+                const resolvedBeneficiary = formData.beneficiary?.trim() || (formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (formData.supplierId ? suppliers.find(s => s.id === formData.supplierId)?.name : undefined));
+
                 payload = {
                     type: 'EXPENSE',
                     category: resolvedCategory,
@@ -652,6 +667,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     projectCostItemId: costItemMode === 'EXISTING' ? formData.projectCostItemId : undefined,
                     payerUserId: formData.payerUserId || user?.id,
                     workmanId: formData.workmanId || undefined,
+                    supplierId: (isMaterial && chosenMaterial?.supplierId) ? chosenMaterial.supplierId : undefined,
+                    beneficiary: resolvedBeneficiary || undefined,
                     createBatch: isMaterial,
                     materialId: (isMaterial && formData.materialId) ? formData.materialId : undefined,
                     description: formData.description?.trim() || resolvedItemName || t(`finance.categories.${resolvedCategory?.toLowerCase()}`) || resolvedCategory || 'Site Expense',
@@ -662,7 +679,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     unitPrice: isMaterial ? (formData.unitPrice ? Number(formData.unitPrice) : (chosenMaterial?.unitPrice ? Number(chosenMaterial.unitPrice) : undefined)) : (costItemMode === 'NEW' && formData.unitPrice ? Number(formData.unitPrice) : undefined),
                     quantity: formData.quantity ? Number(formData.quantity) : undefined,
                     costCenter: formData.costCenter || (isMaterial ? (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')) : undefined),
-                    transactionTo: formData.transactionTo || undefined,
+                    transactionTo: formData.transactionTo?.trim() || undefined,
                     invoiceNumber: formData.invoiceNumber
                 };
             }
@@ -1345,8 +1362,27 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         </div>
 
                                         {renderDropdownWithCustom(
+                                            "beneficiary",
+                                            t('finance.beneficiary') || (isRTL ? 'المستفيد' : 'Beneficiary'),
+                                            [
+                                                ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+                                                ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
+                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
+                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
+                                                ...existingBeneficiaries.map(b => ({ value: b, label: b }))
+                                            ].reduce((acc, current) => {
+                                                const x = acc.find(item => item.value === current.value);
+                                                if (!x) { return acc.concat([current]); } else { return acc; }
+                                            }, []),
+                                            t('finance.beneficiaryPlaceholder') || (isRTL ? "أدخل اسم المستفيد (الشركة / المورد / المقاول / الصنايعي)..." : "e.g. Supplier, Subcontractor, Beneficiary..."),
+                                            true,
+                                            null,
+                                            errors.beneficiary
+                                        )}
+
+                                        {renderDropdownWithCustom(
                                             "transactionTo",
-                                            t('finance.transactionTo'),
+                                            t('finance.transactionTo') || (isRTL ? 'المستلم / باليد' : 'Handover Recipient / Handed to'),
                                             [
                                                 ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
                                                 ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
@@ -1357,7 +1393,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 const x = acc.find(item => item.value === current.value);
                                                 if (!x) { return acc.concat([current]); } else { return acc; }
                                             }, []),
-                                            isRTL ? "أدخل اسم المستلم / العامل / الفني..." : "e.g. Worker name, Assistant, Vendor staff..."
+                                            t('finance.transactionToPlaceholder') || (isRTL ? "اسم الشخص المستلم فعلياً (إن كان مختلفاً عن المستفيد)..." : "e.g. Courier, Foreman, Site rep (if different)..."),
+                                            false
                                         )}
 
                                         {renderAttachmentUploader()}

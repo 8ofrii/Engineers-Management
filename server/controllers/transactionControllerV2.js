@@ -108,6 +108,7 @@ export const createTransactionV2 = async (req, res, next) => {
             quantity,
             unitPrice,
             costCenter,
+            beneficiary,
             transactionTo,
             transactionFrom,
             physicalAccount
@@ -236,6 +237,7 @@ export const createTransactionV2 = async (req, res, next) => {
                         projectCostItemId: finalCostItemId,
                         supplierId,
                         workmanId,
+                        beneficiary: beneficiary || null,
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'CASH',

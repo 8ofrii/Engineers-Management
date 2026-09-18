@@ -418,6 +418,7 @@ model Transaction {
   tenant            Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workman           Workman?            @relation(fields: [workmanId], references: [id])
   costCenter        String?
+  beneficiary       String?
   transactionTo     String?
   transactionFrom   String?
   paidByClientContact String?

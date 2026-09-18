@@ -67,6 +67,7 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
         unitPrice: '',
         costCenter: '',
         paymentMethod: 'CUSTODY_WALLET',
+        beneficiary: '',
         transactionTo: '',
         payerUserId: ''
     });
@@ -106,6 +107,7 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                     unitPrice: firstItem?.unitPrice != null ? String(firstItem.unitPrice) : '',
                     costCenter: md.costCenter || '',
                     paymentMethod: md.paymentMethod || 'CASH',
+                    beneficiary: md.beneficiary || (md.supplierId ? (sRes.data.data || []).find(s => s.id === md.supplierId)?.name : '') || '',
                     transactionTo: md.transactionTo || '',
                     payerUserId: md.payerUserId || d.createdById || ''
                 });
@@ -250,6 +252,7 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                 transactionDate: form.transactionDate || undefined,
                 paymentMethod: form.paymentMethod || undefined,
                 supplierId: form.supplierId || undefined,
+                beneficiary: form.beneficiary || (form.supplierId ? suppliers.find(s => s.id === form.supplierId)?.name : undefined) || undefined,
                 payerUserId: form.payerUserId || undefined,
                 costCenter: form.costCenter || undefined,
                 transactionTo: form.transactionTo || undefined,
@@ -480,6 +483,23 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                                             <option value="CREDIT_CARD">{t('finance.methods.creditCard', 'Credit Card')}</option>
                                             <option value="OTHER">{t('finance.categories.other', 'Other')}</option>
                                         </select>
+                                    </FormRow>
+
+                                    <FormRow label={t('finance.beneficiary', 'المستفيد') + ' *'}>
+                                        <input
+                                            type="text" value={form.beneficiary}
+                                            onChange={handleChange('beneficiary')} disabled={isReadOnly}
+                                            placeholder={t('finance.beneficiaryPlaceholder', 'اسم المستفيد (المقاول / المورد / الفني)')}
+                                            required
+                                        />
+                                    </FormRow>
+
+                                    <FormRow label={t('finance.transactionTo', 'المستلم / باليد (اختياري)')}>
+                                        <input
+                                            type="text" value={form.transactionTo}
+                                            onChange={handleChange('transactionTo')} disabled={isReadOnly}
+                                            placeholder={t('finance.transactionToPlaceholder', 'اسم المستلم الفعلي (اختياري)')}
+                                        />
                                     </FormRow>
 
                                     <FormRow label={t('drafts.costCenter', 'Cost Center (optional)')}>

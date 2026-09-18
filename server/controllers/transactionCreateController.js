@@ -37,7 +37,13 @@ export const createTransaction = async (req, res, next) => {
             unit,
             quantity,
             unitPrice,
-            isOfficeExpense
+            isOfficeExpense,
+            beneficiary,
+            transactionTo,
+            transactionFrom,
+            costCenter,
+            physicalAccount,
+            paidByClientContact
         } = req.body;
 
         // Validate required fields
@@ -88,7 +94,11 @@ export const createTransaction = async (req, res, next) => {
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'BANK_TRANSFER',
-                        invoiceNumber,
+                        invoiceNumber: invoiceNumber || null,
+                        transactionFrom: transactionFrom || null,
+                        paidByClientContact: paidByClientContact || null,
+                        physicalAccount: physicalAccount || null,
+                        costCenter: costCenter || null,
                         tenantId: req.user.tenantId
                     }
                 });
@@ -144,12 +154,15 @@ export const createTransaction = async (req, res, next) => {
                         status: 'APPROVED',
                         projectId,
                         projectCostItemId: finalCostItemId,
-                        supplierId,
-                        workmanId,
+                        supplierId: supplierId || null,
+                        workmanId: workmanId || null,
+                        beneficiary: beneficiary || null,
+                        transactionTo: transactionTo || null,
+                        costCenter: costCenter || null,
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'CASH',
-                        invoiceNumber,
+                        invoiceNumber: invoiceNumber || null,
                         isOfficeExpense: isOfficeExpense || false,
                         tenantId: req.user.tenantId
                     }

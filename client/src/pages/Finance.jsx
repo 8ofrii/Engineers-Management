@@ -262,7 +262,8 @@ export default function Finance() {
                 isArabic ? 'البيان / الوصف' : 'Description',
                 isArabic ? 'البند المرتبط' : 'Cost Item / Band',
                 isArabic ? 'الجهة الدافعة / العميل' : 'Payer / Client',
-                isArabic ? 'المستلم / إلى' : 'Recipient / To',
+                isArabic ? 'المستفيد' : 'Beneficiary',
+                isArabic ? 'المستلم / باليد' : 'Recipient / Handed to',
                 isArabic ? 'طريقة الدفع' : 'Payment Method',
                 isArabic ? 'المبلغ (جنيه)' : 'Amount (EGP)',
                 isArabic ? 'الحالة' : 'Status',
@@ -295,6 +296,10 @@ export default function Finance() {
                 ? (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '')
                 : (tx.category || '');
 
+            const beneficiaryVal = tx.type === 'INCOME'
+                ? (tx.client?.name || tx.project?.client?.name || '')
+                : (tx.beneficiary || tx.supplier?.name || tx.workman?.name || '');
+
             rows.push([
                 formatDate(tx.transactionDate || tx.createdAt),
                 txType,
@@ -302,8 +307,9 @@ export default function Finance() {
                 catLabel,
                 tx.description || '',
                 tx.projectCostItem?.name || '',
-                tx.paidByClientContact || tx.transactionFrom || tx.client?.name || '',
-                tx.transactionTo || tx.workman?.name || '',
+                tx.paidByClientContact || tx.transactionFrom || tx.payer?.name || tx.user?.name || '',
+                beneficiaryVal,
+                tx.transactionTo || '',
                 pMethod,
                 Number(Number(tx.amount || 0).toFixed(2)),
                 status,
@@ -338,15 +344,15 @@ export default function Finance() {
                 break;
             case 'CASH':
                 label = t('finance.methods.cash') || (isArabic ? 'نقداً (كاش)' : 'Cash');
-                badgeEl = <span className="badge badge-success" style={badgeStyle}>💵 {label}</span>;
+                badgeEl = <span className="badge badge-warning" style={badgeStyle}>💵 {label}</span>;
                 break;
             case 'CHECK':
                 label = t('finance.methods.check') || (isArabic ? 'شيك' : 'Check');
-                badgeEl = <span className="badge badge-warning" style={badgeStyle}>📝 {label}</span>;
+                badgeEl = <span className="badge badge-info" style={badgeStyle}>🧾 {label}</span>;
                 break;
             case 'CREDIT_CARD':
                 label = t('finance.methods.creditCard') || (isArabic ? 'بطاقة ائتمان' : 'Credit Card');
-                badgeEl = <span className="badge badge-secondary" style={badgeStyle}>💳 {label}</span>;
+                badgeEl = <span className="badge badge-primary" style={badgeStyle}>💳 {label}</span>;
                 break;
             case 'CUSTODY_WALLET':
                 label = t('finance.methods.custodyWallet') || (isArabic ? 'عهدة مهندس' : 'Custody Wallet');
@@ -357,29 +363,29 @@ export default function Finance() {
         }
 
         return (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 {badgeEl}
                 {receiptUrl && (
                     <a
                         href={receiptUrl.startsWith('http') ? receiptUrl : `/uploads/${receiptUrl.replace(/^(\/|uploads\/)/, '')}`}
                         target="_blank"
                         rel="noreferrer"
-                        title={isArabic ? 'عرض المرفق / الإيصال' : 'View Attachment / Receipt'}
+                        className="btn-icon-sm"
                         style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '3px',
+                            justifyContent: 'center',
                             padding: '2px 6px',
-                            fontSize: '0.7rem',
-                            background: 'hsla(220, 80%, 50%, 0.12)',
+                            fontSize: '0.72rem',
                             color: 'var(--color-primary)',
-                            border: '1px solid var(--color-primary)',
-                            borderRadius: '5px',
+                            background: 'hsla(220, 80%, 50%, 0.1)',
+                            borderRadius: '4px',
                             textDecoration: 'none',
-                            fontWeight: '600'
+                            border: '1px solid hsla(220, 80%, 50%, 0.2)'
                         }}
+                        title={isArabic ? 'عرض المرفق / الإيصال' : 'View Attachment / Receipt'}
                     >
-                        <Paperclip size={12} />
+                        <ExternalLink size={12} style={{ marginRight: isArabic ? 0 : 3, marginLeft: isArabic ? 3 : 0 }} />
                         {isArabic ? 'مرفق' : 'Receipt'}
                     </a>
                 )}
@@ -406,12 +412,22 @@ export default function Finance() {
             return <span className="text-secondary">-</span>;
         } else {
             const payer = tx.payer?.name || tx.user?.name || '';
-            const recipient = tx.supplier?.name || tx.transactionTo || '';
+            const beneficiary = tx.beneficiary || tx.supplier?.name || tx.workman?.name || '';
+            const recipient = tx.transactionTo || '';
             return (
                 <div>
                     {payer && <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{payer}</div>}
-                    {recipient && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{isArabic ? 'إلى:' : 'To:'} {recipient}</div>}
-                    {!payer && !recipient && <span className="text-secondary">-</span>}
+                    {beneficiary && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                            <span>🎯 {isArabic ? 'المستفيد:' : 'Beneficiary:'} <strong style={{ color: 'var(--text-primary)' }}>{beneficiary}</strong></span>
+                        </div>
+                    )}
+                    {recipient && recipient !== beneficiary && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
+                            <span>🤝 {isArabic ? 'المستلم:' : 'Receiver:'} {recipient}</span>
+                        </div>
+                    )}
+                    {!payer && !beneficiary && !recipient && <span className="text-secondary">-</span>}
                 </div>
             );
         }
