@@ -23,6 +23,16 @@ export const formatNumber = (amount, lang = 'en', opts = {}) => {
     return new Intl.NumberFormat(localeFor(lang), opts).format(value);
 };
 
+export const formatDate = (dateString, lang = 'en') => {
+    if (!dateString) return '-';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return '-';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}/${month}/${day}`;
+};
+
 // Convenience hook so components don't have to thread `i18n.language` through every callsite.
 export const useFormat = () => {
     const { i18n } = useTranslation();
@@ -30,6 +40,9 @@ export const useFormat = () => {
     return {
         currency: (amount, opts) => formatCurrency(amount, lang, opts),
         number: (amount, opts) => formatNumber(amount, lang, opts),
+        date: (dateString) => formatDate(dateString, lang),
+        formatDate: (dateString) => formatDate(dateString, lang),
         lang
     };
 };
+

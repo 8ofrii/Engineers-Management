@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { AlertProvider } from './context/AlertContext';
 import { CopilotProvider } from './context/CopilotContext';
 import { PrivateRoute } from './components/PrivateRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import Login from './pages/Login';
@@ -41,7 +42,8 @@ function App() {
             <AlertProvider>
                 <CopilotProvider>
                     <BrowserRouter>
-                        <Routes>
+                        <ErrorBoundary>
+                            <Routes>
                         {/* Public Routes */}
                         <Route path="/login" element={<Login />} />
                         <Route path="/signup" element={<RegisterCompany />} />
@@ -258,6 +260,7 @@ function App() {
                         {/* Catch-all → marketing page (logged-in users see "Open App" CTA) */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
+                        </ErrorBoundary>
                 </BrowserRouter>
                 </CopilotProvider>
             </AlertProvider>

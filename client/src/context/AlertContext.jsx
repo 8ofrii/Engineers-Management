@@ -28,16 +28,31 @@ export const AlertProvider = ({ children }) => {
         setAlertState(prev => ({ ...prev, isOpen: false }));
     }, []);
 
-    const showAlert = useCallback(({
-        type = 'info',
-        title,
-        message,
-        confirmText = 'OK',
-        cancelText = 'Cancel',
-        showCancel = false,
-        onConfirm,
-        onCancel
-    }) => {
+    const showAlert = useCallback((opts, maybeMessage) => {
+        let type = 'info';
+        let title = '';
+        let message = '';
+        let confirmText = 'OK';
+        let cancelText = 'Cancel';
+        let showCancel = false;
+        let onConfirm;
+        let onCancel;
+
+        if (typeof opts === 'string') {
+            type = opts;
+            message = maybeMessage || '';
+            title = type === 'error' ? 'خطأ' : type === 'success' ? 'نجاح' : type === 'warning' ? 'تنبيه' : 'معلومة';
+        } else if (opts && typeof opts === 'object') {
+            type = opts.type || 'info';
+            title = opts.title || '';
+            message = opts.message || '';
+            confirmText = opts.confirmText || 'OK';
+            cancelText = opts.cancelText || 'Cancel';
+            showCancel = !!opts.showCancel;
+            onConfirm = opts.onConfirm;
+            onCancel = opts.onCancel;
+        }
+
         setAlertState({
             isOpen: true,
             type,

@@ -38,6 +38,18 @@ export default function OfficeFinances() {
     const { currency: fmtCurrency, date: fmtDate } = useFormat();
     const user = JSON.parse(localStorage.getItem('user') || '{}');
 
+    // Robust date formatter fallback
+    const formatDate = (dateString) => {
+        if (!dateString) return '-';
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return '-';
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}/${month}/${day}`;
+    };
+    const displayDate = fmtDate || formatDate;
+
     // Data states
     const [summary, setSummary] = useState(null);
     const [safes, setSafes] = useState([]);
@@ -85,7 +97,7 @@ export default function OfficeFinances() {
             }
         } catch (error) {
             console.error('Error loading office finances:', error);
-            showAlert('error', isArabic ? 'فشل تحميل بيانات ماليات المقر' : 'Failed to load office finances data');
+            showAlert({ type: 'error', message: isArabic ? 'فشل تحميل بيانات ماليات المقر' : 'Failed to load office finances data' });
         } finally {
             setLoading(false);
         }
@@ -112,7 +124,7 @@ export default function OfficeFinances() {
             }
         } catch (error) {
             console.error('Error fetching statement:', error);
-            showAlert('error', isArabic ? 'فشل تحميل كشف الحساب' : 'Failed to fetch statement');
+            showAlert({ type: 'error', message: isArabic ? 'فشل تحميل كشف الحساب' : 'Failed to fetch statement' });
         } finally {
             setStatementLoading(false);
         }
@@ -120,26 +132,50 @@ export default function OfficeFinances() {
 
     const handleExportStatement = () => {
         if (!statementData || !statementData.statement || statementData.statement.length === 0) {
-            showAlert('warning', isArabic ? 'لا توجد حركات للتصدير' : 'No transactions to export');
+            showAlert({ type: 'warning', message: isArabic ? 'لا توجد حركات للتصدير' : 'No transactions to export' });
             return;
         }
 
-        const rows = statementData.statement.map((item, idx) => ({
-            '#': idx + 1,
-            [isArabic ? 'التاريخ' : 'Date']: fmtDate(item.date),
-            [isArabic ? 'النوع' : 'Type']: item.type === 'INCOME' ? (isArabic ? 'إيراد' : 'Income')
-                : item.type === 'EXPENSE' ? (isArabic ? 'مصروف' : 'Expense')
-                : item.type === 'TRANSFER_IN' ? (isArabic ? 'تحويل وارد' : 'Transfer In')
-                : (isArabic ? 'تحويل صادر' : 'Transfer Out'),
-            [isArabic ? 'وارد (+)' : 'Inflow (+)']: item.inflow > 0 ? item.inflow : 0,
-            [isArabic ? 'منصرف (-)' : 'Outflow (-)']: item.outflow > 0 ? item.outflow : 0,
-            [isArabic ? 'الرصيد بعد الحركة' : 'Balance After']: item.balanceAfter,
-            [isArabic ? 'البيان' : 'Description']: item.description,
-            [isArabic ? 'المرجع / الفاتورة' : 'Reference']: item.reference || '-',
-            [isArabic ? 'الجهة / المشروع' : 'Party / Project']: item.projectName || item.partyName || '-'
-        }));
+        const header = [
+            '#',
+            isArabic ? 'التاريخ' : 'Date',
+            isArabic ? 'النوع' : 'Type',
+            isArabic ? 'وارد (+)' : 'Inflow (+)',
+            isArabic ? 'منصرف (-)' : 'Outflow (-)',
+            isArabic ? 'الرصيد بعد الحركة' : 'Balance After',
+            isArabic ? 'البيان' : 'Description',
+            isArabic ? 'المرجع / الفاتورة' : 'Reference',
+            isArabic ? 'الجهة / المشروع' : 'Party / Project'
+        ];
 
-        exportToXLSX(rows, `كشف_حساب_${statementData.safe.name}_${new Date().toISOString().slice(0, 10)}`);
+        const rows = [header];
+        statementData.statement.forEach((item, idx) => {
+            rows.push([
+                idx + 1,
+                displayDate(item.date),
+                item.type === 'INCOME' ? (isArabic ? 'إيراد' : 'Income')
+                    : item.type === 'EXPENSE' ? (isArabic ? 'مصروف' : 'Expense')
+                    : item.type === 'TRANSFER_IN' ? (isArabic ? 'تحويل وارد' : 'Transfer In')
+                    : (isArabic ? 'تحويل صادر' : 'Transfer Out'),
+                item.inflow > 0 ? item.inflow : 0,
+                item.outflow > 0 ? item.outflow : 0,
+                item.balanceAfter,
+                item.description || '',
+                item.reference || '-',
+                item.projectName || item.partyName || '-'
+            ]);
+        });
+
+        exportToXLSX({
+            filename: `statement-${statementData.safe?.name || 'safe'}-${new Date().toISOString().slice(0, 10)}.xlsx`,
+            sheets: [
+                {
+                    sheetName: isArabic ? 'كشف الحساب' : 'Statement',
+                    data: rows
+                }
+            ],
+            isRTL: isArabic
+        });
     };
 
     // Filter safes
@@ -545,7 +581,7 @@ export default function OfficeFinances() {
                                             return (
                                                 <tr key={tx.id}>
                                                     <td style={{ whiteSpace: 'nowrap', fontSize: '0.85rem' }}>
-                                                        {fmtDate(tx.transactionDate || tx.createdAt)}
+                                                        {displayDate(tx.transactionDate || tx.createdAt)}
                                                     </td>
                                                     <td>
                                                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -936,7 +972,7 @@ export default function OfficeFinances() {
                         onSubmit={() => {
                             setIsAddTxModalOpen(false);
                             loadData();
-                            showAlert('success', isArabic ? 'تم تسجيل المعاملة بنجاح' : 'Transaction recorded successfully');
+                            showAlert({ type: 'success', message: isArabic ? 'تم تسجيل المعاملة بنجاح' : 'Transaction recorded successfully' });
                         }}
                         initialData={{ isOfficeExpense: true, mode: 'EXPENSE' }}
                         user={user}
@@ -982,7 +1018,7 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!name.trim()) {
-            showAlert('warning', isArabic ? 'يرجى إدخال اسم الخزينة' : 'Safe name is required');
+            showAlert({ type: 'warning', message: isArabic ? 'يرجى إدخال اسم الخزينة' : 'Safe name is required' });
             return;
         }
 
@@ -1000,16 +1036,16 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
 
             if (safe) {
                 await safesAPI.update(safe.id, payload);
-                showAlert('success', isArabic ? 'تم تحديث بيانات الخزينة بنجاح' : 'Safe updated successfully');
+                showAlert({ type: 'success', message: isArabic ? 'تم تحديث بيانات الخزينة بنجاح' : 'Safe updated successfully' });
             } else {
                 payload.initialBalance = Number(initialBalance) || 0;
                 await safesAPI.create(payload);
-                showAlert('success', isArabic ? 'تم إنشاء الخزينة بنجاح' : 'Safe created successfully');
+                showAlert({ type: 'success', message: isArabic ? 'تم إنشاء الخزينة بنجاح' : 'Safe created successfully' });
             }
             onSuccess();
         } catch (error) {
             console.error('Save safe error:', error);
-            showAlert('error', error.response?.data?.message || (isArabic ? 'فشل حفظ الخزينة' : 'Failed to save safe'));
+            showAlert({ type: 'error', message: error.response?.data?.message || (isArabic ? 'فشل حفظ الخزينة' : 'Failed to save safe') });
         } finally {
             setLoading(false);
         }
@@ -1162,17 +1198,17 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
         e.preventDefault();
         const numAmount = Number(amount);
         if (!numAmount || numAmount <= 0) {
-            showAlert('warning', isArabic ? 'يرجى إدخال مبلغ تحويل صحيح' : 'Please enter valid transfer amount');
+            showAlert({ type: 'warning', message: isArabic ? 'يرجى إدخال مبلغ تحويل صحيح' : 'Please enter valid transfer amount' });
             return;
         }
 
         if (!fromSafeId || !toSafeId) {
-            showAlert('warning', isArabic ? 'يرجى تحديد الخزينة المحول منها والمحول إليها' : 'Source and destination safes are required');
+            showAlert({ type: 'warning', message: isArabic ? 'يرجى تحديد الخزينة المحول منها والمحول إليها' : 'Source and destination safes are required' });
             return;
         }
 
         if (fromSafeId === toSafeId) {
-            showAlert('warning', isArabic ? 'لا يمكن التحويل لنفس الخزينة' : 'Cannot transfer to the same safe');
+            showAlert({ type: 'warning', message: isArabic ? 'لا يمكن التحويل لنفس الخزينة' : 'Cannot transfer to the same safe' });
             return;
         }
 
@@ -1186,11 +1222,11 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                 notes: notes.trim() || undefined
             });
 
-            showAlert('success', isArabic ? 'تم التحويل بنجاح بين الخزائن' : 'Transfer completed successfully');
+            showAlert({ type: 'success', message: isArabic ? 'تم التحويل بنجاح بين الخزائن' : 'Transfer completed successfully' });
             onSuccess();
         } catch (error) {
             console.error('Transfer safe error:', error);
-            showAlert('error', error.response?.data?.message || (isArabic ? 'فشل إتمام التحويل' : 'Failed to transfer'));
+            showAlert({ type: 'error', message: error.response?.data?.message || (isArabic ? 'فشل إتمام التحويل' : 'Failed to transfer') });
         } finally {
             setLoading(false);
         }
@@ -1317,6 +1353,15 @@ function SafeStatementModal({
     const { i18n } = useTranslation();
     const isArabic = i18n.language === 'ar';
     const { currency: fmtCurrency, date: fmtDate } = useFormat();
+    const displayDate = fmtDate || ((d) => {
+        if (!d) return '-';
+        const dateObj = new Date(d);
+        if (isNaN(dateObj.getTime())) return '-';
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}/${month}/${day}`;
+    });
 
     const statement = statementData?.statement || [];
 
@@ -1415,7 +1460,7 @@ function SafeStatementModal({
                                 {statement.map(item => (
                                     <tr key={item.id}>
                                         <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
-                                            {fmtDate(item.date)}
+                                            {displayDate(item.date)}
                                         </td>
                                         <td>
                                             <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
