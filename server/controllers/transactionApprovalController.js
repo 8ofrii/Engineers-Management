@@ -42,7 +42,11 @@ export const getPendingApprovals = async (req, res, next) => {
             },
             include: {
                 user: { select: { name: true, email: true } },
-                project: { select: { name: true } }
+                project: { select: { name: true } },
+                supplier: { select: { name: true } },
+                client: { select: { name: true } },
+                payer: { select: { name: true } },
+                workman: { select: { name: true } }
             },
             orderBy: { createdAt: 'asc' }
         });
@@ -265,7 +269,8 @@ export const approveTransaction = async (req, res, next) => {
                                 transactionDate: new Date(),
                                 paymentMethod: 'OTHER',
                                 tenantId: req.user.tenantId,
-                                isOfficeExpense: false
+                                isOfficeExpense: false,
+                                notes: `PARENT_TX:${transaction.id}`
                             }
                         });
                     }

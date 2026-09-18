@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import RefundConfirmationModal from '../components/RefundConfirmationModal';
 import { useFormat } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 
@@ -31,6 +32,12 @@ export default function Finance() {
     // Delete state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [transactionToDelete, setTransactionToDelete] = useState(null);
+
+    // Refund state
+    const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+    const [transactionToRefund, setTransactionToRefund] = useState(null);
+    const [isRefunding, setIsRefunding] = useState(false);
+
     const [workmen, setWorkmen] = useState([]);
     const [projects, setProjects] = useState([]);
     const [filterWorkmanId, setFilterWorkmanId] = useState('ALL');
@@ -164,6 +171,36 @@ export default function Finance() {
         }
     };
 
+    const handleRefundClick = (tx) => {
+        setTransactionToRefund(tx);
+        setIsRefundModalOpen(true);
+    };
+
+    const handleConfirmRefund = async () => {
+        if (!transactionToRefund) return;
+        try {
+            setIsRefunding(true);
+            await transactionsAPI.refund(transactionToRefund.id);
+            showAlert({
+                type: 'success',
+                title: t('common.success') || (isArabic ? 'تم بنجاح' : 'Success'),
+                message: t('finance.refundSuccess') || (isArabic ? 'تم استرداد وإلغاء المعاملة بنجاح' : 'Transaction refunded and cancelled successfully')
+            });
+            setIsRefundModalOpen(false);
+            setTransactionToRefund(null);
+            await loadTransactions();
+        } catch (error) {
+            console.error('Failed to refund transaction:', error);
+            showAlert({
+                type: 'error',
+                title: t('common.error') || (isArabic ? 'خطأ' : 'Error'),
+                message: error.response?.data?.message || t('finance.refundFailed') || (isArabic ? 'فشل في استرداد وإلغاء المعاملة' : 'Failed to refund transaction')
+            });
+        } finally {
+            setIsRefunding(false);
+        }
+    };
+
     const openCreateModal = () => {
         setEditingTransaction(null);
         setIsModalOpen(true);
@@ -242,7 +279,9 @@ export default function Finance() {
 
             const status = tx.status === 'APPROVED'
                 ? (isArabic ? 'معتمد' : 'Approved')
-                : (tx.status === 'REJECTED' ? (isArabic ? 'مرفوض' : 'Rejected') : (isArabic ? 'بانتظار الاعتماد' : 'Pending'));
+                : (tx.status === 'CANCELLED'
+                    ? (isArabic ? 'مسترد / ملغي' : 'Refunded / Cancelled')
+                    : (tx.status === 'REJECTED' ? (isArabic ? 'مرفوض' : 'Rejected') : (isArabic ? 'بانتظار الاعتماد' : 'Pending')));
 
             const pMethod = tx.paymentMethod === 'BANK_TRANSFER'
                 ? (isArabic ? 'تحويل بنكي / إنستاباي' : 'Bank Transaction / InstaPay')
@@ -752,8 +791,10 @@ export default function Finance() {
                                                 <th>{t('finance.project')}</th>
                                                 <th>{t('finance.category')}</th>
                                                 <th>{t('finance.description')}</th>
+                                                <th>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Client Contact')}</th>
+                                                <th>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
                                                 <th>{t('finance.amount')}</th>
-                                                <th>{t('finance.createdBy') || 'بواسطة'}</th>
+                                                <th>{t('finance.createdBy') || (isArabic ? 'بواسطة' : 'Created By')}</th>
                                                 <th style={{ width: '120px' }}>{t('common.actions')}</th>
                                             </tr>
                                         </thead>
@@ -764,6 +805,12 @@ export default function Finance() {
                                                     <td>{tx.project?.name || '-'}</td>
                                                     <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
                                                     <td style={{ maxWidth: '200px' }} className="truncate" title={tx.description}>{tx.description}</td>
+                                                    <td style={{ maxWidth: '180px' }} className="truncate">
+                                                        {renderPayerOrClient(tx)}
+                                                    </td>
+                                                    <td>
+                                                        {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
+                                                    </td>
                                                     <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
                                                         {fmtCurrency(tx.amount)}
                                                     </td>
@@ -799,6 +846,7 @@ export default function Finance() {
 
                             return Object.entries(groups).map(([projectName, txs]) => {
                                 const totalAmount = txs.reduce((sum, tx) => {
+                                    if (tx.status === 'CANCELLED') return sum; // Refunded transactions do not affect net total
                                     if (filterType === 'MY_LEDGER') {
                                         // Custody logic:
                                         // User received money (Transfer TO me) -> + Balance
@@ -832,7 +880,7 @@ export default function Finance() {
                                                     <Link
                                                         to={`/projects/${txs[0].project.id}`}
                                                         style={{
-                                                            color: 'var(--color-primary)',
+                                                             color: 'var(--color-primary)',
                                                             textDecoration: 'none',
                                                             borderBottom: '1px dashed var(--color-primary)',
                                                             paddingBottom: 2
@@ -866,16 +914,18 @@ export default function Finance() {
                                                         <th>{t('common.type')}</th>
                                                         <th>{t('finance.category')}</th>
                                                         <th>{t('finance.description')}</th>
-                                                        <th>{t('finance.payerOrClient') || 'الجهة الدافعة / المفوض'}</th>
-                                                        <th>{t('finance.paymentMethod') || 'طريقة الدفع'}</th>
+                                                        <th>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Client Contact')}</th>
+                                                        <th>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
                                                         <th>{t('finance.amount')}</th>
                                                         <th>{t('common.status')}</th>
                                                         <th style={{ width: '120px' }}>{t('common.actions')}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {txs.map((tx) => (
-                                                        <tr key={tx.id}>
+                                                    {txs.map((tx) => {
+                                                        const isCancelled = tx.status === 'CANCELLED';
+                                                        return (
+                                                        <tr key={tx.id} style={isCancelled ? { opacity: 0.65, background: 'hsla(0, 0%, 50%, 0.05)' } : undefined}>
                                                             <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
                                                                 <span dir="ltr" style={{ unicodeBidi: 'plaintext', display: 'inline-block' }}>
                                                                     {formatDate(tx.transactionDate)}
@@ -893,7 +943,7 @@ export default function Finance() {
                                                                 )}
                                                             </td>
                                                             <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                                            <td style={{ maxWidth: '220px' }} className="truncate" title={tx.description}>
+                                                            <td style={{ maxWidth: '220px', textDecoration: isCancelled ? 'line-through' : 'none' }} className="truncate" title={tx.description}>
                                                                 {tx.description}
                                                                 {tx.projectCostItem && (
                                                                     <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
@@ -907,26 +957,35 @@ export default function Finance() {
                                                             <td>
                                                                 {renderPaymentMethod(tx.paymentMethod, tx.receiptPhotoUrl)}
                                                             </td>
-                                                            <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                            <td style={{ fontWeight: '700', color: 'var(--text-primary)', textDecoration: isCancelled ? 'line-through' : 'none' }}>
                                                                 {fmtCurrency(tx.amount)}
                                                             </td>
                                                             <td>
-                                                                <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                    {t(`finance.status.${tx.status}`) || tx.status?.replace('_', ' ')}
+                                                                <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : tx.status === 'CANCELLED' ? 'badge-secondary' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
+                                                                    {t(`finance.status.${tx.status}`) || (tx.status === 'CANCELLED' ? (isArabic ? 'مسترد / ملغي' : 'Refunded / Cancelled') : tx.status?.replace('_', ' '))}
                                                                 </span>
                                                             </td>
                                                             <td>
                                                                 <div className="flex gap-sm justify-center">
-                                                                    <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
-                                                                        <Pencil size={16} />
-                                                                    </button>
-                                                                    <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.delete')}>
-                                                                        <Trash2 size={16} />
-                                                                    </button>
+                                                                    {isCancelled ? (
+                                                                        <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي من السجل' : 'Delete Permanently')}>
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    ) : (
+                                                                        <>
+                                                                            <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
+                                                                                <Pencil size={16} />
+                                                                            </button>
+                                                                            <button className="btn-icon-sm" style={{ color: '#d97706', borderColor: '#d97706' }} onClick={() => handleRefundClick(tx)} title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}>
+                                                                                <RotateCcw size={16} />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             </td>
                                                         </tr>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -953,6 +1012,19 @@ export default function Finance() {
                 itemName={t('finance.newTransaction')}
                 title={t('common.deleteConfirmTitle')}
                 message={t('common.deleteConfirmMessage')}
+            />
+
+            <RefundConfirmationModal
+                isOpen={isRefundModalOpen}
+                onClose={() => {
+                    if (!isRefunding) {
+                        setIsRefundModalOpen(false);
+                        setTransactionToRefund(null);
+                    }
+                }}
+                onConfirm={handleConfirmRefund}
+                transaction={transactionToRefund}
+                isLoading={isRefunding}
             />
         </Layout>
     );

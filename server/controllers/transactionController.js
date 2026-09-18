@@ -72,7 +72,9 @@ export const getTransactions = async (req, res, next) => {
                 project: { select: { name: true } },
                 supplier: { select: { name: true } },
                 client: { select: { name: true } },
-                user: { select: { name: true, email: true } }
+                user: { select: { name: true, email: true } },
+                payer: { select: { name: true } },
+                workman: { select: { name: true } }
             },
             orderBy: {
                 createdAt: 'desc'
@@ -421,6 +423,299 @@ export const getTransaction = async (req, res, next) => {
     }
 };
 
+// Helper: Find linked MANAGEMENT_FEE_TRANSFER for an expense
+export const findLinkedManagementFee = async (tx, parentTransaction, project = null) => {
+    if (!parentTransaction || !parentTransaction.projectId) return null;
+
+    // 1. Direct tag in notes: PARENT_TX:<id>
+    let feeTx = await tx.transaction.findFirst({
+        where: {
+            tenantId: parentTransaction.tenantId,
+            projectId: parentTransaction.projectId,
+            category: 'MANAGEMENT_FEE_TRANSFER',
+            notes: `PARENT_TX:${parentTransaction.id}`
+        }
+    });
+    if (feeTx) return feeTx;
+
+    // 2. Notes contains parent id
+    feeTx = await tx.transaction.findFirst({
+        where: {
+            tenantId: parentTransaction.tenantId,
+            projectId: parentTransaction.projectId,
+            category: 'MANAGEMENT_FEE_TRANSFER',
+            notes: { contains: parentTransaction.id }
+        }
+    });
+    if (feeTx) return feeTx;
+
+    // 3. Candidate search on the same project
+    const candidates = await tx.transaction.findMany({
+        where: {
+            tenantId: parentTransaction.tenantId,
+            projectId: parentTransaction.projectId,
+            category: 'MANAGEMENT_FEE_TRANSFER'
+        },
+        orderBy: { createdAt: 'desc' }
+    });
+
+    if (!candidates.length) return null;
+
+    const parentAmount = Number(parentTransaction.amount);
+
+    // Filter out candidates that already explicitly point to a DIFFERENT parent transaction
+    const eligible = candidates.filter(c => !c.notes || !c.notes.startsWith('PARENT_TX:') || c.notes === `PARENT_TX:${parentTransaction.id}`);
+
+    // Match by description
+    feeTx = eligible.find(c => {
+        if (!c.description) return false;
+        const desc = c.description;
+        const matchesAmount =
+            desc.includes(`${parentAmount} EGP`) ||
+            desc.includes(`${Math.round(parentAmount)} EGP`) ||
+            desc.includes(`${parentAmount.toLocaleString()} EGP`) ||
+            desc.includes(`${parentAmount.toFixed(2)} EGP`);
+        return matchesAmount;
+    });
+    if (feeTx) return feeTx;
+
+    // Match by calculated expected fee amount
+    let feePercent = 0;
+    if (project && project.managementFeePercent) {
+        feePercent = Number(project.managementFeePercent);
+    } else {
+        const proj = await tx.project.findFirst({
+            where: { id: parentTransaction.projectId, tenantId: parentTransaction.tenantId },
+            select: { managementFeePercent: true, revenueModel: true }
+        });
+        if (proj) feePercent = Number(proj.managementFeePercent) || 0;
+    }
+
+    if (feePercent > 0) {
+        const expectedFee = parentAmount * (feePercent / 100);
+        feeTx = eligible.find(c => Math.abs(Number(c.amount) - expectedFee) < 0.01);
+        if (feeTx) return feeTx;
+    }
+
+    // Time window heuristic
+    if (parentTransaction.createdAt) {
+        const pTime = new Date(parentTransaction.createdAt).getTime();
+        const nearby = eligible.filter(c => {
+            const cTime = new Date(c.createdAt).getTime();
+            return Math.abs(cTime - pTime) <= 60000;
+        });
+        if (nearby.length === 1) return nearby[0];
+    }
+
+    return null;
+};
+
+// @desc    Refund & Cancel transaction (reverses balances, keeps record as CANCELLED)
+// @route   POST /api/transactions/:id/refund
+// @access  Private (Owner/Manager/Admin/Accountant)
+export const refundTransaction = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const transaction = await prisma.transaction.findFirst({
+            where: {
+                id,
+                tenantId: req.user.tenantId
+            },
+            include: {
+                project: true,
+                user: true
+            }
+        });
+
+        if (!transaction) {
+            return res.status(404).json({
+                success: false,
+                message: 'Transaction not found'
+            });
+        }
+
+        // Authorization: Creator, Admin, Project Manager, or Accountant
+        if (
+            transaction.createdBy !== req.user.id &&
+            req.user.role !== 'ADMIN' &&
+            req.user.role !== 'PROJECT_MANAGER' &&
+            req.user.role !== 'ACCOUNTANT'
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to refund this transaction'
+            });
+        }
+
+        if (transaction.status === 'CANCELLED') {
+            return res.status(400).json({
+                success: false,
+                message: 'Transaction is already refunded / cancelled'
+            });
+        }
+
+        let updatedTx;
+
+        await prisma.$transaction(async (tx) => {
+            // 1. Handle Financial Reversals based on status
+            if (transaction.type === 'EXPENSE') {
+                if (transaction.paymentMethod === 'CUSTODY_WALLET') {
+                    if (transaction.status === 'DRAFT' || transaction.status === 'PENDING_APPROVAL') {
+                        await tx.user.update({
+                            where: { id: transaction.createdBy },
+                            data: {
+                                pendingClearance: { decrement: transaction.amount }
+                            }
+                        });
+                    } else if (transaction.status === 'APPROVED') {
+                        // Reverse User Custody Impact
+                        await tx.user.update({
+                            where: { id: transaction.createdBy },
+                            data: {
+                                currentCustodyBalance: { increment: transaction.amount }
+                            }
+                        });
+
+                        // Reverse Project Impact
+                        if (transaction.projectId) {
+                            await tx.project.update({
+                                where: {
+                                    id: transaction.projectId,
+                                    tenantId: req.user.tenantId
+                                },
+                                data: {
+                                    operationalFund: { increment: transaction.amount },
+                                    actualCost: { decrement: transaction.amount },
+                                    projectSafeBalance: { increment: transaction.amount }
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    // Non-Custody Expense (Cash/Bank Transfer/etc)
+                    if (transaction.status === 'APPROVED' && transaction.projectId) {
+                        await tx.project.update({
+                            where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                            data: {
+                                actualCost: { decrement: transaction.amount },
+                                operationalFund: { increment: transaction.amount },
+                                projectSafeBalance: { increment: transaction.amount }
+                            }
+                        });
+                    }
+                }
+
+                // If approved expense on project, locate linked MANAGEMENT_FEE_TRANSFER
+                if (transaction.status === 'APPROVED' && transaction.projectId) {
+                    const linkedFeeTx = await findLinkedManagementFee(tx, transaction, transaction.project);
+                    if (linkedFeeTx) {
+                        // Undo the fee impact from project
+                        await tx.project.update({
+                            where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                            data: {
+                                officeRevenue: { decrement: linkedFeeTx.amount },
+                                projectSafeBalance: { increment: linkedFeeTx.amount }
+                            }
+                        });
+
+                        // Cancel the linked fee transaction so it also shows as CANCELLED
+                        const feeNotes = linkedFeeTx.notes
+                            ? `${linkedFeeTx.notes} | CANCELLED_WITH_PARENT:${transaction.id}`
+                            : `CANCELLED_WITH_PARENT:${transaction.id}`;
+                        await tx.transaction.update({
+                            where: { id: linkedFeeTx.id, tenantId: req.user.tenantId },
+                            data: {
+                                status: 'CANCELLED',
+                                notes: feeNotes
+                            }
+                        });
+                    }
+                }
+
+                // Reverse Cost Item if linked
+                if (transaction.projectCostItemId && transaction.status === 'APPROVED') {
+                    await tx.projectCostItem.update({
+                        where: { id: transaction.projectCostItemId, tenantId: req.user.tenantId },
+                        data: { totalPaid: { decrement: transaction.amount } }
+                    }).catch(() => {});
+                }
+
+                // Reverse Workman if linked
+                if (transaction.workmanId && transaction.status === 'APPROVED') {
+                    await tx.workman.update({
+                        where: { id: transaction.workmanId, tenantId: req.user.tenantId },
+                        data: { totalPaid: { decrement: transaction.amount } }
+                    }).catch(() => {});
+                }
+            } else if (transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
+                // Direct refund of a standalone MANAGEMENT_FEE_TRANSFER entry
+                if (transaction.projectId) {
+                    await tx.project.update({
+                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                        data: {
+                            officeRevenue: { decrement: transaction.amount },
+                            projectSafeBalance: { increment: transaction.amount }
+                        }
+                    });
+                }
+            } else if (transaction.type === 'INCOME') {
+                if (transaction.status === 'APPROVED' && transaction.projectId) {
+                    await tx.project.update({
+                        where: {
+                            id: transaction.projectId,
+                            tenantId: req.user.tenantId
+                        },
+                        data: {
+                            projectSafeBalance: { decrement: transaction.amount },
+                            operationalFund: { decrement: transaction.amount }
+                        }
+                    });
+                }
+            }
+
+            // 2. Mark this transaction as CANCELLED (Do NOT delete row)
+            const refundNotes = transaction.notes
+                ? `${transaction.notes} | REFUNDED_AT:${new Date().toISOString()}`
+                : `REFUNDED_AT:${new Date().toISOString()}`;
+
+            updatedTx = await tx.transaction.update({
+                where: {
+                    id,
+                    tenantId: req.user.tenantId
+                },
+                data: {
+                    status: 'CANCELLED',
+                    notes: refundNotes
+                }
+            });
+        });
+
+        await auditFromReq(req, {
+            action: 'REFUND',
+            entity: 'Transaction',
+            entityId: req.params.id,
+            before: {
+                type: transaction.type,
+                category: transaction.category,
+                amount: Number(transaction.amount),
+                status: transaction.status,
+                projectId: transaction.projectId
+            },
+            after: {
+                status: 'CANCELLED'
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Transaction refunded and cancelled successfully',
+            data: updatedTx
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Delete transaction (with financial reversals)
 // @route   DELETE /api/transactions/:id
 // @access  Private (Owner/Admin)
@@ -454,18 +749,38 @@ export const deleteTransaction = async (req, res, next) => {
         }
 
         await prisma.$transaction(async (tx) => {
+            // If already CANCELLED / REFUNDED, financial balances were ALREADY reversed at refund time!
+            if (transaction.status === 'CANCELLED') {
+                // If there's a linked fee transaction that was cancelled with this parent, delete it too
+                if (transaction.projectId) {
+                    const linkedFeeTx = await tx.transaction.findFirst({
+                        where: {
+                            tenantId: req.user.tenantId,
+                            projectId: transaction.projectId,
+                            category: 'MANAGEMENT_FEE_TRANSFER',
+                            status: 'CANCELLED',
+                            notes: { contains: transaction.id }
+                        }
+                    });
+                    if (linkedFeeTx) {
+                        await tx.transaction.delete({
+                            where: { id: linkedFeeTx.id, tenantId: req.user.tenantId }
+                        }).catch(() => {});
+                    }
+                }
+
+                await tx.transaction.delete({
+                    where: {
+                        id,
+                        tenantId: req.user.tenantId
+                    }
+                });
+                return;
+            }
+
             // 1. Handle Reversals based on status
             if (transaction.type === 'EXPENSE') {
                 if (transaction.paymentMethod === 'CUSTODY_WALLET') {
-                    // If DRAFT or PENDING, money is in "pendingClearance" (Frozen)
-                    // We must release it back (decrement pendingClearance is not quite right, pendingClearance tracks "money spent but not approved").
-                    // Actually, `pendingClearance` = "Receipts in hand". 
-                    // If I delete the receipt, I effectively say "I didn't spend this".
-                    // So `pendingClearance` should be DECREMENTED.
-                    // And `currentCustodyBalance`? In `createDraft` we ONLY touched `pendingClearance`.
-                    // Wait, `createDraft` -> `pendingClearance: { increment: amount }`.
-                    // `currentCustodyBalance` was NOT touched.
-                    // So if I delete DRAFT, I just remove from `pendingClearance`.
                     if (transaction.status === 'DRAFT' || transaction.status === 'PENDING_APPROVAL') {
                         await tx.user.update({
                             where: { id: transaction.createdBy },
@@ -475,11 +790,6 @@ export const deleteTransaction = async (req, res, next) => {
                         });
                     }
                     else if (transaction.status === 'APPROVED') {
-                        // If APPROVED, it was deducted from `currentCustodyBalance` and removed from `pendingClearance`.
-                        // Reversing means: Giving money back to `currentCustodyBalance`.
-                        // And updating Project costs.
-
-                        // Reverse User Impact
                         await tx.user.update({
                             where: { id: transaction.createdBy },
                             data: {
@@ -487,7 +797,6 @@ export const deleteTransaction = async (req, res, next) => {
                             }
                         });
 
-                        // Reverse Project Impact
                         if (transaction.projectId) {
                             await tx.project.update({
                                 where: {
@@ -495,48 +804,52 @@ export const deleteTransaction = async (req, res, next) => {
                                     tenantId: req.user.tenantId
                                 },
                                 data: {
-                                    operationalFund: { increment: transaction.amount }, // Give back to fund
-                                    actualCost: { decrement: transaction.amount }       // Reduce cost
+                                    operationalFund: { increment: transaction.amount },
+                                    actualCost: { decrement: transaction.amount },
+                                    projectSafeBalance: { increment: transaction.amount }
                                 }
                             });
                         }
                     }
                 } else {
-                    // Non-Custody Expense (Cash/Check/etc)
                     if (transaction.status === 'APPROVED' && transaction.projectId) {
                         await tx.project.update({
-                            where: { id: transaction.projectId },
+                            where: { id: transaction.projectId, tenantId: req.user.tenantId },
                             data: {
-                                actualCost: { decrement: transaction.amount }
+                                actualCost: { decrement: transaction.amount },
+                                operationalFund: { increment: transaction.amount },
+                                projectSafeBalance: { increment: transaction.amount }
                             }
                         });
                     }
                 }
+
+                // Reverse Cost Item if linked
+                if (transaction.projectCostItemId && transaction.status === 'APPROVED') {
+                    await tx.projectCostItem.update({
+                        where: { id: transaction.projectCostItemId, tenantId: req.user.tenantId },
+                        data: { totalPaid: { decrement: transaction.amount } }
+                    }).catch(() => {});
+                }
+
+                // Reverse Workman if linked
+                if (transaction.workmanId && transaction.status === 'APPROVED') {
+                    await tx.workman.update({
+                        where: { id: transaction.workmanId, tenantId: req.user.tenantId },
+                        data: { totalPaid: { decrement: transaction.amount } }
+                    }).catch(() => {});
+                }
             }
             else if (transaction.type === 'INCOME') {
                 if (transaction.status === 'APPROVED' && transaction.projectId) {
-                    // Reverse Income
-                    // Need to reverse the split (Office/Ops)
-                    // We can re-calculate or assume standard split.
-                    // Let's use the project's current model.
-                    const project = transaction.project;
-                    let officeShare = 0;
-                    let opsShare = Number(transaction.amount);
-
-                    if (project.revenueModel === 'EXECUTION_COST_PLUS') {
-                        const feePercent = Number(project.managementFeePercent) || 20;
-                        officeShare = Number(transaction.amount) * (feePercent / 100);
-                        opsShare = Number(transaction.amount) - officeShare;
-                    }
-
                     await tx.project.update({
                         where: {
                             id: transaction.projectId,
                             tenantId: req.user.tenantId
                         },
                         data: {
-                            officeRevenue: { decrement: officeShare },
-                            operationalFund: { decrement: opsShare }
+                            projectSafeBalance: { decrement: transaction.amount },
+                            operationalFund: { decrement: transaction.amount }
                         }
                     });
                 }
@@ -721,9 +1034,74 @@ export const updateTransaction = async (req, res, next) => {
                             },
                             data: {
                                 actualCost: { increment: diff },       // Cost goes up
-                                operationalFund: { decrement: diff }   // Fund goes down
+                                operationalFund: { decrement: diff },  // Fund goes down
+                                projectSafeBalance: { decrement: diff }
                             }
                         });
+
+                        const proj = await tx.project.findFirst({
+                            where: { id: transaction.projectId, tenantId: req.user.tenantId }
+                        });
+                        if (proj && proj.revenueModel === 'EXECUTION_COST_PLUS') {
+                            const feePercent = Number(proj.managementFeePercent) || 0;
+                            const newFeeAmount = Number((newAmount * (feePercent / 100)).toFixed(2));
+                            const feeTx = await findLinkedManagementFee(tx, transaction, proj);
+
+                            if (feeTx) {
+                                const oldFeeAmount = Number(feeTx.amount);
+                                const feeDiff = newFeeAmount - oldFeeAmount;
+
+                                if (newFeeAmount > 0) {
+                                    await tx.transaction.update({
+                                        where: { id: feeTx.id },
+                                        data: {
+                                            amount: newFeeAmount,
+                                            description: `Cost-Plus Management Fee (${feePercent}%) on ${newAmount} EGP expense`,
+                                            notes: `PARENT_TX:${transaction.id}`
+                                        }
+                                    });
+                                } else {
+                                    await tx.transaction.delete({
+                                        where: { id: feeTx.id }
+                                    });
+                                }
+
+                                if (feeDiff !== 0) {
+                                    await tx.project.update({
+                                        where: { id: proj.id },
+                                        data: {
+                                            officeRevenue: { increment: feeDiff },
+                                            projectSafeBalance: { decrement: feeDiff }
+                                        }
+                                    });
+                                }
+                            } else if (newFeeAmount > 0) {
+                                await tx.transaction.create({
+                                    data: {
+                                        type: 'EXPENSE',
+                                        category: 'MANAGEMENT_FEE_TRANSFER',
+                                        amount: newFeeAmount,
+                                        description: `Cost-Plus Management Fee (${feePercent}%) on ${newAmount} EGP expense`,
+                                        status: 'APPROVED',
+                                        projectId: proj.id,
+                                        createdBy: req.user.id,
+                                        transactionDate: transaction.transactionDate || new Date(),
+                                        paymentMethod: 'OTHER',
+                                        tenantId: req.user.tenantId,
+                                        isOfficeExpense: false,
+                                        notes: `PARENT_TX:${transaction.id}`
+                                    }
+                                });
+
+                                await tx.project.update({
+                                    where: { id: proj.id },
+                                    data: {
+                                        officeRevenue: { increment: newFeeAmount },
+                                        projectSafeBalance: { decrement: newFeeAmount }
+                                    }
+                                });
+                            }
+                        }
                     }
                 }
                 // If PENDING or DRAFT and CUSTODY_WALLET, update pendingClearance

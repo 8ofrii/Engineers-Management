@@ -428,6 +428,16 @@
         "selectCategory": "اختر التصنيف",
         "selectProject": "اختر المشروع",
         "payerContact": "الدافع / جهة الاتصال",
+        "payerOrClient": "الدافع / جهة الاتصال",
+        "refund": "استرداد وإلغاء",
+        "refunded": "مسترد",
+        "refundSuccess": "تم استرداد وإلغاء المعاملة بنجاح",
+        "refundFailed": "فشل في استرداد وإلغاء المعاملة",
+        "refundConfirmTitle": "تأكيد استرداد وإلغاء المعاملة",
+        "refundConfirmMessage": "هل أنت متأكد من رغبتك في استرداد وإلغاء هذه المعاملة؟",
+        "refundImpactNotice": "سيؤدي هذا إلى إعادة الأموال إلى رصيد المشروع/الخزينة، وعكس أي أرباح أو أتعاب تم تسجيلها، وتغيير حالة المعاملة إلى 'ملغي'. سيتم الاحتفاظ بالسجل في الدفتر للتدقيق.",
+        "confirmRefund": "تأكيد الاسترداد والإلغاء",
+        "refunding": "جاري الاسترداد...",
         "transactionFrom": "المورّد / الدافع",
         "transactionFromPlaceholder": "اسم الدافع / المورد",
         "transactionTo": "المستلم",
@@ -536,7 +546,8 @@
             "APPROVED": "معتمد",
             "PENDING_APPROVAL": "قيد الاعتماد",
             "DRAFT": "مسودة",
-            "REJECTED": "مرفوض"
+            "REJECTED": "مرفوض",
+            "CANCELLED": "مسترد / ملغي"
         }
     },
     "chat": {

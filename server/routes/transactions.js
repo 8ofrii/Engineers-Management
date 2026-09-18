@@ -99,6 +99,13 @@ router.put('/:id', transactionController.updateTransaction);
 // Phase 3 — attach a receipt photo (multipart, field=file)
 router.patch('/:id/receipt', upload.single('file'), transactionController.uploadReceipt);
 
+// Refund & Cancel transaction (reverses balances and marks CANCELLED)
+router.post(
+    '/:id/refund',
+    verifyRole(['ENGINEER', 'PROJECT_MANAGER', 'ADMIN', 'ACCOUNTANT']),
+    transactionController.refundTransaction
+);
+
 // Delete transaction
 router.delete('/:id', transactionController.deleteTransaction);
 

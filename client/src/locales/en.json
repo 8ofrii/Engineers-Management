@@ -430,6 +430,16 @@
         "selectCategory": "Select Category",
         "selectProject": "Select Project",
         "payerContact": "Payer / Client Contact",
+        "payerOrClient": "Payer / Contact",
+        "refund": "Refund & Cancel",
+        "refunded": "Refunded",
+        "refundSuccess": "Transaction refunded and cancelled successfully",
+        "refundFailed": "Failed to refund transaction",
+        "refundConfirmTitle": "Refund & Cancel Transaction",
+        "refundConfirmMessage": "Are you sure you want to refund and cancel this transaction?",
+        "refundImpactNotice": "This will return the funds to the project/safe balance, reverse any recorded profits or fees, and mark the transaction as CANCELLED. The record will be kept in the ledger.",
+        "confirmRefund": "Confirm Refund",
+        "refunding": "Refunding...",
         "transactionFrom": "Transaction From",
         "transactionFromPlaceholder": "Paid By / Vendor",
         "transactionTo": "Transaction To",
@@ -538,7 +548,8 @@
             "APPROVED": "Approved",
             "PENDING_APPROVAL": "Pending Approval",
             "DRAFT": "Draft",
-            "REJECTED": "Rejected"
+            "REJECTED": "Rejected",
+            "CANCELLED": "Refunded / Cancelled"
         }
     },
     "chat": {

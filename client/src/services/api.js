@@ -231,6 +231,7 @@ export const transactionsAPI = {
     create: (data) => api.post('/transactions', data),
     update: (id, data) => api.put(`/transactions/${id}`, data),
     delete: (id) => api.delete(`/transactions/${id}`),
+    refund: (id) => api.post(`/transactions/${id}/refund`),
     getStats: (params) => api.get('/transactions/stats', { params }),
     recordIncome: (data) => api.post('/transactions/income', data),
     createV2: (data) => api.post('/transactions/v2', data),
