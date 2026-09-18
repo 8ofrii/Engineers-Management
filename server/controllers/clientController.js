@@ -11,6 +11,19 @@ export const getClients = async (req, res, next) => {
                 tenantId: req.user.tenantId,  // Tenant Isolation
                 deletedAt: null               // Hide soft-deleted
             },
+            include: {
+                projects: {
+                    where: { deletedAt: null },
+                    select: {
+                        id: true,
+                        name: true,
+                        status: true
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                }
+            },
             orderBy: {
                 createdAt: 'desc'
             }

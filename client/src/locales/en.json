@@ -238,6 +238,8 @@
         "email": "Email",
         "phone": "Phone",
         "company": "Company",
+        "currentProject": "Current Project",
+        "noProject": "No current project",
         "status": {
             "active": "Active",
             "inactive": "Inactive",

@@ -239,6 +239,8 @@
         "email": "البريد الإلكتروني",
         "phone": "الهاتف",
         "company": "الشركة",
+        "currentProject": "المشروع الحالي",
+        "noProject": "لا يوجد مشروع حالي",
         "status": {
             "active": "نشط",
             "inactive": "غير نشط",
