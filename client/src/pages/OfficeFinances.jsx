@@ -31,6 +31,7 @@ import { useFormat } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 import AddTransactionModal from '../components/AddTransactionModal';
 import TransactionDetailModal from '../components/TransactionDetailModal';
+import '../components/Modal.css';
 
 export default function OfficeFinances() {
     const { t, i18n } = useTranslation();
@@ -518,7 +519,7 @@ export default function OfficeFinances() {
                         </div>
                     )}
 
-                    {/* Scoped CSS for Table & Badges */}
+                    {/* Scoped CSS for Table, Safe Cards, Modals & Badges */}
                     <style>{`
                         .office-finances-page .tx-table-card {
                             background: var(--bg-surface);
@@ -601,7 +602,7 @@ export default function OfficeFinances() {
                         .office-finances-page .status-badge-pill.pending {
                             background: rgba(245, 158, 11, 0.12);
                             color: #f59e0b;
-                            border: 1px solid rgba(245, 158, 11, 0.3);
+                            border: 1px solid rgba(16, 185, 129, 0.3);
                         }
                         .office-finances-page .status-badge-pill.rejected {
                             background: rgba(239, 68, 68, 0.12);
@@ -633,6 +634,147 @@ export default function OfficeFinances() {
                             color: #3b82f6;
                             transform: translateY(-1px);
                         }
+                        /* Safe Card Actions & Edit Button */
+                        .office-finances-page .safe-edit-btn {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 8px;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: var(--bg-tertiary);
+                            border: 1px solid var(--border-color);
+                            color: var(--text-secondary);
+                            cursor: pointer;
+                            transition: all 0.15s ease;
+                        }
+                        .office-finances-page .safe-edit-btn:hover {
+                            background: rgba(59, 130, 246, 0.15);
+                            border-color: rgba(59, 130, 246, 0.35);
+                            color: #3b82f6;
+                            transform: translateY(-1px);
+                        }
+                        .office-finances-page .safe-action-btn {
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 7px;
+                            padding: 8px 14px;
+                            border-radius: 8px;
+                            font-size: 0.84rem;
+                            font-weight: 600;
+                            border: 1px solid var(--border-color);
+                            background: var(--bg-secondary);
+                            color: var(--text-primary);
+                            cursor: pointer;
+                            transition: all 0.15s ease;
+                        }
+                        .office-finances-page .safe-action-btn:hover {
+                            background: var(--bg-tertiary);
+                            border-color: var(--color-primary);
+                            color: var(--color-primary);
+                            transform: translateY(-1px);
+                        }
+                        .office-finances-page .safe-action-btn.statement {
+                            flex: 1;
+                        }
+
+                        /* Solid Modal Overlay & Containers */
+                        .modal-overlay {
+                            position: fixed;
+                            inset: 0;
+                            background: rgba(0, 0, 0, 0.75);
+                            backdrop-filter: blur(8px);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            z-index: 1050;
+                            padding: 20px;
+                        }
+                        .modal-container.office-modal {
+                            background: var(--bg-surface, #18181b) !important;
+                            border: 1px solid var(--border-color) !important;
+                            border-radius: 16px !important;
+                            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6) !important;
+                            overflow: hidden;
+                            max-height: 90vh;
+                            display: flex;
+                            flex-direction: column;
+                        }
+                        .modal-container.office-modal .modal-header {
+                            background: var(--bg-surface, #18181b);
+                            border-bottom: 1px solid var(--border-color);
+                            padding: 20px 24px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                        }
+                        .modal-container.office-modal .modal-close {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 8px;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: var(--bg-tertiary);
+                            border: 1px solid var(--border-color);
+                            color: var(--text-secondary);
+                            cursor: pointer;
+                            transition: all 0.15s ease;
+                        }
+                        .modal-container.office-modal .modal-close:hover {
+                            background: rgba(239, 68, 68, 0.15);
+                            border-color: rgba(239, 68, 68, 0.35);
+                            color: #ef4444;
+                            transform: translateY(-1px);
+                        }
+                        .modal-container.office-modal .modal-body {
+                            background: var(--bg-surface, #18181b);
+                            padding: 24px;
+                            overflow-y: auto;
+                        }
+                        .modal-container.office-modal .modal-footer {
+                            background: var(--bg-secondary, #121214);
+                            border-top: 1px solid var(--border-color);
+                            padding: 16px 24px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: flex-end;
+                            gap: 12px;
+                        }
+                        .modal-container.office-modal .form-group label {
+                            font-size: 0.86rem;
+                            font-weight: 600;
+                            color: var(--text-primary);
+                            margin-bottom: 6px;
+                            display: block;
+                        }
+                        .modal-container.office-modal input,
+                        .modal-container.office-modal select,
+                        .modal-container.office-modal textarea {
+                            background: var(--bg-secondary) !important;
+                            border: 1px solid var(--border-color) !important;
+                            color: var(--text-primary) !important;
+                            border-radius: 8px !important;
+                            padding: 10px 14px !important;
+                            outline: none;
+                            width: 100%;
+                            font-size: 0.9rem;
+                            transition: border-color 0.2s, box-shadow 0.2s;
+                        }
+                        .modal-container.office-modal input:focus,
+                        .modal-container.office-modal select:focus,
+                        .modal-container.office-modal textarea:focus {
+                            border-color: var(--color-primary) !important;
+                            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+                        }
+                        .statement-table th {
+                            background: var(--bg-tertiary) !important;
+                        }
+                        .statement-table tbody tr:hover {
+                            background: rgba(255, 255, 255, 0.035) !important;
+                        }
+
                         body.light-mode .office-finances-page .office-tx-table th {
                             background: #f1f5f9;
                         }
@@ -990,15 +1132,14 @@ export default function OfficeFinances() {
                                                         </span>
                                                     )}
                                                     <button
-                                                        className="btn-icon"
+                                                        className="safe-edit-btn"
                                                         onClick={() => {
                                                             setEditingSafe(safe);
                                                             setIsAddSafeModalOpen(true);
                                                         }}
-                                                        style={{ padding: '4px', color: 'var(--text-tertiary)' }}
-                                                        title={isArabic ? 'تعديل الخزينة' : 'Edit Safe'}
+                                                        title={isArabic ? 'تعديل بيانات الخزينة' : 'Edit Safe'}
                                                     >
-                                                        <Pencil size={15} />
+                                                        <Pencil size={14} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -1074,20 +1215,18 @@ export default function OfficeFinances() {
                                             paddingTop: '14px'
                                         }}>
                                             <button
-                                                className="btn btn-secondary btn-sm"
+                                                className="safe-action-btn statement"
                                                 onClick={() => handleOpenStatement(safe)}
-                                                style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: 600 }}
                                             >
                                                 <FileText size={15} />
                                                 <span>{isArabic ? 'كشف حساب' : 'Statement'}</span>
                                             </button>
                                             <button
-                                                className="btn btn-secondary btn-sm"
+                                                className="safe-action-btn transfer"
                                                 onClick={() => {
                                                     setTransferSourceSafeId(safe.id);
                                                     setIsTransferModalOpen(true);
                                                 }}
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                                 title={isArabic ? 'تحويل من/إلى هذه الخزينة' : 'Transfer'}
                                             >
                                                 <ArrowRightLeft size={15} />
@@ -1247,14 +1386,14 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '100%' }}>
+            <div className="modal-container office-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', width: '100%' }}>
                 <div className="modal-header">
                     <h2>
                         {safe
                             ? (isArabic ? 'تعديل بيانات الخزينة' : 'Edit Safe')
                             : (isArabic ? 'إضافة خزينة / حساب مالي جديد' : 'Add New Safe / Account')}
                     </h2>
-                    <button className="btn-close" onClick={onClose}><X size={20} /></button>
+                    <button className="modal-close" onClick={onClose} title={isArabic ? 'إغلاق' : 'Close'}><X size={18} /></button>
                 </div>
 
                 <form onSubmit={handleSubmit}>
@@ -1428,20 +1567,20 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', width: '100%' }}>
+            <div className="modal-container office-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', width: '100%' }}>
                 <div className="modal-header">
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <ArrowRightLeft size={20} style={{ color: 'var(--color-primary)' }} />
                         <span>{isArabic ? 'تحويل أموال بين خزائن الشركة' : 'Internal Safe Transfer'}</span>
                     </h2>
-                    <button className="btn-close" onClick={onClose}><X size={20} /></button>
+                    <button className="modal-close" onClick={onClose} title={isArabic ? 'إغلاق' : 'Close'}><X size={18} /></button>
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                         {/* Source Safe */}
                         <div className="form-group">
-                            <label style={{ fontWeight: 600 }}>{isArabic ? 'من الخزينة / الحساب (المصدر)' : 'From Safe / Account'} *</label>
+                            <label>{isArabic ? 'من الخزينة / الحساب (المصدر)' : 'From Safe / Account'} *</label>
                             <select
                                 value={fromSafeId}
                                 onChange={(e) => setFromSafeId(e.target.value)}
@@ -1450,20 +1589,23 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                                 <option value="">-- {isArabic ? 'اختر الخزينة' : 'Select Source'} --</option>
                                 {safes.map(s => (
                                     <option key={s.id} value={s.id}>
-                                        {s.name} ({fmtCurrency(s.balance)})
+                                        {s.name}  —  [{fmtCurrency(s.balance)}]
                                     </option>
                                 ))}
                             </select>
                             {sourceSafe && (
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: '3px', display: 'block' }}>
-                                    {isArabic ? 'الرصيد المتاح حالياً:' : 'Available:'} <strong style={{ color: Number(sourceSafe.balance) >= 0 ? '#10b981' : '#ef4444' }}>{fmtCurrency(sourceSafe.balance)}</strong>
-                                </span>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span>{isArabic ? 'الرصيد المتاح حالياً:' : 'Available:'}</span>
+                                    <strong style={{ color: Number(sourceSafe.balance) >= 0 ? '#10b981' : '#ef4444' }}>
+                                        {fmtCurrency(sourceSafe.balance)}
+                                    </strong>
+                                </div>
                             )}
                         </div>
 
                         {/* Destination Safe */}
                         <div className="form-group">
-                            <label style={{ fontWeight: 600 }}>{isArabic ? 'إلى الخزينة / الحساب (الوجهة)' : 'To Safe / Account'} *</label>
+                            <label>{isArabic ? 'إلى الخزينة / الحساب (الوجهة)' : 'To Safe / Account'} *</label>
                             <select
                                 value={toSafeId}
                                 onChange={(e) => setToSafeId(e.target.value)}
@@ -1472,7 +1614,7 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                                 <option value="">-- {isArabic ? 'اختر الخزينة' : 'Select Destination'} --</option>
                                 {safes.filter(s => s.id !== fromSafeId).map(s => (
                                     <option key={s.id} value={s.id}>
-                                        {s.name} ({fmtCurrency(s.balance)})
+                                        {s.name}  —  [{fmtCurrency(s.balance)}]
                                     </option>
                                 ))}
                             </select>
@@ -1480,7 +1622,7 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
 
                         {/* Amount */}
                         <div className="form-group">
-                            <label style={{ fontWeight: 600 }}>{isArabic ? 'المبلغ المراد تحويله (ج.م)' : 'Transfer Amount (EGP)'} *</label>
+                            <label>{isArabic ? 'المبلغ المراد تحويله (ج.م)' : 'Transfer Amount (EGP)'} *</label>
                             <input
                                 type="number"
                                 step="0.01"
@@ -1489,13 +1631,13 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                                 onChange={(e) => setAmount(e.target.value)}
                                 placeholder="0.00"
                                 required
-                                style={{ fontSize: '1.2rem', fontWeight: 700 }}
+                                style={{ fontSize: '1.25rem', fontWeight: 800 }}
                             />
                         </div>
 
                         {/* Date */}
                         <div className="form-group">
-                            <label style={{ fontWeight: 600 }}>{isArabic ? 'تاريخ التحويل' : 'Transfer Date'}</label>
+                            <label>{isArabic ? 'تاريخ التحويل' : 'Transfer Date'}</label>
                             <input
                                 type="date"
                                 value={transferDate}
@@ -1505,7 +1647,7 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
 
                         {/* Notes */}
                         <div className="form-group">
-                            <label style={{ fontWeight: 600 }}>{isArabic ? 'سبب التحويل / ملاحظات' : 'Notes / Reason'}</label>
+                            <label>{isArabic ? 'سبب التحويل / ملاحظات' : 'Notes / Reason'}</label>
                             <textarea
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
@@ -1515,11 +1657,11 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                         </div>
                     </div>
 
-                    <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={onClose} style={{ padding: '8px 18px', borderRadius: '8px', fontWeight: 600 }}>
                             {isArabic ? 'إلغاء' : 'Cancel'}
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                        <button type="submit" className="btn btn-primary" disabled={loading} style={{ padding: '8px 20px', borderRadius: '8px', fontWeight: 700 }}>
                             {loading ? (isArabic ? 'جاري التحويل...' : 'Transferring...') : (isArabic ? 'تأكيد التحويل' : 'Confirm Transfer')}
                         </button>
                     </div>
@@ -1561,30 +1703,40 @@ function SafeStatementModal({
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-                <div className="modal-header" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+            <div className="modal-container office-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '960px', width: '100%', maxHeight: '90vh' }}>
+                <div className="modal-header">
                     <div>
-                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '1.25rem' }}>
                             <FileText size={22} style={{ color: 'var(--color-primary)' }} />
-                            <span>{isArabic ? `كشف حساب: ${safe.name}` : `Statement: ${safe.name}`}</span>
+                            <span dir="auto">{isArabic ? `كشف حساب: ${safe.name}` : `Statement: ${safe.name}`}</span>
                         </h2>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                            {isArabic ? 'الرصيد الافتتاحي:' : 'Opening:'} {fmtCurrency(statementData?.safe?.initialBalance || 0)} • {isArabic ? 'الرصيد الحالي:' : 'Current Balance:'} <strong style={{ color: Number(statementData?.safe?.currentBalance || 0) >= 0 ? '#10b981' : '#ef4444' }}>{fmtCurrency(statementData?.safe?.currentBalance || 0)}</strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px', fontSize: '0.84rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                            <span>
+                                {isArabic ? 'الرصيد الافتتاحي:' : 'Opening:'}{' '}
+                                <strong style={{ color: 'var(--text-primary)' }}>{fmtCurrency(statementData?.safe?.initialBalance || 0)}</strong>
+                            </span>
+                            <span style={{ color: 'var(--border-color)' }}>•</span>
+                            <span>
+                                {isArabic ? 'الرصيد الحالي:' : 'Current Balance:'}{' '}
+                                <strong style={{ color: Number(statementData?.safe?.currentBalance || 0) >= 0 ? '#10b981' : '#ef4444' }}>
+                                    {fmtCurrency(statementData?.safe?.currentBalance || 0)}
+                                </strong>
+                            </span>
                         </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <button className="btn btn-secondary btn-sm" onClick={onExport} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={onExport} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '8px' }}>
                             <Download size={15} />
                             <span>{isArabic ? 'تصدير Excel' : 'Export Excel'}</span>
                         </button>
-                        <button className="btn-close" onClick={onClose}><X size={20} /></button>
+                        <button className="modal-close" onClick={onClose} title={isArabic ? 'إغلاق' : 'Close'}><X size={18} /></button>
                     </div>
                 </div>
 
                 {/* Filter Toolbar */}
                 <div style={{
-                    padding: '12px 20px',
+                    padding: '12px 24px',
                     background: 'var(--bg-secondary)',
                     borderBottom: '1px solid var(--border-color)',
                     display: 'flex',
@@ -1592,25 +1744,41 @@ function SafeStatementModal({
                     gap: '12px',
                     flexWrap: 'wrap'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
-                        <span>{isArabic ? 'من:' : 'From:'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{isArabic ? 'من:' : 'From:'}</span>
                         <input
                             type="date"
                             value={dateFrom}
                             onChange={(e) => setDateFrom(e.target.value)}
-                            style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '0.82rem' }}
+                            style={{
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-surface)',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.84rem',
+                                outline: 'none'
+                            }}
                         />
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem' }}>
-                        <span>{isArabic ? 'إلى:' : 'To:'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{isArabic ? 'إلى:' : 'To:'}</span>
                         <input
                             type="date"
                             value={dateTo}
                             onChange={(e) => setDateTo(e.target.value)}
-                            style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', fontSize: '0.82rem' }}
+                            style={{
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-surface)',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.84rem',
+                                outline: 'none'
+                            }}
                         />
                     </div>
-                    <button className="btn btn-primary btn-sm" onClick={onFilter} style={{ padding: '4px 12px', fontSize: '0.82rem' }}>
+                    <button className="btn btn-primary btn-sm" onClick={onFilter} style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 600 }}>
                         {isArabic ? 'تصفية' : 'Filter'}
                     </button>
                     {(dateFrom || dateTo) && (
@@ -1621,7 +1789,7 @@ function SafeStatementModal({
                                 setDateTo('');
                                 onFilter();
                             }}
-                            style={{ padding: '4px 8px', fontSize: '0.82rem' }}
+                            style={{ padding: '6px 10px', borderRadius: '8px', fontSize: '0.84rem' }}
                         >
                             {isArabic ? 'مسح' : 'Clear'}
                         </button>
@@ -1629,58 +1797,92 @@ function SafeStatementModal({
                 </div>
 
                 {/* Statement Table */}
-                <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+                <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: 0 }}>
                     {loading ? (
-                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
+                        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)' }}>
                             {isArabic ? 'جاري تحميل كشف الحساب...' : 'Loading statement...'}
                         </div>
                     ) : statement.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
-                            {isArabic ? 'لا توجد حركات مسجلة على هذه الخزينة في هذه الفترة' : 'No transactions recorded for this period'}
+                        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)' }}>
+                            <AlertCircle size={32} style={{ margin: '0 auto 10px', opacity: 0.4, display: 'block' }} />
+                            <div>{isArabic ? 'لا توجد حركات مسجلة على هذه الخزينة في هذه الفترة' : 'No transactions recorded for this period'}</div>
                         </div>
                     ) : (
-                        <table className="table" style={{ margin: 0, width: '100%' }}>
-                            <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 2 }}>
+                        <table className="office-tx-table statement-table">
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
                                 <tr>
-                                    <th>{isArabic ? 'التاريخ' : 'Date'}</th>
-                                    <th>{isArabic ? 'البيان' : 'Description'}</th>
-                                    <th>{isArabic ? 'المشروع / الجهة' : 'Party / Project'}</th>
-                                    <th style={{ color: '#10b981' }}>{isArabic ? 'وارد (+)' : 'Inflow (+)'}</th>
-                                    <th style={{ color: '#ef4444' }}>{isArabic ? 'منصرف (-)' : 'Outflow (-)'}</th>
-                                    <th>{isArabic ? 'الرصيد' : 'Running Balance'}</th>
+                                    <th style={{ textAlign: 'start', width: '120px', minWidth: '120px' }}>{isArabic ? 'التاريخ' : 'Date'}</th>
+                                    <th style={{ textAlign: 'start', minWidth: '260px' }}>{isArabic ? 'البيان' : 'Description'}</th>
+                                    <th style={{ textAlign: 'start', width: '140px', minWidth: '140px' }}>{isArabic ? 'المشروع / الجهة' : 'Party / Project'}</th>
+                                    <th style={{ textAlign: isArabic ? 'left' : 'right', width: '130px', minWidth: '130px', color: '#10b981' }}>{isArabic ? 'وارد (+)' : 'Inflow (+)'}</th>
+                                    <th style={{ textAlign: isArabic ? 'left' : 'right', width: '130px', minWidth: '130px', color: '#ef4444' }}>{isArabic ? 'منصرف (-)' : 'Outflow (-)'}</th>
+                                    <th style={{ textAlign: isArabic ? 'left' : 'right', width: '150px', minWidth: '150px' }}>{isArabic ? 'الرصيد' : 'Running Balance'}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {statement.map(item => (
                                     <tr key={item.id}>
-                                        <td style={{ whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
-                                            {displayDate(item.date)}
+                                        <td style={{ textAlign: 'start', whiteSpace: 'nowrap' }}>
+                                            <span dir="ltr" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                                                {displayDate(item.date)}
+                                            </span>
                                         </td>
-                                        <td>
-                                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
+                                        <td style={{ textAlign: 'start' }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.86rem', lineHeight: '1.4' }}>
                                                 {item.description}
                                             </div>
                                             {item.reference && (
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-                                                    مرجع: {item.reference}
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '3px' }}>
+                                                    {isArabic ? 'مرجع:' : 'Ref:'} {item.reference}
                                                 </div>
                                             )}
                                         </td>
-                                        <td style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                                            {item.projectName || item.partyName || '-'}
+                                        <td style={{ textAlign: 'start' }}>
+                                            {item.projectName || item.partyName ? (
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '6px',
+                                                    background: 'var(--bg-tertiary)',
+                                                    border: '1px solid var(--border-color)',
+                                                    fontSize: '0.78rem',
+                                                    color: 'var(--text-secondary)'
+                                                }}>
+                                                    {item.projectName || item.partyName}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-tertiary)' }}>-</span>
+                                            )}
                                         </td>
-                                        <td style={{ fontWeight: 700, color: '#10b981', whiteSpace: 'nowrap' }}>
-                                            {item.inflow > 0 ? `+${fmtCurrency(item.inflow)}` : '-'}
+                                        <td style={{ textAlign: isArabic ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                                            {item.inflow > 0 ? (
+                                                <span dir="ltr" style={{ fontWeight: 800, color: '#10b981', fontSize: '0.9rem', fontVariantNumeric: 'tabular-nums' }}>
+                                                    +{fmtCurrency(item.inflow)}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-tertiary)' }}>-</span>
+                                            )}
                                         </td>
-                                        <td style={{ fontWeight: 700, color: '#ef4444', whiteSpace: 'nowrap' }}>
-                                            {item.outflow > 0 ? `-${fmtCurrency(item.outflow)}` : '-'}
+                                        <td style={{ textAlign: isArabic ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                                            {item.outflow > 0 ? (
+                                                <span dir="ltr" style={{ fontWeight: 800, color: '#ef4444', fontSize: '0.9rem', fontVariantNumeric: 'tabular-nums' }}>
+                                                    -{fmtCurrency(item.outflow)}
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: 'var(--text-tertiary)' }}>-</span>
+                                            )}
                                         </td>
-                                        <td style={{
-                                            fontWeight: 800,
-                                            color: item.balanceAfter >= 0 ? 'var(--text-primary)' : '#ef4444',
-                                            whiteSpace: 'nowrap'
-                                        }}>
-                                            {fmtCurrency(item.balanceAfter)}
+                                        <td style={{ textAlign: isArabic ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                                            <span dir="ltr" style={{
+                                                fontWeight: 800,
+                                                fontSize: '0.92rem',
+                                                fontVariantNumeric: 'tabular-nums',
+                                                color: item.balanceAfter >= 0 ? 'var(--text-primary)' : '#ef4444'
+                                            }}>
+                                                {fmtCurrency(item.balanceAfter)}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}
@@ -1689,8 +1891,8 @@ function SafeStatementModal({
                     )}
                 </div>
 
-                <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '12px 20px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="btn btn-secondary" onClick={onClose}>
+                <div className="modal-footer">
+                    <button className="btn btn-secondary" onClick={onClose} style={{ padding: '8px 18px', borderRadius: '8px', fontWeight: 600 }}>
                         {isArabic ? 'إغلاق' : 'Close'}
                     </button>
                 </div>
