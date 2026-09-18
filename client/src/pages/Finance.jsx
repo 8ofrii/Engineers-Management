@@ -344,32 +344,39 @@ export default function Finance() {
     const renderPaymentMethod = (method, txOrUrl = null) => {
         if (!method) return <span className="text-secondary">-</span>;
         let label = method;
-        const badgeStyle = { fontSize: '0.72rem', padding: '3px 8px', borderRadius: '6px', fontWeight: '500' };
+        let methodClass = 'custody';
+        let icon = '💼';
 
-        let badgeEl = null;
         switch (method) {
             case 'BANK_TRANSFER':
-                label = t('finance.methods.bankTransfer') || (isArabic ? 'تحويل بنكي / إنستاباي' : 'Bank Transaction / InstaPay');
-                badgeEl = <span className="badge badge-primary" style={badgeStyle}>🏦 {label}</span>;
+                label = t('finance.methods.bankTransfer') || (isArabic ? 'تحويل بنكي' : 'Bank Transfer');
+                methodClass = 'bank';
+                icon = '🏦';
                 break;
             case 'CASH':
                 label = t('finance.methods.cash') || (isArabic ? 'نقداً (كاش)' : 'Cash');
-                badgeEl = <span className="badge badge-warning" style={badgeStyle}>💵 {label}</span>;
+                methodClass = 'cash';
+                icon = '💵';
                 break;
             case 'CHECK':
                 label = t('finance.methods.check') || (isArabic ? 'شيك' : 'Check');
-                badgeEl = <span className="badge badge-info" style={badgeStyle}>🧾 {label}</span>;
+                methodClass = 'check';
+                icon = '🧾';
                 break;
             case 'CREDIT_CARD':
                 label = t('finance.methods.creditCard') || (isArabic ? 'بطاقة ائتمان' : 'Credit Card');
-                badgeEl = <span className="badge badge-primary" style={badgeStyle}>💳 {label}</span>;
+                methodClass = 'card';
+                icon = '💳';
                 break;
             case 'CUSTODY_WALLET':
                 label = t('finance.methods.custodyWallet') || (isArabic ? 'عهدة مهندس' : 'Custody Wallet');
-                badgeEl = <span className="badge badge-secondary" style={badgeStyle}>💼 {label}</span>;
+                methodClass = 'custody';
+                icon = '💼';
                 break;
             default:
-                badgeEl = <span className="badge badge-secondary" style={badgeStyle}>{label}</span>;
+                label = method;
+                methodClass = 'custody';
+                icon = '💼';
         }
 
         const txObj = typeof txOrUrl === 'object' && txOrUrl !== null ? txOrUrl : null;
@@ -379,8 +386,11 @@ export default function Finance() {
         const hasAi = Boolean(txObj?.aiRawText || txObj?.aiExtractedData);
 
         return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                {badgeEl}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                <span className={`badge-method-pill ${methodClass}`}>
+                    <span>{icon}</span>
+                    <span>{label}</span>
+                </span>
 
                 {/* Voice Note Pill */}
                 {hasVoice && (
@@ -390,20 +400,7 @@ export default function Finance() {
                             e.stopPropagation();
                             handleOpenDetail(txObj);
                         }}
-                        className="btn-icon-sm"
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '2px 7px',
-                            fontSize: '0.72rem',
-                            color: '#a855f7',
-                            background: 'rgba(168, 85, 247, 0.12)',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(168, 85, 247, 0.3)',
-                            cursor: 'pointer',
-                            fontWeight: '600'
-                        }}
+                        className="badge-media-btn voice"
                         title={isArabic ? 'استماع للملاحظة الصوتية وتفاصيلها' : 'Play Voice Note & Details'}
                     >
                         <Mic size={12} />
@@ -423,20 +420,7 @@ export default function Finance() {
                                 window.open(legacyUrl.startsWith('http') ? legacyUrl : `/uploads/${legacyUrl.replace(/^(\/?uploads\/|\/+)/, '')}`, '_blank');
                             }
                         }}
-                        className="btn-icon-sm"
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '2px 7px',
-                            fontSize: '0.72rem',
-                            color: '#3b82f6',
-                            background: 'rgba(59, 130, 246, 0.12)',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            cursor: 'pointer',
-                            fontWeight: '600'
-                        }}
+                        className="badge-media-btn receipt"
                         title={isArabic ? 'معاينة الإيصال وتفاصيله' : 'View Receipt & Details'}
                     >
                         <ImageIcon size={12} />
@@ -452,20 +436,7 @@ export default function Finance() {
                             e.stopPropagation();
                             handleOpenDetail(txObj);
                         }}
-                        className="btn-icon-sm"
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '2px 6px',
-                            fontSize: '0.7rem',
-                            color: '#6366f1',
-                            background: 'rgba(99, 102, 241, 0.1)',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(99, 102, 241, 0.25)',
-                            cursor: 'pointer',
-                            fontWeight: '500'
-                        }}
+                        className="badge-media-btn ai"
                         title={isArabic ? 'بيانات مستخرجة بالذكاء الاصطناعي' : 'AI Extracted'}
                     >
                         <Sparkles size={11} />
@@ -480,37 +451,37 @@ export default function Finance() {
         if (tx.type === 'INCOME') {
             const clientName = tx.client?.name || tx.project?.client?.name || '';
             const payerRep = tx.paidByClientContact || (tx.transactionFrom && tx.transactionFrom !== clientName ? tx.transactionFrom : '');
-            if (clientName && payerRep) {
-                return (
-                    <div>
-                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{clientName}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <span>👤 {isArabic ? 'المفوض:' : 'By:'} {payerRep}</span>
-                        </div>
+            return (
+                <div style={{ lineHeight: 1.35 }}>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.84rem' }} className="truncate">
+                        {clientName || payerRep || '-'}
                     </div>
-                );
-            }
-            if (clientName) return <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{clientName}</span>;
-            if (payerRep) return <span style={{ fontWeight: '600' }}>{payerRep}</span>;
-            return <span className="text-secondary">-</span>;
+                    {clientName && payerRep && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }} className="truncate">
+                            {isArabic ? 'المفوض:' : 'By:'} {payerRep}
+                        </div>
+                    )}
+                </div>
+            );
         } else {
             const payer = tx.payer?.name || tx.user?.name || '';
             const beneficiary = tx.beneficiary || tx.supplier?.name || tx.workman?.name || '';
             const recipient = tx.transactionTo || '';
             return (
-                <div>
-                    {payer && <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{payer}</div>}
-                    {beneficiary && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                            <span>🎯 {isArabic ? 'المستفيد:' : 'Beneficiary:'} <strong style={{ color: 'var(--text-primary)' }}>{beneficiary}</strong></span>
+                <div style={{ lineHeight: 1.35 }}>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.84rem' }} className="truncate">
+                        {payer || beneficiary || recipient || '-'}
+                    </div>
+                    {beneficiary && payer && beneficiary !== payer && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }} className="truncate">
+                            ↳ {isArabic ? 'المستفيد:' : 'To:'} <span style={{ color: 'var(--text-primary)' }}>{beneficiary}</span>
                         </div>
                     )}
-                    {recipient && recipient !== beneficiary && (
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
-                            <span>🤝 {isArabic ? 'المستلم:' : 'Receiver:'} {recipient}</span>
+                    {recipient && recipient !== beneficiary && recipient !== payer && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }} className="truncate">
+                            🤝 {recipient}
                         </div>
                     )}
-                    {!payer && !beneficiary && !recipient && <span className="text-secondary">-</span>}
                 </div>
             );
         }
@@ -869,82 +840,256 @@ export default function Finance() {
                                     color: var(--text-secondary);
                                     font-weight: 600;
                                 }
-                                .transaction-table {
-                                    width: 100%;\r
-                                    border-collapse: collapse;
+                                .project-group {
                                     background: var(--bg-secondary);
-                                    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+                                    border: 1px solid var(--border-color);
+                                    border-radius: var(--radius-lg);
                                     overflow: hidden;
-                                    box-shadow: var(--shadow-sm);
+                                    margin-bottom: var(--spacing-xl);
+                                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+                                }
+                                .project-header {
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    padding: 14px 20px;
+                                    background: var(--bg-tertiary);
+                                    border-bottom: 1px solid var(--border-color);
+                                }
+                                .transaction-table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    background: transparent;
                                 }
                                 .transaction-table th {
-                                    padding: 16px 14px;
-                                    text-align: center;
-                                    font-size: 0.8125rem;
+                                    padding: 12px 14px;
+                                    font-size: 0.72rem;
                                     color: var(--text-secondary);
-                                    background: var(--bg-tertiary);
-                                    border-bottom: 2px solid var(--border-color);
+                                    background: rgba(255, 255, 255, 0.02);
+                                    border-bottom: 1px solid var(--border-color);
                                     font-weight: 700;
                                     text-transform: uppercase;
-                                    letter-spacing: 0.5px;
+                                    letter-spacing: 0.05em;
+                                    white-space: nowrap;
                                 }
                                 .transaction-table td {
-                                    padding: 16px 14px;
-                                    text-align: center;
-                                    font-size: 0.875rem;
-                                    border-bottom: 1px solid var(--border-color);
+                                    padding: 12px 14px;
+                                    font-size: 0.85rem;
+                                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
                                     color: var(--text-primary);
-                                    transition: all var(--transition-fast);
+                                    vertical-align: middle;
                                 }
-                                .transaction-table tbody tr {
-                                    transition: all var(--transition-fast);
+                                .transaction-table tbody tr.tx-row {
+                                    transition: background 0.15s ease;
                                 }
-                                .transaction-table tbody tr:hover {
-                                    background: var(--bg-elevated);
-                                    transform: scale(1.005);
-                                    box-shadow: 0 2px 8px hsla(220, 80%, 45%, 0.08);
+                                .transaction-table tbody tr.tx-row:hover {
+                                    background: rgba(255, 255, 255, 0.035);
                                 }
-                                .transaction-table tbody tr:last-child td {
-                                    border-bottom: none;
-                                }
-                                .btn-icon-sm {
-                                    background: var(--bg-tertiary);
-                                    border: 1px solid var(--border-color);
-                                    color: var(--text-primary);
-                                    padding: 8px;
-                                    border-radius: var(--radius-md);
-                                    cursor: pointer;
+
+                                /* Standardized Type Pills */
+                                .badge-type-pill {
                                     display: inline-flex;
                                     align-items: center;
                                     justify-content: center;
-                                    transition: all var(--transition-base);
+                                    height: 24px;
+                                    min-width: 76px;
+                                    padding: 0 8px;
+                                    font-size: 0.68rem;
+                                    font-weight: 700;
+                                    letter-spacing: 0.04em;
+                                    border-radius: 6px;
+                                    text-transform: uppercase;
                                 }
-                                .btn-icon-sm:hover {
-                                    background: var(--color-primary);
-                                    color: white;
-                                    border-color: var(--color-primary);
-                                    transform: translateY(-2px);
-                                    box-shadow: 0 4px 8px hsla(220, 80%, 45%, 0.3);
+                                .badge-type-pill.expense {
+                                    background: rgba(239, 68, 68, 0.12);
+                                    color: #f87171;
+                                    border: 1px solid rgba(239, 68, 68, 0.28);
                                 }
-                                .btn-icon-sm.text-danger:hover {
-                                    background: var(--color-danger);
-                                    border-color: var(--color-danger);
-                                    box-shadow: 0 4px 8px hsla(0, 85%, 60%, 0.3);
+                                .badge-type-pill.income {
+                                    background: rgba(16, 185, 129, 0.12);
+                                    color: #34d399;
+                                    border: 1px solid rgba(16, 185, 129, 0.28);
                                 }
+                                .badge-type-pill.profit {
+                                    background: rgba(6, 182, 212, 0.12);
+                                    color: #22d3ee;
+                                    border: 1px solid rgba(6, 182, 212, 0.28);
+                                }
+
+                                /* Standardized Method Badges */
+                                .badge-method-pill {
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 5px;
+                                    height: 24px;
+                                    padding: 0 8px;
+                                    font-size: 0.72rem;
+                                    font-weight: 500;
+                                    border-radius: 6px;
+                                    white-space: nowrap;
+                                    border: 1px solid transparent;
+                                }
+                                .badge-method-pill.bank {
+                                    background: rgba(59, 130, 246, 0.12);
+                                    color: #60a5fa;
+                                    border-color: rgba(59, 130, 246, 0.25);
+                                }
+                                .badge-method-pill.cash {
+                                    background: rgba(245, 158, 11, 0.12);
+                                    color: #fbbf24;
+                                    border-color: rgba(245, 158, 11, 0.25);
+                                }
+                                .badge-method-pill.check {
+                                    background: rgba(168, 85, 247, 0.12);
+                                    color: #c084fc;
+                                    border-color: rgba(168, 85, 247, 0.25);
+                                }
+                                .badge-method-pill.card {
+                                    background: rgba(99, 102, 241, 0.12);
+                                    color: #818cf8;
+                                    border-color: rgba(99, 102, 241, 0.25);
+                                }
+                                .badge-method-pill.custody {
+                                    background: rgba(148, 163, 184, 0.12);
+                                    color: #cbd5e1;
+                                    border-color: rgba(148, 163, 184, 0.25);
+                                }
+
+                                /* Standardized Media Evidence Buttons */
+                                .badge-media-btn {
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 4px;
+                                    height: 24px;
+                                    padding: 0 7px;
+                                    font-size: 0.7rem;
+                                    font-weight: 600;
+                                    border-radius: 5px;
+                                    cursor: pointer;
+                                    transition: all 0.15s ease;
+                                    white-space: nowrap;
+                                }
+                                .badge-media-btn.voice {
+                                    background: rgba(168, 85, 247, 0.15);
+                                    color: #c084fc;
+                                    border: 1px solid rgba(168, 85, 247, 0.35);
+                                }
+                                .badge-media-btn.voice:hover {
+                                    background: rgba(168, 85, 247, 0.28);
+                                    transform: translateY(-1px);
+                                }
+                                .badge-media-btn.receipt {
+                                    background: rgba(59, 130, 246, 0.15);
+                                    color: #60a5fa;
+                                    border: 1px solid rgba(59, 130, 246, 0.35);
+                                }
+                                .badge-media-btn.receipt:hover {
+                                    background: rgba(59, 130, 246, 0.28);
+                                    transform: translateY(-1px);
+                                }
+                                .badge-media-btn.ai {
+                                    background: rgba(99, 102, 241, 0.12);
+                                    color: #a5b4fc;
+                                    border: 1px solid rgba(99, 102, 241, 0.3);
+                                }
+
+                                /* Cost-plus Indicator Tag */
+                                .fee-included-tag {
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 3px;
+                                    font-size: 0.65rem;
+                                    font-weight: 700;
+                                    padding: 1px 6px;
+                                    border-radius: 4px;
+                                    background: rgba(16, 185, 129, 0.12);
+                                    color: #34d399;
+                                    border: 1px solid rgba(16, 185, 129, 0.3);
+                                    margin-top: 3px;
+                                }
+
+                                /* Parent & Nested Fee Row Architecture */
+                                .parent-with-fee {
+                                    border-bottom: 1px dashed rgba(16, 185, 129, 0.22) !important;
+                                }
+                                .parent-with-fee td:first-child {
+                                    border-inline-start: 3px solid #10b981;
+                                }
+                                .nested-fee-row {
+                                    background: linear-gradient(90deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.01) 100%) !important;
+                                }
+                                .nested-fee-row td {
+                                    padding-top: 8px !important;
+                                    padding-bottom: 8px !important;
+                                    border-bottom: 1px solid var(--border-color) !important;
+                                    font-size: 0.8rem !important;
+                                }
+                                .nested-fee-row td:first-child {
+                                    border-inline-start: 3px solid #10b981;
+                                }
+
+                                /* Standardized Action Button Group */
+                                .tx-action-group {
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 3px;
+                                    background: rgba(255, 255, 255, 0.02);
+                                    padding: 2px 4px;
+                                    border-radius: 8px;
+                                    border: 1px solid rgba(255, 255, 255, 0.06);
+                                }
+                                .tx-action-btn {
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: 6px;
+                                    display: inline-flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    background: transparent;
+                                    border: 1px solid transparent;
+                                    color: var(--text-secondary);
+                                    cursor: pointer;
+                                    transition: all 0.15s ease;
+                                }
+                                .tx-action-btn:hover {
+                                    background: rgba(255, 255, 255, 0.08);
+                                    color: var(--text-primary);
+                                }
+                                .tx-action-btn.view:hover {
+                                    color: var(--color-primary);
+                                    background: rgba(0, 113, 227, 0.15);
+                                    border-color: rgba(0, 113, 227, 0.3);
+                                }
+                                .tx-action-btn.edit:hover {
+                                    color: #60a5fa;
+                                    background: rgba(59, 130, 246, 0.15);
+                                    border-color: rgba(59, 130, 246, 0.3);
+                                }
+                                .tx-action-btn.refund:hover {
+                                    color: #fbbf24;
+                                    background: rgba(245, 158, 11, 0.15);
+                                    border-color: rgba(245, 158, 11, 0.3);
+                                }
+                                .tx-action-btn.delete:hover {
+                                    color: #f87171;
+                                    background: rgba(239, 68, 68, 0.15);
+                                    border-color: rgba(239, 68, 68, 0.3);
+                                }
+                                .tx-action-btn.approve:hover {
+                                    color: #34d399;
+                                    background: rgba(16, 185, 129, 0.15);
+                                    border-color: rgba(16, 185, 129, 0.3);
+                                }
+                                .tx-action-btn.reject:hover {
+                                    color: #f87171;
+                                    background: rgba(239, 68, 68, 0.15);
+                                    border-color: rgba(239, 68, 68, 0.3);
+                                }
+
                                 .truncate {
                                     white-space: nowrap;
                                     overflow: hidden;
                                     text-overflow: ellipsis;
-                                }
-                                .nested-fee-row td {
-                                    background: hsla(158, 64%, 52%, 0.04) !important;
-                                    border-bottom: 1px dashed rgba(16, 185, 129, 0.22) !important;
-                                    font-size: 0.8125rem !important;
-                                    padding: 11px 14px !important;
-                                    color: var(--text-secondary);
-                                }
-                                .nested-fee-row:hover td {
-                                    background: hsla(158, 64%, 52%, 0.09) !important;
                                 }
                             `}
                         </style>
@@ -963,49 +1108,56 @@ export default function Finance() {
                                     <table className="transaction-table">
                                         <thead>
                                             <tr>
-                                                <th>{t('common.date')}</th>
-                                                <th>{t('finance.project')}</th>
-                                                <th>{t('finance.category')}</th>
-                                                <th>{t('finance.description')}</th>
-                                                <th>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Client Contact')}</th>
-                                                <th>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
-                                                <th>{t('finance.amount')}</th>
-                                                <th>{t('finance.createdBy') || (isArabic ? 'بواسطة' : 'Created By')}</th>
-                                                <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                                                <th style={{ textAlign: 'start', width: '105px' }}>{t('common.date')}</th>
+                                                <th style={{ textAlign: 'start', width: '130px' }}>{t('finance.project')}</th>
+                                                <th style={{ textAlign: 'start', width: '135px' }}>{t('finance.category')}</th>
+                                                <th style={{ textAlign: 'start' }}>{t('finance.description')}</th>
+                                                <th style={{ textAlign: 'start', width: '165px' }}>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Contact')}</th>
+                                                <th style={{ textAlign: 'start', width: '145px' }}>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
+                                                <th style={{ textAlign: 'end', width: '130px' }}>{t('finance.amount')}</th>
+                                                <th style={{ textAlign: 'start', width: '110px' }}>{t('finance.createdBy') || (isArabic ? 'بواسطة' : 'Created By')}</th>
+                                                <th style={{ textAlign: 'center', width: '115px' }}>{t('common.actions')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {pendingTransactions.map((tx) => (
-                                                <tr key={tx.id} style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
-                                                    <td style={{ fontWeight: '500' }}>{formatDate(tx.transactionDate)}</td>
-                                                    <td>{tx.project?.name || '-'}</td>
-                                                    <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                                    <td style={{ maxWidth: '200px' }} className="truncate" title={tx.description}>{tx.description}</td>
-                                                    <td style={{ maxWidth: '180px' }} className="truncate">
+                                                <tr key={tx.id} className="tx-row" style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
+                                                    <td style={{ textAlign: 'start', fontWeight: '500', fontSize: '0.82rem' }}>{formatDate(tx.transactionDate)}</td>
+                                                    <td style={{ textAlign: 'start' }}>{tx.project?.name || '-'}</td>
+                                                    <td style={{ textAlign: 'start', fontWeight: '600' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                    <td style={{ textAlign: 'start', maxWidth: '220px' }} className="truncate" title={tx.description}>{tx.description}</td>
+                                                    <td style={{ textAlign: 'start', maxWidth: '165px' }}>
                                                         {renderPayerOrClient(tx)}
                                                     </td>
-                                                    <td>
+                                                    <td style={{ textAlign: 'start' }}>
                                                          {renderPaymentMethod(tx.paymentMethod, tx)}
                                                      </td>
-                                                     <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                                                     <td style={{ textAlign: 'end', fontWeight: '700', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
                                                          {fmtCurrency(tx.amount)}
                                                      </td>
-                                                     <td>{tx.creator?.name || '-'}</td>
-                                                     <td>
-                                                         <div className="flex gap-sm justify-center">
+                                                     <td style={{ textAlign: 'start' }}>{tx.creator?.name || '-'}</td>
+                                                     <td style={{ textAlign: 'center' }}>
+                                                         <div className="tx-action-group">
                                                              <button
-                                                                 className="btn-icon-sm"
-                                                                 style={{ color: 'var(--color-primary)', borderColor: 'rgba(0, 113, 227, 0.3)' }}
+                                                                 className="tx-action-btn view"
                                                                  onClick={() => handleOpenDetail(tx)}
                                                                  title={isArabic ? 'عرض التفاصيل وأدلة الإثبات' : 'View Details & Evidence'}
                                                              >
-                                                                 <Eye size={16} />
+                                                                 <Eye size={15} />
                                                              </button>
-                                                             <button className="btn-icon-sm" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(tx.id)} title={t('common.approve') || 'Approve'}>
-                                                                 <CheckCircle size={16} />
+                                                             <button
+                                                                 className="tx-action-btn approve"
+                                                                 onClick={() => handleApprove(tx.id)}
+                                                                 title={t('common.approve') || 'Approve'}
+                                                             >
+                                                                 <CheckCircle size={15} />
                                                              </button>
-                                                             <button className="btn-icon-sm" style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }} onClick={() => handleReject(tx.id)} title={t('common.reject') || 'Reject'}>
-                                                                 <XCircle size={16} />
+                                                             <button
+                                                                 className="tx-action-btn reject"
+                                                                 onClick={() => handleReject(tx.id)}
+                                                                 title={t('common.reject') || 'Reject'}
+                                                             >
+                                                                 <XCircle size={15} />
                                                              </button>
                                                          </div>
                                                      </td>
@@ -1094,15 +1246,15 @@ export default function Finance() {
                                             <table className="transaction-table">
                                                 <thead>
                                                     <tr>
-                                                        <th>{t('common.date')}</th>
-                                                        <th>{t('common.type')}</th>
-                                                        <th>{t('finance.category')}</th>
-                                                        <th>{t('finance.description')}</th>
-                                                        <th>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Client Contact')}</th>
-                                                        <th>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
-                                                        <th>{t('finance.amount')}</th>
-                                                        <th>{t('common.status')}</th>
-                                                        <th style={{ width: '120px' }}>{t('common.actions')}</th>
+                                                        <th style={{ textAlign: 'start', width: '105px' }}>{t('common.date')}</th>
+                                                        <th style={{ textAlign: 'center', width: '92px' }}>{t('common.type')}</th>
+                                                        <th style={{ textAlign: 'start', width: '135px' }}>{t('finance.category')}</th>
+                                                        <th style={{ textAlign: 'start' }}>{t('finance.description')}</th>
+                                                        <th style={{ textAlign: 'start', width: '165px' }}>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Contact')}</th>
+                                                        <th style={{ textAlign: 'start', width: '145px' }}>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
+                                                        <th style={{ textAlign: 'end', width: '130px' }}>{t('finance.amount')}</th>
+                                                        <th style={{ textAlign: 'center', width: '95px' }}>{t('common.status')}</th>
+                                                        <th style={{ textAlign: 'center', width: '115px' }}>{t('common.actions')}</th>
                                                     </tr>
                                                 </thead>
                                                  <tbody>
@@ -1111,86 +1263,126 @@ export default function Finance() {
                                                         return displayTxs.map((tx) => {
                                                             const isCancelled = tx.status === 'CANCELLED';
                                                             const hasNestedFees = tx.nestedFees && tx.nestedFees.length > 0;
+                                                            const catLabel = t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '';
+                                                            const isDescDuplicate = !tx.description || tx.description.trim().toLowerCase() === catLabel.trim().toLowerCase();
+
                                                             return (
                                                                 <Fragment key={tx.id}>
-                                                                    <tr key={tx.id} style={isCancelled ? { opacity: 0.65, background: 'hsla(0, 0%, 50%, 0.05)' } : undefined}>
-                                                                        <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
-                                                                            <span dir="ltr" style={{ unicodeBidi: 'plaintext', display: 'inline-block' }}>
-                                                                                {formatDate(tx.transactionDate)}
+                                                                    <tr
+                                                                        key={tx.id}
+                                                                        className={`tx-row ${hasNestedFees ? 'parent-with-fee' : ''}`}
+                                                                        style={isCancelled ? { opacity: 0.6, background: 'rgba(255, 255, 255, 0.01)' } : undefined}
+                                                                    >
+                                                                        {/* 1. Date */}
+                                                                        <td style={{ textAlign: 'start', fontWeight: '500', whiteSpace: 'nowrap', fontSize: '0.82rem' }}>
+                                                                            <span dir="ltr" style={{ unicodeBidi: 'plaintext' }}>
+                                                                                {formatDate(tx.transactionDate || tx.createdAt)}
                                                                             </span>
                                                                         </td>
-                                                                        <td>
+
+                                                                        {/* 2. Type */}
+                                                                        <td style={{ textAlign: 'center' }}>
                                                                             {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (
-                                                                                <span className="badge" style={{ fontSize: '0.7rem', padding: '4px 10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 700 }}>
-                                                                                    {t('finance.companyShare') || (isArabic ? 'ارباح المكتب' : 'Office Profit')}
+                                                                                <span className="badge-type-pill profit">
+                                                                                    {isArabic ? 'أرباح مكتب' : 'PROFIT'}
                                                                                 </span>
                                                                             ) : (
-                                                                                <span className={`badge ${tx.type === 'INCOME' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                                    {tx.type === 'INCOME' ? t('finance.income') : t('finance.expense')}
+                                                                                <span className={`badge-type-pill ${tx.type === 'INCOME' ? 'income' : 'expense'}`}>
+                                                                                    {tx.type === 'INCOME' ? (isArabic ? 'إيراد' : 'INCOME') : (isArabic ? 'مصروف' : 'EXPENSE')}
                                                                                 </span>
                                                                             )}
                                                                         </td>
-                                                                        <td style={{ fontWeight: '500' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
-                                                                        <td style={{ maxWidth: '220px', textDecoration: isCancelled ? 'line-through' : 'none' }} className="truncate" title={tx.description}>
-                                                                            {tx.description}
-                                                                            {tx.projectCostItem && (
-                                                                                <div style={{ fontSize: '0.75rem', color: 'var(--color-primary)', marginTop: '4px', fontWeight: '600' }}>
-                                                                                    #{tx.projectCostItem.name}
-                                                                                </div>
-                                                                            )}
-                                                                            {hasNestedFees && (
-                                                                                <div style={{ marginTop: '4px' }}>
-                                                                                    <span
-                                                                                        className="badge"
-                                                                                        style={{
-                                                                                            fontSize: '0.68rem',
-                                                                                            padding: '2px 6px',
-                                                                                            background: 'rgba(16, 185, 129, 0.12)',
-                                                                                            color: '#10b981',
-                                                                                            border: '1px solid rgba(16, 185, 129, 0.25)',
-                                                                                            fontWeight: '600'
-                                                                                        }}
-                                                                                    >
-                                                                                        {t('finance.includesManagementFee') || (isArabic ? 'يتضمن أتعاب إدارة كوست بلس' : 'Includes Cost-Plus Fee')}
-                                                                                    </span>
-                                                                                </div>
-                                                                            )}
+
+                                                                        {/* 3. Category */}
+                                                                        <td style={{ textAlign: 'start', fontWeight: '600', fontSize: '0.84rem' }}>
+                                                                            <div className="truncate" title={catLabel}>
+                                                                                {catLabel}
+                                                                            </div>
                                                                         </td>
-                                                                        <td style={{ maxWidth: '180px' }} className="truncate">
+
+                                                                        {/* 4. Description */}
+                                                                        <td style={{ textAlign: 'start', maxWidth: '240px' }}>
+                                                                            <div
+                                                                                className="truncate"
+                                                                                style={{
+                                                                                    color: isDescDuplicate ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                                                                                    textDecoration: isCancelled ? 'line-through' : 'none'
+                                                                                }}
+                                                                                title={tx.description || ''}
+                                                                            >
+                                                                                {isDescDuplicate ? '—' : tx.description}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-xs flex-wrap" style={{ marginTop: '2px' }}>
+                                                                                {tx.projectCostItem && (
+                                                                                    <span style={{ fontSize: '0.72rem', color: 'var(--color-primary)', fontWeight: '600' }}>
+                                                                                        #{tx.projectCostItem.name}
+                                                                                    </span>
+                                                                                )}
+                                                                                {hasNestedFees && (
+                                                                                    <span className="fee-included-tag" title={isArabic ? 'يتضمن أتعاب إدارة كوست بلس (+10%)' : 'Includes Cost-Plus Fee (+10%)'}>
+                                                                                        +10% Fee
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+
+                                                                        {/* 5. Payer / Contact */}
+                                                                        <td style={{ textAlign: 'start', maxWidth: '165px' }}>
                                                                             {renderPayerOrClient(tx)}
                                                                         </td>
-                                                                        <td>
+
+                                                                        {/* 6. Payment Method & Media */}
+                                                                        <td style={{ textAlign: 'start' }}>
                                                                             {renderPaymentMethod(tx.paymentMethod, tx)}
                                                                         </td>
-                                                                        <td style={{ fontWeight: '700', color: 'var(--text-primary)', textDecoration: isCancelled ? 'line-through' : 'none' }}>
-                                                                            {fmtCurrency(tx.amount)}
-                                                                        </td>
-                                                                        <td>
-                                                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : tx.status === 'CANCELLED' ? 'badge-secondary' : 'badge-secondary'}`} style={{ fontSize: '0.7rem', padding: '4px 10px' }}>
-                                                                                {t(`finance.status.${tx.status}`) || (tx.status === 'CANCELLED' ? (isArabic ? 'مسترد / ملغي' : 'Refunded / Cancelled') : tx.status?.replace('_', ' '))}
+
+                                                                        {/* 7. Amount */}
+                                                                        <td style={{ textAlign: 'end', fontWeight: '700', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', textDecoration: isCancelled ? 'line-through' : 'none' }}>
+                                                                            <span style={{ color: tx.type === 'INCOME' ? '#34d399' : 'var(--text-primary)' }}>
+                                                                                {tx.type === 'INCOME' ? '+ ' : ''}{fmtCurrency(tx.amount)}
                                                                             </span>
                                                                         </td>
-                                                                        <td>
-                                                                            <div className="flex gap-sm justify-center">
+
+                                                                        {/* 8. Status */}
+                                                                        <td style={{ textAlign: 'center' }}>
+                                                                            <span className={`badge ${tx.status === 'APPROVED' ? 'badge-success' : tx.status === 'PENDING_APPROVAL' ? 'badge-warning' : 'badge-secondary'}`} style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px' }}>
+                                                                                {t(`finance.status.${tx.status}`) || (tx.status === 'CANCELLED' ? (isArabic ? 'مسترد' : 'Refunded') : tx.status)}
+                                                                            </span>
+                                                                        </td>
+
+                                                                        {/* 9. Actions */}
+                                                                        <td style={{ textAlign: 'center' }}>
+                                                                            <div className="tx-action-group">
                                                                                 <button
-                                                                                    className="btn-icon-sm"
-                                                                                    style={{ color: 'var(--color-primary)', borderColor: 'rgba(0, 113, 227, 0.3)' }}
+                                                                                    className="tx-action-btn view"
                                                                                     onClick={() => handleOpenDetail(tx)}
                                                                                     title={isArabic ? 'عرض التفاصيل وأدلة الإثبات' : 'View Details & Evidence'}
                                                                                 >
-                                                                                    <Eye size={16} />
+                                                                                    <Eye size={15} />
                                                                                 </button>
                                                                                 {isCancelled ? (
-                                                                                    <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(tx)} title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي من السجل' : 'Delete Permanently')}>
-                                                                                        <Trash2 size={16} />
+                                                                                    <button
+                                                                                        className="tx-action-btn delete"
+                                                                                        onClick={() => handleDeleteClick(tx)}
+                                                                                        title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي' : 'Delete Permanently')}
+                                                                                    >
+                                                                                        <Trash2 size={15} />
                                                                                     </button>
                                                                                 ) : (
                                                                                     <>
-                                                                                        <button className="btn-icon-sm" onClick={() => openEditModal(tx)} title={t('common.edit')}>
-                                                                                            <Pencil size={16} />
+                                                                                        <button
+                                                                                            className="tx-action-btn edit"
+                                                                                            onClick={() => openEditModal(tx)}
+                                                                                            title={t('common.edit')}
+                                                                                        >
+                                                                                            <Pencil size={15} />
                                                                                         </button>
-                                                                                        <button className="btn-icon-sm" style={{ color: '#d97706', borderColor: '#d97706' }} onClick={() => handleRefundClick(tx)} title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}>
-                                                                                            <RotateCcw size={16} />
+                                                                                        <button
+                                                                                            className="tx-action-btn refund"
+                                                                                            onClick={() => handleRefundClick(tx)}
+                                                                                            title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}
+                                                                                        >
+                                                                                            <RotateCcw size={15} />
                                                                                         </button>
                                                                                     </>
                                                                                 )}
@@ -1198,93 +1390,102 @@ export default function Finance() {
                                                                         </td>
                                                                     </tr>
 
-                                                                    {/* Nested Cost-Plus Management Fee Sub-Row (Always visible as requested) */}
+                                                                    {/* Nested Cost-Plus Child Fee Rows */}
                                                                     {hasNestedFees && tx.nestedFees.map((feeTx) => {
                                                                         const isFeeCancelled = feeTx.status === 'CANCELLED';
                                                                         return (
                                                                             <tr
                                                                                 key={feeTx.id}
                                                                                 className="nested-fee-row"
-                                                                                style={{
-                                                                                    borderInlineStart: '4px solid #10b981',
-                                                                                    ...(isFeeCancelled ? { opacity: 0.6, textDecoration: 'line-through' } : {})
-                                                                                }}
+                                                                                style={isFeeCancelled ? { opacity: 0.5, textDecoration: 'line-through' } : undefined}
                                                                             >
-                                                                                <td style={{ fontWeight: '500', whiteSpace: 'nowrap' }}>
-                                                                                    <div className="flex items-center gap-xs justify-center" style={{ color: 'var(--text-secondary)' }}>
+                                                                                {/* 1. Date with Tree Branch Connector */}
+                                                                                <td style={{ textAlign: 'start', whiteSpace: 'nowrap', paddingInlineStart: '22px' }}>
+                                                                                    <div className="flex items-center gap-xs" style={{ color: '#10b981' }}>
                                                                                         <CornerDownRight
                                                                                             size={14}
                                                                                             style={{
-                                                                                                color: '#10b981',
                                                                                                 flexShrink: 0,
                                                                                                 transform: isArabic ? 'scaleX(-1)' : 'none'
                                                                                             }}
                                                                                         />
-                                                                                        <span dir="ltr" style={{ unicodeBidi: 'plaintext', fontSize: '0.8rem' }}>
+                                                                                        <span dir="ltr" style={{ unicodeBidi: 'plaintext', fontSize: '0.78rem', opacity: 0.85 }}>
                                                                                             {formatDate(feeTx.transactionDate || feeTx.createdAt)}
                                                                                         </span>
                                                                                     </div>
                                                                                 </td>
-                                                                                <td>
-                                                                                    <span
-                                                                                        className="badge"
-                                                                                        style={{
-                                                                                            fontSize: '0.68rem',
-                                                                                            padding: '3px 8px',
-                                                                                            background: 'rgba(16, 185, 129, 0.15)',
-                                                                                            color: '#10b981',
-                                                                                            border: '1px solid rgba(16, 185, 129, 0.35)',
-                                                                                            fontWeight: 700
-                                                                                        }}
-                                                                                    >
-                                                                                        {t('finance.companyShare') || (isArabic ? 'أتعاب كوست بلس' : 'Cost-Plus Fee')}
+
+                                                                                {/* 2. Type: Office Profit Pill */}
+                                                                                <td style={{ textAlign: 'center' }}>
+                                                                                    <span className="badge-type-pill profit" style={{ height: '20px', fontSize: '0.64rem', minWidth: '68px' }}>
+                                                                                        {isArabic ? 'أرباح مكتب' : 'PROFIT'}
                                                                                     </span>
                                                                                 </td>
-                                                                                <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                                                    {t(`finance.categories.${feeTx.category?.toLowerCase()}`) || (isArabic ? 'أتعاب إدارة' : 'Management Fee')}
+
+                                                                                {/* 3. Category: Cost-Plus Fee */}
+                                                                                <td style={{ textAlign: 'start', fontSize: '0.8rem', color: '#10b981', fontWeight: '600' }}>
+                                                                                    {isArabic ? 'أتعاب كوست بلس (+10%)' : 'Cost-Plus Fee (+10%)'}
                                                                                 </td>
-                                                                                <td style={{ maxWidth: '220px', textDecoration: isFeeCancelled ? 'line-through' : 'none' }} className="truncate" title={feeTx.description}>
-                                                                                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                                                                        {feeTx.description}
-                                                                                    </span>
+
+                                                                                {/* 4. Description: Transferred to Office Profit */}
+                                                                                <td style={{ textAlign: 'start', fontSize: '0.78rem', color: 'var(--text-secondary)', maxWidth: '240px' }}>
+                                                                                    <div className="truncate" title={feeTx.description}>
+                                                                                        {isArabic ? 'خصم من خزينة المشروع إلى حساب أرباح المكتب' : 'Transferred from project safe to office profit'}
+                                                                                    </div>
                                                                                 </td>
-                                                                                <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                                                                                        {isArabic ? 'خصم من خزينة المشروع' : 'Project Safe'}
-                                                                                    </span>
+
+                                                                                {/* 5. Safe Routing */}
+                                                                                <td style={{ textAlign: 'start', fontSize: '0.75rem', color: 'var(--text-tertiary)', maxWidth: '165px' }}>
+                                                                                    <div className="truncate">
+                                                                                        {isArabic ? 'خزينة المشروع ➔ أرباح المكتب' : 'Project Safe ➔ Office'}
+                                                                                    </div>
                                                                                 </td>
-                                                                                <td>
-                                                                                    <span className="badge badge-secondary" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+
+                                                                                {/* 6. Method */}
+                                                                                <td style={{ textAlign: 'start' }}>
+                                                                                    <span className="badge-method-pill custody" style={{ height: '20px', fontSize: '0.68rem' }}>
                                                                                         {isArabic ? 'تحويل أرباح' : 'Profit Transfer'}
                                                                                     </span>
                                                                                 </td>
-                                                                                <td style={{ fontWeight: '700', color: '#10b981', textDecoration: isFeeCancelled ? 'line-through' : 'none' }}>
-                                                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                                                                        <span>+</span>
-                                                                                        {fmtCurrency(feeTx.amount)}
+
+                                                                                {/* 7. Amount: Emerald Bold Right-Aligned */}
+                                                                                <td style={{ textAlign: 'end', fontWeight: '700', color: '#10b981', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                                                                                    + {fmtCurrency(feeTx.amount)}
+                                                                                </td>
+
+                                                                                {/* 8. Status */}
+                                                                                <td style={{ textAlign: 'center' }}>
+                                                                                    <span className={`badge ${feeTx.status === 'APPROVED' ? 'badge-success' : 'badge-secondary'}`} style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px' }}>
+                                                                                        {t(`finance.status.${feeTx.status}`) || feeTx.status}
                                                                                     </span>
                                                                                 </td>
-                                                                                <td>
-                                                                                    <span
-                                                                                        className={`badge ${feeTx.status === 'APPROVED' ? 'badge-success' : 'badge-secondary'}`}
-                                                                                        style={{ fontSize: '0.68rem', padding: '2px 8px' }}
-                                                                                    >
-                                                                                        {t(`finance.status.${feeTx.status}`) || (feeTx.status === 'CANCELLED' ? (isArabic ? 'مسترد / ملغي' : 'Refunded / Cancelled') : feeTx.status)}
-                                                                                    </span>
-                                                                                </td>
-                                                                                <td>
-                                                                                    <div className="flex gap-sm justify-center">
+
+                                                                                {/* 9. Actions */}
+                                                                                <td style={{ textAlign: 'center' }}>
+                                                                                    <div className="tx-action-group">
                                                                                         {isFeeCancelled ? (
-                                                                                            <button className="btn-icon-sm text-danger" onClick={() => handleDeleteClick(feeTx)} title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي من السجل' : 'Delete Permanently')}>
-                                                                                                <Trash2 size={16} />
+                                                                                            <button
+                                                                                                className="tx-action-btn delete"
+                                                                                                onClick={() => handleDeleteClick(feeTx)}
+                                                                                                title={t('common.deletePermanently')}
+                                                                                            >
+                                                                                                <Trash2 size={13} />
                                                                                             </button>
                                                                                         ) : (
                                                                                             <>
-                                                                                                <button className="btn-icon-sm" onClick={() => openEditModal(feeTx)} title={t('common.edit')}>
-                                                                                                    <Pencil size={16} />
+                                                                                                <button
+                                                                                                    className="tx-action-btn edit"
+                                                                                                    onClick={() => openEditModal(feeTx)}
+                                                                                                    title={t('common.edit')}
+                                                                                                >
+                                                                                                    <Pencil size={13} />
                                                                                                 </button>
-                                                                                                <button className="btn-icon-sm" style={{ color: '#d97706', borderColor: '#d97706' }} onClick={() => handleRefundClick(feeTx)} title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}>
-                                                                                                    <RotateCcw size={16} />
+                                                                                                <button
+                                                                                                    className="tx-action-btn refund"
+                                                                                                    onClick={() => handleRefundClick(feeTx)}
+                                                                                                    title={t('finance.refund') || 'Refund'}
+                                                                                                >
+                                                                                                    <RotateCcw size={13} />
                                                                                                 </button>
                                                                                             </>
                                                                                         )}
