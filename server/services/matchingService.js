@@ -142,27 +142,27 @@ const bestMatch = (query, fullText, candidates, getName) => {
 export const matchSupplier = async (vendorName, tenantId, fullText = '') => {
     const candidates = await prisma.supplier.findMany({
         where: { tenantId, deletedAt: null },
-        select: { id: true, name: true, company: true }
+        select: { id: true, name: true, company: true, phone: true }
     });
-    const m = bestMatch(vendorName, fullText, candidates, c => `${c.name} ${c.company || ''}`);
+    const m = bestMatch(vendorName, fullText, candidates, c => `${c.name} ${c.company || ''} ${c.phone || ''}`);
     return m ? { id: m.candidate.id, name: m.candidate.name, confidence: round(m.score) } : null;
 };
 
 export const matchClient = async (clientName, tenantId, fullText = '') => {
     const candidates = await prisma.client.findMany({
         where: { tenantId, deletedAt: null },
-        select: { id: true, name: true, company: true }
+        select: { id: true, name: true, company: true, phone: true }
     });
-    const m = bestMatch(clientName, fullText, candidates, c => `${c.name} ${c.company || ''}`);
+    const m = bestMatch(clientName, fullText, candidates, c => `${c.name} ${c.company || ''} ${c.phone || ''}`);
     return m ? { id: m.candidate.id, name: m.candidate.name, confidence: round(m.score) } : null;
 };
 
 export const matchProject = async (projectName, tenantId, fullText = '') => {
     const candidates = await prisma.project.findMany({
         where: { tenantId, deletedAt: null },
-        select: { id: true, name: true }
+        select: { id: true, name: true, location: true, client: { select: { name: true } } }
     });
-    const m = bestMatch(projectName, fullText, candidates, c => c.name);
+    const m = bestMatch(projectName, fullText, candidates, c => `${c.name} ${c.location || ''} ${c.client?.name || ''}`);
     return m ? { id: m.candidate.id, name: m.candidate.name, confidence: round(m.score) } : null;
 };
 
@@ -170,12 +170,34 @@ export const matchMaterial = async (itemName, tenantId, fullText = '') => {
     if (!itemName) return null;
     const candidates = await prisma.material.findMany({
         where: { tenantId, deletedAt: null },
-        select: { id: true, name: true, unit: true }
+        select: { id: true, name: true, nameAr: true, unit: true, unitPrice: true }
     });
-    const m = bestMatch(itemName, fullText, candidates, c => c.name);
+    const m = bestMatch(itemName, fullText, candidates, c => `${c.name} ${c.nameAr || ''}`);
     return m
-        ? { id: m.candidate.id, name: m.candidate.name, unit: m.candidate.unit, confidence: round(m.score) }
+        ? { id: m.candidate.id, name: m.candidate.name, unit: m.candidate.unit, unitPrice: m.candidate.unitPrice, confidence: round(m.score) }
         : null;
+};
+
+export const matchWorkman = async (workmanName, tenantId, fullText = '') => {
+    if (!workmanName && !fullText) return null;
+    const candidates = await prisma.workman.findMany({
+        where: { tenantId, deletedAt: null },
+        select: { id: true, name: true, nameAr: true, trade: true, customTrade: true, dailyRate: true }
+    });
+    const m = bestMatch(workmanName, fullText, candidates, c => `${c.name} ${c.nameAr || ''} ${c.trade || ''} ${c.customTrade || ''}`);
+    return m
+        ? { id: m.candidate.id, name: m.candidate.name, trade: m.candidate.trade || m.candidate.customTrade, dailyRate: m.candidate.dailyRate, confidence: round(m.score) }
+        : null;
+};
+
+export const matchUser = async (userName, tenantId, fullText = '') => {
+    if (!userName && !fullText) return null;
+    const candidates = await prisma.user.findMany({
+        where: { tenantId, isActive: true },
+        select: { id: true, name: true, role: true }
+    });
+    const m = bestMatch(userName, fullText, candidates, c => `${c.name} ${c.role || ''}`);
+    return m ? { id: m.candidate.id, name: m.candidate.name, role: m.candidate.role, confidence: round(m.score) } : null;
 };
 
 const round = (n) => Math.round(n * 100) / 100;
@@ -189,10 +211,13 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
         ext.description,
         ext.transcript,
         ext.vendor,
+        ext.clientName,
         ext.projectName,
-        ext.project_name
+        ext.project_name,
+        ext.workmanName
     ].filter(Boolean).join(' ');
 
+    // 1. Supplier / Vendor matching
     const vendorQuery = ext.vendor || ext.supplier || ext.supplierName || ext.merchant_name || '';
     let supplierMatch = null;
     if (ext.supplierId) {
@@ -204,10 +229,11 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
             supplierMatch = { id: directSupplier.id, name: directSupplier.name, confidence: 1.0 };
         }
     }
-    if (!supplierMatch) {
+    if (!supplierMatch && (vendorQuery || fullText)) {
         supplierMatch = await matchSupplier(vendorQuery, tenantId, fullText);
     }
 
+    // 2. Project matching
     const projectQuery = ext.projectName || ext.project || ext.project_name || '';
     let projectMatch = null;
     if (ext.projectId) {
@@ -219,19 +245,73 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
             projectMatch = { id: directProject.id, name: directProject.name, confidence: 1.0 };
         }
     }
-    if (!projectMatch) {
+    if (!projectMatch && (projectQuery || fullText)) {
         projectMatch = await matchProject(projectQuery, tenantId, fullText);
     }
 
+    // 3. Client matching
     const clientQuery = ext.clientName || ext.client || ext.client_name || '';
-    const clientMatch = await matchClient(clientQuery, tenantId, fullText);
+    let clientMatch = null;
+    if (ext.clientId) {
+        const directClient = await prisma.client.findFirst({
+            where: { id: ext.clientId, tenantId, deletedAt: null },
+            select: { id: true, name: true }
+        });
+        if (directClient) {
+            clientMatch = { id: directClient.id, name: directClient.name, confidence: 1.0 };
+        }
+    }
+    if (!clientMatch && (clientQuery || fullText)) {
+        clientMatch = await matchClient(clientQuery, tenantId, fullText);
+    }
 
-    // Match line items
+    // 4. Workman / Laborer matching
+    const workmanQuery = ext.workmanName || ext.workman || ext.technician || ext.craftsman || '';
+    let workmanMatch = null;
+    if (ext.workmanId) {
+        const directWorkman = await prisma.workman.findFirst({
+            where: { id: ext.workmanId, tenantId, deletedAt: null },
+            select: { id: true, name: true, trade: true, dailyRate: true }
+        });
+        if (directWorkman) {
+            workmanMatch = { id: directWorkman.id, name: directWorkman.name, trade: directWorkman.trade, confidence: 1.0 };
+        }
+    }
+    if (!workmanMatch && (workmanQuery || fullText)) {
+        workmanMatch = await matchWorkman(workmanQuery, tenantId, fullText);
+    }
+
+    // 5. Payer / Custody Holder matching
+    let payerUserMatch = null;
+    if (ext.payerUserId) {
+        const directUser = await prisma.user.findFirst({
+            where: { id: ext.payerUserId, tenantId, isActive: true },
+            select: { id: true, name: true, role: true }
+        });
+        if (directUser) {
+            payerUserMatch = { id: directUser.id, name: directUser.name, role: directUser.role, confidence: 1.0 };
+        }
+    }
+
+    // 6. Match line items
     const items = Array.isArray(ext.items) ? ext.items : [];
     const matchedItems = await Promise.all(items.map(async (it) => {
-        const materialMatch = it?.name ? await matchMaterial(it.name, tenantId, fullText) : null;
+        let materialMatch = null;
+        if (it?.materialId) {
+            const directMat = await prisma.material.findFirst({
+                where: { id: it.materialId, tenantId, deletedAt: null },
+                select: { id: true, name: true, unit: true, unitPrice: true }
+            });
+            if (directMat) {
+                materialMatch = { id: directMat.id, name: directMat.name, unit: directMat.unit, unitPrice: directMat.unitPrice, confidence: 1.0 };
+            }
+        }
+        if (!materialMatch && it?.name) {
+            materialMatch = await matchMaterial(it.name, tenantId, fullText);
+        }
         return {
             ...it,
+            materialId: materialMatch?.id ?? it?.materialId ?? null,
             materialMatch
         };
     }));
@@ -240,9 +320,15 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
     const category = mapToExactCategory(ext.category, items, fullText);
     const paymentMethod = ext.paymentMethod || resolvePaymentMethod(ext, fullText);
 
+    // Resolve transaction type (EXPENSE or INCOME)
+    let type = 'EXPENSE';
+    if (ext.transactionType === 'REVENUE' || ext.transactionType === 'INCOME' || (clientMatch && (category === 'CLIENT_PAYMENT' || fullText.includes('استلام دفعة') || fullText.includes('تحصيل من العميل')))) {
+        type = 'INCOME';
+    }
+
     return {
         draft: {
-            type: 'EXPENSE',
+            type,
             amount: ext.totalAmount ?? ext.amount ?? null,
             subtotal: ext.subtotal ?? null,
             taxAmount: ext.taxAmount ?? null,
@@ -250,12 +336,13 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
             transactionDate: ext.transactionDate ?? new Date().toISOString().slice(0, 10),
             category,
             paymentMethod,
-            payerUserId: userId || null,
+            payerUserId: payerUserMatch?.id || userId || null,
             description: ext.summary ?? ext.description ?? '',
             // Resolved IDs pre-fill the form cleanly
             supplierId: supplierMatch?.id ?? null,
             clientId: clientMatch?.id ?? null,
             projectId: projectMatch?.id ?? null,
+            workmanId: workmanMatch?.id ?? null,
             isStockPurchase: !!ext.is_stock_purchase,
             items: matchedItems
         },
@@ -263,6 +350,8 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
             vendor: { raw: vendorQuery || null, ...supplierMatch ? { matched: supplierMatch } : { matched: null } },
             client: { raw: clientQuery || null, matched: clientMatch },
             project: { raw: projectQuery || null, matched: projectMatch },
+            workman: { raw: workmanQuery || null, matched: workmanMatch },
+            payerUser: { raw: ext.payerUserId || null, matched: payerUserMatch },
             items: matchedItems.map(it => ({ raw: it?.name || null, matched: it?.materialMatch }))
         }
     };

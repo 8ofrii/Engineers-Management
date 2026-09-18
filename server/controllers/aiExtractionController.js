@@ -9,6 +9,64 @@ import { aiErrorResponse } from '../lib/aiErrors.js';
 import { enforceAiBudget } from '../lib/aiUsage.js';
 
 /**
+ * Fetch complete tenant master data context for AI prompt injection and entity matching:
+ * - Projects (id, name, code, location, linked client)
+ * - Clients (id, name, company, phone)
+ * - Suppliers (id, name, company, phone)
+ * - Materials (id, name, nameAr, unit, unitPrice)
+ * - Workmen / Laborers / Craftsmen (id, name, nameAr, trade, customTrade, phone, dailyRate)
+ * - Users / Engineers (id, name, role)
+ */
+export const getTenantMasterDataContext = async (tenantId) => {
+    if (!tenantId) return {};
+
+    try {
+        const [projects, clients, suppliers, materials, workmen, users] = await Promise.all([
+            prisma.project.findMany({
+                where: { tenantId, deletedAt: null },
+                select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                    client: { select: { id: true, name: true } }
+                },
+                take: 100
+            }),
+            prisma.client.findMany({
+                where: { tenantId, deletedAt: null },
+                select: { id: true, name: true, company: true, phone: true },
+                take: 100
+            }),
+            prisma.supplier.findMany({
+                where: { tenantId, deletedAt: null },
+                select: { id: true, name: true, company: true, phone: true },
+                take: 100
+            }),
+            prisma.material.findMany({
+                where: { tenantId, deletedAt: null },
+                select: { id: true, name: true, nameAr: true, unit: true, unitPrice: true },
+                take: 100
+            }),
+            prisma.workman.findMany({
+                where: { tenantId, deletedAt: null },
+                select: { id: true, name: true, nameAr: true, trade: true, customTrade: true, phone: true, dailyRate: true },
+                take: 100
+            }),
+            prisma.user.findMany({
+                where: { tenantId, isActive: true },
+                select: { id: true, name: true, role: true },
+                take: 50
+            })
+        ]);
+
+        return { projects, clients, suppliers, materials, workmen, users };
+    } catch (err) {
+        logger.warn({ err, tenantId }, 'Failed to fetch tenant master data context for AI');
+        return {};
+    }
+};
+
+/**
  * POST /api/ai/extract/voice
  * Multipart audio in field "audio". Persists a TransactionDraft and returns it
  * with the matched fields + S3 URL of the audio (so user can replay before
@@ -24,13 +82,8 @@ export const extractFromVoice = async (req, res) => {
         // Step 0 — protect the bill: refuse if this tenant has hit the monthly cap
         await enforceAiBudget(req.user.tenantId);
 
-        // Fetch company context (projects, suppliers, materials) for AI dynamic entity matching
-        const [projects, suppliers, materials] = await Promise.all([
-            prisma.project.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true } }),
-            prisma.supplier.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, company: true } }),
-            prisma.material.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, unit: true } })
-        ]);
-        const companyContext = { projects, suppliers, materials };
+        // Fetch comprehensive master data context (projects, clients, suppliers, materials, workmen, users)
+        const companyContext = await getTenantMasterDataContext(req.user.tenantId);
 
         // Step 1 — AI: transcribe + extract with full company context
         const clientTranscript = req.body.transcript || '';
@@ -107,12 +160,8 @@ export const extractFromReceipt = async (req, res) => {
     try {
         await enforceAiBudget(req.user.tenantId);
 
-        const [projects, suppliers, materials] = await Promise.all([
-            prisma.project.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true } }),
-            prisma.supplier.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, company: true } }),
-            prisma.material.findMany({ where: { tenantId: req.user.tenantId, deletedAt: null }, select: { id: true, name: true, unit: true } })
-        ]);
-        const companyContext = { projects, suppliers, materials };
+        // Fetch comprehensive master data context
+        const companyContext = await getTenantMasterDataContext(req.user.tenantId);
 
         const parsed = await aiService.processReceiptImage(req.file.buffer, req.file.mimetype, companyContext);
         const imageUrl = await uploadBuffer(req.file.buffer, req.file.mimetype, 'images/receipt-drafts');

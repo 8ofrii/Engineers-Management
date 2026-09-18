@@ -65,36 +65,73 @@ const getOpenAI = () => {
 };
 
 /**
- * Build dynamic database context (projects, suppliers, materials, categories) to inject into the AI prompt
+ * Build dynamic database context (projects, clients, suppliers, materials, workmen, users, categories) to inject into the AI prompt
  */
 export function buildDynamicContext(context = {}) {
     const lines = [];
 
-    // 1. Projects
+    // 1. Projects (المشاريع المسجلة)
     if (Array.isArray(context.projects) && context.projects.length > 0) {
-        lines.push(`\n**Company Existing Projects (If the voice/receipt mentions a project name or site location, match it to the exact Project ID):**`);
+        lines.push(`\n**Company Existing Projects (المشاريع المسجلة بالشركة - Match mentioned project or site to exact Project ID):**`);
         for (const p of context.projects) {
-            lines.push(`- Project ID: "${p.id}" | Name: "${p.name}"`);
+            const clientPart = p.client?.name ? ` | Client: "${p.client.name}"` : '';
+            const codePart = p.code ? ` | Code: "${p.code}"` : '';
+            const locPart = p.location ? ` | Location: "${p.location}"` : '';
+            lines.push(`- Project ID: "${p.id}" | Name: "${p.name}"${codePart}${locPart}${clientPart}`);
         }
     }
 
-    // 2. Suppliers
+    // 2. Clients (العملاء المسجلين)
+    if (Array.isArray(context.clients) && context.clients.length > 0) {
+        lines.push(`\n**Company Existing Clients (العملاء المسجلين بالشركة - Match mentioned customer/client to exact Client ID):**`);
+        for (const c of context.clients) {
+            const compPart = c.company ? ` (${c.company})` : '';
+            const phonePart = c.phone ? ` | Phone: "${c.phone}"` : '';
+            lines.push(`- Client ID: "${c.id}" | Name: "${c.name}"${compPart}${phonePart}`);
+        }
+    }
+
+    // 3. Suppliers & Subcontractors (الموردين ومقاولي الباطن)
     if (Array.isArray(context.suppliers) && context.suppliers.length > 0) {
-        lines.push(`\n**Company Existing Suppliers (If the voice/receipt mentions a vendor/supplier/contractor, match it to the exact Supplier ID):**`);
+        lines.push(`\n**Company Existing Suppliers (الموردين وتجار الخامات ومقاولي الباطن - Match vendor/supplier to exact Supplier ID):**`);
         for (const s of context.suppliers) {
-            lines.push(`- Supplier ID: "${s.id}" | Name: "${s.name}"${s.company ? ` (${s.company})` : ''}`);
+            const compPart = s.company ? ` (${s.company})` : '';
+            const phonePart = s.phone ? ` | Phone: "${s.phone}"` : '';
+            lines.push(`- Supplier ID: "${s.id}" | Name: "${s.name}"${compPart}${phonePart}`);
         }
     }
 
-    // 3. Materials
+    // 4. Materials (أصناف الخامات والمواد بالمخزن)
     if (Array.isArray(context.materials) && context.materials.length > 0) {
-        lines.push(`\n**Company Inventory Materials (Match purchased items to these when applicable):**`);
-        for (const m of context.materials.slice(0, 40)) {
-            lines.push(`- Material: "${m.name}" (${m.unit || 'وحدة'})`);
+        lines.push(`\n**Company Inventory Materials (أصناف المواد والخامات - Match purchased items to these exact names and Material IDs):**`);
+        for (const m of context.materials.slice(0, 50)) {
+            const unitPart = m.unit ? ` (${m.unit})` : '';
+            const pricePart = m.unitPrice ? ` | Price: ${m.unitPrice} EGP` : '';
+            const arPart = m.nameAr && m.nameAr !== m.name ? ` / ${m.nameAr}` : '';
+            lines.push(`- Material ID: "${m.id}" | Name: "${m.name}"${arPart}${unitPart}${pricePart}`);
         }
     }
 
-    // 4. Exact ERP Categories
+    // 5. Craftsmen & Laborers (الصنايعية والعمال المسجلين)
+    if (Array.isArray(context.workmen) && context.workmen.length > 0) {
+        lines.push(`\n**Company Craftsmen & Laborers (الصنايعية والعمال المسجلين - Match labor/wages to exact Workman ID):**`);
+        for (const w of context.workmen.slice(0, 40)) {
+            const tradePart = (w.trade || w.customTrade) ? ` [${w.trade || w.customTrade}]` : '';
+            const wagePart = w.dailyRate ? ` | Daily Rate: ${w.dailyRate} EGP` : '';
+            const phonePart = w.phone ? ` | Phone: "${w.phone}"` : '';
+            lines.push(`- Workman ID: "${w.id}" | Name: "${w.name}"${tradePart}${wagePart}${phonePart}`);
+        }
+    }
+
+    // 6. Engineers & Staff / Custody Holders (فريق العمل ومسؤولي العهد)
+    if (Array.isArray(context.users) && context.users.length > 0) {
+        lines.push(`\n**Company Engineers & Team Members (فريق العمل ومسؤولي العهد - Match payer/custody to exact User ID):**`);
+        for (const u of context.users.slice(0, 30)) {
+            lines.push(`- User ID: "${u.id}" | Name: "${u.name}" (${u.role || 'Staff'})`);
+        }
+    }
+
+    // 7. Exact ERP Categories
     lines.push(`
 **Allowed Cost Categories (Select the single best exact enum key):**
 - PAINTING_MATERIALS (خامات دهانات / بويات / سيلر / معجون / جوتن / سكيب)
@@ -145,19 +182,32 @@ You are an expert Arabic AI Assistant for an Egyptian Construction ERP (Hesaby).
 Your role is to parse spoken voice notes and text from site engineers into structured accounting data.
 You natively understand Egyptian Arabic, all regional accents (Cairo, Delta, Upper Egypt, Alexandria), slang, transliterations, Franco-Arab, abbreviations, and informal nicknames.
 
+**CRITICAL MATCHING INSTRUCTIONS:**
+- Always match spoken project names or site locations to the exact matching "Project ID" UUID from Company Existing Projects.
+- Always match spoken vendors, shops, or suppliers to the exact matching "Supplier ID" UUID from Company Existing Suppliers.
+- Always match spoken clients or customers to the exact matching "Client ID" UUID from Company Existing Clients.
+- Always match spoken craftsmen, technicians, or laborers to the exact matching "Workman ID" UUID from Company Existing Craftsmen.
+- Always match purchased items to the exact matching "Material ID" UUID from Company Inventory Materials when applicable.
+
 **Output Schema (Strict JSON):**
 {
   "summary": "String (Clear Arabic description of what was purchased or paid)",
   "totalAmount": Number (Total cost or money spent),
-  "projectId": "String (The exact matching Project ID UUID from the Company Existing Projects list, or null if not mentioned)",
-  "supplierId": "String (The exact matching Supplier ID UUID from the Company Existing Suppliers list, or null if not mentioned)",
+  "transactionType": "EXPENSE | REVENUE (EXPENSE for spending, labor, materials; REVENUE for client payments or deposits)",
+  "projectId": "String (Exact matching Project ID UUID from Company Existing Projects list, or null if not mentioned)",
+  "projectName": "String or null (Project name or location as mentioned)",
+  "supplierId": "String (Exact matching Supplier ID UUID from Company Existing Suppliers list, or null if not mentioned)",
   "vendor": "String or null (Vendor, contractor, or supplier name as mentioned)",
-  "projectName": "String or null (Project name as mentioned)",
-  "category": "Exact enum key from the Allowed Cost Categories list",
+  "clientId": "String (Exact matching Client ID UUID from Company Existing Clients list, or null if not mentioned)",
+  "clientName": "String or null (Client name as mentioned)",
+  "workmanId": "String (Exact matching Workman ID UUID from Company Existing Craftsmen list, or null if not mentioned)",
+  "workmanName": "String or null (Workman or technician name as mentioned)",
+  "payerUserId": "String (Exact matching User ID UUID from Company Team list if mentioned, or null)",
+  "category": "Exact enum key from Allowed Cost Categories list",
   "paymentMethod": "CASH | CUSTODY_WALLET | BANK_TRANSFER | CHECK | CREDIT_CARD | OTHER",
   "is_stock_purchase": Boolean (True for physical building materials. False for labor/services/wages),
   "items": [
-    { "name": "String", "quantity": Number, "unit": "String", "unitPrice": Number or null, "total": Number or null }
+    { "name": "String", "materialId": "String or null", "quantity": Number, "unit": "String", "unitPrice": Number or null, "total": Number or null }
   ]
 }
 `;
@@ -166,6 +216,12 @@ const RECEIPT_SYSTEM_PROMPT = `
 You are an expert financial OCR extraction engine for an Egyptian Construction ERP system (Hesaby).
 Your role is to extract structured accounting data from receipts, invoices, and mobile wallet records (Vodafone Cash, InstaPay, Bank transfers).
 
+**CRITICAL MATCHING INSTRUCTIONS:**
+- Match merchant, recipient, or vendor to exact "Supplier ID" UUID from Company Existing Suppliers.
+- Match project mentions to exact "Project ID" UUID from Company Existing Projects.
+- Match client mentions to exact "Client ID" UUID from Company Existing Clients.
+- Match purchased items to exact "Material ID" UUID from Company Inventory Materials when applicable.
+
 **Output Schema (Strict JSON):**
 {
   "summary": "String (Detailed Arabic description of the transaction)",
@@ -173,15 +229,18 @@ Your role is to extract structured accounting data from receipts, invoices, and 
   "subtotal": Number or null,
   "taxAmount": Number or null,
   "currency": "EGP",
-  "projectId": "String (The exact matching Project ID UUID from Company Existing Projects, or null if not mentioned)",
-  "supplierId": "String (The exact matching Supplier ID UUID from Company Existing Suppliers, or null if not mentioned)",
-  "vendor": "String or null (Merchant name, recipient name, or recipient phone)",
+  "transactionType": "EXPENSE | REVENUE",
+  "projectId": "String (Exact matching Project ID UUID from Company Existing Projects, or null if not mentioned)",
   "projectName": "String or null (Project name)",
+  "supplierId": "String (Exact matching Supplier ID UUID from Company Existing Suppliers, or null if not mentioned)",
+  "vendor": "String or null (Merchant name, recipient name, or recipient phone)",
+  "clientId": "String (Exact matching Client ID UUID from Company Existing Clients, or null if not mentioned)",
+  "clientName": "String or null (Client name)",
   "category": "Exact enum key from Allowed Cost Categories",
   "paymentMethod": "CASH | CUSTODY_WALLET | BANK_TRANSFER | CHECK | CREDIT_CARD | OTHER",
   "transactionDate": "YYYY-MM-DD",
   "items": [
-    { "name": "String", "quantity": Number, "unit": "String or null", "unitPrice": Number or null, "total": Number or null }
+    { "name": "String", "materialId": "String or null", "quantity": Number, "unit": "String or null", "unitPrice": Number or null, "total": Number or null }
   ],
   "confidence": "high | medium | low"
 }
@@ -308,12 +367,34 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
     const projectName = data.projectName || data.project || data.project_name || null;
     const projectId = data.projectId || data.project_id || null;
 
-    // 4. Line Items
+    // 4. Client Name & Client ID
+    const clientName = data.clientName || data.client || data.client_name || null;
+    const clientId = data.clientId || data.client_id || null;
+
+    // 5. Workman / Craftsman & Workman ID
+    const workmanName = data.workmanName || data.workman || data.technician || data.craftsman || null;
+    const workmanId = data.workmanId || data.workman_id || null;
+
+    // 6. Payer / Custody User ID
+    const payerUserId = data.payerUserId || data.payer_user_id || data.engineerId || null;
+
+    // 7. Transaction Type (EXPENSE or REVENUE)
+    let transactionType = data.transactionType || data.type || null;
+    if (!transactionType) {
+        if (data.category === 'CLIENT_PAYMENT' || rawText.includes('استلام دفعة') || rawText.includes('تحصيل من العميل')) {
+            transactionType = 'REVENUE';
+        } else {
+            transactionType = 'EXPENSE';
+        }
+    }
+
+    // 8. Line Items
     let items = Array.isArray(data.items) ? data.items : [];
     if (items.length === 0 && data.material) {
         const mat = typeof data.material === 'object' ? data.material : { name: String(data.material) };
         items = [{
             name: mat.name || 'مادة مشتراة',
+            materialId: mat.materialId || mat.id || null,
             quantity: mat.quantity || 1,
             unit: mat.unit || 'وحدة',
             unitPrice: mat.unitPrice || (totalAmount && mat.quantity ? totalAmount / mat.quantity : null),
@@ -330,13 +411,13 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
         }];
     }
 
-    // 5. Category Normalization (Fine-grained)
+    // 9. Category Normalization (Fine-grained)
     const category = mapToExactCategory(data.category, items, `${rawText} ${data.summary || ''} ${data.description || ''}`);
 
-    // 6. Payment Method
+    // 10. Payment Method
     const paymentMethod = resolvePaymentMethod(data, `${rawText} ${data.summary || ''} ${data.description || ''}`);
 
-    // 7. Transaction Date
+    // 11. Transaction Date
     let rawDate = data.transaction_date || data.transactionDate || data.date || null;
     let transactionDate = new Date().toISOString().split('T')[0];
     if (rawDate) {
@@ -352,7 +433,7 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
         }
     }
 
-    // 8. Summary / Description
+    // 12. Summary / Description
     let summary = data.description || data.summary || '';
     if (!summary) {
         if (data.transaction_type === 'money_transfer' || data.to || data.from) {
@@ -362,6 +443,10 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
             summary = `تحويل فودافون كاش بقيمة ${totalAmount || 0} ج.م${receiverStr}${senderStr}${txIdStr}`;
         } else if (vendor) {
             summary = `فاتورة / إيصال مع ${vendor} بمبلغ ${totalAmount ? totalAmount.toLocaleString() + ' ج.م' : 'غير محدد'}`;
+        } else if (workmanName) {
+            summary = `مصنعية / أجر ${workmanName} بمبلغ ${totalAmount ? totalAmount.toLocaleString() + ' ج.م' : 'غير محدد'}`;
+        } else if (clientName) {
+            summary = `دفعة من العميل ${clientName} بمبلغ ${totalAmount ? totalAmount.toLocaleString() + ' ج.م' : 'غير محدد'}`;
         } else {
             summary = `إيصال مستخرج بمبلغ ${totalAmount ? totalAmount.toLocaleString() + ' ج.م' : 'غير محدد'}`;
         }
@@ -372,6 +457,12 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
         supplierId,
         projectName,
         projectId,
+        clientName,
+        clientId,
+        workmanName,
+        workmanId,
+        payerUserId,
+        transactionType,
         totalAmount,
         subtotal: data.subtotal ?? (data.transfer_amount?.value ?? totalAmount),
         taxAmount: feeAmount,
@@ -416,7 +507,7 @@ function extractJsonFromText(rawText) {
 }
 
 /**
- * Call the MicroMind / GPT 5.6 Luna Pro agent backend for extraction with live company context
+ * Call the MicroMind / GPT 5.6 Luna Pro agent backend for extraction with live company master data
  */
 async function callMicroMindExtraction(prompt, context = {}) {
     const apiUrl = process.env.MICROMIND_API_URL;
@@ -425,7 +516,15 @@ async function callMicroMindExtraction(prompt, context = {}) {
     try {
         const dynamicContextText = buildDynamicContext(context);
         const payload = {
-            question: `${SYSTEM_PROMPT}\n${dynamicContextText}\n\nSite Engineer input text/document:\n"""\n${prompt}\n"""\n\nReturn strict JSON matching the schema.`
+            question: `${SYSTEM_PROMPT}\n${dynamicContextText}\n\nSite Engineer input text/document:\n"""\n${prompt}\n"""\n\nReturn strict JSON matching the schema.`,
+            masterData: {
+                projects: (context.projects || []).map(p => ({ id: p.id, name: p.name, location: p.location, client: p.client?.name })),
+                clients: (context.clients || []).map(c => ({ id: c.id, name: c.name, company: c.company, phone: c.phone })),
+                suppliers: (context.suppliers || []).map(s => ({ id: s.id, name: s.name, company: s.company, phone: s.phone })),
+                materials: (context.materials || []).map(m => ({ id: m.id, name: m.name, nameAr: m.nameAr, unit: m.unit, unitPrice: m.unitPrice })),
+                workmen: (context.workmen || []).map(w => ({ id: w.id, name: w.name, trade: w.trade || w.customTrade, dailyRate: w.dailyRate })),
+                users: (context.users || []).map(u => ({ id: u.id, name: u.name, role: u.role }))
+            }
         };
 
         const response = await fetch(apiUrl, {

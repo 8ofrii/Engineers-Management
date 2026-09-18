@@ -24,6 +24,7 @@
 import fs from 'fs';
 import OpenAI from 'openai';
 import * as aiService from '../services/aiService.js';
+import { getTenantMasterDataContext } from './aiExtractionController.js';
 import logger from '../lib/logger.js';
 
 // Lazy initialization to ensure env vars are loaded
@@ -47,7 +48,8 @@ export const analyzeTransaction = async (req, res, next) => {
             });
         }
 
-        const result = await aiService.processVoiceNote(req.file.path);
+        const companyContext = await getTenantMasterDataContext(req.user?.tenantId);
+        const result = await aiService.processVoiceNote(req.file.path, req.body.transcript || '', companyContext);
 
         // Cleanup: Delete file after processing
         if (fs.existsSync(req.file.path)) {
