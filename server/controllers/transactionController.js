@@ -933,7 +933,9 @@ export const uploadReceipt = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Not authorized to attach a receipt to this transaction' });
         }
 
-        const url = req.file.location || `/uploads/receipts/${req.file.filename}`;
+        const url = req.file.key
+            ? `/uploads/${req.file.key}`
+            : (req.file.location || `/uploads/receipts/${req.file.filename}`);
 
         if (tx.receiptPhotoUrl && tx.receiptPhotoUrl !== url) {
             await deleteByUrl(tx.receiptPhotoUrl).catch(() => {});
@@ -981,7 +983,9 @@ export const uploadVoiceNote = async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Not authorized to attach a voice note to this transaction' });
         }
 
-        const url = req.file.location || `/uploads/audio/voice-drafts/${req.file.filename}`;
+        const url = req.file.key
+            ? `/uploads/${req.file.key}`
+            : (req.file.location || (req.file.filename ? `/uploads/audio/${req.file.filename}` : `/uploads/audio/voice-drafts/${req.file.filename}`));
 
         if (tx.voiceNoteUrl && tx.voiceNoteUrl !== url) {
             await deleteByUrl(tx.voiceNoteUrl).catch(() => {});

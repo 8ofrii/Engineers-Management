@@ -1,10 +1,10 @@
 import multer from 'multer';
 import multerS3 from 'multer-s3';
-import { S3Client } from '@aws-sdk/client-s3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { getS3, BUCKET, useS3 } from '../lib/storage.js';
 
 // Ensure environment variables are loaded
 dotenv.config();
@@ -47,7 +47,7 @@ const AUDIO_MIME_MAP = {
 const getSafeImageExt = (file) => IMAGE_MIME_MAP[file.mimetype] || '.jpg';
 const getSafeAudioExt = (file) => AUDIO_MIME_MAP[file.mimetype] || '.mp3';
 
-// Configure local storage for audio (temporary)
+// Audio storage: local disk (used for temp audio processing)
 const localAudioStorage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, audioDir);
@@ -68,21 +68,10 @@ const audioUpload = multer({
     limits: { fileSize: 25 * 1024 * 1024 }
 });
 
-// --- S3 Storage for Persistent Images ---
-const s3 = new S3Client({
-    region: process.env.AWS_REGION || 'eu-north-1',
-    credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    }
-});
-
-const BUCKET_NAME = process.env.AWS_BUCKET_NAME || 'engineers-app-images-2026';
-
-// Storage configuration with S3
+// S3/MinIO Profile/General Image Storage
 const s3ImageStorage = multerS3({
-    s3: s3,
-    bucket: BUCKET_NAME, // Fixed: Must be a string or a callback-based function
+    s3: getS3(),
+    bucket: BUCKET,
     contentType: multerS3.AUTO_CONTENT_TYPE,
     metadata: function (req, file, cb) {
         cb(null, { fieldName: file.fieldname });
@@ -104,9 +93,6 @@ const localImageStorage = multer.diskStorage({
     }
 });
 
-// Decide whether to use S3 or Local
-const useS3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_BUCKET_NAME);
-
 const upload = multer({
     storage: useS3 ? s3ImageStorage : localImageStorage,
     fileFilter: (req, file, cb) => {
@@ -118,8 +104,6 @@ const upload = multer({
 });
 
 // Receipt images for AI extraction — processed in memory, never persisted.
-// Privacy: receipts often contain personal/financial details; we only need the
-// extracted JSON, not the raw image. memoryStorage keeps the bytes in req.file.buffer.
 const receiptMemoryUpload = multer({
     storage: multer.memoryStorage(),
     fileFilter: (req, file, cb) => {
@@ -130,7 +114,7 @@ const receiptMemoryUpload = multer({
         if (allowedTypes.includes(file.mimetype)) cb(null, true);
         else cb(new Error('Invalid file type. Receipt must be an image (JPEG, PNG, WebP) or PDF document.'), false);
     },
-    limits: { fileSize: 15 * 1024 * 1024 } // 15 MB to comfortably allow scanned PDF invoices
+    limits: { fileSize: 15 * 1024 * 1024 }
 });
 
 // --- Persistent Receipt / Invoice Media Upload ---
@@ -185,8 +169,8 @@ const localReceiptStorage = multer.diskStorage({
 });
 
 const s3ReceiptStorage = multerS3({
-    s3: s3,
-    bucket: BUCKET_NAME,
+    s3: getS3(),
+    bucket: BUCKET,
     contentType: multerS3.AUTO_CONTENT_TYPE,
     metadata: function (req, file, cb) {
         cb(null, { fieldName: file.fieldname });
@@ -215,5 +199,3 @@ const receiptUpload = multer({
 
 export { upload, audioUpload, receiptMemoryUpload, receiptUpload };
 export default audioUpload;
-
-

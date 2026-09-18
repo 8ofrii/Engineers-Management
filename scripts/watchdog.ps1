@@ -1,6 +1,6 @@
 # ==============================================================================
 # Hesaby ERP - Self-Healing Watchdog Daemon (Production Hardened)
-# Continuously monitors Database, Backend API, and IIS Frontend health.
+# Continuously monitors Database, MinIO Storage, Backend API, and IIS Frontend health.
 # Features:
 #   - Consecutive failure thresholds (prevents thrashing/death loops)
 #   - Recovery mode detection (never kills PostgreSQL during WAL replay)
@@ -37,9 +37,10 @@ function Check-LogRotation {
     }
 }
 
-Log-Event "INFO" "WATCHDOG" "Hesaby ERP Watchdog Daemon started (Hardened Mode). Monitoring interval: 30s."
+Log-Event "INFO" "WATCHDOG" "Hesaby ERP Watchdog Daemon started (Hardened Mode with MinIO). Monitoring interval: 30s."
 
 $dbFailCount = 0
+$minioFailCount = 0
 $backendFailCount = 0
 $FAIL_THRESHOLD = 3  # Require 3 consecutive failures (90s) before restarting
 
@@ -107,7 +108,53 @@ while ($true) {
         }
 
         # ----------------------------------------------------------------------
-        # 2. Check Backend API Endpoint (http://localhost:5000/api/health)
+        # 2. Check MinIO Object Storage (http://127.0.0.1:9000/minio/health/live)
+        # ----------------------------------------------------------------------
+        $minioHealthy = $false
+        $minioErr = ""
+        try {
+            $minioRes = Invoke-WebRequest -Uri "http://127.0.0.1:9000/minio/health/live" -Method Get -TimeoutSec 5 -ErrorAction Stop
+            if ($minioRes.StatusCode -eq 200) {
+                $minioHealthy = $true
+                $minioFailCount = 0
+            }
+        }
+        catch {
+            $minioHealthy = $false
+            $minioErr = $_.Exception.Message
+        }
+
+        if (!$minioHealthy) {
+            $minioFailCount++
+            Log-Event "WARN" "STORAGE-MINIO" "MinIO health check failed: $minioErr (Consecutive failures: $minioFailCount/$FAIL_THRESHOLD)."
+
+            if ($minioFailCount -ge $FAIL_THRESHOLD) {
+                Log-Event "WARN" "STORAGE-MINIO" "MinIO failure threshold reached ($minioFailCount). Initiating restart..."
+                
+                $minioPidFile = Join-Path $LogDir "minio.pid"
+                if (Test-Path $minioPidFile) {
+                    $oldPid = (Get-Content $minioPidFile -Raw).Trim()
+                    Stop-Process -Id $oldPid -Force -ErrorAction SilentlyContinue
+                }
+
+                $minioTask = Get-ScheduledTask -TaskName "Hesaby-MinIO-Service" -ErrorAction SilentlyContinue
+                if ($minioTask) {
+                    try {
+                        Stop-ScheduledTask -TaskName "Hesaby-MinIO-Service" -ErrorAction SilentlyContinue
+                        Start-Sleep -Seconds 2
+                        Start-ScheduledTask -TaskName "Hesaby-MinIO-Service" -ErrorAction Stop
+                        Log-Event "INFO" "STORAGE-MINIO" "Triggered Hesaby-MinIO-Service task restart."
+                        $minioFailCount = 0
+                    }
+                    catch {
+                        Log-Event "ERROR" "STORAGE-MINIO" "Failed to restart MinIO scheduled task: $($_.Exception.Message)"
+                    }
+                }
+            }
+        }
+
+        # ----------------------------------------------------------------------
+        # 3. Check Backend API Endpoint (http://localhost:5000/api/health)
         # ----------------------------------------------------------------------
         $backendHealthy = $false
         $errorDetail = ""
@@ -155,7 +202,7 @@ while ($true) {
         }
 
         # ----------------------------------------------------------------------
-        # 3. Check IIS Web Server (W3SVC)
+        # 4. Check IIS Web Server (W3SVC)
         # ----------------------------------------------------------------------
         $w3svc = Get-Service -Name "W3SVC" -ErrorAction SilentlyContinue
         if ($null -ne $w3svc -and $w3svc.Status -ne "Running") {

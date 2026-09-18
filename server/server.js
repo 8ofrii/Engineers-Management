@@ -47,6 +47,8 @@ import aiExtractionRoutes from './routes/aiExtraction.js';
 import transactionDraftRoutes from './routes/transactionDrafts.js';
 import bankStatementRoutes from './routes/bankStatements.js';
 import billingRoutes from './routes/billing.js';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { ensureBucketExists, useS3, getS3, BUCKET } from './lib/storage.js';
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -157,6 +159,60 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     }
 }));
 
+// S3 / MinIO Object Storage Streaming Fallback
+// When media is persisted in MinIO/S3, transparently stream it through /uploads/*
+app.use('/uploads', async (req, res, next) => {
+    if (!useS3 || (req.method !== 'GET' && req.method !== 'HEAD')) {
+        return next();
+    }
+    try {
+        const key = decodeURIComponent(req.path.replace(/^\/+/, ''));
+        if (!key) return next();
+
+        const getObjectParams = {
+            Bucket: BUCKET,
+            Key: key
+        };
+
+        if (req.headers.range) {
+            getObjectParams.Range = req.headers.range;
+        }
+
+        const s3Response = await getS3().send(new GetObjectCommand(getObjectParams));
+
+        if (s3Response.ContentRange) {
+            res.status(206);
+            res.setHeader('Content-Range', s3Response.ContentRange);
+        } else {
+            res.status(200);
+        }
+
+        res.setHeader('Accept-Ranges', 'bytes');
+        if (s3Response.ContentType) res.setHeader('Content-Type', s3Response.ContentType);
+        if (s3Response.ContentLength) res.setHeader('Content-Length', s3Response.ContentLength);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "default-src 'none'");
+
+        const ext = path.extname(key).toLowerCase();
+        if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.webm', '.mp3', '.wav', '.m4a', '.ogg', '.aac', '.mp4', '.pdf'].includes(ext)) {
+            res.setHeader('Content-Disposition', 'inline');
+        } else {
+            res.setHeader('Content-Disposition', 'attachment');
+        }
+
+        if (req.method === 'HEAD') {
+            return res.end();
+        }
+
+        s3Response.Body.pipe(res);
+    } catch (err) {
+        if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+            return res.status(404).json({ success: false, message: 'File not found' });
+        }
+        return next(err);
+    }
+});
+
 // Mount routers
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/projects', projectRoutes);
@@ -220,6 +276,9 @@ const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV }, 'Server ready');
+    ensureBucketExists().catch((err) => {
+        logger.warn({ err: err.message }, 'MinIO/S3 bucket verification deferred');
+    });
 });
 
 // Graceful shutdown handling

@@ -1,47 +1,85 @@
-// Lightweight wrapper around S3 PUT for cases where multer-s3 doesn't fit:
-// uploading raw buffers (in-memory receipt images) or files we already have on
-// disk (audio temp files we need to persist after Whisper transcription).
-//
-// Falls back to local /uploads when S3 isn't configured — same convention the
-// existing image upload pipeline uses.
+// ==============================================================================
+// Hesaby ERP - High-Performance Object Storage Subsystem (S3 / MinIO / Local)
+// Provides unified storage abstraction for receipts, voice notes, profile images,
+// and project documents with seamless MinIO & AWS S3 support.
+// ==============================================================================
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+    S3Client,
+    PutObjectCommand,
+    DeleteObjectCommand,
+    GetObjectCommand,
+    HeadBucketCommand,
+    CreateBucketCommand
+} from '@aws-sdk/client-s3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.join(__dirname, '..');
 
-const useS3 = !!(
+export const useS3 = !!(
     process.env.AWS_ACCESS_KEY_ID &&
     process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.AWS_BUCKET_NAME
+    (process.env.AWS_BUCKET_NAME || process.env.S3_ENDPOINT)
 );
 
+export const BUCKET = process.env.AWS_BUCKET_NAME || 'hesaby-media';
+export const REGION = process.env.AWS_REGION || 'us-east-1';
+
 let s3Client = null;
-const getS3 = () => {
+
+export const getS3 = () => {
     if (!s3Client) {
-        s3Client = new S3Client({
-            region: process.env.AWS_REGION || 'eu-north-1',
+        const config = {
+            region: REGION,
             credentials: {
                 accessKeyId: process.env.AWS_ACCESS_KEY_ID,
                 secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
             }
-        });
+        };
+
+        if (process.env.S3_ENDPOINT) {
+            config.endpoint = process.env.S3_ENDPOINT;
+            // MinIO requires path-style access (e.g. http://127.0.0.1:9000/bucket/key)
+            config.forcePathStyle = process.env.S3_FORCE_PATH_STYLE !== 'false';
+        }
+
+        s3Client = new S3Client(config);
     }
     return s3Client;
 };
 
-const BUCKET = process.env.AWS_BUCKET_NAME || 'engineers-app-images-2026';
-const REGION = process.env.AWS_REGION || 'eu-north-1';
-
-const buildPublicUrl = (key) => `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+/**
+ * Ensures the target S3/MinIO bucket exists on application startup.
+ */
+export const ensureBucketExists = async () => {
+    if (!useS3) return;
+    try {
+        await getS3().send(new HeadBucketCommand({ Bucket: BUCKET }));
+    } catch (err) {
+        const status = err.$metadata?.httpStatusCode;
+        if (status === 404 || err.name === 'NotFound' || err.name === 'NoSuchBucket') {
+            try {
+                await getS3().send(new CreateBucketCommand({ Bucket: BUCKET }));
+                console.log(`[Storage] MinIO/S3 bucket '${BUCKET}' initialized successfully.`);
+            } catch (createErr) {
+                console.warn(`[Storage] Notice creating bucket '${BUCKET}': ${createErr.message}`);
+            }
+        } else {
+            console.warn(`[Storage] HeadBucket check for '${BUCKET}': ${err.message}`);
+        }
+    }
+};
 
 /**
- * Upload a Buffer to S3 (or local disk fallback).
- * @returns {Promise<string>} the public URL or local path that can be persisted
+ * Upload a Buffer to MinIO / S3 (or local disk fallback).
+ * @returns {Promise<string>} public relative path (/uploads/...) or S3_PUBLIC_URL
  */
 export const uploadBuffer = async (buffer, mimeType, prefix = 'misc') => {
     const ext = mimeType.split('/')[1]?.split(';')[0] || 'bin';
@@ -54,7 +92,12 @@ export const uploadBuffer = async (buffer, mimeType, prefix = 'misc') => {
             Body: buffer,
             ContentType: mimeType
         }));
-        return buildPublicUrl(key);
+
+        if (process.env.S3_PUBLIC_URL) {
+            return `${process.env.S3_PUBLIC_URL.replace(/\/$/, '')}/${key}`;
+        }
+        // Canonical URL served by express.static & MinIO stream fallback in server.js
+        return `/uploads/${key}`;
     }
 
     // Local fallback — write to /uploads/<prefix>/<filename>
@@ -63,13 +106,12 @@ export const uploadBuffer = async (buffer, mimeType, prefix = 'misc') => {
     const filename = path.basename(key);
     const fullPath = path.join(dir, filename);
     fs.writeFileSync(fullPath, buffer);
-    // The /uploads/ static mount in server.js exposes this URL at runtime
     return `/uploads/${prefix}/${filename}`;
 };
 
 /**
- * Upload a file already on disk to S3 (or move into the local /uploads dir).
- * Used by the voice-extraction flow which writes audio to a temp path first.
+ * Upload a file already on disk to S3/MinIO (or move into the local /uploads dir).
+ * Used by voice extraction and file attachment flows.
  */
 export const uploadFile = async (filePath, mimeType, prefix = 'misc') => {
     const buffer = fs.readFileSync(filePath);
@@ -77,32 +119,49 @@ export const uploadFile = async (filePath, mimeType, prefix = 'misc') => {
 };
 
 /**
- * Best-effort delete. Used when discarding a draft so we don't keep orphan media.
- * Local URLs starting with `/uploads/` map to disk paths; S3 URLs are deleted
- * by extracting the key after the bucket hostname.
+ * Best-effort delete. Used when discarding a draft or replacing an existing file.
  */
 export const deleteByUrl = async (url) => {
     if (!url) return;
     try {
         if (url.startsWith('/uploads/')) {
+            const key = url.replace(/^\/uploads[\/\\]?/, '');
+            // 1. Delete from local disk if it exists
             const uploadsRoot = path.resolve(rootDir, 'uploads');
-            const relativePart = url.replace(/^\/uploads[\/\\]?/, '');
-            const fullPath = path.resolve(uploadsRoot, relativePart);
-            // Verify path traversal does not escape uploads directory
+            const fullPath = path.resolve(uploadsRoot, key);
             if (fullPath.startsWith(uploadsRoot) && fs.existsSync(fullPath)) {
                 fs.unlinkSync(fullPath);
             }
+            // 2. Delete from MinIO/S3 if enabled
+            if (useS3 && key) {
+                await getS3().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })).catch(() => {});
+            }
             return;
         }
-        if (url.includes('.s3.') && url.includes(BUCKET)) {
-            const key = url.split(`${BUCKET}.s3.${REGION}.amazonaws.com/`)[1];
+
+        if (useS3 && url.includes(BUCKET)) {
+            const parsed = new URL(url);
+            let key = parsed.pathname.replace(/^\/+/, '');
+            if (key.startsWith(`${BUCKET}/`)) {
+                key = key.replace(`${BUCKET}/`, '');
+            }
             if (key) {
-                await getS3().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+                await getS3().send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })).catch(() => {});
             }
         }
     } catch (e) {
-        // Don't throw — orphan cleanup is best-effort, the draft delete shouldn't fail because of it
+        // Orphan cleanup is best-effort
     }
 };
 
-export const storageEnabled = useS3 ? 's3' : 'local';
+export const storageEnabled = useS3 ? 'minio-s3' : 'local';
+export default {
+    uploadBuffer,
+    uploadFile,
+    deleteByUrl,
+    getS3,
+    ensureBucketExists,
+    BUCKET,
+    useS3,
+    storageEnabled
+};
