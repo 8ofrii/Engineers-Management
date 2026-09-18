@@ -1,0 +1,757 @@
+import prisma from '../lib/prisma.js';
+import { auditFromReq } from '../lib/audit.js';
+
+/**
+ * @desc    Get all company safes for current tenant with live balances and stats
+ * @route   GET /api/safes
+ * @access  Private
+ */
+export const getSafes = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { includeInactive } = req.query;
+
+        const where = { tenantId };
+        if (includeInactive !== 'true') {
+            where.isActive = true;
+        }
+
+        const safes = await prisma.companySafe.findMany({
+            where,
+            orderBy: [
+                { isDefault: 'desc' },
+                { createdAt: 'asc' }
+            ],
+            include: {
+                _count: {
+                    select: {
+                        transactions: true,
+                        transfersFrom: true,
+                        transfersTo: true
+                    }
+                }
+            }
+        });
+
+        // Compute inflow and outflow for each safe from approved transactions
+        const enrichedSafes = await Promise.all(safes.map(async (safe) => {
+            const [inflows, outflows] = await Promise.all([
+                prisma.transaction.aggregate({
+                    where: {
+                        safeId: safe.id,
+                        status: 'APPROVED',
+                        type: 'INCOME',
+                        tenantId
+                    },
+                    _sum: { amount: true }
+                }),
+                prisma.transaction.aggregate({
+                    where: {
+                        safeId: safe.id,
+                        status: 'APPROVED',
+                        type: 'EXPENSE',
+                        tenantId
+                    },
+                    _sum: { amount: true }
+                })
+            ]);
+
+            return {
+                ...safe,
+                totalIncome: Number(inflows._sum.amount || 0),
+                totalExpense: Number(outflows._sum.amount || 0),
+                balance: Number(safe.balance),
+                initialBalance: Number(safe.initialBalance)
+            };
+        }));
+
+        res.status(200).json({
+            success: true,
+            count: enrichedSafes.length,
+            data: enrichedSafes
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Get single safe by ID
+ * @route   GET /api/safes/:id
+ * @access  Private
+ */
+export const getSafeById = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.user.tenantId;
+
+        const safe = await prisma.companySafe.findFirst({
+            where: { id, tenantId },
+            include: {
+                transactions: {
+                    take: 10,
+                    orderBy: { transactionDate: 'desc' },
+                    include: {
+                        user: { select: { id: true, name: true } },
+                        project: { select: { id: true, name: true } }
+                    }
+                }
+            }
+        });
+
+        if (!safe) {
+            return res.status(404).json({
+                success: false,
+                message: 'Company safe not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: safe
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Create new company safe
+ * @route   POST /api/safes
+ * @access  Private (Admin, SuperAdmin, Manager, Accountant)
+ */
+export const createSafe = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const {
+            name,
+            nameAr,
+            type,
+            accountNumber,
+            bankName,
+            initialBalance,
+            currency,
+            isDefault,
+            description
+        } = req.body;
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Safe name is required'
+            });
+        }
+
+        const startBal = Number(initialBalance) || 0;
+
+        const result = await prisma.$transaction(async (tx) => {
+            // If this safe is marked default, unset default on other safes
+            if (isDefault) {
+                await tx.companySafe.updateMany({
+                    where: { tenantId, isDefault: true },
+                    data: { isDefault: false }
+                });
+            }
+
+            const newSafe = await tx.companySafe.create({
+                data: {
+                    name: name.trim(),
+                    nameAr: nameAr ? nameAr.trim() : null,
+                    type: type || 'CASH_SAFE',
+                    accountNumber: accountNumber ? accountNumber.trim() : null,
+                    bankName: bankName ? bankName.trim() : null,
+                    initialBalance: startBal,
+                    balance: startBal,
+                    currency: currency || 'EGP',
+                    isDefault: Boolean(isDefault),
+                    description: description ? description.trim() : null,
+                    tenantId
+                }
+            });
+
+            return newSafe;
+        });
+
+        await auditFromReq(req, {
+            action: 'CREATE',
+            entity: 'CompanySafe',
+            entityId: result.id,
+            after: {
+                name: result.name,
+                type: result.type,
+                balance: Number(result.balance)
+            }
+        });
+
+        res.status(201).json({
+            success: true,
+            data: result,
+            message: 'Company safe created successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Update company safe
+ * @route   PUT /api/safes/:id
+ * @access  Private (Admin, SuperAdmin, Manager)
+ */
+export const updateSafe = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.user.tenantId;
+        const {
+            name,
+            nameAr,
+            type,
+            accountNumber,
+            bankName,
+            description,
+            isActive,
+            isDefault
+        } = req.body;
+
+        const existingSafe = await prisma.companySafe.findFirst({
+            where: { id, tenantId }
+        });
+
+        if (!existingSafe) {
+            return res.status(404).json({
+                success: false,
+                message: 'Company safe not found'
+            });
+        }
+
+        const updated = await prisma.$transaction(async (tx) => {
+            if (isDefault) {
+                await tx.companySafe.updateMany({
+                    where: { tenantId, id: { not: id }, isDefault: true },
+                    data: { isDefault: false }
+                });
+            }
+
+            return tx.companySafe.update({
+                where: { id },
+                data: {
+                    name: name !== undefined ? name.trim() : existingSafe.name,
+                    nameAr: nameAr !== undefined ? (nameAr ? nameAr.trim() : null) : existingSafe.nameAr,
+                    type: type !== undefined ? type : existingSafe.type,
+                    accountNumber: accountNumber !== undefined ? (accountNumber ? accountNumber.trim() : null) : existingSafe.accountNumber,
+                    bankName: bankName !== undefined ? (bankName ? bankName.trim() : null) : existingSafe.bankName,
+                    description: description !== undefined ? (description ? description.trim() : null) : existingSafe.description,
+                    isActive: isActive !== undefined ? Boolean(isActive) : existingSafe.isActive,
+                    isDefault: isDefault !== undefined ? Boolean(isDefault) : existingSafe.isDefault
+                }
+            });
+        });
+
+        await auditFromReq(req, {
+            action: 'UPDATE',
+            entity: 'CompanySafe',
+            entityId: id,
+            before: { name: existingSafe.name, isActive: existingSafe.isActive },
+            after: { name: updated.name, isActive: updated.isActive }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: updated,
+            message: 'Company safe updated successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Delete or deactivate company safe
+ * @route   DELETE /api/safes/:id
+ * @access  Private (Admin, SuperAdmin)
+ */
+export const deleteSafe = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.user.tenantId;
+
+        const safe = await prisma.companySafe.findFirst({
+            where: { id, tenantId },
+            include: {
+                _count: {
+                    select: {
+                        transactions: true,
+                        transfersFrom: true,
+                        transfersTo: true
+                    }
+                }
+            }
+        });
+
+        if (!safe) {
+            return res.status(404).json({
+                success: false,
+                message: 'Company safe not found'
+            });
+        }
+
+        const totalUsage = safe._count.transactions + safe._count.transfersFrom + safe._count.transfersTo;
+
+        if (totalUsage > 0) {
+            // Cannot hard delete -> soft delete / deactivate
+            const deactivated = await prisma.companySafe.update({
+                where: { id },
+                data: { isActive: false }
+            });
+
+            return res.status(200).json({
+                success: true,
+                data: deactivated,
+                message: 'Safe has transaction history and has been deactivated instead of deleted.'
+            });
+        }
+
+        await prisma.companySafe.delete({
+            where: { id }
+        });
+
+        await auditFromReq(req, {
+            action: 'DELETE',
+            entity: 'CompanySafe',
+            entityId: id,
+            before: { name: safe.name }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'Company safe deleted successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Internal transfer between two company safes
+ * @route   POST /api/safes/transfers
+ * @access  Private (Admin, SuperAdmin, Manager, Accountant)
+ */
+export const transferBetweenSafes = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { fromSafeId, toSafeId, amount, notes, transferDate } = req.body;
+
+        const transferAmount = Number(amount);
+        if (!transferAmount || transferAmount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid positive amount is required'
+            });
+        }
+
+        if (!fromSafeId || !toSafeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Source and destination safes are required'
+            });
+        }
+
+        if (fromSafeId === toSafeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Source and destination safes cannot be the same'
+            });
+        }
+
+        const [fromSafe, toSafe] = await Promise.all([
+            prisma.companySafe.findFirst({ where: { id: fromSafeId, tenantId, isActive: true } }),
+            prisma.companySafe.findFirst({ where: { id: toSafeId, tenantId, isActive: true } })
+        ]);
+
+        if (!fromSafe) {
+            return res.status(404).json({ success: false, message: 'Source safe not found or inactive' });
+        }
+        if (!toSafe) {
+            return res.status(404).json({ success: false, message: 'Destination safe not found or inactive' });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Decrement source safe balance
+            const updatedFrom = await tx.companySafe.update({
+                where: { id: fromSafeId },
+                data: { balance: { decrement: transferAmount } }
+            });
+
+            // 2. Increment destination safe balance
+            const updatedTo = await tx.companySafe.update({
+                where: { id: toSafeId },
+                data: { balance: { increment: transferAmount } }
+            });
+
+            // 3. Create SafeTransfer record
+            const transferRecord = await tx.safeTransfer.create({
+                data: {
+                    amount: transferAmount,
+                    fromSafeId,
+                    toSafeId,
+                    notes: notes ? notes.trim() : null,
+                    transferDate: transferDate ? new Date(transferDate) : new Date(),
+                    createdBy: req.user.id,
+                    tenantId
+                },
+                include: {
+                    fromSafe: { select: { id: true, name: true, nameAr: true } },
+                    toSafe: { select: { id: true, name: true, nameAr: true } },
+                    user: { select: { id: true, name: true } }
+                }
+            });
+
+            return { transferRecord, fromBalance: updatedFrom.balance, toBalance: updatedTo.balance };
+        });
+
+        await auditFromReq(req, {
+            action: 'TRANSFER_SAFE',
+            entity: 'SafeTransfer',
+            entityId: result.transferRecord.id,
+            after: {
+                fromSafe: fromSafe.name,
+                toSafe: toSafe.name,
+                amount: transferAmount
+            }
+        });
+
+        res.status(201).json({
+            success: true,
+            data: result.transferRecord,
+            message: 'Transfer completed successfully'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Get safe transfers history
+ * @route   GET /api/safes/transfers
+ * @access  Private
+ */
+export const getSafeTransfers = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const { limit = 50 } = req.query;
+
+        const transfers = await prisma.safeTransfer.findMany({
+            where: { tenantId },
+            take: Number(limit),
+            orderBy: { transferDate: 'desc' },
+            include: {
+                fromSafe: { select: { id: true, name: true, nameAr: true, type: true } },
+                toSafe: { select: { id: true, name: true, nameAr: true, type: true } },
+                user: { select: { id: true, name: true } }
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            count: transfers.length,
+            data: transfers
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Get chronological statement / ledger for a safe with running balance
+ * @route   GET /api/safes/:id/statement
+ * @access  Private
+ */
+export const getSafeStatement = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.user.tenantId;
+        const { dateFrom, dateTo } = req.query;
+
+        const safe = await prisma.companySafe.findFirst({
+            where: { id, tenantId }
+        });
+
+        if (!safe) {
+            return res.status(404).json({
+                success: false,
+                message: 'Company safe not found'
+            });
+        }
+
+        // 1. Fetch approved transactions tied to this safe
+        const txWhere = {
+            safeId: id,
+            status: 'APPROVED',
+            tenantId
+        };
+        if (dateFrom) txWhere.transactionDate = { gte: new Date(dateFrom) };
+        if (dateTo) {
+            txWhere.transactionDate = {
+                ...(txWhere.transactionDate || {}),
+                lte: new Date(`${dateTo}T23:59:59.999Z`)
+            };
+        }
+
+        const transactions = await prisma.transaction.findMany({
+            where: txWhere,
+            orderBy: { transactionDate: 'asc' },
+            include: {
+                project: { select: { id: true, name: true } },
+                user: { select: { id: true, name: true } },
+                workman: { select: { id: true, name: true } },
+                supplier: { select: { id: true, name: true } },
+                client: { select: { id: true, name: true } }
+            }
+        });
+
+        // 2. Fetch transfers in
+        const transferInWhere = {
+            toSafeId: id,
+            tenantId
+        };
+        if (dateFrom) transferInWhere.transferDate = { gte: new Date(dateFrom) };
+        if (dateTo) transferInWhere.transferDate = { ...(transferInWhere.transferDate || {}), lte: new Date(`${dateTo}T23:59:59.999Z`) };
+
+        const transfersIn = await prisma.safeTransfer.findMany({
+            where: transferInWhere,
+            orderBy: { transferDate: 'asc' },
+            include: {
+                fromSafe: { select: { id: true, name: true, nameAr: true } },
+                user: { select: { id: true, name: true } }
+            }
+        });
+
+        // 3. Fetch transfers out
+        const transferOutWhere = {
+            fromSafeId: id,
+            tenantId
+        };
+        if (dateFrom) transferOutWhere.transferDate = { gte: new Date(dateFrom) };
+        if (dateTo) transferOutWhere.transferDate = { ...(transferOutWhere.transferDate || {}), lte: new Date(`${dateTo}T23:59:59.999Z`) };
+
+        const transfersOut = await prisma.safeTransfer.findMany({
+            where: transferOutWhere,
+            orderBy: { transferDate: 'asc' },
+            include: {
+                toSafe: { select: { id: true, name: true, nameAr: true } },
+                user: { select: { id: true, name: true } }
+            }
+        });
+
+        // 4. Map to unified ledger records
+        const ledger = [];
+
+        transactions.forEach(t => {
+            const isIncome = t.type === 'INCOME';
+            ledger.push({
+                id: t.id,
+                date: t.transactionDate,
+                type: isIncome ? 'INCOME' : 'EXPENSE',
+                inflow: isIncome ? Number(t.amount) : 0,
+                outflow: !isIncome ? Number(t.amount) : 0,
+                description: t.description || (isIncome ? 'إيراد' : 'مصروف'),
+                reference: t.invoiceNumber || t.id.slice(0, 8),
+                category: t.category,
+                projectName: t.project?.name || (t.isOfficeExpense ? 'المكتب الرئيسي' : null),
+                partyName: t.client?.name || t.supplier?.name || t.workman?.name || null,
+                userName: t.user?.name || null
+            });
+        });
+
+        transfersIn.forEach(tr => {
+            ledger.push({
+                id: tr.id,
+                date: tr.transferDate,
+                type: 'TRANSFER_IN',
+                inflow: Number(tr.amount),
+                outflow: 0,
+                description: `تحويل وارد من [${tr.fromSafe?.name || 'خزينة أخرى'}]${tr.notes ? ` - ${tr.notes}` : ''}`,
+                reference: `TR-${tr.id.slice(0, 6)}`,
+                category: 'INTERNAL_TRANSFER',
+                projectName: 'تحويل داخلي',
+                partyName: tr.fromSafe?.name,
+                userName: tr.user?.name || null
+            });
+        });
+
+        transfersOut.forEach(tr => {
+            ledger.push({
+                id: tr.id,
+                date: tr.transferDate,
+                type: 'TRANSFER_OUT',
+                inflow: 0,
+                outflow: Number(tr.amount),
+                description: `تحويل صادر إلى [${tr.toSafe?.name || 'خزينة أخرى'}]${tr.notes ? ` - ${tr.notes}` : ''}`,
+                reference: `TR-${tr.id.slice(0, 6)}`,
+                category: 'INTERNAL_TRANSFER',
+                projectName: 'تحويل داخلي',
+                partyName: tr.toSafe?.name,
+                userName: tr.user?.name || null
+            });
+        });
+
+        // 5. Sort chronologically
+        ledger.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // 6. Calculate running balance starting from initialBalance
+        let runningBalance = Number(safe.initialBalance || 0);
+        const entriesWithBalance = ledger.map(entry => {
+            runningBalance += (entry.inflow - entry.outflow);
+            return {
+                ...entry,
+                balanceAfter: runningBalance
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                safe: {
+                    id: safe.id,
+                    name: safe.name,
+                    nameAr: safe.nameAr,
+                    type: safe.type,
+                    bankName: safe.bankName,
+                    accountNumber: safe.accountNumber,
+                    currentBalance: Number(safe.balance),
+                    initialBalance: Number(safe.initialBalance),
+                    currency: safe.currency
+                },
+                statement: entriesWithBalance.reverse() // Most recent first for display
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @desc    Get Office Finances summary KPI metrics and recent transactions
+ * @route   GET /api/safes/office-summary
+ * @access  Private
+ */
+export const getOfficeFinancesSummary = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+
+        // 1. Office Profits:
+        // A) Management fees recognized from projects
+        const feeTxs = await prisma.transaction.aggregate({
+            where: {
+                tenantId,
+                status: 'APPROVED',
+                category: 'MANAGEMENT_FEE_TRANSFER'
+            },
+            _sum: { amount: true }
+        });
+        const totalManagementFees = Number(feeTxs._sum.amount || 0);
+
+        // B) Any direct office income (income with isOfficeExpense: true or no projectId)
+        const directOfficeIncome = await prisma.transaction.aggregate({
+            where: {
+                tenantId,
+                status: 'APPROVED',
+                type: 'INCOME',
+                OR: [
+                    { isOfficeExpense: true },
+                    { projectId: null }
+                ]
+            },
+            _sum: { amount: true }
+        });
+        const totalDirectIncome = Number(directOfficeIncome._sum.amount || 0);
+        const totalOfficeProfit = totalManagementFees + totalDirectIncome;
+
+        // 2. Office Expenses:
+        // Any approved expense marked isOfficeExpense: true OR has no projectId
+        const officeExpensesAgg = await prisma.transaction.aggregate({
+            where: {
+                tenantId,
+                status: 'APPROVED',
+                type: 'EXPENSE',
+                category: { not: 'MANAGEMENT_FEE_TRANSFER' },
+                OR: [
+                    { isOfficeExpense: true },
+                    { projectId: null }
+                ]
+            },
+            _sum: { amount: true }
+        });
+        const totalOfficeExpenses = Number(officeExpensesAgg._sum.amount || 0);
+
+        // Net Operating Profit
+        const netOfficeProfit = totalOfficeProfit - totalOfficeExpenses;
+
+        // 3. Total Liquidity in Company Safes:
+        const activeSafes = await prisma.companySafe.findMany({
+            where: { tenantId, isActive: true },
+            select: { balance: true }
+        });
+        const totalLiquidFunds = activeSafes.reduce((sum, s) => sum + Number(s.balance || 0), 0);
+
+        // 4. Breakdown of Office Expenses by category
+        const officeExpenses = await prisma.transaction.findMany({
+            where: {
+                tenantId,
+                status: 'APPROVED',
+                type: 'EXPENSE',
+                category: { not: 'MANAGEMENT_FEE_TRANSFER' },
+                OR: [
+                    { isOfficeExpense: true },
+                    { projectId: null }
+                ]
+            },
+            select: { category: true, amount: true }
+        });
+
+        const categoryBreakdownMap = {};
+        officeExpenses.forEach(tx => {
+            const cat = tx.category || 'OTHER';
+            categoryBreakdownMap[cat] = (categoryBreakdownMap[cat] || 0) + Number(tx.amount || 0);
+        });
+
+        const categoryBreakdown = Object.entries(categoryBreakdownMap)
+            .map(([category, amount]) => ({ category, amount }))
+            .sort((a, b) => b.amount - a.amount);
+
+        // 5. Recent Office Transactions (last 25)
+        const recentOfficeTransactions = await prisma.transaction.findMany({
+            where: {
+                tenantId,
+                OR: [
+                    { isOfficeExpense: true },
+                    { projectId: null },
+                    { category: 'MANAGEMENT_FEE_TRANSFER' }
+                ]
+            },
+            take: 25,
+            orderBy: { transactionDate: 'desc' },
+            include: {
+                user: { select: { id: true, name: true } },
+                safe: { select: { id: true, name: true, nameAr: true } },
+                project: { select: { id: true, name: true } }
+            }
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                totalOfficeProfit,
+                totalManagementFees,
+                totalDirectIncome,
+                totalOfficeExpenses,
+                netOfficeProfit,
+                totalLiquidFunds,
+                categoryBreakdown,
+                recentTransactions: recentOfficeTransactions
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};

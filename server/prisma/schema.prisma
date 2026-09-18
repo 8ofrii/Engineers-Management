@@ -51,6 +51,8 @@ model Tenant {
   bankStatements      BankStatement[]
   subscriptions       Subscription[]
   paymentAttempts     PaymentAttempt[]
+  companySafes        CompanySafe[]
+  safeTransfers       SafeTransfer[]
 
   @@map("tenants")
 }
@@ -102,6 +104,7 @@ model User {
   invoicesCreated       Invoice[]         @relation("InvoiceCreator")
   transactionDrafts     TransactionDraft[]
   bankStatements        BankStatement[]
+  safeTransfers         SafeTransfer[]
 
   @@unique([email, tenantId])
   @@index([phone, tenantId])
@@ -424,6 +427,8 @@ model Transaction {
   transactionFrom   String?
   paidByClientContact String?
   physicalAccount   String?
+  safeId            String?
+  safe              CompanySafe?        @relation(fields: [safeId], references: [id])
   draft             TransactionDraft?
   // Phase 6.3 — set when this transaction was matched to a bank-statement row
   reconciledAt      DateTime?
@@ -432,6 +437,7 @@ model Transaction {
   @@index([projectId, transactionDate])
   @@index([type, category])
   @@index([status])
+  @@index([safeId])
   @@map("transactions")
 }
 
@@ -1118,4 +1124,56 @@ enum PaymentAttemptStatus {
   SUCCESS       // webhook confirmed
   FAILED        // webhook reported failure
   EXPIRED       // user never completed checkout, abandoned
+}
+
+enum SafeType {
+  CASH_SAFE
+  BANK_ACCOUNT
+  MOBILE_WALLET
+  OWNER_ACCOUNT
+  OTHER
+}
+
+model CompanySafe {
+  id             String          @id @default(uuid())
+  name           String
+  nameAr         String?
+  type           SafeType        @default(CASH_SAFE)
+  accountNumber  String?
+  bankName       String?
+  balance        Decimal         @default(0) @db.Decimal(15, 2)
+  initialBalance Decimal         @default(0) @db.Decimal(15, 2)
+  currency       String          @default("EGP")
+  isDefault      Boolean         @default(false)
+  isActive       Boolean         @default(true)
+  description    String?
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions   Transaction[]
+  transfersFrom  SafeTransfer[]  @relation("TransferFromSafe")
+  transfersTo    SafeTransfer[]  @relation("TransferToSafe")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([tenantId, isActive])
+  @@map("company_safes")
+}
+
+model SafeTransfer {
+  id           String      @id @default(uuid())
+  amount       Decimal     @db.Decimal(15, 2)
+  fromSafeId   String
+  toSafeId     String
+  notes        String?
+  transferDate DateTime    @default(now())
+  createdBy    String
+  tenantId     String
+  fromSafe     CompanySafe @relation("TransferFromSafe", fields: [fromSafeId], references: [id])
+  toSafe       CompanySafe @relation("TransferToSafe", fields: [toSafeId], references: [id])
+  user         User        @relation(fields: [createdBy], references: [id])
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+
+  @@index([tenantId, transferDate])
+  @@map("safe_transfers")
 }

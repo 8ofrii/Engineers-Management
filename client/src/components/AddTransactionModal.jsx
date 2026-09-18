@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText, FileSpreadsheet, ExternalLink, File } from 'lucide-react';
-import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI, documentsAPI } from '../services/api';
+import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI, documentsAPI, safesAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
 import AddWorkmanModal from './AddWorkmanModal';
@@ -73,6 +73,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [clients, setClients] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [rawMaterials, setRawMaterials] = useState([]);
+    const [safes, setSafes] = useState([]);
     const [existingCostCenters, setExistingCostCenters] = useState([]);
     const [existingTransactionFroms, setExistingTransactionFroms] = useState([]);
     const [existingTransactionTos, setExistingTransactionTos] = useState([]);
@@ -134,6 +135,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
         // Transfer Custody
         toEngineerId: '',
+
+        // Safe & Office Expense
+        safeId: initialData?.safeId || '',
+        isOfficeExpense: initialData?.isOfficeExpense || false
     });
 
     // V1.2 UI Logic: New vs Existing Item Switch
@@ -169,7 +174,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 workmanId: '',
                 invoiceNumber: '',
                 physicalAccount: '',
-                toEngineerId: ''
+                toEngineerId: '',
+                safeId: formData.safeId || '',
+                isOfficeExpense: false
             });
             setErrors({});
         }
@@ -421,7 +428,28 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         if (mode === 'USAGE' || isOpen) {
             loadBatches(selectedProjectId || undefined);
         }
+        if (isOpen) {
+            loadSafes();
+        }
     }, [mode, selectedProjectId, isOpen]);
+
+    const loadSafes = async () => {
+        try {
+            const res = await safesAPI.list();
+            if (res?.data?.data) {
+                const list = res.data.data;
+                setSafes(list);
+                if (!initialData) {
+                    const defSafe = list.find(s => s.isDefault) || list[0];
+                    if (defSafe) {
+                        setFormData(prev => prev.safeId ? prev : ({ ...prev, safeId: defSafe.id }));
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load company safes', e);
+        }
+    };
 
     const loadProjects = async () => {
         try {
@@ -618,15 +646,16 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
     const validate = () => {
         const newErrors = {};
-        if (mode !== 'TRANSFER' && !selectedProjectId) newErrors.projectId = t('common.required');
 
         if (mode === 'EXPENSE') {
+            if (!formData.isOfficeExpense && !selectedProjectId) newErrors.projectId = t('common.required');
+            if (!formData.safeId) newErrors.safeId = isRTL ? 'يرجى تحديد خزينة الصرف (إلزامي)' : 'Source safe is mandatory';
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
             if (!formData.beneficiary?.trim() && !formData.workmanId && !formData.supplierId) {
                 newErrors.beneficiary = t('finance.beneficiaryRequired') || (isRTL ? 'يرجى تحديد أو إدخال اسم المستفيد' : 'Beneficiary is required');
             }
-            if (costItemMode === 'MATERIAL') {
-                if (!formData.materialId) newErrors.materialId = t('common.required');
+            if (costItemMode === 'MATERIAL' || isStockPurchase) {
+                if (!formData.materialId) newErrors.materialId = isRTL ? 'يرجى اختيار الخامة' : 'Please select material';
             } else if (costItemMode === 'EXISTING') {
                 if (!formData.projectCostItemId) newErrors.projectCostItemId = t('common.required');
             } else {
@@ -635,6 +664,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         }
         else if (mode === 'INCOME') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
+            if (!formData.safeId) newErrors.safeId = isRTL ? 'يرجى تحديد خزينة الإيداع (إلزامي)' : 'Destination safe is mandatory';
         }
         else if (mode === 'USAGE') {
             if (!selectedBatchId) newErrors.batchId = t('common.required');
@@ -675,7 +705,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     type: 'EXPENSE',
                     category: resolvedCategory,
                     amount: Number(formData.amount),
-                    projectId: selectedProjectId,
+                    projectId: formData.isOfficeExpense ? (selectedProjectId || undefined) : selectedProjectId,
+                    safeId: formData.safeId || undefined,
+                    isOfficeExpense: Boolean(formData.isOfficeExpense),
                     projectCostItemId: costItemMode === 'EXISTING' ? formData.projectCostItemId : undefined,
                     payerUserId: formData.payerUserId || user?.id,
                     workmanId: formData.workmanId || undefined,
@@ -704,7 +736,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     type: 'INCOME',
                     category: 'PAYMENT',
                     amount: Number(formData.amount),
-                    projectId: selectedProjectId,
+                    projectId: selectedProjectId || undefined,
+                    safeId: formData.safeId || undefined,
+                    isOfficeExpense: Boolean(formData.isOfficeExpense),
                     projectCostItemId: formData.projectCostItemId || undefined,
                     description: formData.description?.trim() || t('finance.categories.payment') || 'Client Payment',
                     transactionDate: formData.transactionDate,
@@ -1228,15 +1262,16 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         {/* Project Selection */}
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: '0.85rem', marginBottom: '4px' }}>
-                                {t('nav.projects')} {mode !== 'TRANSFER' ? <span className="required">*</span> : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span>}
+                                {t('nav.projects')} {mode !== 'TRANSFER' && !formData.isOfficeExpense ? <span className="required">*</span> : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span>}
                             </label>
                             <select
                                 value={selectedProjectId}
                                 onChange={handleProjectChange}
+                                disabled={Boolean(formData.isOfficeExpense)}
                                 className={errors.projectId ? 'error' : ''}
                                 style={{ fontSize: '1rem', padding: '10px' }}
                             >
-                                <option value="">-- {mode === 'TRANSFER' ? (isRTL ? 'بدون ربط بمشروع محدد' : 'General / No specific project') : t('finance.selectProject')} --</option>
+                                <option value="">-- {formData.isOfficeExpense ? (isRTL ? 'بدون مشروع (مصروف للمقر الرئيسي)' : 'Office Expense (No Project)') : (mode === 'TRANSFER' ? (isRTL ? 'بدون ربط بمشروع محدد' : 'General / No specific project') : t('finance.selectProject'))} --</option>
                                 {projects.map(p => (
                                     <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}
@@ -1307,6 +1342,80 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+                        )}
+
+                        {/* Office Expense Toggle for Expenses */}
+                        {mode === 'EXPENSE' && (
+                            <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600, color: formData.isOfficeExpense ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(formData.isOfficeExpense)}
+                                        onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            setFormData(prev => ({ ...prev, isOfficeExpense: checked }));
+                                            if (checked) {
+                                                setSelectedProjectId('');
+                                                setSelectedProject(null);
+                                                if (errors.projectId) setErrors(prev => ({ ...prev, projectId: '' }));
+                                            }
+                                        }}
+                                        style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
+                                    />
+                                    <span>🏢 {isRTL ? 'مصروف للمقر الرئيسي / المكتب (غير مرتبط بمشروع محدد)' : 'Office / Headquarters Expense (No Project)'}</span>
+                                </label>
+                            </div>
+                        )}
+
+                        {/* Mandatory Safe Selector for Expense and Income */}
+                        {(mode === 'EXPENSE' || mode === 'INCOME') && (
+                            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '10px', marginBottom: 0 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.88rem', fontWeight: 700 }}>
+                                    <Wallet size={16} style={{ color: mode === 'INCOME' ? '#10b981' : '#f59e0b' }} />
+                                    <span>
+                                        {mode === 'EXPENSE'
+                                            ? (isRTL ? 'خزينة الصرف (الخزينة/الحساب المالي الذي خرجت منه الأموال)' : 'Source Safe / Account')
+                                            : (isRTL ? 'خزينة الإيداع (الخزينة/الحساب المالي الذي أودعت فيه الأموال)' : 'Destination Safe / Account')}
+                                    </span>
+                                    <span className="required" style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <select
+                                    name="safeId"
+                                    value={formData.safeId || ''}
+                                    onChange={handleChange}
+                                    className={errors.safeId ? 'error' : ''}
+                                    style={{
+                                        fontSize: '0.95rem',
+                                        padding: '10px 12px',
+                                        borderRadius: 'var(--radius-md)',
+                                        background: 'var(--bg-secondary)',
+                                        border: errors.safeId ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        width: '100%',
+                                        fontWeight: 500
+                                    }}
+                                >
+                                    <option value="">
+                                        -- {isRTL ? 'اختر الخزينة أو الحساب المالي (إلزامي)' : 'Select Safe / Account (Mandatory)'} --
+                                    </option>
+                                    {safes.map(s => {
+                                        const typeLabel = s.type === 'BANK_ACCOUNT' ? (isRTL ? `حساب بنكي - ${s.bankName || ''}` : `Bank - ${s.bankName || ''}`)
+                                            : s.type === 'MOBILE_WALLET' ? (isRTL ? 'محفظة إلكترونية' : 'Mobile Wallet')
+                                            : s.type === 'OWNER_ACCOUNT' ? (isRTL ? 'حساب شريك/مدير' : 'Owner/Manager Account')
+                                            : (isRTL ? 'خزينة نقدية (كاش)' : 'Cash Safe');
+                                        return (
+                                            <option key={s.id} value={s.id}>
+                                                {s.name} ({typeLabel}) - {isRTL ? 'الرصيد' : 'Balance'}: {fmtCurrency(s.balance)}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                {errors.safeId && (
+                                    <span className="error-message" style={{ color: '#ef4444', fontSize: '0.8rem', display: 'block', marginTop: '3px' }}>
+                                        {errors.safeId}
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>

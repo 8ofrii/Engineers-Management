@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight, Eye, Mic, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight, Eye, Mic, Image as ImageIcon, Sparkles, Building2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
@@ -104,7 +104,11 @@ export default function Finance() {
 
             // Filter by project
             if (filterProjectId) {
-                allTx = allTx.filter(tx => tx.projectId === filterProjectId);
+                if (filterProjectId === 'OFFICE') {
+                    allTx = allTx.filter(tx => tx.isOfficeExpense || !tx.projectId);
+                } else {
+                    allTx = allTx.filter(tx => tx.projectId === filterProjectId);
+                }
             }
 
             // Filter by workman
@@ -557,6 +561,64 @@ export default function Finance() {
     return (
         <Layout>
             <div className="finance-page">
+                {/* Sub-Tab Navigation Switcher */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: 'var(--spacing-lg)',
+                    borderBottom: '1px solid var(--border-color)',
+                    paddingBottom: '12px'
+                }}>
+                    <Link
+                        to="/finance"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 18px',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: '0.9rem',
+                            fontWeight: '600',
+                            textDecoration: 'none',
+                            background: 'var(--color-primary)',
+                            color: '#fff',
+                            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.2)'
+                        }}
+                    >
+                        <Wallet size={18} />
+                        <span>{isArabic ? 'المعاملات المحاسبية' : 'Accounting & Expenses'}</span>
+                    </Link>
+                    <Link
+                        to="/office-finances"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 18px',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: '0.9rem',
+                            fontWeight: '600',
+                            textDecoration: 'none',
+                            background: 'var(--bg-tertiary)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border-color)',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.color = 'var(--text-primary)';
+                            e.currentTarget.style.borderColor = 'var(--color-primary)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.color = 'var(--text-secondary)';
+                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                        }}
+                    >
+                        <Building2 size={18} />
+                        <span>{isArabic ? 'ماليات المقر والخزائن' : 'Office Finances & Safes'}</span>
+                    </Link>
+                </div>
+
                 {/* Header Section */}
                 <div className="flex-between mb-xl">
                     <div>
@@ -652,6 +714,7 @@ export default function Finance() {
                                 }}
                             >
                                 <option value="ALL">{t('common.allProjects') || 'المشاريع (الكل)'}</option>
+                                <option value="OFFICE">🏢 {isArabic ? 'المكتب / المقر الرئيسي' : 'Office / Headquarters'}</option>
                                 {projects.map(p => (
                                     <option key={p.id} value={p.id}>{p.name}</option>
                                 ))}

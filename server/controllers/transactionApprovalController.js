@@ -209,42 +209,70 @@ export const approveTransaction = async (req, res, next) => {
                 }
             });
 
-            // If this is an INCOME transaction, increment project safe balance upon approval
+            // If this is an INCOME transaction, increment project safe and company safe balance upon approval
             if (transaction.type === 'INCOME') {
-                await tx.project.update({
-                    where: { id: transaction.projectId, tenantId: req.user.tenantId },
-                    data: {
-                        projectSafeBalance: { increment: transaction.amount }
-                    }
+                if (transaction.projectId) {
+                    await tx.project.update({
+                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                        data: {
+                            projectSafeBalance: { increment: transaction.amount }
+                        }
+                    });
+                }
+                if (transaction.safeId) {
+                    await tx.companySafe.update({
+                        where: { id: transaction.safeId },
+                        data: {
+                            balance: { increment: transaction.amount }
+                        }
+                    });
+                }
+            }
+
+            // Make sure we have the latest project data for calculation if project exists
+            let project = null;
+            if (transaction.projectId) {
+                project = await tx.project.findFirst({
+                    where: { id: transaction.projectId, tenantId: req.user.tenantId }
                 });
             }
 
-            // Make sure we have the latest project data for calculation
-            const project = await tx.project.findFirst({
-                where: { id: transaction.projectId, tenantId: req.user.tenantId }
-            });
-
             // LINK 2: Handle EXPENSE transactions with logic V1.2
             if (transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
-                await tx.project.update({
-                    where: { id: transaction.projectId, tenantId: req.user.tenantId },
-                    data: {
-                        projectSafeBalance: { decrement: transaction.amount },
-                        officeRevenue: { increment: transaction.amount }
-                    }
-                });
+                if (transaction.projectId) {
+                    await tx.project.update({
+                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                        data: {
+                            projectSafeBalance: { decrement: transaction.amount },
+                            officeRevenue: { increment: transaction.amount }
+                        }
+                    });
+                }
             } else if (transaction.type === 'EXPENSE') {
+                // Update Company Safe balance if safeId linked
+                if (transaction.safeId) {
+                    await tx.companySafe.update({
+                        where: { id: transaction.safeId },
+                        data: {
+                            balance: { decrement: transaction.amount }
+                        }
+                    });
+                }
+
                 const isInventory = transaction.category === 'MATERIALS' || transaction.category === 'ELECTRICITY_MATERIALS' || transaction.category === 'PLUMBING_MATERIALS' || transaction.category === 'PAINTING_MATERIALS' || transaction.category === 'CERAMIC_MATERIALS' || transaction.category === 'CARPENTRY_MATERIALS';
 
-                // Deduct from Project Safe (Drafts skipped this on creation)
-                const updatedProject = await tx.project.update({
-                    where: { id: transaction.projectId, tenantId: req.user.tenantId },
-                    data: {
-                        projectSafeBalance: { decrement: transaction.amount },
-                        actualCost: { increment: transaction.amount }
-                    },
-                    include: { engineer: true }
-                });
+                let updatedProject = project;
+                if (transaction.projectId) {
+                    // Deduct from Project Safe (Drafts skipped this on creation)
+                    updatedProject = await tx.project.update({
+                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                        data: {
+                            projectSafeBalance: { decrement: transaction.amount },
+                            actualCost: { increment: transaction.amount }
+                        },
+                        include: { engineer: true }
+                    });
+                }
 
                 // V1.2 PROFIT CALCULATION
                 if (!isInventory) {

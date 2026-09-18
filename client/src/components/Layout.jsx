@@ -35,7 +35,8 @@ import {
     PanelLeftClose,
     PanelLeft,
     Check,
-    Shield
+    Shield,
+    Building2
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import SkyToggle from './ui/sky-toggle';
@@ -212,6 +213,7 @@ export default function Layout({ children }) {
             badge: pendingApprovalCount > 0 ? (pendingApprovalCount > 9 ? '9+' : pendingApprovalCount) : null,
             items: [
                 { path: '/finance', icon: Wallet, label: t('finance.title', 'Accounting & Expenses'), badge: pendingApprovalCount > 0 ? (pendingApprovalCount > 9 ? '9+' : pendingApprovalCount) : null },
+                { path: '/office-finances', icon: Building2, label: i18n.language === 'ar' ? 'ماليات المقر والخزائن' : 'Office Finances & Safes' },
                 { path: '/invoices', icon: Receipt, label: t('nav.invoices', 'Invoices') },
                 ...( ['ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER', 'ACCOUNTANT'].includes(user?.role) ? [
                     { path: '/reconcile', icon: Banknote, label: t('nav.reconcile', 'Bank Reconciliation') }

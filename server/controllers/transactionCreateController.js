@@ -47,30 +47,34 @@ export const createTransaction = async (req, res, next) => {
             voiceNoteUrl,
             receiptPhotoUrl,
             aiRawText,
-            aiExtractedData
+            aiExtractedData,
+            safeId
         } = req.body;
 
-        // Validate required fields
-        if (!type || !amount || !projectId) {
+        // Validate required fields: projectId is required UNLESS isOfficeExpense is true
+        if (!type || !amount || (!projectId && !isOfficeExpense)) {
             return res.status(400).json({
                 success: false,
-                message: 'Type, amount, and projectId are required'
+                message: 'Type, amount, and projectId (or office expense flag) are required'
             });
         }
 
-        // Fetch project
-        const project = await prisma.project.findFirst({
-            where: {
-                id: projectId,
-                tenantId: req.user.tenantId
-            }
-        });
-
-        if (!project) {
-            return res.status(404).json({
-                success: false,
-                message: 'Project not found'
+        // Fetch project if projectId is provided
+        let project = null;
+        if (projectId) {
+            project = await prisma.project.findFirst({
+                where: {
+                    id: projectId,
+                    tenantId: req.user.tenantId
+                }
             });
+
+            if (!project) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Project not found'
+                });
+            }
         }
 
         // V1.2: Determine payer (Manager can assign, Engineer defaults to self)
@@ -92,9 +96,10 @@ export const createTransaction = async (req, res, next) => {
                         amount: Number(amount),
                         description: description || 'Client Payment',
                         status: 'APPROVED',
-                        projectId,
-                        projectCostItemId,
-                        clientId: clientId || project.clientId,
+                        projectId: projectId || null,
+                        projectCostItemId: projectCostItemId || null,
+                        clientId: clientId || project?.clientId || null,
+                        safeId: safeId || null,
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'BANK_TRANSFER',
@@ -103,6 +108,7 @@ export const createTransaction = async (req, res, next) => {
                         paidByClientContact: paidByClientContact || null,
                         physicalAccount: physicalAccount || null,
                         costCenter: costCenter || null,
+                        isOfficeExpense: Boolean(isOfficeExpense),
                         voiceNoteUrl: voiceNoteUrl || null,
                         receiptPhotoUrl: receiptPhotoUrl || null,
                         aiRawText: aiRawText || null,
@@ -111,22 +117,34 @@ export const createTransaction = async (req, res, next) => {
                     }
                 });
 
-                // V1.2: Update Project Safe Balance (full amount)
-                await tx.project.update({
-                    where: {
-                        id: projectId,
-                        tenantId: req.user.tenantId
-                    },
-                    data: {
-                        projectSafeBalance: { increment: Number(amount) }
-                    }
-                });
+                // V1.2: Update Project Safe Balance (full amount) if attached to project
+                if (projectId) {
+                    await tx.project.update({
+                        where: {
+                            id: projectId,
+                            tenantId: req.user.tenantId
+                        },
+                        data: {
+                            projectSafeBalance: { increment: Number(amount) }
+                        }
+                    });
+                }
+
+                // Update Company Safe Balance if safe selected
+                if (safeId) {
+                    await tx.companySafe.update({
+                        where: { id: safeId },
+                        data: {
+                            balance: { increment: Number(amount) }
+                        }
+                    });
+                }
 
                 profitInfo = {
                     type: 'INCOME',
                     amountToSafe: Number(amount),
                     profitRecognized: 0,
-                    message: 'Full amount added to Project Safe. Profit will be recognized on expenses.'
+                    message: 'Full amount added to Safe. Profit will be recognized on expenses.'
                 };
 
                 return { transaction, profitInfo };
@@ -136,7 +154,7 @@ export const createTransaction = async (req, res, next) => {
             if (type === 'EXPENSE') {
                 // V1.2: If projectCostItemId is missing but itemName is provided, create a new ProjectCostItem (Work Order/Band)
                 let finalCostItemId = projectCostItemId;
-                if (!finalCostItemId && itemName && type === 'EXPENSE') {
+                if (!finalCostItemId && itemName && projectId) {
                     const newItem = await tx.projectCostItem.create({
                         data: {
                             projectId,
@@ -160,10 +178,11 @@ export const createTransaction = async (req, res, next) => {
                         amount: Number(amount),
                         description,
                         status: 'APPROVED',
-                        projectId,
-                        projectCostItemId: finalCostItemId,
+                        projectId: projectId || null,
+                        projectCostItemId: finalCostItemId || null,
                         supplierId: supplierId || null,
                         workmanId: workmanId || null,
+                        safeId: safeId || null,
                         beneficiary: beneficiary || null,
                         transactionTo: transactionTo || null,
                         costCenter: costCenter || null,
@@ -171,7 +190,7 @@ export const createTransaction = async (req, res, next) => {
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'CASH',
                         invoiceNumber: invoiceNumber || null,
-                        isOfficeExpense: isOfficeExpense || false,
+                        isOfficeExpense: Boolean(isOfficeExpense),
                         voiceNoteUrl: voiceNoteUrl || null,
                         receiptPhotoUrl: receiptPhotoUrl || null,
                         aiRawText: aiRawText || null,
@@ -180,40 +199,52 @@ export const createTransaction = async (req, res, next) => {
                     }
                 });
 
-                // Deduct from Project Safe or Office Expenses
-                if (category === 'MANAGEMENT_FEE_TRANSFER') {
-                    await tx.project.update({
-                        where: {
-                            id: projectId,
-                            tenantId: req.user.tenantId
-                        },
+                // Update Company Safe balance if safe selected
+                if (safeId) {
+                    await tx.companySafe.update({
+                        where: { id: safeId },
                         data: {
-                            projectSafeBalance: { decrement: Number(amount) },
-                            officeRevenue: { increment: Number(amount) }
+                            balance: { decrement: Number(amount) }
                         }
                     });
-                } else if (isOfficeExpense) {
-                    await tx.project.update({
-                        where: {
-                            id: projectId,
-                            tenantId: req.user.tenantId
-                        },
-                        data: {
-                            officeExpenses: { increment: Number(amount) },
-                            actualCost: { increment: Number(amount) }
-                        }
-                    });
-                } else {
-                    await tx.project.update({
-                        where: {
-                            id: projectId,
-                            tenantId: req.user.tenantId
-                        },
-                        data: {
-                            projectSafeBalance: { decrement: Number(amount) },
-                            actualCost: { increment: Number(amount) }
-                        }
-                    });
+                }
+
+                // Deduct from Project Safe or Office Expenses if project exists
+                if (projectId) {
+                    if (category === 'MANAGEMENT_FEE_TRANSFER') {
+                        await tx.project.update({
+                            where: {
+                                id: projectId,
+                                tenantId: req.user.tenantId
+                            },
+                            data: {
+                                projectSafeBalance: { decrement: Number(amount) },
+                                officeRevenue: { increment: Number(amount) }
+                            }
+                        });
+                    } else if (isOfficeExpense) {
+                        await tx.project.update({
+                            where: {
+                                id: projectId,
+                                tenantId: req.user.tenantId
+                            },
+                            data: {
+                                officeExpenses: { increment: Number(amount) },
+                                actualCost: { increment: Number(amount) }
+                            }
+                        });
+                    } else {
+                        await tx.project.update({
+                            where: {
+                                id: projectId,
+                                tenantId: req.user.tenantId
+                            },
+                            data: {
+                                projectSafeBalance: { decrement: Number(amount) },
+                                actualCost: { increment: Number(amount) }
+                            }
+                        });
+                    }
                 }
 
                 // Update Cost Item if linked
@@ -242,56 +273,8 @@ export const createTransaction = async (req, res, next) => {
                     });
                 }
 
-                // V1.2 PROFIT CALCULATION
-                // If it's NOT an inventory purchase and NOT an office expense, recognize profit immediately
-                if (!createBatch && !isOfficeExpense) {
-                    const feePercent = Number(project.managementFeePercent) || 0;
-                    const profit = Number(amount) * (feePercent / 100);
-
-                    if (profit > 0 && project.revenueModel === 'EXECUTION_COST_PLUS') {
-                        // Transfer profit from Project Safe to Office Revenue
-                        await tx.project.update({
-                            where: {
-                                id: projectId,
-                                tenantId: req.user.tenantId
-                            },
-                            data: {
-                                projectSafeBalance: { decrement: profit },
-                                officeRevenue: { increment: profit }
-                            }
-                        });
-
-                        // Explicit ledger transaction for management fee
-                        await tx.transaction.create({
-                            data: {
-                                type: 'EXPENSE',
-                                category: 'MANAGEMENT_FEE_TRANSFER',
-                                amount: profit,
-                                description: `Cost-Plus Management Fee (${feePercent}%) on ${amount} EGP expense (${description || ''})`,
-                                status: 'APPROVED',
-                                projectId,
-                                createdBy: actualPayer,
-                                transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-                                paymentMethod: 'OTHER',
-                                tenantId: req.user.tenantId,
-                                isOfficeExpense: false,
-                                notes: `PARENT_TX:${transaction.id}`
-                            }
-                        });
-
-                        profitInfo = {
-                            profit,
-                            projectSafeAfter: Number(project.projectSafeBalance) - Number(amount) - profit,
-                            officeRevenueAfter: Number(project.officeRevenue) + profit,
-                            message: `Profit of ${profit} EGP recognized and transferred to office revenue.`
-                        };
-                    } else {
-                        profitInfo = {
-                            profit: 0,
-                            message: 'No profit recognized (not a COST_PLUS project or 0% fee).'
-                        };
-                    }
-                } else {
+                // V1.2 PROFIT CALCULATION / BATCH CREATION
+                if (createBatch && projectId) {
                     // Inventory Purchase: Create batch, defer profit
                     let parsedQty = Number(req.body.quantity) || 0;
                     if (!parsedQty && req.body.unitPrice && Number(req.body.unitPrice) > 0) {
@@ -323,8 +306,55 @@ export const createTransaction = async (req, res, next) => {
 
                     profitInfo = {
                         profit: 0,
-                        message: 'Inventory batch created. Profit deferred until usage.'
+                        message: 'Batch created. Profit deferred until material is consumed.'
                     };
+                } else if (!isOfficeExpense && project) {
+                    const feePercent = Number(project.managementFeePercent) || 0;
+                    const profit = Number(amount) * (feePercent / 100);
+
+                    if (profit > 0 && project.revenueModel === 'EXECUTION_COST_PLUS') {
+                        // Transfer profit from Project Safe to Office Revenue
+                        await tx.project.update({
+                            where: {
+                                id: projectId,
+                                tenantId: req.user.tenantId
+                            },
+                            data: {
+                                projectSafeBalance: { decrement: profit },
+                                officeRevenue: { increment: profit }
+                            }
+                        });
+
+                        // Explicit ledger transaction for management fee
+                        await tx.transaction.create({
+                            data: {
+                                type: 'EXPENSE',
+                                category: 'MANAGEMENT_FEE_TRANSFER',
+                                amount: profit,
+                                description: `Cost-Plus Management Fee (${feePercent}%) on ${amount} EGP expense (${description || ''})`,
+                                notes: `PARENT_TX:${transaction.id}`,
+                                status: 'APPROVED',
+                                projectId,
+                                createdBy: actualPayer,
+                                transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
+                                paymentMethod: 'BANK_TRANSFER',
+                                isOfficeExpense: false,
+                                tenantId: req.user.tenantId
+                            }
+                        });
+
+                        profitInfo = {
+                            profit,
+                            projectSafeAfter: Number(project.projectSafeBalance) - Number(amount) - profit,
+                            officeRevenueAfter: Number(project.officeRevenue) + profit,
+                            message: `Profit of ${profit} EGP recognized and transferred to office revenue.`
+                        };
+                    } else {
+                        profitInfo = {
+                            profit: 0,
+                            message: 'No profit recognized (not a COST_PLUS project or 0% fee).'
+                        };
+                    }
                 }
 
                 // Check if Project Safe is negative and send notification

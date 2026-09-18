@@ -145,6 +145,19 @@ export const bankStatementsAPI = {
         api.post(`/bank-statements/${statementId}/rows/${rowId}/ignore`)
 };
 
+// Company Safes & Treasury
+export const safesAPI = {
+    list: (params) => api.get('/safes', { params }),
+    get: (id) => api.get(`/safes/${id}`),
+    create: (data) => api.post('/safes', data),
+    update: (id, data) => api.put(`/safes/${id}`, data),
+    remove: (id) => api.delete(`/safes/${id}`),
+    transfer: (data) => api.post('/safes/transfers', data),
+    getTransfers: (params) => api.get('/safes/transfers', { params }),
+    getStatement: (id, params) => api.get(`/safes/${id}/statement`, { params }),
+    getOfficeFinancesSummary: (params) => api.get('/safes/office-summary', { params })
+};
+
 // Phase 7 — AI extraction (voice / receipt → persisted draft) + draft CRUD
 export const aiExtractAPI = {
     voice: (audioBlob, transcript = '') => {

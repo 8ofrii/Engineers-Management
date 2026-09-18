@@ -20,6 +20,7 @@ import ChatAssistant from './pages/ChatAssistant';
 import Reports from './pages/Reports';
 import TeamManagement from './pages/TeamManagement';
 import Finance from './pages/Finance';
+import OfficeFinances from './pages/OfficeFinances';
 import Inventory from './pages/Inventory';
 import TwoFactorSettings from './pages/TwoFactorSettings';
 import AuditLog from './pages/AuditLog';
@@ -126,6 +127,14 @@ function App() {
                             element={
                                 <PrivateRoute>
                                     <Finance />
+                                </PrivateRoute>
+                            }
+                        />
+                        <Route
+                            path="/office-finances"
+                            element={
+                                <PrivateRoute>
+                                    <OfficeFinances />
                                 </PrivateRoute>
                             }
                         />

@@ -47,6 +47,7 @@ import aiExtractionRoutes from './routes/aiExtraction.js';
 import transactionDraftRoutes from './routes/transactionDrafts.js';
 import bankStatementRoutes from './routes/bankStatements.js';
 import billingRoutes from './routes/billing.js';
+import safeRoutes from './routes/safeRoutes.js';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { ensureBucketExists, useS3, getS3, BUCKET } from './lib/storage.js';
 
@@ -241,6 +242,7 @@ app.use('/api/ai', aiExtractionRoutes);               // Phase 7: AI extraction 
 app.use('/api/transaction-drafts', transactionDraftRoutes); // Phase 7: draft review queue
 app.use('/api/bank-statements', bankStatementRoutes);       // Phase 6.3: bank reconciliation
 app.use('/api/billing', billingRoutes);                     // Phase 6.4: Paymob subscriptions
+app.use('/api/safes', safeRoutes);                         // Company Safes & Treasury
 
 // Health check endpoint with active database ping
 app.get('/api/health', async (req, res) => {

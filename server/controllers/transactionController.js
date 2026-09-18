@@ -305,7 +305,7 @@ export const transferCustody = async (req, res, next) => {
 // @access  Private
 export const createDraft = async (req, res, next) => {
     try {
-        const { projectId, amount, category, description, isOfficeExpense } = req.body;
+        const { projectId, amount, category, description, isOfficeExpense, safeId } = req.body;
 
         const draft = await prisma.transaction.create({
             data: {
@@ -314,10 +314,11 @@ export const createDraft = async (req, res, next) => {
                 amount: amount,
                 description: description,
                 status: 'DRAFT',
-                projectId: projectId,
+                projectId: projectId || null,
                 createdBy: req.user.id,
                 paymentMethod: 'CUSTODY_WALLET',
                 isOfficeExpense: isOfficeExpense || false,
+                safeId: safeId || null,
                 tenantId: req.user.tenantId
             }
         });
@@ -694,6 +695,21 @@ export const refundTransaction = async (req, res, next) => {
                 }
             }
 
+            // Reverse Company Safe Balance if transaction was approved and linked to safe
+            if (transaction.status === 'APPROVED' && transaction.safeId) {
+                if (transaction.type === 'INCOME') {
+                    await tx.companySafe.update({
+                        where: { id: transaction.safeId },
+                        data: { balance: { decrement: transaction.amount } }
+                    });
+                } else if (transaction.type === 'EXPENSE') {
+                    await tx.companySafe.update({
+                        where: { id: transaction.safeId },
+                        data: { balance: { increment: transaction.amount } }
+                    });
+                }
+            }
+
             // 2. Mark this transaction as CANCELLED (Do NOT delete row)
             const refundNotes = transaction.notes
                 ? `${transaction.notes} | REFUNDED_AT:${new Date().toISOString()}`
@@ -882,6 +898,21 @@ export const deleteTransaction = async (req, res, next) => {
                             projectSafeBalance: { decrement: transaction.amount },
                             operationalFund: { decrement: transaction.amount }
                         }
+                    });
+                }
+            }
+
+            // Reverse Company Safe Balance if transaction was approved and linked to safe
+            if (transaction.status === 'APPROVED' && transaction.safeId) {
+                if (transaction.type === 'INCOME') {
+                    await tx.companySafe.update({
+                        where: { id: transaction.safeId },
+                        data: { balance: { decrement: transaction.amount } }
+                    });
+                } else if (transaction.type === 'EXPENSE') {
+                    await tx.companySafe.update({
+                        where: { id: transaction.safeId },
+                        data: { balance: { increment: transaction.amount } }
                     });
                 }
             }
