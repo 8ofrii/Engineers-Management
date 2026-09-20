@@ -74,7 +74,12 @@ async function resolveLogoBuffer(logoPath) {
 export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
     return new Promise(async (resolve, reject) => {
         try {
-            const doc = new PDFDocument({ margin: 45, size: 'A4' });
+            const doc = new PDFDocument({
+                autoFirstPage: true,
+                bufferPages: true,
+                size: 'A4',
+                margins: { top: 35, bottom: 25, left: 45, right: 45 }
+            });
             setupDocFonts(doc);
 
             const chunks = [];
@@ -362,8 +367,11 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             });
 
             // 6. Summary Totals & Notes Section
-            y = Math.max(y + 20, 500);
-            if (y > 660) {
+            y = Math.max(y + 20, 280);
+            const totalsH = 135;
+
+            // If totals box would collide with footer (at 770), push cleanly to next page
+            if (y + totalsH > 735) {
                 doc.addPage();
                 y = 50;
             }
@@ -371,7 +379,6 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             const totalsBoxX = 315;
             const totalsBoxW = 235;
             const totalsStartY = y;
-            const totalsH = 135;
 
             // Totals Box Container
             doc.roundedRect(totalsBoxX, totalsStartY, totalsBoxW, totalsH, 6).fillColor(CARD_BG).fill();
@@ -381,10 +388,11 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             const writeTotalRow = (label, value, isBold = false, valColor = TEXT) => {
                 useFont(isBold);
                 doc.fontSize(isBold ? 10 : 8.5).fillColor(isBold ? TEXT : TEXT_MUTED);
-                drawPdfText(doc, label, totalsBoxX + 12, totalLineY, { width: 110 });
+                drawPdfText(doc, label, totalsBoxX + 12, totalLineY, { width: 110, lineBreak: false });
                 doc.fillColor(valColor).text(fmtMoney(value, invoice.currency), totalsBoxX + 120, totalLineY, {
                     width: totalsBoxW - 132,
-                    align: 'right'
+                    align: 'right',
+                    lineBreak: false
                 });
                 totalLineY += isBold ? 18 : 16;
             };
@@ -402,10 +410,11 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             doc.roundedRect(totalsBoxX + 6, totalLineY, totalsBoxW - 12, dueBannerH, 4).fillColor(PRIMARY_DARK).fill();
             useFont(true);
             doc.fillColor('#ffffff').fontSize(10);
-            drawPdfText(doc, L.totalDue, totalsBoxX + 14, totalLineY + 10, { width: 105 });
+            drawPdfText(doc, L.totalDue, totalsBoxX + 14, totalLineY + 10, { width: 105, lineBreak: false });
             doc.fillColor('#f59e0b').fontSize(11.5).text(fmtMoney(invoice.totalAmount, invoice.currency), totalsBoxX + 115, totalLineY + 9, {
                 width: totalsBoxW - 125,
-                align: 'right'
+                align: 'right',
+                lineBreak: false
             });
             totalLineY += dueBannerH + 8;
 
@@ -423,7 +432,7 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
 
             useFont(true);
             doc.fillColor(PRIMARY).fontSize(8);
-            drawPdfText(doc, L.notesTitle, notesBoxX + 12, totalsStartY + 4, { width: notesBoxW - 16 });
+            drawPdfText(doc, L.notesTitle, notesBoxX + 12, totalsStartY + 4, { width: notesBoxW - 16, lineBreak: false });
             useFont(false);
 
             let notesContentY = totalsStartY + 18;
@@ -434,7 +443,7 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             }
             if (invoice.terms) {
                 useFont(true);
-                doc.fontSize(7.5).fillColor(TEXT_MUTED).text('TERMS & CONDITIONS:', notesBoxX + 12, notesContentY, { width: notesBoxW - 16 });
+                doc.fontSize(7.5).fillColor(TEXT_MUTED).text('TERMS & CONDITIONS:', notesBoxX + 12, notesContentY, { width: notesBoxW - 16, lineBreak: false });
                 useFont(false);
                 doc.fontSize(8).fillColor(TEXT);
                 drawPdfText(doc, invoice.terms, notesBoxX + 12, notesContentY + 10, { width: notesBoxW - 16 });
@@ -446,20 +455,24 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             // Authorized Signature
             const sigY = totalsStartY + totalsH - 24;
             useFont(false);
-            doc.fontSize(8).fillColor(TEXT_MUTED).text('Authorized Signature: _______________________', notesBoxX + 12, sigY);
+            doc.fontSize(8).fillColor(TEXT_MUTED).text('Authorized Signature: _______________________', notesBoxX + 12, sigY, { lineBreak: false });
 
-            // 7. Official Footer
-            const footerY = 780;
-            doc.moveTo(45, footerY).lineTo(550, footerY).strokeColor(BORDER).stroke();
-            useFont(true);
-            doc.fontSize(8).fillColor(PRIMARY_DARK);
-            drawPdfText(doc, `${L.thankYou} • شكراً لتعاملكم معنا`, 45, footerY + 8, { width: 505, align: 'center' });
-            useFont(false);
-            doc.fontSize(7.5).fillColor(TEXT_MUTED).text(
-                `${tenant?.name || 'Hesaby ERP'} • ${L.officialDoc} • Page 1 of 1`,
-                45, footerY + 22,
-                { width: 505, align: 'center' }
-            );
+            // 7. Official Footer on all buffered pages
+            const range = doc.bufferedPageRange();
+            for (let i = range.start; i < range.start + range.count; i++) {
+                doc.switchToPage(i);
+                const footerY = 770;
+                doc.moveTo(45, footerY).lineTo(550, footerY).lineWidth(0.75).strokeColor(BORDER).stroke();
+                useFont(true);
+                doc.fontSize(8).fillColor(PRIMARY_DARK);
+                drawPdfText(doc, `${L.thankYou} • شكراً لتعاملكم معنا`, 45, footerY + 5, { width: 505, align: 'center', lineBreak: false });
+                useFont(false);
+                doc.fontSize(7.5).fillColor(TEXT_MUTED).text(
+                    `${tenant?.name || 'Hesaby ERP'} • ${L.officialDoc} • Page ${i + 1} of ${range.count}`,
+                    45, footerY + 17,
+                    { width: 505, align: 'center', lineBreak: false }
+                );
+            }
 
             doc.end();
         } catch (err) {
