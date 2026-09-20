@@ -233,8 +233,8 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
 
             useFont(false);
             doc.fontSize(8.5).fillColor(TEXT_MUTED);
-            doc.text(`${L.issueDate}: ${fmtDate(invoice.issueDate)}`, metaX, 88, { align: 'right', width: metaW });
-            doc.text(`${L.dueDate}: ${fmtDate(invoice.dueDate)}`, metaX, 101, { align: 'right', width: metaW });
+            drawPdfText(doc, `${L.issueDate}: ${fmtDate(invoice.issueDate)}`, metaX, 88, { align: 'right', width: metaW });
+            drawPdfText(doc, `${L.dueDate}: ${fmtDate(invoice.dueDate)}`, metaX, 101, { align: 'right', width: metaW });
 
             // Status Badge - ONLY if distinct status (PAID, PARTIAL, OVERDUE).
             // DRAFT/SENT invoices remain clean and unbadged for an official look.

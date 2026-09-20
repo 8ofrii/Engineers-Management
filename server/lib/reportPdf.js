@@ -274,9 +274,9 @@ export const generateFinancialReportPdf = ({
             useFont(false);
             doc.fontSize(8).fillColor(TEXT_MUTED);
             const now = new Date();
-            doc.text(`${L.generatedAt}: ${fmtDateTime(now)}`, metaX, 78, { width: metaW, align: 'right' });
+            drawPdfText(doc, `${L.generatedAt}: ${fmtDateTime(now)}`, metaX, 78, { width: metaW, align: 'right' });
             if (user?.name) {
-                doc.text(`${L.preparedBy}: ${user.name}`, metaX, 90, { width: metaW, align: 'right' });
+                drawPdfText(doc, `${L.preparedBy}: ${user.name}`, metaX, 90, { width: metaW, align: 'right' });
             }
 
             // Scope line
