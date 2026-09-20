@@ -158,20 +158,36 @@ export default function OfficeFinances() {
             return;
         }
 
-        const header = [
-            '#',
-            isArabic ? 'التاريخ' : 'Date',
-            isArabic ? 'النوع' : 'Type',
-            isArabic ? 'وارد (+)' : 'Inflow (+)',
-            isArabic ? 'منصرف (-)' : 'Outflow (-)',
-            isArabic ? 'الرصيد بعد الحركة' : 'Balance After',
-            isArabic ? 'البيان' : 'Description',
-            isArabic ? 'المرجع / الفاتورة' : 'Reference',
-            isArabic ? 'الجهة / المشروع' : 'Party / Project'
+        const safeName = statementData.safe?.name || '';
+        const openingBal = Number(statementData.openingBalance || 0);
+        const currentBal = Number(statementData.currentBalance || 0);
+
+        const rows = [
+            [`${isArabic ? 'حسابي ERP — كشف حساب الخزينة:' : 'Hesaby ERP — Safe Statement:'} ${safeName}`],
+            [`${isArabic ? 'الرصيد الافتتاحي:' : 'Opening Balance:'} ${openingBal.toLocaleString()} EGP | ${isArabic ? 'الرصيد الحالي:' : 'Current Balance:'} ${currentBal.toLocaleString()} EGP | ${isArabic ? 'تاريخ التصدير:' : 'Exported:'} ${new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')}`],
+            [],
+            [
+                '#',
+                isArabic ? 'التاريخ' : 'Date',
+                isArabic ? 'النوع' : 'Type',
+                isArabic ? 'وارد (+)' : 'Inflow (+)',
+                isArabic ? 'منصرف (-)' : 'Outflow (-)',
+                isArabic ? 'الرصيد بعد الحركة' : 'Balance After',
+                isArabic ? 'البيان' : 'Description',
+                isArabic ? 'المرجع / الفاتورة' : 'Reference',
+                isArabic ? 'الجهة / المشروع' : 'Party / Project'
+            ]
         ];
 
-        const rows = [header];
+        let totalInflow = 0;
+        let totalOutflow = 0;
+
         statementData.statement.forEach((item, idx) => {
+            const inf = item.inflow > 0 ? Number(item.inflow) : 0;
+            const outf = item.outflow > 0 ? Number(item.outflow) : 0;
+            totalInflow += inf;
+            totalOutflow += outf;
+
             rows.push([
                 idx + 1,
                 displayDate(item.date),
@@ -179,14 +195,27 @@ export default function OfficeFinances() {
                     : item.type === 'EXPENSE' ? (isArabic ? 'مصروف' : 'Expense')
                     : item.type === 'TRANSFER_IN' ? (isArabic ? 'تحويل وارد' : 'Transfer In')
                     : (isArabic ? 'تحويل صادر' : 'Transfer Out'),
-                item.inflow > 0 ? item.inflow : 0,
-                item.outflow > 0 ? item.outflow : 0,
-                item.balanceAfter,
+                inf,
+                outf,
+                Number(Number(item.balanceAfter || 0).toFixed(2)),
                 item.description || '',
                 item.reference || '-',
                 item.projectName || item.partyName || '-'
             ]);
         });
+
+        // Grand Total row
+        rows.push([
+            isArabic ? 'الإجمالي الكلي' : 'Grand Total',
+            '',
+            `${statementData.statement.length} ${isArabic ? 'حركة مسجلة' : 'items'}`,
+            Number(totalInflow.toFixed(2)),
+            Number(totalOutflow.toFixed(2)),
+            Number(currentBal.toFixed(2)),
+            '',
+            '',
+            ''
+        ]);
 
         exportToXLSX({
             filename: `statement-${statementData.safe?.name || 'safe'}-${new Date().toISOString().slice(0, 10)}.xlsx`,

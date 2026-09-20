@@ -268,6 +268,9 @@ export default function Finance() {
         }
 
         const rows = [
+            [isArabic ? 'حسابي ERP — سجل المعاملات والقيود المالية' : 'Hesaby ERP — Financial Transactions Register'],
+            [`${isArabic ? 'تاريخ التصدير:' : 'Exported:'} ${new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')} | ${isArabic ? 'إجمالي السجلات:' : 'Total Records:'} ${transactions.length}`],
+            [],
             [
                 isArabic ? 'التاريخ' : 'Date',
                 isArabic ? 'نوع المعاملة' : 'Type',
@@ -287,6 +290,7 @@ export default function Finance() {
             ]
         ];
 
+        let totalAmountSum = 0;
         transactions.forEach(tx => {
             const txType = tx.category === 'MANAGEMENT_FEE_TRANSFER'
                 ? (isArabic ? 'ارباح المكتب' : 'Office Profit')
@@ -314,6 +318,9 @@ export default function Finance() {
                 ? (tx.client?.name || tx.project?.client?.name || '')
                 : (tx.beneficiary || tx.supplier?.name || tx.workman?.name || '');
 
+            const numAmount = Number(Number(tx.amount || 0).toFixed(2));
+            totalAmountSum += numAmount;
+
             rows.push([
                 formatDate(tx.transactionDate || tx.createdAt),
                 txType,
@@ -325,13 +332,32 @@ export default function Finance() {
                 beneficiaryVal,
                 tx.transactionTo || '',
                 pMethod,
-                Number(Number(tx.amount || 0).toFixed(2)),
+                numAmount,
                 status,
                 tx.physicalAccount || '',
                 tx.costCenter || '',
                 tx.creator?.name || ''
             ]);
         });
+
+        // Grand Total Summary Row
+        rows.push([
+            isArabic ? 'الإجمالي الكلي' : 'Grand Total',
+            '',
+            '',
+            '',
+            `${transactions.length} ${isArabic ? 'معاملة مسجلة' : 'transactions'}`,
+            '',
+            '',
+            '',
+            '',
+            '',
+            Number(totalAmountSum.toFixed(2)),
+            '',
+            '',
+            '',
+            ''
+        ]);
 
         exportToXLSX({
             filename: `hesaby-transactions-${new Date().toISOString().slice(0, 10)}.xlsx`,

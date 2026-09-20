@@ -142,8 +142,7 @@ export default function Reports() {
         // Sheet 1: Executive Summary & KPIs
         const summaryRows = [
             [isArabic ? 'حسابي ERP — التقرير المالي التنفيذي' : 'Hesaby ERP — Executive Financial Report'],
-            [isArabic ? 'تاريخ التقرير:' : 'Generated At:', new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-US')],
-            [isArabic ? 'المشروع المحدد:' : 'Project Filter:', projectName],
+            [`${isArabic ? 'تاريخ التقرير:' : 'Generated At:'} ${new Date().toLocaleString(isArabic ? 'ar-EG' : 'en-US')} | ${isArabic ? 'المشروع المحدد:' : 'Project Filter:'} ${projectName}`],
             [],
             [isArabic ? 'المؤشر المالي' : 'Financial KPI', isArabic ? 'المبلغ (جنيه مصري)' : 'Amount (EGP)'],
             [isArabic ? 'إجمالي الإيرادات المحصلة' : 'Total Collected Income', Number(approvedIncomes.toFixed(2))],
@@ -154,6 +153,9 @@ export default function Reports() {
 
         // Sheet 2: Project Breakdown
         const breakdownRows = [
+            [isArabic ? 'حسابي ERP — تفاصيل وتحليلات المشاريع' : 'Hesaby ERP — Project Financial Breakdown'],
+            [`${isArabic ? 'المشروع المحدد:' : 'Project Filter:'} ${projectName} | ${isArabic ? 'تاريخ التقرير:' : 'Date:'} ${new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')}`],
+            [],
             [
                 isArabic ? 'اسم المشروع' : 'Project Name',
                 isArabic ? 'الميزانية التقديرية' : 'Budget',
@@ -165,20 +167,52 @@ export default function Reports() {
             ]
         ];
 
+        let totalBudget = 0;
+        let totalIncome = 0;
+        let totalSpent = 0;
+        let totalSafe = 0;
+        let totalProfit = 0;
+
         projectBreakdown.forEach(p => {
+            const b = Number(p.budget || 0);
+            const inc = Number(p.income || 0);
+            const sp = Number(p.spent || 0);
+            const sf = Number(p.safe || 0);
+            const pr = Number(p.profit || 0);
+            totalBudget += b;
+            totalIncome += inc;
+            totalSpent += sp;
+            totalSafe += sf;
+            totalProfit += pr;
+
             breakdownRows.push([
                 p.name,
-                p.budget,
-                p.income,
-                p.spent,
-                p.safe,
-                p.profit,
+                b,
+                inc,
+                sp,
+                sf,
+                pr,
                 `${p.burnRate}%`
             ]);
         });
 
+        // Grand Total row for projects
+        const overallBurnRate = totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : '0.0';
+        breakdownRows.push([
+            isArabic ? 'الإجمالي الكلي' : 'Grand Total',
+            Number(totalBudget.toFixed(2)),
+            Number(totalIncome.toFixed(2)),
+            Number(totalSpent.toFixed(2)),
+            Number(totalSafe.toFixed(2)),
+            Number(totalProfit.toFixed(2)),
+            `${overallBurnRate}%`
+        ]);
+
         // Sheet 3: Expenses by Category
         const categoryRows = [
+            [isArabic ? 'حسابي ERP — توزيع المصروفات حسب التصنيف' : 'Hesaby ERP — Expenses by Category'],
+            [`${isArabic ? 'المشروع المحدد:' : 'Project Filter:'} ${projectName} | ${isArabic ? 'إجمالي المصروفات:' : 'Total Expenses:'} ${approvedExpenses.toLocaleString()} EGP`],
+            [],
             [
                 isArabic ? 'بند التكلفة / التصنيف' : 'Expense Category',
                 isArabic ? 'إجمالي المصروف (جنيه)' : 'Total Spent (EGP)',
@@ -186,13 +220,23 @@ export default function Reports() {
             ]
         ];
 
+        let totalCatSpent = 0;
         categoryData.forEach(c => {
             const catName = isArabic
                 ? (t(`finance.categories.${c.name.toLowerCase().replace(/ /g, '_')}`) || c.name)
                 : (c.name);
-            const pct = approvedExpenses > 0 ? ((c.value / approvedExpenses) * 100).toFixed(1) : '0.0';
-            categoryRows.push([catName, Number(c.value.toFixed(2)), `${pct}%`]);
+            const catVal = Number(c.value || 0);
+            totalCatSpent += catVal;
+            const pct = approvedExpenses > 0 ? ((catVal / approvedExpenses) * 100).toFixed(1) : '0.0';
+            categoryRows.push([catName, Number(catVal.toFixed(2)), `${pct}%`]);
         });
+
+        // Grand Total row for categories
+        categoryRows.push([
+            isArabic ? 'الإجمالي الكلي' : 'Grand Total',
+            Number(totalCatSpent.toFixed(2)),
+            '100.0%'
+        ]);
 
         exportToXLSX({
             filename: `hesaby-financial-report-${new Date().toISOString().slice(0, 10)}.xlsx`,
