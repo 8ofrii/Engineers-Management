@@ -358,13 +358,15 @@
     "inventory": {
         "title": "المخزون",
         "subtitle": "إدارة ومتابعة المواد في المخازن والمواقع",
-        "allProjects": "جميع المشاريع",
+        "allProjects": "جميع المخزونات",
+        "allInventories": "جميع المخزونات",
         "noItems": "لا توجد بنود في المخزون حالياً",
         "items": "بنود",
         "initialValue": "القيمة الأصلية",
         "remainingValue": "القيمة المتبقية",
         "remaining": "متبقي",
-        "batches": "دفعات المخزون",
+        "batches": "المخزونات",
+        "inventories": "المخزونات",
         "rawMaterials": "الخامات الأساسية",
         "recordUsage": "تسجيل استهلاك",
         "status": {

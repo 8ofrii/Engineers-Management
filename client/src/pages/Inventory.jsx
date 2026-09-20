@@ -205,7 +205,7 @@ export default function Inventory() {
                                 className={`btn btn-sm ${viewMode === 'BATCHES' ? 'btn-primary' : 'btn-ghost'}`}
                                 onClick={() => setViewMode('BATCHES')}
                             >
-                                {t('inventory.batches') || 'الاستهلاكات والمواقع'}
+                                {t('inventory.inventories') || t('inventory.batches') || (isAr ? 'المخزونات' : 'Inventories')}
                             </button>
                             <button
                                 className={`btn btn-sm ${viewMode === 'MATERIALS' ? 'btn-primary' : 'btn-ghost'}`}
@@ -260,9 +260,11 @@ export default function Inventory() {
                                         color: 'var(--text-primary)'
                                     }}
                                 >
-                                    <option value="all">{t('inventory.allProjects') || 'جميع المشاريع'}</option>
+                                    <option value="all">{t('inventory.allInventories') || t('inventory.allProjects') || (isAr ? 'جميع المخزونات' : 'All Inventories')}</option>
                                     {projects.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                        <option key={p.id} value={p.id}>
+                                            {isAr ? `مخزون ${p.name}` : `${p.name}'s Inventory`}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
@@ -286,7 +288,7 @@ export default function Inventory() {
                                 <div key={projectName} className="inventory-section mb-xl">
                                     <h3 className="section-title flex items-center gap-sm mb-md">
                                         <ArrowRight size={18} className="text-primary" style={isAr ? { transform: 'scaleX(-1)' } : {}} />
-                                        {projectName}
+                                        {isAr ? (projectName === 'Unassigned' ? 'مخزون غير محدد' : `مخزون ${projectName}`) : (projectName === 'Unassigned' ? 'Unassigned Inventory' : `${projectName}'s Inventory`)}
                                         <span className="badge badge-secondary ml-sm">{items.length} {t('inventory.items') || 'بنود'}</span>
                                     </h3>
                                     <div className="grid grid-3 gap-md">
