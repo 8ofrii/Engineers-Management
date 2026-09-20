@@ -205,10 +205,23 @@ export const dsrAPI = {
     acknowledge: (id, acknowledgeNotes) =>
         api.put(`/dsr/${id}/acknowledge`, { acknowledgeNotes }),
     remove: (id) => api.delete(`/dsr/${id}`),
-    extractVoice: (formData) =>
-        api.post('/dsr/extract/voice', formData, {
+    extractVoice: (audioBlobOrFormData, transcript = '') => {
+        let fd;
+        if (audioBlobOrFormData instanceof FormData) {
+            fd = audioBlobOrFormData;
+        } else {
+            fd = new FormData();
+            if (audioBlobOrFormData) {
+                fd.append('audio', audioBlobOrFormData, 'voice-dsr.webm');
+            }
+            if (transcript) {
+                fd.append('transcript', transcript);
+            }
+        }
+        return api.post('/dsr/extract/voice', fd, {
             headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        });
+    }
 };
 
 // Phase 3 — Documents/photos per project

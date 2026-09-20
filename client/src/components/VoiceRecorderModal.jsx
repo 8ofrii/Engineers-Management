@@ -5,7 +5,15 @@ import { VoicePoweredOrb } from '@/components/ui/voice-powered-orb';
 
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSeconds = 60 }) {
+export default function VoiceRecorderModal({
+    open,
+    onClose,
+    onCaptured,
+    maxSeconds = 60,
+    title,
+    idleHint,
+    processingText
+}) {
     const { t, i18n } = useTranslation();
     const isRTL = i18n.language === 'ar' || document.documentElement.dir === 'rtl';
 
@@ -149,7 +157,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                     const rec = new SpeechRec();
                     rec.continuous = true;
                     rec.interimResults = true;
-                    rec.lang = 'ar-EG';
+                    rec.lang = (i18n.language === 'ar' || isRTL) ? 'ar-EG' : 'en-US';
                     rec.onresult = (e) => {
                         let text = '';
                         for (let i = 0; i < e.results.length; i++) {
@@ -199,6 +207,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
             await onCaptured?.(blob, transcriptRef.current);
         } catch (err) {
             console.error('Upload failed:', err);
+            setErrorMsg(err?.response?.data?.message || err?.message || (isRTL ? 'فشل معالجة التسجيل الصوتي' : 'Voice processing failed'));
             setPhase('preview');
         }
     };
@@ -257,7 +266,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                 <div className="flex items-center justify-center gap-2 mb-2">
                     <div className="flex h-6 items-center gap-1.5 px-3 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-medium tracking-wide">
                         <Sparkles size={13} className="text-indigo-400 animate-pulse" />
-                        <span>{t('drafts.voiceTitle', 'Siri Voice Copilot')}</span>
+                        <span>{title || t('drafts.voiceTitle', 'Siri Voice Copilot')}</span>
                     </div>
                 </div>
 
@@ -308,10 +317,10 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                 {/* Subtitle / Status Display (Pure Siri style, NO live transcript) */}
                 <div className="min-h-[44px] flex flex-col items-center justify-center text-center px-4">
                     {phase === 'idle' && (
-                        <p className="text-sm font-medium text-white/70 animate-fade-in">
-                            {isRTL
+                        <p className="text-sm font-medium text-white/70 animate-fade-in text-center">
+                            {idleHint || (isRTL
                                 ? 'اضغط على الميكروفون للتحدث وتسجيل مصاريف أو يوميات الموقع'
-                                : 'Tap the microphone to speak and record site expenses'}
+                                : 'Tap the microphone to speak and record site expenses')}
                         </p>
                     )}
 
@@ -393,7 +402,7 @@ export default function VoiceRecorderModal({ open, onClose, onCaptured, maxSecon
                         <div className="flex flex-col items-center gap-2 py-1 animate-fade-in">
                             <div className="flex items-center gap-2 text-sm font-medium text-indigo-300">
                                 <Sparkles size={16} className="animate-spin text-purple-400" />
-                                <span>{t('drafts.processing', 'AI is analyzing your voice note...')}</span>
+                                <span>{processingText || t('drafts.processing', 'AI is analyzing your voice note...')}</span>
                             </div>
                             <div className="w-48 h-1 rounded-full bg-white/10 overflow-hidden">
                                 <div className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full animate-pulse w-full" />
