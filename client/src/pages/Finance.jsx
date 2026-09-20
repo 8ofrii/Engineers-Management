@@ -478,7 +478,8 @@ export default function Finance() {
                     </div>
                     {beneficiary && payer && beneficiary !== payer && (
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }} className="truncate">
-                            ↳ {isArabic ? 'المستفيد:' : 'To:'} <span style={{ color: 'var(--text-primary)' }}>{beneficiary}</span>
+                            <span style={{ display: 'inline-block', transform: isArabic ? 'scaleX(-1)' : 'none', marginInlineEnd: '4px', opacity: 0.75 }}>↳</span>
+                            {isArabic ? 'المستفيد:' : 'To:'} <span style={{ color: 'var(--text-primary)' }}>{beneficiary}</span>
                         </div>
                     )}
                     {recipient && recipient !== beneficiary && recipient !== payer && (
@@ -1775,7 +1776,7 @@ export default function Finance() {
 
                                                                                 {/* 3. Category: Cost-Plus Fee with Sub-tree Indicator */}
                                                                                 <td style={{ textAlign: 'start', fontSize: '0.71rem' }} className="nested-fee-category">
-                                                                                    <span style={{ opacity: 0.55, marginInlineEnd: '4px' }}>↳</span>
+                                                                                    <span style={{ opacity: 0.55, marginInlineEnd: '4px', display: 'inline-block', transform: isArabic ? 'scaleX(-1)' : 'none' }}>↳</span>
                                                                                     {isArabic ? 'أتعاب كوست بلس (+10%)' : 'Cost-Plus Fee (+10%)'}
                                                                                 </td>
 
