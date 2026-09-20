@@ -616,19 +616,19 @@ export default function Reports() {
                     <div className="print-kpi-grid">
                         <div className="print-kpi-card highlight-green">
                             <div className="print-kpi-label">{isArabic ? 'إجمالي المقبوضات' : 'Collected Income'}</div>
-                            <div className="print-kpi-val" style={{ color: '#10b981' }}>{formatCurrency(approvedIncomes)}</div>
+                            <div className="print-kpi-val" style={{ color: '#065f46' }}>{formatCurrency(approvedIncomes)}</div>
                         </div>
                         <div className="print-kpi-card highlight-slate">
                             <div className="print-kpi-label">{isArabic ? 'مصروفات المواقع' : 'Site Expenses'}</div>
-                            <div className="print-kpi-val" style={{ color: '#0f172a' }}>{formatCurrency(approvedExpenses)}</div>
+                            <div className="print-kpi-val" style={{ color: '#c2410c' }}>{formatCurrency(approvedExpenses)}</div>
                         </div>
                         <div className="print-kpi-card highlight-amber">
                             <div className="print-kpi-label">{isArabic ? 'أرباح المكتب' : 'Office Profit'}</div>
-                            <div className="print-kpi-val" style={{ color: '#d97706' }}>{formatCurrency(totalProfitRecognized)}</div>
+                            <div className="print-kpi-val" style={{ color: '#b45309' }}>{formatCurrency(totalProfitRecognized)}</div>
                         </div>
                         <div className="print-kpi-card highlight-navy">
                             <div className="print-kpi-label">{isArabic ? 'صافي السيولة النقدية' : 'Net Cash Balance'}</div>
-                            <div className="print-kpi-val" style={{ color: '#0284c7' }}>{formatCurrency(netBalance)}</div>
+                            <div className="print-kpi-val" style={{ color: '#0369a1' }}>{formatCurrency(netBalance)}</div>
                         </div>
                     </div>
 

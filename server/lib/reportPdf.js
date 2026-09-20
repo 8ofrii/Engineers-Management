@@ -107,10 +107,10 @@ export const generateFinancialReportPdf = ({
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
                     const footerY = 800;
-                    doc.moveTo(40, footerY).lineTo(555, footerY).lineWidth(0.5).strokeColor('#e2e8f0').stroke();
-                    doc.font('AppFont').fontSize(7.5).fillColor('#64748b');
+                    doc.moveTo(40, footerY).lineTo(555, footerY).lineWidth(0.5).strokeColor('#d8cbaf').stroke();
+                    doc.font('AppFont').fontSize(7.5).fillColor('#8c7e6c');
                     const compTitle = tenant?.name || 'Hesaby ERP';
-                    const docLabel = isArabic ? 'تقرير مالي معتمد صادق آلياً' : 'Official Financial Summary';
+                    const docLabel = isArabic ? 'تقرير مالي معتمد صادر آلياً' : 'Official Financial Summary';
                     const pageText = isArabic ? `صفحة ${i + 1} من ${range.count}` : `Page ${i + 1} of ${range.count}`;
                     
                     doc.text(`${compTitle} • ${docLabel}`, 40, footerY + 8, { width: 350 });
@@ -120,17 +120,22 @@ export const generateFinancialReportPdf = ({
             });
             doc.on('error', reject);
 
-            // Palette — Modern Executive Corporate Palette
-            const PRIMARY_DARK = '#0f172a'; // Slate 900
-            const PRIMARY = '#1e293b';      // Slate 800
-            const ACCENT_BLUE = '#2563eb';  // Royal Blue
-            const ACCENT_GOLD = '#d97706';  // Amber 600
-            const SUCCESS = '#059669';      // Emerald 600
-            const DANGER = '#dc2626';       // Red 600
-            const TEXT = '#0f172a';         // Slate Dark
-            const TEXT_MUTED = '#64748b';   // Slate 500
-            const CARD_BG = '#f8fafc';      // Slate 50
-            const BORDER = '#e2e8f0';       // Slate 200
+            // Hesaby Webpage Light Mode Palette (Warm Cafe & Ember)
+            const BRAND_EMBER = '#c2410c';     // Primary Brand Accent (Warm Terracotta / Ember)
+            const BRAND_EMBER_DARK = '#9a3412';// Deep Terracotta
+            const BRAND_EMBER_LIGHT = '#ea580c';// Vibrant Ember
+            const BRAND_GOLD = '#d97706';      // Warm Gold / Amber
+            const SUCCESS = '#065f46';         // Deep Forest Emerald
+            const DANGER = '#991b1b';          // Deep Crimson
+            const TEXT_PRIMARY = '#1c1710';    // Deep Espresso
+            const TEXT_SECONDARY = '#6b5f4d';  // Warm Coffee
+            const TEXT_MUTED = '#8c7e6c';      // Muted Sand
+            const BG_WARM_CARD = '#fdfaf2';    // Elevated card background (warm ivory)
+            const BG_WARM_SUBTLE = '#f7f1e5';  // Secondary container / hero background
+            const BG_HEADER_SAND = '#ede4d0';  // Table header background (warm sand)
+            const BG_TOTALS_ROW = '#f5eedf';   // Totals / highlight row
+            const BORDER = '#d8cbaf';          // Warm Sandstone border
+            const BORDER_LIGHT = '#e5dcce';    // Subtle divider
 
             const useFont = (bold = false) => {
                 try {
@@ -194,8 +199,8 @@ export const generateFinancialReportPdf = ({
                 signApproved: 'Management Approval & Stamp'
             };
 
-            // 1. Top Corporate Accent Bar
-            doc.rect(40, 20, 515, 4).fillColor(PRIMARY_DARK).fill();
+            // 1. Top Continuous Accent Bar (Warm Ember)
+            doc.rect(40, 20, 515, 3.5).fillColor(BRAND_EMBER).fill();
 
             // 2. Company Brand & Logo (Top Left)
             const logoBuffer = await resolveLogoBuffer(tenant?.logo);
@@ -227,16 +232,17 @@ export const generateFinancialReportPdf = ({
 
             if (!logoRendered) {
                 const emblemSize = 38;
-                doc.roundedRect(40, compY, emblemSize, emblemSize, 6).fillColor(PRIMARY_DARK).fill();
+                doc.roundedRect(40, compY, emblemSize, emblemSize, 6).fillColor(BG_WARM_SUBTLE).fill();
+                doc.roundedRect(40, compY, emblemSize, emblemSize, 6).lineWidth(0.75).strokeColor(BORDER).stroke();
                 useFont(true);
                 const initial = (tenant?.name || 'H').trim().charAt(0).toUpperCase();
-                doc.fillColor('#ffffff').fontSize(17).text(initial, 40, compY + 9, { width: emblemSize, align: 'center' });
+                doc.fillColor(BRAND_EMBER_DARK).fontSize(17).text(initial, 40, compY + 9, { width: emblemSize, align: 'center' });
                 compX = 40 + emblemSize + 12;
             }
 
             // Company Title and Contact
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(13);
+            doc.fillColor(TEXT_PRIMARY).fontSize(13);
             drawPdfText(doc, tenant?.name || 'Hesaby Construction ERP', compX, compY, { width: 240 });
 
             useFont(false);
@@ -245,7 +251,7 @@ export const generateFinancialReportPdf = ({
             if (tenant?.email) metaParts.push(tenant.email);
             if (tenant?.phone) metaParts.push(tenant.phone);
             if (metaParts.length > 0) {
-                doc.fontSize(8).fillColor(TEXT_MUTED);
+                doc.fontSize(8).fillColor(TEXT_SECONDARY);
                 doc.text(metaParts.join(' • '), compX, curCompY, { width: 240 });
                 curCompY += 11;
             }
@@ -258,21 +264,22 @@ export const generateFinancialReportPdf = ({
             const metaX = 335;
             const metaW = 220;
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(14);
+            doc.fillColor(TEXT_PRIMARY).fontSize(14);
             drawPdfText(doc, L.reportTitle, metaX, 34, { width: metaW, align: 'right' });
 
-            // Certified Badge
+            // Certified Badge Pill
             const badgeW = isArabic ? 90 : 85;
             const badgeH = 16;
             const badgeX = metaX + metaW - badgeW;
             const badgeY = 56;
-            doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 3).fillColor(PRIMARY_DARK).fill();
+            doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 8).fillColor('#fef3c7').fill();
+            doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 8).lineWidth(0.75).strokeColor('#fde68a').stroke();
             useFont(true);
-            doc.fillColor('#ffffff').fontSize(7.5);
+            doc.fillColor('#92400e').fontSize(7.5);
             drawPdfText(doc, L.certifiedBadge, badgeX, badgeY + 3.5, { width: badgeW, align: 'center' });
 
             useFont(false);
-            doc.fontSize(8).fillColor(TEXT_MUTED);
+            doc.fontSize(8).fillColor(TEXT_SECONDARY);
             const now = new Date();
             drawPdfText(doc, `${L.generatedAt}: ${fmtDateTime(now)}`, metaX, 78, { width: metaW, align: 'right' });
             if (user?.name) {
@@ -294,38 +301,39 @@ export const generateFinancialReportPdf = ({
             const kpiCardH = 48;
             const kpiGap = 9;
 
-            const renderKpiCard = (x, label, value, accentColor, valColor = PRIMARY_DARK) => {
-                doc.roundedRect(x, kpiY, kpiCardW, kpiCardH, 4).fillColor(CARD_BG).fill();
+            const renderKpiCard = (x, label, value, accentColor, valColor = TEXT_PRIMARY) => {
+                doc.roundedRect(x, kpiY, kpiCardW, kpiCardH, 4).fillColor(BG_WARM_CARD).fill();
                 doc.roundedRect(x, kpiY, kpiCardW, kpiCardH, 4).lineWidth(0.75).strokeColor(BORDER).stroke();
                 // Top accent strip
                 doc.rect(x, kpiY, kpiCardW, 3).fillColor(accentColor).fill();
 
                 useFont(true);
-                doc.fillColor(TEXT_MUTED).fontSize(7.5);
+                doc.fillColor(TEXT_SECONDARY).fontSize(7.5);
                 drawPdfText(doc, label, x + 8, kpiY + 7, { width: kpiCardW - 16 });
 
                 doc.fillColor(valColor).fontSize(11);
                 doc.text(fmtMoney(value), x + 8, kpiY + 22, { width: kpiCardW - 16 });
             };
 
-            renderKpiCard(40, L.kpiIncome, kpis.approvedIncomes || 0, SUCCESS, '#059669');
-            renderKpiCard(40 + (kpiCardW + kpiGap), L.kpiExpenses, kpis.approvedExpenses || 0, PRIMARY_DARK, PRIMARY_DARK);
-            renderKpiCard(40 + (kpiCardW + kpiGap) * 2, L.kpiProfit, kpis.totalProfitRecognized || 0, ACCENT_GOLD, '#b45309');
-            renderKpiCard(40 + (kpiCardW + kpiGap) * 3, L.kpiCash, kpis.netBalance || 0, ACCENT_BLUE, '#0284c7');
+            renderKpiCard(40, L.kpiIncome, kpis.approvedIncomes || 0, SUCCESS, SUCCESS);
+            renderKpiCard(40 + (kpiCardW + kpiGap), L.kpiExpenses, kpis.approvedExpenses || 0, BRAND_EMBER, BRAND_EMBER_DARK);
+            renderKpiCard(40 + (kpiCardW + kpiGap) * 2, L.kpiProfit, kpis.totalProfitRecognized || 0, BRAND_GOLD, '#b45309');
+            renderKpiCard(40 + (kpiCardW + kpiGap) * 3, L.kpiCash, kpis.netBalance || 0, '#0284c7', '#0369a1');
 
             let currentY = kpiY + kpiCardH + 18;
 
             // 5. Expense Distribution by Category Table
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(10.5);
+            doc.fillColor(TEXT_PRIMARY).fontSize(10.5);
             drawPdfText(doc, `• ${L.catSection}`, 40, currentY, { width: 515 });
             currentY += 16;
 
             // Table Header
             const catTableH = 20;
-            doc.roundedRect(40, currentY, 515, catTableH, 3).fillColor(PRIMARY_DARK).fill();
+            doc.roundedRect(40, currentY, 515, catTableH, 3).fillColor(BG_HEADER_SAND).fill();
+            doc.roundedRect(40, currentY, 515, catTableH, 3).lineWidth(0.75).strokeColor(BORDER).stroke();
             useFont(true);
-            doc.fillColor('#ffffff').fontSize(8);
+            doc.fillColor(TEXT_PRIMARY).fontSize(8);
             drawPdfText(doc, L.catCol, 50, currentY + 5.5, { width: 250 });
             drawPdfText(doc, L.amountCol, 310, currentY + 5.5, { width: 120, align: 'right' });
             drawPdfText(doc, L.shareCol, 440, currentY + 5.5, { width: 95, align: 'right' });
@@ -342,28 +350,28 @@ export const generateFinancialReportPdf = ({
                 }
                 const rowH = 18;
                 if (idx % 2 === 1) {
-                    doc.rect(40, currentY, 515, rowH).fillColor(CARD_BG).fill();
+                    doc.rect(40, currentY, 515, rowH).fillColor(BG_WARM_CARD).fill();
                 }
 
                 const catVal = Number(cat.value || 0);
                 totalCatSum += catVal;
                 const pct = cat.pct || (kpis.approvedExpenses > 0 ? ((catVal / kpis.approvedExpenses) * 100).toFixed(1) + '%' : '0.0%');
 
-                doc.fillColor(TEXT).fontSize(8.5);
+                doc.fillColor(TEXT_PRIMARY).fontSize(8.5);
                 drawPdfText(doc, cat.name || '-', 50, currentY + 4, { width: 250 });
                 doc.text(fmtMoney(catVal), 310, currentY + 4, { width: 120, align: 'right' });
                 doc.text(pct, 440, currentY + 4, { width: 95, align: 'right' });
 
-                doc.moveTo(40, currentY + rowH).lineTo(555, currentY + rowH).lineWidth(0.5).strokeColor('#f1f5f9').stroke();
+                doc.moveTo(40, currentY + rowH).lineTo(555, currentY + rowH).lineWidth(0.5).strokeColor(BORDER_LIGHT).stroke();
                 currentY += rowH;
             });
 
             // Category Total Row
-            doc.rect(40, currentY, 515, 20).fillColor('#f1f5f9').fill();
+            doc.rect(40, currentY, 515, 20).fillColor(BG_TOTALS_ROW).fill();
             doc.moveTo(40, currentY).lineTo(555, currentY).lineWidth(1).strokeColor(BORDER).stroke();
             doc.moveTo(40, currentY + 20).lineTo(555, currentY + 20).lineWidth(1).strokeColor(BORDER).stroke();
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(8.5);
+            doc.fillColor(TEXT_PRIMARY).fontSize(8.5);
             drawPdfText(doc, L.grandTotal, 50, currentY + 5, { width: 250 });
             doc.text(fmtMoney(totalCatSum), 310, currentY + 5, { width: 120, align: 'right' });
             doc.text('100.0%', 440, currentY + 5, { width: 95, align: 'right' });
@@ -376,14 +384,15 @@ export const generateFinancialReportPdf = ({
             }
 
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(10.5);
+            doc.fillColor(TEXT_PRIMARY).fontSize(10.5);
             drawPdfText(doc, `• ${L.projSection}`, 40, currentY, { width: 515 });
             currentY += 16;
 
             const projHeaderH = 20;
-            doc.roundedRect(40, currentY, 515, projHeaderH, 3).fillColor(PRIMARY_DARK).fill();
+            doc.roundedRect(40, currentY, 515, projHeaderH, 3).fillColor(BG_HEADER_SAND).fill();
+            doc.roundedRect(40, currentY, 515, projHeaderH, 3).lineWidth(0.75).strokeColor(BORDER).stroke();
             useFont(true);
-            doc.fillColor('#ffffff').fontSize(7.5);
+            doc.fillColor(TEXT_PRIMARY).fontSize(7.5);
             drawPdfText(doc, L.projCol, 48, currentY + 5.5, { width: 130 });
             drawPdfText(doc, L.budgetCol, 180, currentY + 5.5, { width: 60, align: 'right' });
             drawPdfText(doc, L.incomeCol, 242, currentY + 5.5, { width: 60, align: 'right' });
@@ -403,7 +412,7 @@ export const generateFinancialReportPdf = ({
                 }
                 const rowH = 18;
                 if (idx % 2 === 1) {
-                    doc.rect(40, currentY, 515, rowH).fillColor(CARD_BG).fill();
+                    doc.rect(40, currentY, 515, rowH).fillColor(BG_WARM_CARD).fill();
                 }
 
                 const b = Number(p.budget || 0);
@@ -420,35 +429,35 @@ export const generateFinancialReportPdf = ({
                 totPr += pr;
 
                 useFont(false);
-                doc.fillColor(TEXT).fontSize(8);
+                doc.fillColor(TEXT_PRIMARY).fontSize(8);
                 drawPdfText(doc, p.name || '-', 48, currentY + 4, { width: 130 });
                 doc.text(b > 0 ? b.toLocaleString('en-US') : '-', 180, currentY + 4, { width: 60, align: 'right' });
                 doc.fillColor(SUCCESS).text(inc > 0 ? inc.toLocaleString('en-US') : '-', 242, currentY + 4, { width: 60, align: 'right' });
                 doc.fillColor(DANGER).text(sp > 0 ? sp.toLocaleString('en-US') : '-', 304, currentY + 4, { width: 60, align: 'right' });
-                doc.fillColor(sf >= 0 ? TEXT : DANGER).text(sf.toLocaleString('en-US'), 366, currentY + 4, { width: 62, align: 'right' });
+                doc.fillColor(sf >= 0 ? TEXT_PRIMARY : DANGER).text(sf.toLocaleString('en-US'), 366, currentY + 4, { width: 62, align: 'right' });
                 doc.fillColor('#7c3aed').text(pr > 0 ? pr.toLocaleString('en-US') : '-', 430, currentY + 4, { width: 60, align: 'right' });
                 
                 const burnNum = parseFloat(burn);
-                doc.fillColor(burnNum > 90 ? DANGER : TEXT).text(burn, 492, currentY + 4, { width: 53, align: 'right' });
+                doc.fillColor(burnNum > 90 ? DANGER : TEXT_PRIMARY).text(burn, 492, currentY + 4, { width: 53, align: 'right' });
 
-                doc.moveTo(40, currentY + rowH).lineTo(555, currentY + rowH).lineWidth(0.5).strokeColor('#f1f5f9').stroke();
+                doc.moveTo(40, currentY + rowH).lineTo(555, currentY + rowH).lineWidth(0.5).strokeColor(BORDER_LIGHT).stroke();
                 currentY += rowH;
             });
 
             // Project Grand Total Row
-            doc.rect(40, currentY, 515, 20).fillColor('#f1f5f9').fill();
+            doc.rect(40, currentY, 515, 20).fillColor(BG_TOTALS_ROW).fill();
             doc.moveTo(40, currentY).lineTo(555, currentY).lineWidth(1).strokeColor(BORDER).stroke();
             doc.moveTo(40, currentY + 20).lineTo(555, currentY + 20).lineWidth(1).strokeColor(BORDER).stroke();
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(8);
+            doc.fillColor(TEXT_PRIMARY).fontSize(8);
             drawPdfText(doc, L.grandTotal, 48, currentY + 5, { width: 130 });
             doc.text(totBud.toLocaleString('en-US'), 180, currentY + 5, { width: 60, align: 'right' });
             doc.fillColor(SUCCESS).text(totInc.toLocaleString('en-US'), 242, currentY + 5, { width: 60, align: 'right' });
             doc.fillColor(DANGER).text(totSp.toLocaleString('en-US'), 304, currentY + 5, { width: 60, align: 'right' });
-            doc.fillColor(totSf >= 0 ? PRIMARY_DARK : DANGER).text(totSf.toLocaleString('en-US'), 366, currentY + 5, { width: 62, align: 'right' });
+            doc.fillColor(totSf >= 0 ? TEXT_PRIMARY : DANGER).text(totSf.toLocaleString('en-US'), 366, currentY + 5, { width: 62, align: 'right' });
             doc.fillColor('#7c3aed').text(totPr.toLocaleString('en-US'), 430, currentY + 5, { width: 60, align: 'right' });
             const ovBurn = totBud > 0 ? ((totSp / totBud) * 100).toFixed(1) + '%' : '0.0%';
-            doc.fillColor(PRIMARY_DARK).text(ovBurn, 492, currentY + 5, { width: 53, align: 'right' });
+            doc.fillColor(TEXT_PRIMARY).text(ovBurn, 492, currentY + 5, { width: 53, align: 'right' });
             currentY += 36;
 
             // 7. Official Sign-Off Block
@@ -462,13 +471,13 @@ export const generateFinancialReportPdf = ({
             const signY = currentY + 10;
 
             const renderSignCol = (x, title, name) => {
-                doc.moveTo(x, signY).lineTo(x + signBoxW, signY).lineWidth(0.75).dash(3, { space: 3 }).strokeColor('#94a3b8').stroke();
+                doc.moveTo(x, signY).lineTo(x + signBoxW, signY).lineWidth(0.75).dash(3, { space: 3 }).strokeColor(BORDER).stroke();
                 doc.undash();
                 useFont(true);
-                doc.fillColor(TEXT_MUTED).fontSize(8);
+                doc.fillColor(TEXT_SECONDARY).fontSize(8);
                 drawPdfText(doc, title, x, signY + 6, { width: signBoxW, align: 'center' });
                 useFont(false);
-                doc.fillColor(PRIMARY_DARK).fontSize(8.5);
+                doc.fillColor(TEXT_PRIMARY).fontSize(8.5);
                 drawPdfText(doc, name, x, signY + 36, { width: signBoxW, align: 'center' });
             };
 

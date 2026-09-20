@@ -171,19 +171,21 @@ export function drawPdfText(doc, text, x, y, options = {}) {
  * Registers Unicode TrueType fonts (Regular and Bold) into a PDFKit document.
  */
 export function setupDocFonts(doc) {
-    const localFontRegular = path.join(__dirname, '../assets/fonts/Arial.ttf');
-    const localFontBold = path.join(__dirname, '../assets/fonts/Arial-Bold.ttf');
-    const winFontRegular = 'C:/Windows/Fonts/arial.ttf';
-    const winFontBold = 'C:/Windows/Fonts/arialbd.ttf';
+    const candidatesRegular = [
+        path.join(__dirname, '../assets/fonts/SegoeUI.ttf'),
+        'C:/Windows/Fonts/segoeui.ttf',
+        path.join(__dirname, '../assets/fonts/Arial.ttf'),
+        'C:/Windows/Fonts/arial.ttf'
+    ];
+    const candidatesBold = [
+        path.join(__dirname, '../assets/fonts/SegoeUI-Bold.ttf'),
+        'C:/Windows/Fonts/segoeuib.ttf',
+        path.join(__dirname, '../assets/fonts/Arial-Bold.ttf'),
+        'C:/Windows/Fonts/arialbd.ttf'
+    ];
 
-    let regularPath = null;
-    let boldPath = null;
-
-    if (fs.existsSync(localFontRegular)) regularPath = localFontRegular;
-    else if (fs.existsSync(winFontRegular)) regularPath = winFontRegular;
-
-    if (fs.existsSync(localFontBold)) boldPath = localFontBold;
-    else if (fs.existsSync(winFontBold)) boldPath = winFontBold;
+    let regularPath = candidatesRegular.find(p => fs.existsSync(p)) || null;
+    let boldPath = candidatesBold.find(p => fs.existsSync(p)) || null;
 
     if (regularPath) {
         doc.registerFont('AppFont', regularPath);

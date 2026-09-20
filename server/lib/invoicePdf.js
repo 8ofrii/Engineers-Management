@@ -87,17 +87,22 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);
 
-            // Palette — Modern Executive Corporate Palette
-            const PRIMARY_DARK = '#0f172a'; // Slate 900
-            const PRIMARY = '#1e293b';      // Slate 800
-            const ACCENT_BLUE = '#2563eb';  // Royal Blue
-            const ACCENT_GOLD = '#d97706';  // Amber 600
-            const SUCCESS = '#059669';      // Emerald 600
-            const DANGER = '#dc2626';       // Red 600
-            const TEXT = '#0f172a';         // Slate Dark
-            const TEXT_MUTED = '#64748b';   // Slate 500
-            const CARD_BG = '#f8fafc';      // Slate 50
-            const BORDER = '#e2e8f0';       // Slate 200
+            // Hesaby Webpage Light Mode Palette (Warm Cafe & Ember)
+            const BRAND_EMBER = '#c2410c';     // Primary Brand Accent (Warm Terracotta / Ember)
+            const BRAND_EMBER_DARK = '#9a3412';// Deep Terracotta
+            const BRAND_EMBER_LIGHT = '#ea580c';// Vibrant Ember
+            const BRAND_GOLD = '#d97706';      // Warm Gold / Amber
+            const SUCCESS = '#065f46';         // Deep Forest Emerald
+            const DANGER = '#991b1b';          // Deep Crimson
+            const TEXT_PRIMARY = '#1c1710';    // Deep Espresso
+            const TEXT_SECONDARY = '#6b5f4d';  // Warm Coffee
+            const TEXT_MUTED = '#8c7e6c';      // Muted Sand
+            const BG_WARM_CARD = '#fdfaf2';    // Elevated card background (warm ivory)
+            const BG_WARM_SUBTLE = '#f7f1e5';  // Secondary container / hero background
+            const BG_HEADER_SAND = '#ede4d0';  // Table header background (warm sand)
+            const BG_TOTALS_ROW = '#f5eedf';   // Totals / highlight row
+            const BORDER = '#d8cbaf';          // Warm Sandstone border
+            const BORDER_LIGHT = '#e5dcce';    // Subtle divider
 
             const useFont = (bold = false) => {
                 try {
@@ -158,7 +163,7 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             };
 
             // 1. Sleek Continuous Top Accent Bar
-            doc.rect(45, 24, 505, 3.5).fillColor(PRIMARY_DARK).fill();
+            doc.rect(45, 24, 505, 3.5).fillColor(BRAND_EMBER).fill();
 
             // 2. Resolve & Render Logo / Monogram (Top-Left)
             const logoBuffer = await resolveLogoBuffer(tenant?.logo);
@@ -192,7 +197,7 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             if (!logoRendered) {
                 // Render sleek vector monogram emblem
                 const emblemSize = 40;
-                doc.roundedRect(45, compY, emblemSize, emblemSize, 6).fillColor(PRIMARY_DARK).fill();
+                doc.roundedRect(45, compY, emblemSize, emblemSize, 6).fillColor(BRAND_EMBER).fill();
                 useFont(true);
                 const initial = (tenant?.name || 'H').trim().charAt(0).toUpperCase();
                 doc.fillColor('#ffffff').fontSize(18).text(initial, 45, compY + 11, { width: emblemSize, align: 'center' });
@@ -202,80 +207,82 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             // Company Info Block (Tightly grouped)
             const maxCompWidth = 240;
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(13);
+            doc.fillColor(TEXT_PRIMARY).fontSize(13);
             drawPdfText(doc, tenant?.name || 'Hesaby ERP', compX, compY, { width: maxCompWidth });
 
             useFont(false);
             let curCompY = compY + 17;
 
             if (tenant?.address) {
-                doc.fontSize(8).fillColor(TEXT_MUTED);
+                doc.fontSize(8).fillColor(TEXT_SECONDARY);
                 drawPdfText(doc, tenant.address, compX, curCompY, { width: maxCompWidth });
                 curCompY += 12;
             }
             if (tenant?.email) {
-                doc.fontSize(8).fillColor(TEXT_MUTED).text(tenant.email, compX, curCompY, { width: maxCompWidth });
+                doc.fontSize(8).fillColor(TEXT_SECONDARY).text(tenant.email, compX, curCompY, { width: maxCompWidth });
                 curCompY += 11;
             }
             if (tenant?.phone) {
-                doc.fontSize(8).fillColor(TEXT_MUTED).text(tenant.phone, compX, curCompY, { width: maxCompWidth });
+                doc.fontSize(8).fillColor(TEXT_SECONDARY).text(tenant.phone, compX, curCompY, { width: maxCompWidth });
             }
 
             // 3. Document Meta (Top-Right)
             const metaX = 350;
             const metaW = 200;
             useFont(true);
-            doc.fillColor(PRIMARY_DARK).fontSize(22);
+            doc.fillColor(TEXT_PRIMARY).fontSize(22);
             drawPdfText(doc, L.docTitle, metaX, 42, { align: 'right', width: metaW });
 
-            doc.fontSize(11).fillColor(ACCENT_BLUE);
+            doc.fontSize(11).fillColor(BRAND_EMBER);
             doc.text(`# ${invoice.invoiceNumber}`, metaX, 70, { align: 'right', width: metaW });
 
             useFont(false);
-            doc.fontSize(8.5).fillColor(TEXT_MUTED);
+            doc.fontSize(8.5).fillColor(TEXT_SECONDARY);
             drawPdfText(doc, `${L.issueDate}: ${fmtDate(invoice.issueDate)}`, metaX, 88, { align: 'right', width: metaW });
             drawPdfText(doc, `${L.dueDate}: ${fmtDate(invoice.dueDate)}`, metaX, 101, { align: 'right', width: metaW });
 
-            // Status Badge - ONLY if distinct status (PAID, PARTIAL, OVERDUE).
-            // DRAFT/SENT invoices remain clean and unbadged for an official look.
+            // Status Badge - Webpage Pill Style
             if (invoice.status === 'PAID') {
-                const bW = 60, bH = 18, bX = 490, bY = 117;
-                doc.roundedRect(bX, bY, bW, bH, 4).fillColor(SUCCESS).fill();
+                const bW = 64, bH = 18, bX = 486, bY = 117;
+                doc.roundedRect(bX, bY, bW, bH, 4).fillColor('#d1fae5').fill();
+                doc.roundedRect(bX, bY, bW, bH, 4).lineWidth(0.75).strokeColor('#6ee7b7').stroke();
                 useFont(true);
-                doc.fillColor('#ffffff').fontSize(8);
+                doc.fillColor('#065f46').fontSize(8);
                 drawPdfText(doc, isArDoc ? 'مسددة' : 'PAID', bX, bY + 4, { width: bW, align: 'center' });
             } else if (invoice.status === 'PARTIALLY_PAID') {
-                const bW = 80, bH = 18, bX = 470, bY = 117;
-                doc.roundedRect(bX, bY, bW, bH, 4).fillColor(ACCENT_GOLD).fill();
+                const bW = 84, bH = 18, bX = 466, bY = 117;
+                doc.roundedRect(bX, bY, bW, bH, 4).fillColor('#fef3c7').fill();
+                doc.roundedRect(bX, bY, bW, bH, 4).lineWidth(0.75).strokeColor('#fcd34d').stroke();
                 useFont(true);
-                doc.fillColor('#ffffff').fontSize(8);
+                doc.fillColor('#92400e').fontSize(8);
                 drawPdfText(doc, isArDoc ? 'مسدد جزئياً' : 'PARTIAL', bX, bY + 4, { width: bW, align: 'center' });
             } else if (invoice.status === 'OVERDUE') {
-                const bW = 70, bH = 18, bX = 480, bY = 117;
-                doc.roundedRect(bX, bY, bW, bH, 4).fillColor(DANGER).fill();
+                const bW = 74, bH = 18, bX = 476, bY = 117;
+                doc.roundedRect(bX, bY, bW, bH, 4).fillColor('#fee2e2').fill();
+                doc.roundedRect(bX, bY, bW, bH, 4).lineWidth(0.75).strokeColor('#fca5a5').stroke();
                 useFont(true);
-                doc.fillColor('#ffffff').fontSize(8);
+                doc.fillColor('#991b1b').fontSize(8);
                 drawPdfText(doc, isArDoc ? 'متأخرة' : 'OVERDUE', bX, bY + 4, { width: bW, align: 'center' });
             }
 
-            // 4. Client & Project Details (Clean Typography, No bulky boxes)
+            // 4. Client & Project Details
             const detailsY = 142;
-            doc.moveTo(45, detailsY - 10).lineTo(550, detailsY - 10).strokeColor(BORDER).stroke();
+            doc.moveTo(45, detailsY - 10).lineTo(550, detailsY - 10).lineWidth(0.75).strokeColor(BORDER).stroke();
 
             // Left: Billed To
             const col1X = 45;
             const col1W = 245;
             useFont(true);
-            doc.fillColor(TEXT_MUTED).fontSize(7.5);
+            doc.fillColor(TEXT_SECONDARY).fontSize(7.5);
             drawPdfText(doc, L.billedTo, col1X, detailsY, { width: col1W });
 
-            doc.fillColor(PRIMARY_DARK).fontSize(11);
+            doc.fillColor(TEXT_PRIMARY).fontSize(11);
             drawPdfText(doc, client?.name || '-', col1X, detailsY + 14, { width: col1W });
 
             useFont(false);
             let curClientY = detailsY + 28;
             if (client?.company) {
-                doc.fontSize(9).fillColor(PRIMARY);
+                doc.fontSize(9).fillColor(TEXT_SECONDARY);
                 drawPdfText(doc, client.company, col1X, curClientY, { width: col1W });
                 curClientY += 13;
             }
@@ -291,17 +298,17 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             const col2X = 310;
             const col2W = 240;
             useFont(true);
-            doc.fillColor(TEXT_MUTED).fontSize(7.5);
+            doc.fillColor(TEXT_SECONDARY).fontSize(7.5);
             drawPdfText(doc, L.projectDetails, col2X, detailsY, { width: col2W });
 
             if (project) {
-                doc.fillColor(PRIMARY_DARK).fontSize(11);
+                doc.fillColor(TEXT_PRIMARY).fontSize(11);
                 drawPdfText(doc, project.name, col2X, detailsY + 14, { width: col2W });
 
                 useFont(false);
                 let curProjY = detailsY + 28;
                 if (project.location) {
-                    doc.fontSize(9).fillColor(PRIMARY);
+                    doc.fontSize(9).fillColor(TEXT_SECONDARY);
                     drawPdfText(doc, project.location, col2X, curProjY, { width: col2W });
                     curProjY += 13;
                 }
@@ -314,11 +321,12 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
                 drawPdfText(doc, isArDoc ? 'خدمات عامة' : 'General Services', col2X, detailsY + 14, { width: col2W });
             }
 
-            // 5. Line Items Table
+            // 5. Line Items Table (Warm Sand Header, Deep Espresso Text)
             const tableTop = 224;
-            doc.roundedRect(45, tableTop, 505, 24, 3).fillColor(PRIMARY_DARK).fill();
+            doc.roundedRect(45, tableTop, 505, 24, 3).fillColor(BG_HEADER_SAND).fill();
+            doc.roundedRect(45, tableTop, 505, 24, 3).lineWidth(0.75).strokeColor(BORDER).stroke();
             useFont(true);
-            doc.fillColor('#ffffff').fontSize(8);
+            doc.fillColor(TEXT_PRIMARY).fontSize(8);
             drawPdfText(doc, L.description, 55, tableTop + 7, { width: 235 });
             drawPdfText(doc, L.qty, 295, tableTop + 7, { width: 45, align: 'right' });
             drawPdfText(doc, L.unitPrice, 345, tableTop + 7, { width: 95, align: 'right' });
@@ -332,9 +340,10 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
                 if (y > 680) {
                     doc.addPage();
                     y = 50;
-                    doc.roundedRect(45, y, 505, 22, 3).fillColor(PRIMARY_DARK).fill();
+                    doc.roundedRect(45, y, 505, 22, 3).fillColor(BG_HEADER_SAND).fill();
+                    doc.roundedRect(45, y, 505, 22, 3).lineWidth(0.75).strokeColor(BORDER).stroke();
                     useFont(true);
-                    doc.fillColor('#ffffff').fontSize(8);
+                    doc.fillColor(TEXT_PRIMARY).fontSize(8);
                     drawPdfText(doc, L.description, 55, y + 6, { width: 235 });
                     drawPdfText(doc, L.qty, 295, y + 6, { width: 45, align: 'right' });
                     drawPdfText(doc, L.unitPrice, 345, y + 6, { width: 95, align: 'right' });
@@ -351,10 +360,10 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
                 const rowHeight = Math.max(26, descHeight + 10);
 
                 if (idx % 2 === 1) {
-                    doc.rect(45, y, 505, rowHeight).fillColor(CARD_BG).fill();
+                    doc.rect(45, y, 505, rowHeight).fillColor(BG_WARM_CARD).fill();
                 }
 
-                doc.fillColor(TEXT).fontSize(9);
+                doc.fillColor(TEXT_PRIMARY).fontSize(9);
                 drawPdfText(doc, descText, 55, y + 5, { width: descWidth, align: isItemAr ? 'right' : 'left' });
                 doc.fontSize(9).text(String(item.quantity ?? '-'), 295, y + 5, { width: 45, align: 'right' });
                 doc.text(fmtMoney(item.unitPrice, invoice.currency), 345, y + 5, { width: 95, align: 'right' });
@@ -362,7 +371,7 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
                 doc.text(fmtMoney(item.total, invoice.currency), 445, y + 5, { width: 95, align: 'right' });
                 useFont(false);
 
-                doc.moveTo(45, y + rowHeight).lineTo(550, y + rowHeight).strokeColor('#f1f5f9').stroke();
+                doc.moveTo(45, y + rowHeight).lineTo(550, y + rowHeight).lineWidth(0.5).strokeColor(BORDER_LIGHT).stroke();
                 y += rowHeight;
             });
 
@@ -380,14 +389,14 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             const totalsBoxW = 235;
             const totalsStartY = y;
 
-            // Totals Box Container
-            doc.roundedRect(totalsBoxX, totalsStartY, totalsBoxW, totalsH, 6).fillColor(CARD_BG).fill();
+            // Totals Box Container (Warm Card)
+            doc.roundedRect(totalsBoxX, totalsStartY, totalsBoxW, totalsH, 6).fillColor(BG_WARM_CARD).fill();
             doc.roundedRect(totalsBoxX, totalsStartY, totalsBoxW, totalsH, 6).lineWidth(1).strokeColor(BORDER).stroke();
 
             let totalLineY = totalsStartY + 10;
-            const writeTotalRow = (label, value, isBold = false, valColor = TEXT) => {
+            const writeTotalRow = (label, value, isBold = false, valColor = TEXT_PRIMARY) => {
                 useFont(isBold);
-                doc.fontSize(isBold ? 10 : 8.5).fillColor(isBold ? TEXT : TEXT_MUTED);
+                doc.fontSize(isBold ? 10 : 8.5).fillColor(isBold ? TEXT_PRIMARY : TEXT_SECONDARY);
                 drawPdfText(doc, label, totalsBoxX + 12, totalLineY, { width: 110, lineBreak: false });
                 doc.fillColor(valColor).text(fmtMoney(value, invoice.currency), totalsBoxX + 120, totalLineY, {
                     width: totalsBoxW - 132,
@@ -405,13 +414,14 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
                 writeTotalRow(L.tax, invoice.taxAmount);
             }
 
-            // TOTAL DUE Highlight Banner (34px height, perfectly centered!)
+            // TOTAL DUE Highlight Banner (Warm Sand with Ember Accent)
             const dueBannerH = 34;
-            doc.roundedRect(totalsBoxX + 6, totalLineY, totalsBoxW - 12, dueBannerH, 4).fillColor(PRIMARY_DARK).fill();
+            doc.roundedRect(totalsBoxX + 6, totalLineY, totalsBoxW - 12, dueBannerH, 4).fillColor(BG_HEADER_SAND).fill();
+            doc.roundedRect(totalsBoxX + 6, totalLineY, totalsBoxW - 12, dueBannerH, 4).lineWidth(0.75).strokeColor(BORDER).stroke();
             useFont(true);
-            doc.fillColor('#ffffff').fontSize(10);
+            doc.fillColor(TEXT_PRIMARY).fontSize(10);
             drawPdfText(doc, L.totalDue, totalsBoxX + 14, totalLineY + 10, { width: 105, lineBreak: false });
-            doc.fillColor('#f59e0b').fontSize(11.5).text(fmtMoney(invoice.totalAmount, invoice.currency), totalsBoxX + 115, totalLineY + 9, {
+            doc.fillColor(BRAND_EMBER).fontSize(12).text(fmtMoney(invoice.totalAmount, invoice.currency), totalsBoxX + 115, totalLineY + 9, {
                 width: totalsBoxW - 125,
                 align: 'right',
                 lineBreak: false
@@ -421,41 +431,41 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             if (Number(invoice.paidAmount || 0) > 0) {
                 writeTotalRow(L.paidAmount, invoice.paidAmount, false, SUCCESS);
                 const balance = Number(invoice.totalAmount) - Number(invoice.paidAmount);
-                writeTotalRow(L.balanceDue, balance, true, balance > 0 ? '#f59e0b' : SUCCESS);
+                writeTotalRow(L.balanceDue, balance, true, balance > 0 ? BRAND_EMBER : SUCCESS);
             }
 
             // Notes / Terms / Signature (Left Section)
             const notesBoxX = 45;
             const notesBoxW = 255;
             // Clean 3px accent line on the left
-            doc.rect(notesBoxX, totalsStartY, 3, totalsH).fillColor(PRIMARY_DARK).fill();
+            doc.rect(notesBoxX, totalsStartY, 3, totalsH).fillColor(BRAND_EMBER).fill();
 
             useFont(true);
-            doc.fillColor(PRIMARY).fontSize(8);
+            doc.fillColor(BRAND_EMBER).fontSize(8.5);
             drawPdfText(doc, L.notesTitle, notesBoxX + 12, totalsStartY + 4, { width: notesBoxW - 16, lineBreak: false });
             useFont(false);
 
             let notesContentY = totalsStartY + 18;
             if (invoice.notes) {
-                doc.fontSize(8).fillColor(TEXT);
+                doc.fontSize(8).fillColor(TEXT_PRIMARY);
                 drawPdfText(doc, invoice.notes, notesBoxX + 12, notesContentY, { width: notesBoxW - 16 });
                 notesContentY += 22;
             }
             if (invoice.terms) {
                 useFont(true);
-                doc.fontSize(7.5).fillColor(TEXT_MUTED).text('TERMS & CONDITIONS:', notesBoxX + 12, notesContentY, { width: notesBoxW - 16, lineBreak: false });
+                doc.fontSize(7.5).fillColor(TEXT_SECONDARY).text('TERMS & CONDITIONS:', notesBoxX + 12, notesContentY, { width: notesBoxW - 16, lineBreak: false });
                 useFont(false);
-                doc.fontSize(8).fillColor(TEXT);
+                doc.fontSize(8).fillColor(TEXT_PRIMARY);
                 drawPdfText(doc, invoice.terms, notesBoxX + 12, notesContentY + 10, { width: notesBoxW - 16 });
             } else if (!invoice.notes) {
-                doc.fontSize(8).fillColor(TEXT_MUTED);
+                doc.fontSize(8).fillColor(TEXT_SECONDARY);
                 drawPdfText(doc, L.defaultTerms, notesBoxX + 12, notesContentY, { width: notesBoxW - 16 });
             }
 
             // Authorized Signature
             const sigY = totalsStartY + totalsH - 24;
             useFont(false);
-            doc.fontSize(8).fillColor(TEXT_MUTED).text('Authorized Signature: _______________________', notesBoxX + 12, sigY, { lineBreak: false });
+            doc.fontSize(8).fillColor(TEXT_SECONDARY).text('Authorized Signature: _______________________', notesBoxX + 12, sigY, { lineBreak: false });
 
             // 7. Official Footer on all buffered pages
             const range = doc.bufferedPageRange();
@@ -464,10 +474,10 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
                 const footerY = 770;
                 doc.moveTo(45, footerY).lineTo(550, footerY).lineWidth(0.75).strokeColor(BORDER).stroke();
                 useFont(true);
-                doc.fontSize(8).fillColor(PRIMARY_DARK);
+                doc.fontSize(8).fillColor(TEXT_PRIMARY);
                 drawPdfText(doc, `${L.thankYou} • شكراً لتعاملكم معنا`, 45, footerY + 5, { width: 505, align: 'center', lineBreak: false });
                 useFont(false);
-                doc.fontSize(7.5).fillColor(TEXT_MUTED).text(
+                doc.fontSize(7.5).fillColor(TEXT_SECONDARY).text(
                     `${tenant?.name || 'Hesaby ERP'} • ${L.officialDoc} • Page ${i + 1} of ${range.count}`,
                     45, footerY + 17,
                     { width: 505, align: 'center', lineBreak: false }
