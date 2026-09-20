@@ -9,6 +9,7 @@ import AddTransactionModal from '../components/AddTransactionModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import RefundConfirmationModal from '../components/RefundConfirmationModal';
 import TransactionDetailModal from '../components/TransactionDetailModal';
+import TransactionActionsMenu from '../components/TransactionActionsMenu';
 import { useFormat } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 
@@ -1631,7 +1632,7 @@ export default function Finance() {
                                                         <th style={{ textAlign: 'start', width: '145px' }}>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
                                                         <th style={{ textAlign: 'end', width: '130px' }}>{t('finance.amount')}</th>
                                                         <th style={{ textAlign: 'center', width: '95px' }}>{t('common.status')}</th>
-                                                        <th style={{ textAlign: 'center', width: '115px' }}>{t('common.actions')}</th>
+                                                        <th style={{ textAlign: 'center', width: '80px' }}>{t('common.actions')}</th>
                                                     </tr>
                                                 </thead>
                                                  <tbody>
@@ -1728,42 +1729,17 @@ export default function Finance() {
                                                                         </td>
 
                                                                         {/* 9. Actions */}
-                                                                        <td style={{ textAlign: 'center' }}>
-                                                                            <div className="tx-action-group">
-                                                                                <button
-                                                                                    className="tx-action-btn view"
-                                                                                    onClick={() => handleOpenDetail(tx)}
-                                                                                    title={isArabic ? 'عرض التفاصيل وأدلة الإثبات' : 'View Details & Evidence'}
-                                                                                >
-                                                                                    <Eye size={15} />
-                                                                                </button>
-                                                                                {isCancelled ? (
-                                                                                    <button
-                                                                                        className="tx-action-btn delete"
-                                                                                        onClick={() => handleDeleteClick(tx)}
-                                                                                        title={t('common.deletePermanently') || (isArabic ? 'حذف نهائي' : 'Delete Permanently')}
-                                                                                    >
-                                                                                        <Trash2 size={15} />
-                                                                                    </button>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <button
-                                                                                            className="tx-action-btn edit"
-                                                                                            onClick={() => openEditModal(tx)}
-                                                                                            title={t('common.edit')}
-                                                                                        >
-                                                                                            <Pencil size={15} />
-                                                                                        </button>
-                                                                                        <button
-                                                                                            className="tx-action-btn refund"
-                                                                                            onClick={() => handleRefundClick(tx)}
-                                                                                            title={t('finance.refund') || (isArabic ? 'استرداد وإلغاء' : 'Refund & Cancel')}
-                                                                                        >
-                                                                                            <RotateCcw size={15} />
-                                                                                        </button>
-                                                                                    </>
-                                                                                )}
-                                                                            </div>
+                                                                        <td style={{ textAlign: 'center', width: '80px' }}>
+                                                                            <TransactionActionsMenu
+                                                                                tx={tx}
+                                                                                isCancelled={isCancelled}
+                                                                                onOpenDetail={handleOpenDetail}
+                                                                                onEdit={openEditModal}
+                                                                                onRefund={handleRefundClick}
+                                                                                onDelete={handleDeleteClick}
+                                                                                isArabic={isArabic}
+                                                                                t={t}
+                                                                            />
                                                                         </td>
                                                                     </tr>
 
@@ -1842,35 +1818,18 @@ export default function Finance() {
                                                                                 </td>
 
                                                                                 {/* 9. Actions */}
-                                                                                <td style={{ textAlign: 'center' }}>
-                                                                                    <div className="tx-action-group">
-                                                                                        {isFeeCancelled ? (
-                                                                                            <button
-                                                                                                className="tx-action-btn delete"
-                                                                                                onClick={() => handleDeleteClick(feeTx)}
-                                                                                                title={t('common.deletePermanently')}
-                                                                                            >
-                                                                                                <Trash2 size={11} />
-                                                                                            </button>
-                                                                                        ) : (
-                                                                                            <>
-                                                                                                <button
-                                                                                                    className="tx-action-btn edit"
-                                                                                                    onClick={() => openEditModal(feeTx)}
-                                                                                                    title={t('common.edit')}
-                                                                                                >
-                                                                                                    <Pencil size={11} />
-                                                                                                </button>
-                                                                                                <button
-                                                                                                    className="tx-action-btn refund"
-                                                                                                    onClick={() => handleRefundClick(feeTx)}
-                                                                                                    title={t('finance.refund') || 'Refund'}
-                                                                                                >
-                                                                                                    <RotateCcw size={11} />
-                                                                                                </button>
-                                                                                            </>
-                                                                                        )}
-                                                                                    </div>
+                                                                                <td style={{ textAlign: 'center', width: '80px' }}>
+                                                                                    <TransactionActionsMenu
+                                                                                        tx={feeTx}
+                                                                                        isCancelled={isFeeCancelled}
+                                                                                        onOpenDetail={handleOpenDetail}
+                                                                                        onEdit={openEditModal}
+                                                                                        onRefund={handleRefundClick}
+                                                                                        onDelete={handleDeleteClick}
+                                                                                        isArabic={isArabic}
+                                                                                        t={t}
+                                                                                        size="small"
+                                                                                    />
                                                                                 </td>
                                                                             </tr>
                                                                         );
