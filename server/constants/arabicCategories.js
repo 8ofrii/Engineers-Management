@@ -46,7 +46,11 @@ export const ARABIC_CATEGORIES = [
     { key: 'CONTRACTING_DEMOLITION', ar: 'مقاولة هدم', en: 'Demolition Subcontracting', group: 'CONTRACTING' },
     { key: 'CONTRACTING_MARBLE', ar: 'مقاولة رخام', en: 'Marble Subcontracting', group: 'CONTRACTING' },
     { key: 'CONTRACTING_POOL', ar: 'مقاولة حمام سباحة', en: 'Swimming Pool Subcontracting', group: 'CONTRACTING' },
-    { key: 'CONTRACTING_LANDSCAPE', ar: 'مقاولة Landscape', en: 'Landscape Subcontracting', group: 'CONTRACTING' }
+    { key: 'CONTRACTING_LANDSCAPE', ar: 'مقاولة Landscape', en: 'Landscape Subcontracting', group: 'CONTRACTING' },
+
+    // General & Office Expenses (مصروفات المقر ومصروفات عامة)
+    { key: 'OFFICE_EXPENSES', ar: 'مصروفات مقر ومكتب', en: 'Office & HQ Expenses', group: 'OFFICE' },
+    { key: 'OTHER', ar: 'أخرى / عام', en: 'Other / General', group: 'OFFICE' }
 ];
 
 /**
@@ -63,6 +67,7 @@ export const getAllCategories = () => {
  */
 export const getCategoriesByGroup = () => {
     const grouped = {
+        OFFICE: [],
         MATERIALS: [],
         LABOR: [],
         CONTRACTING: [],

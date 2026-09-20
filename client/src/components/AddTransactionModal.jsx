@@ -185,6 +185,55 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [isRecording, setIsRecording] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Dynamic categories ordering: Prioritize Office & Services when isOfficeExpense is active
+    const displayCategories = useMemo(() => {
+        if (!categories || categories.length === 0) return [];
+        if (formData.isOfficeExpense) {
+            const rank = { 'OFFICE': 1, 'SERVICES': 2, 'EQUIPMENT': 3, 'MATERIALS': 4, 'LABOR': 5, 'CONTRACTING': 6 };
+            return [...categories].sort((a, b) => (rank[a.group] || 99) - (rank[b.group] || 99));
+        }
+        const normalRank = { 'MATERIALS': 1, 'LABOR': 2, 'CONTRACTING': 3, 'SERVICES': 4, 'OFFICE': 5 };
+        return [...categories].sort((a, b) => (normalRank[a.group] || 99) - (normalRank[b.group] || 99));
+    }, [categories, formData.isOfficeExpense]);
+
+    // Contextual cost center suggestions for office vs site
+    const officeCostCenterSuggestions = useMemo(() => {
+        const defaults = isRTL ? [
+            'المقر الرئيسي',
+            'المكتب الإداري',
+            'الإدارة العامة',
+            'بوفيه وضيافة',
+            'أدوات مكتبية ومطبوعات',
+            'صيانة ومرافق المقر',
+            'انترنت واتصالات',
+            'إيجار المقر'
+        ] : [
+            'Headquarters',
+            'Administrative Office',
+            'General Management',
+            'Buffet & Hospitality',
+            'Stationery & Prints',
+            'Office Facilities & Maintenance',
+            'Internet & Telecom',
+            'Office Rent'
+        ];
+        const combined = [...new Set([...defaults, ...(existingCostCenters || [])])];
+        return combined.map(c => ({ value: c, label: c }));
+    }, [isRTL, existingCostCenters]);
+
+    // Contextual beneficiary suggestions for office expenses (employees, utilities, stores, without site workmen)
+    const officeBeneficiarySuggestions = useMemo(() => {
+        const list = [
+            ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
+            ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+            ...existingBeneficiaries.map(b => ({ value: b, label: b }))
+        ];
+        return list.reduce((acc, current) => {
+            if (!acc.find(item => item.value === current.value)) acc.push(current);
+            return acc;
+        }, []);
+    }, [users, suppliers, existingBeneficiaries, isRTL, t]);
+
     // Dynamic Creation State
     const [isWorkmanModalOpen, setIsWorkmanModalOpen] = useState(false);
 
@@ -220,7 +269,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             workmanId: '',
             clientId: '',
             paidByClientContact: '',
-            toEngineerId: ''
+            toEngineerId: '',
+            safeId: formData.safeId || '',
+            isOfficeExpense: false
         });
         setAttachmentFile(null);
         setAttachmentPreview(null);
@@ -285,13 +336,14 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     }
                 }
 
+                const isOffice = Boolean(initialData.isOfficeExpense);
                 setFormData({
                     amount: initialData.amount || '',
                     description: parsedDesc,
                     transactionDate: initialData.transactionDate ? getLocalDateTime(new Date(initialData.transactionDate)) : getLocalDateTime(),
-                    category: initialData.category || '',
+                    category: initialData.category || (isOffice ? 'OFFICE_EXPENSES' : ''),
                     itemName: parsedDesc, // Use description as itemName for stock mode too
-                    unit: parsedUnit,
+                    unit: parsedUnit || (isOffice ? 'PIECE' : 'TON'),
                     clientId: initialData.clientId || initialData.client?.id || '',
                     paidByClientContact: initialData.paidByClientContact || '',
                     beneficiary: initialData.beneficiary || initialData.supplier?.name || initialData.workman?.name || '',
@@ -300,13 +352,21 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     paymentMethod: initialData.paymentMethod || (initialData.type === 'INCOME' ? 'BANK_TRANSFER' : 'CUSTODY_WALLET'),
                     unitPrice: parsedPrice,
                     quantity: parsedQty,
-                    costCenter: initialData.costCenter || '',
+                    costCenter: initialData.costCenter || (isOffice ? (isRTL ? 'المقر الرئيسي' : 'Headquarters') : ''),
                     physicalAccount: initialData.physicalAccount || '',
                     invoiceNumber: initialData.invoiceNumber || '',
-                    payerUserId: initialData.payerUserId || '',
-                    projectCostItemId: initialData.projectCostItemId || '',
-                    toEngineerId: ''
+                    payerUserId: initialData.payerUserId || user?.id || '',
+                    projectCostItemId: isOffice ? '' : (initialData.projectCostItemId || ''),
+                    toEngineerId: '',
+                    safeId: initialData.safeId || formData.safeId || '',
+                    isOfficeExpense: isOffice
                 });
+                if (isOffice) {
+                    setCostItemMode('NEW');
+                    setIsStockPurchase(false);
+                    setSelectedProjectId('');
+                    setSelectedProject(null);
+                }
                 setAttachmentFile(null);
                 setAttachmentPreview(null);
                 setExistingReceiptUrl(initialData.receiptPhotoUrl || null);
@@ -350,7 +410,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         workmanId: savedDraft.formData?.workmanId || '',
                         clientId: savedDraft.formData?.clientId || '',
                         paidByClientContact: savedDraft.formData?.paidByClientContact || '',
-                        toEngineerId: savedDraft.formData?.toEngineerId || ''
+                        toEngineerId: savedDraft.formData?.toEngineerId || '',
+                        safeId: savedDraft.formData?.safeId || formData.safeId || '',
+                        isOfficeExpense: Boolean(savedDraft.formData?.isOfficeExpense)
                     });
                     setHasRestoredDraft(true);
                 } else {
@@ -384,7 +446,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         workmanId: '',
                         clientId: '',
                         paidByClientContact: '',
-                        toEngineerId: ''
+                        toEngineerId: '',
+                        safeId: formData.safeId || '',
+                        isOfficeExpense: false
                     });
                     setCostItemMode('NEW');
                 }
@@ -692,37 +756,38 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             let payload = {};
             // Shared payload construction
             if (mode === 'EXPENSE') {
-                const isMaterial = costItemMode === 'MATERIAL' || isStockPurchase;
+                const isOffice = Boolean(formData.isOfficeExpense);
+                const isMaterial = (costItemMode === 'MATERIAL' || isStockPurchase) && !isOffice;
                 const chosenMaterial = isMaterial ? rawMaterials.find(m => m.id === formData.materialId) : null;
-                const resolvedCategory = isMaterial ? 'MATERIALS' : (formData.category || 'MATERIALS');
+                const resolvedCategory = isMaterial ? 'MATERIALS' : (formData.category || (isOffice ? 'OFFICE_EXPENSES' : 'MATERIALS'));
                 const resolvedItemName = isMaterial
                     ? (formData.itemName || (chosenMaterial ? (isRTL ? (chosenMaterial.nameAr || chosenMaterial.name) : chosenMaterial.name) : 'خامة مخزنية'))
                     : undefined;
 
-                const resolvedBeneficiary = formData.beneficiary?.trim() || (formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (formData.supplierId ? suppliers.find(s => s.id === formData.supplierId)?.name : undefined));
+                const resolvedBeneficiary = formData.beneficiary?.trim() || (!isOffice && formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (formData.supplierId ? suppliers.find(s => s.id === formData.supplierId)?.name : undefined));
 
                 payload = {
                     type: 'EXPENSE',
                     category: resolvedCategory,
                     amount: Number(formData.amount),
-                    projectId: formData.isOfficeExpense ? (selectedProjectId || undefined) : selectedProjectId,
+                    projectId: isOffice ? undefined : (selectedProjectId || undefined),
                     safeId: formData.safeId || undefined,
-                    isOfficeExpense: Boolean(formData.isOfficeExpense),
-                    projectCostItemId: costItemMode === 'EXISTING' ? formData.projectCostItemId : undefined,
+                    isOfficeExpense: isOffice,
+                    projectCostItemId: (!isOffice && costItemMode === 'EXISTING') ? formData.projectCostItemId : undefined,
                     payerUserId: formData.payerUserId || user?.id,
-                    workmanId: formData.workmanId || undefined,
+                    workmanId: isOffice ? undefined : (formData.workmanId || undefined),
                     supplierId: (isMaterial && chosenMaterial?.supplierId) ? chosenMaterial.supplierId : undefined,
                     beneficiary: resolvedBeneficiary || undefined,
                     createBatch: isMaterial,
                     materialId: (isMaterial && formData.materialId) ? formData.materialId : undefined,
-                    description: formData.description?.trim() || resolvedItemName || t(`finance.categories.${resolvedCategory?.toLowerCase()}`) || resolvedCategory || 'Site Expense',
+                    description: formData.description?.trim() || (isOffice ? (isRTL ? 'مصروف مقر ومكتب' : 'Office Expense') : (resolvedItemName || t(`finance.categories.${resolvedCategory?.toLowerCase()}`) || resolvedCategory || 'Site Expense')),
                     transactionDate: formData.transactionDate,
                     paymentMethod: formData.paymentMethod,
                     itemName: resolvedItemName,
-                    unit: isMaterial ? (formData.unit || chosenMaterial?.unit) : (costItemMode === 'NEW' ? formData.unit : undefined),
-                    unitPrice: isMaterial ? (formData.unitPrice ? Number(formData.unitPrice) : (chosenMaterial?.unitPrice ? Number(chosenMaterial.unitPrice) : undefined)) : (costItemMode === 'NEW' && formData.unitPrice ? Number(formData.unitPrice) : undefined),
+                    unit: isOffice ? (formData.unit || undefined) : (isMaterial ? (formData.unit || chosenMaterial?.unit) : (costItemMode === 'NEW' ? formData.unit : undefined)),
+                    unitPrice: isOffice ? (formData.unitPrice ? Number(formData.unitPrice) : undefined) : (isMaterial ? (formData.unitPrice ? Number(formData.unitPrice) : (chosenMaterial?.unitPrice ? Number(chosenMaterial.unitPrice) : undefined)) : (costItemMode === 'NEW' && formData.unitPrice ? Number(formData.unitPrice) : undefined)),
                     quantity: formData.quantity ? Number(formData.quantity) : undefined,
-                    costCenter: formData.costCenter || (isMaterial ? (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')) : undefined),
+                    costCenter: formData.costCenter || (isOffice ? (isRTL ? 'المقر الرئيسي' : 'Headquarters') : (isMaterial ? (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')) : undefined)),
                     transactionTo: formData.transactionTo?.trim() || undefined,
                     invoiceNumber: formData.invoiceNumber
                 };
@@ -1262,20 +1327,42 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         {/* Project Selection */}
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: '0.85rem', marginBottom: '4px' }}>
-                                {t('nav.projects')} {mode !== 'TRANSFER' && !formData.isOfficeExpense ? <span className="required">*</span> : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span>}
+                                {t('nav.projects')} {mode !== 'TRANSFER' && !formData.isOfficeExpense ? <span className="required">*</span> : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>({isRTL ? 'غير مطلوب للمقر' : 'Not required for HQ'})</span>}
                             </label>
-                            <select
-                                value={selectedProjectId}
-                                onChange={handleProjectChange}
-                                disabled={Boolean(formData.isOfficeExpense)}
-                                className={errors.projectId ? 'error' : ''}
-                                style={{ fontSize: '1rem', padding: '10px' }}
-                            >
-                                <option value="">-- {formData.isOfficeExpense ? (isRTL ? 'بدون مشروع (مصروف للمقر الرئيسي)' : 'Office Expense (No Project)') : (mode === 'TRANSFER' ? (isRTL ? 'بدون ربط بمشروع محدد' : 'General / No specific project') : t('finance.selectProject'))} --</option>
-                                {projects.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
+                            {formData.isOfficeExpense ? (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    padding: '9px 12px',
+                                    borderRadius: '8px',
+                                    background: 'rgba(59, 130, 246, 0.09)',
+                                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                                    color: 'var(--text-primary)'
+                                }}>
+                                    <span style={{ fontSize: '1.2rem' }}>🏢</span>
+                                    <div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--color-primary)' }}>
+                                            {isRTL ? 'المقر الرئيسي / المكتب الإداري' : 'Headquarters / Main Office'}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                            {isRTL ? 'مصروف عام للشركة بدون ربط بمشروع محدد' : 'General company expense without project association'}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <select
+                                    value={selectedProjectId}
+                                    onChange={handleProjectChange}
+                                    className={errors.projectId ? 'error' : ''}
+                                    style={{ fontSize: '1rem', padding: '10px' }}
+                                >
+                                    <option value="">-- {mode === 'TRANSFER' ? (isRTL ? 'بدون ربط بمشروع محدد' : 'General / No specific project') : t('finance.selectProject')} --</option>
+                                    {projects.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                            )}
                             {errors.projectId && <span className="error-message">{errors.projectId}</span>}
                         </div>
 
@@ -1354,10 +1441,19 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         checked={Boolean(formData.isOfficeExpense)}
                                         onChange={(e) => {
                                             const checked = e.target.checked;
-                                            setFormData(prev => ({ ...prev, isOfficeExpense: checked }));
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                isOfficeExpense: checked,
+                                                category: checked ? (prev.category && prev.category !== 'MATERIALS' ? prev.category : 'OFFICE_EXPENSES') : (prev.category === 'OFFICE_EXPENSES' ? '' : prev.category),
+                                                costCenter: checked ? (prev.costCenter || (isRTL ? 'المقر الرئيسي' : 'Headquarters')) : prev.costCenter,
+                                                unit: checked ? (prev.unit === 'TON' ? 'PIECE' : prev.unit) : prev.unit,
+                                                workmanId: checked ? '' : prev.workmanId
+                                            }));
                                             if (checked) {
                                                 setSelectedProjectId('');
                                                 setSelectedProject(null);
+                                                setCostItemMode('NEW');
+                                                setIsStockPurchase(false);
                                                 if (errors.projectId) setErrors(prev => ({ ...prev, projectId: '' }));
                                             }
                                         }}
@@ -1427,59 +1523,61 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 <div className="form-section">
                                     <h3 className="section-title">{t('projects.modal.sections.financial')}</h3>
                                     <div className="form-grid">
-                                        {/* 3-Way Item Type Toggle: New Cost Item vs Existing Project Band vs Registered Raw Material */}
-                                        <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 'var(--spacing-sm)' }}>
-                                            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
-                                                {isRTL ? 'نوع بند المصروف / الشراء:' : 'Expense / Purchase Item Type:'}
-                                            </label>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.3fr', gap: '6px', padding: '4px', background: 'var(--bg-tertiary, rgba(0,0,0,0.05))', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                                                <button
-                                                    type="button"
-                                                    className={`btn btn-sm ${costItemMode === 'NEW' ? 'btn-primary' : 'btn-ghost'}`}
-                                                    onClick={() => {
-                                                        setCostItemMode('NEW');
-                                                        setIsStockPurchase(false);
-                                                        setFormData(prev => ({ ...prev, projectCostItemId: '', materialId: '' }));
-                                                    }}
-                                                    style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'NEW' ? '700' : '500' }}
-                                                >
-                                                    {t('finance.newCostItem', 'بند جديد')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={`btn btn-sm ${costItemMode === 'EXISTING' ? 'btn-primary' : 'btn-ghost'}`}
-                                                    onClick={() => {
-                                                        setCostItemMode('EXISTING');
-                                                        setIsStockPurchase(false);
-                                                        setFormData(prev => ({ ...prev, materialId: '' }));
-                                                    }}
-                                                    style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'EXISTING' ? '700' : '500' }}
-                                                    disabled={!selectedProjectId}
-                                                >
-                                                    {t('finance.existingCostItem', 'بند مقايسة مسجل')}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className={`btn btn-sm ${costItemMode === 'MATERIAL' ? 'btn-primary' : 'btn-ghost'}`}
-                                                    onClick={() => {
-                                                        setCostItemMode('MATERIAL');
-                                                        setIsStockPurchase(true);
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            projectCostItemId: '',
-                                                            category: 'MATERIALS',
-                                                            costCenter: prev.costCenter || (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
-                                                        }));
-                                                    }}
-                                                    style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'MATERIAL' ? '700' : '500' }}
-                                                >
-                                                    📦 {isRTL ? 'شراء خامة للمخزن' : 'Buy Material for Stock'}
-                                                </button>
+                                        {/* 3-Way Item Type Toggle: Only for Project Expenses */}
+                                        {!formData.isOfficeExpense && (
+                                            <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 'var(--spacing-sm)' }}>
+                                                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+                                                    {isRTL ? 'نوع بند المصروف / الشراء:' : 'Expense / Purchase Item Type:'}
+                                                </label>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.3fr', gap: '6px', padding: '4px', background: 'var(--bg-tertiary, rgba(0,0,0,0.05))', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn btn-sm ${costItemMode === 'NEW' ? 'btn-primary' : 'btn-ghost'}`}
+                                                        onClick={() => {
+                                                            setCostItemMode('NEW');
+                                                            setIsStockPurchase(false);
+                                                            setFormData(prev => ({ ...prev, projectCostItemId: '', materialId: '' }));
+                                                        }}
+                                                        style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'NEW' ? '700' : '500' }}
+                                                    >
+                                                        {t('finance.newCostItem', 'بند جديد')}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn btn-sm ${costItemMode === 'EXISTING' ? 'btn-primary' : 'btn-ghost'}`}
+                                                        onClick={() => {
+                                                            setCostItemMode('EXISTING');
+                                                            setIsStockPurchase(false);
+                                                            setFormData(prev => ({ ...prev, materialId: '' }));
+                                                        }}
+                                                        style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'EXISTING' ? '700' : '500' }}
+                                                        disabled={!selectedProjectId}
+                                                    >
+                                                        {t('finance.existingCostItem', 'بند مقايسة مسجل')}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`btn btn-sm ${costItemMode === 'MATERIAL' ? 'btn-primary' : 'btn-ghost'}`}
+                                                        onClick={() => {
+                                                            setCostItemMode('MATERIAL');
+                                                            setIsStockPurchase(true);
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                projectCostItemId: '',
+                                                                category: 'MATERIALS',
+                                                                costCenter: prev.costCenter || (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
+                                                            }));
+                                                        }}
+                                                        style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'MATERIAL' ? '700' : '500' }}
+                                                    >
+                                                        📦 {isRTL ? 'شراء خامة للمخزن' : 'Buy Material for Stock'}
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Option 1: Registered Raw Material Selector */}
-                                        {costItemMode === 'MATERIAL' && (
+                                        {!formData.isOfficeExpense && costItemMode === 'MATERIAL' && (
                                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                                 <label>{isRTL ? 'اختر الخامة المسجلة لشحن رصيدها المخزني' : 'Select Registered Material to Recharge'} <span className="required">*</span></label>
                                                 <select
@@ -1520,7 +1618,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         )}
 
                                         {/* Option 2: Band Selection (If Existing Band) */}
-                                        {costItemMode === 'EXISTING' && (
+                                        {!formData.isOfficeExpense && costItemMode === 'EXISTING' && (
                                             <>
                                                 <div className="form-group">
                                                     <label>{t('finance.existingCostItem')} <span className="required">*</span></label>
@@ -1558,17 +1656,27 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         )}
 
                                         {/* Option 3: Category (If Direct Category Expense) */}
-                                        {costItemMode === 'NEW' && (
+                                        {(formData.isOfficeExpense || costItemMode === 'NEW') && (
                                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                                <label>{t('finance.category')} <span className="required">*</span></label>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                    <label style={{ marginBottom: 0 }}>
+                                                        {t('finance.category')} <span className="required">*</span>
+                                                    </label>
+                                                    {formData.isOfficeExpense && (
+                                                        <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+                                                            🏢 {isRTL ? 'مصروفات المقر والمكتب معروضة أولاً' : 'HQ & Office categories prioritized'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <select
                                                     name="category"
                                                     value={formData.category}
                                                     onChange={handleChange}
                                                     className={errors.category ? 'error' : ''}
+                                                    style={{ fontSize: '0.95rem', padding: '10px' }}
                                                 >
                                                     <option value="">-- {t('finance.selectCategory')} --</option>
-                                                    {categories.map(group => (
+                                                    {displayCategories.map(group => (
                                                         <optgroup key={group.group} label={isRTL ? group.groupNameAr : (group.groupNameEn || group.groupNameAr)}>
                                                             {group.items.map(item => (
                                                                 <option key={item.key} value={item.key}>
@@ -1584,9 +1692,15 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
                                         {renderDropdownWithCustom(
                                             "costCenter",
-                                            t('finance.costCenter'),
-                                            existingCostCenters.map(cc => ({ value: cc, label: cc })),
-                                            "e.g. Block A"
+                                            formData.isOfficeExpense
+                                                ? (isRTL ? 'مركز التكلفة / القسم' : 'Cost Center / Department')
+                                                : t('finance.costCenter'),
+                                            formData.isOfficeExpense
+                                                ? officeCostCenterSuggestions
+                                                : existingCostCenters.map(cc => ({ value: cc, label: cc })),
+                                            formData.isOfficeExpense
+                                                ? (isRTL ? 'المقر الرئيسي، الإدارة، بوفيه، صيانة المكتب...' : 'e.g. Headquarters, Admin, Buffet...')
+                                                : "e.g. Block A"
                                         )}
 
                                         <div className="form-group">
@@ -1602,18 +1716,24 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
                                         {renderDropdownWithCustom(
                                             "beneficiary",
-                                            t('finance.beneficiary') || (isRTL ? 'المستفيد' : 'Beneficiary'),
-                                            [
-                                                ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
-                                                ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
-                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
-                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
-                                                ...existingBeneficiaries.map(b => ({ value: b, label: b }))
-                                            ].reduce((acc, current) => {
-                                                const x = acc.find(item => item.value === current.value);
-                                                if (!x) { return acc.concat([current]); } else { return acc; }
-                                            }, []),
-                                            t('finance.beneficiaryPlaceholder') || (isRTL ? "أدخل اسم المستفيد (الشركة / المورد / المقاول / الصنايعي)..." : "e.g. Supplier, Subcontractor, Beneficiary..."),
+                                            formData.isOfficeExpense
+                                                ? (isRTL ? 'الجهة المستفيدة / المستلم' : 'Beneficiary / Payee')
+                                                : (t('finance.beneficiary') || (isRTL ? 'المستفيد' : 'Beneficiary')),
+                                            formData.isOfficeExpense
+                                                ? officeBeneficiarySuggestions
+                                                : [
+                                                    ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+                                                    ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
+                                                    ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
+                                                    ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
+                                                    ...existingBeneficiaries.map(b => ({ value: b, label: b }))
+                                                ].reduce((acc, current) => {
+                                                    const x = acc.find(item => item.value === current.value);
+                                                    if (!x) { return acc.concat([current]); } else { return acc; }
+                                                }, []),
+                                            formData.isOfficeExpense
+                                                ? (isRTL ? "اسم المستفيد (مالك المقر / الكهرباء / مزود النت / الموظف / سوبرماركت)..." : "e.g. Landlord, Utility Co, ISP, Employee...")
+                                                : (t('finance.beneficiaryPlaceholder') || (isRTL ? "أدخل اسم المستفيد (الشركة / المورد / المقاول / الصنايعي)..." : "e.g. Supplier, Subcontractor, Beneficiary...")),
                                             true,
                                             null,
                                             errors.beneficiary
@@ -1632,14 +1752,17 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 const x = acc.find(item => item.value === current.value);
                                                 if (!x) { return acc.concat([current]); } else { return acc; }
                                             }, []),
-                                            t('finance.transactionToPlaceholder') || (isRTL ? "اسم الشخص المستلم فعلياً (إن كان مختلفاً عن المستفيد)..." : "e.g. Courier, Foreman, Site rep (if different)..."),
+                                            formData.isOfficeExpense
+                                                ? (isRTL ? "اسم الشخص المستلم فعلياً (إن كان مختلفاً عن المستفيد)..." : "Handover person (if different from payee)...")
+                                                : (t('finance.transactionToPlaceholder') || (isRTL ? "اسم الشخص المستلم فعلياً (إن كان مختلفاً عن المستفيد)..." : "e.g. Courier, Foreman, Site rep (if different)...")),
                                             false
                                         )}
 
                                         {renderAttachmentUploader()}
 
-                                        {/* Workman Selection (Only for Labor Categories) */}
+                                        {/* Workman Selection (Only for Labor Categories in Site Projects) */}
                                         {(() => {
+                                            if (formData.isOfficeExpense) return null;
                                             const selectedCat = categories.flatMap(g => g.items).find(i => i.key === formData.category);
                                             if (selectedCat?.group === 'LABOR') {
                                                 return (
@@ -1682,53 +1805,96 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 <div className="form-section">
                                     <h3 className="section-title">{t('finance.detailsAndAmount') || 'التفاصيل والمبلغ'}</h3>
                                     <div className="form-grid">
-                                        <div className="form-group">
-                                            <label>{t('finance.quantity')}</label>
-                                            <input
-                                                type="number"
-                                                name="quantity"
-                                                value={formData.quantity}
-                                                onChange={handleChange}
-                                                step="0.01"
-                                                placeholder="0.00"
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>{t('finance.uom')}</label>
-                                            <select name="unit" value={formData.unit} onChange={handleChange}>
-                                                <option value="TON">{t('finance.uom_options.ton')}</option>
-                                                <option value="KG">{t('finance.uom_options.kg')}</option>
-                                                <option value="M3">{t('finance.uom_options.m3')}</option>
-                                                <option value="M2">{t('finance.uom_options.m2')}</option>
-                                                <option value="M">{t('finance.uom_options.m')}</option>
-                                                <option value="PIECE">{t('finance.uom_options.piece')}</option>
-                                                <option value="LITER">{t('finance.uom_options.liter')}</option>
-                                                <option value="BAG">{t('finance.uom_options.bag')}</option>
-                                            </select>
-                                        </div>
-                                        <div className="form-group">
-                                            <label>{t('finance.unitPrice')}</label>
-                                            <input
-                                                type="number"
-                                                name="unitPrice"
-                                                value={formData.unitPrice}
-                                                onChange={handleChange}
-                                                step="0.01"
-                                                placeholder="0.00"
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label>{t('finance.amount')} (EGP) <span className="required">*</span></label>
-                                            <CurrencyInput
-                                                name="amount"
-                                                value={formData.amount}
-                                                onChange={handleChange}
-                                                placeholder="0.00"
-                                                className={errors.amount ? 'error' : ''}
-                                                style={{ fontWeight: 'bold', fontSize: '1.1rem' }}
-                                            />
-                                            {errors.amount && <span className="error-message">{errors.amount}</span>}
-                                        </div>
+                                        {formData.isOfficeExpense ? (
+                                            <>
+                                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                                    <label style={{ fontSize: '0.95rem', fontWeight: 700 }}>
+                                                        {t('finance.amount')} (EGP) <span className="required" style={{ color: '#ef4444' }}>*</span>
+                                                    </label>
+                                                    <CurrencyInput
+                                                        name="amount"
+                                                        value={formData.amount}
+                                                        onChange={handleChange}
+                                                        placeholder="0.00"
+                                                        className={errors.amount ? 'error' : ''}
+                                                        style={{ fontWeight: 'bold', fontSize: '1.25rem', padding: '12px' }}
+                                                    />
+                                                    {errors.amount && <span className="error-message">{errors.amount}</span>}
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>{t('finance.quantity')} <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span></label>
+                                                    <input
+                                                        type="number"
+                                                        name="quantity"
+                                                        value={formData.quantity}
+                                                        onChange={handleChange}
+                                                        step="0.01"
+                                                        placeholder="1"
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>{t('finance.uom')} <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span></label>
+                                                    <select name="unit" value={formData.unit || 'PIECE'} onChange={handleChange}>
+                                                        <option value="PIECE">{isRTL ? 'قطعة / عدد' : 'Piece / Item'}</option>
+                                                        <option value="MONTH">{isRTL ? 'شهر (إيجار / اشتراك)' : 'Month (Rent / Sub)'}</option>
+                                                        <option value="PACKAGE">{isRTL ? 'علبة / باقة / كرتونة' : 'Package / Box'}</option>
+                                                        <option value="KG">{t('finance.uom_options.kg')}</option>
+                                                        <option value="LITER">{t('finance.uom_options.liter')}</option>
+                                                        <option value="OTHER">{isRTL ? 'أخرى' : 'Other'}</option>
+                                                    </select>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="form-group">
+                                                    <label>{t('finance.quantity')}</label>
+                                                    <input
+                                                        type="number"
+                                                        name="quantity"
+                                                        value={formData.quantity}
+                                                        onChange={handleChange}
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>{t('finance.uom')}</label>
+                                                    <select name="unit" value={formData.unit} onChange={handleChange}>
+                                                        <option value="TON">{t('finance.uom_options.ton')}</option>
+                                                        <option value="KG">{t('finance.uom_options.kg')}</option>
+                                                        <option value="M3">{t('finance.uom_options.m3')}</option>
+                                                        <option value="M2">{t('finance.uom_options.m2')}</option>
+                                                        <option value="M">{t('finance.uom_options.m')}</option>
+                                                        <option value="PIECE">{t('finance.uom_options.piece')}</option>
+                                                        <option value="LITER">{t('finance.uom_options.liter')}</option>
+                                                        <option value="BAG">{t('finance.uom_options.bag')}</option>
+                                                    </select>
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>{t('finance.unitPrice')}</label>
+                                                    <input
+                                                        type="number"
+                                                        name="unitPrice"
+                                                        value={formData.unitPrice}
+                                                        onChange={handleChange}
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>{t('finance.amount')} (EGP) <span className="required">*</span></label>
+                                                    <CurrencyInput
+                                                        name="amount"
+                                                        value={formData.amount}
+                                                        onChange={handleChange}
+                                                        placeholder="0.00"
+                                                        className={errors.amount ? 'error' : ''}
+                                                        style={{ fontWeight: 'bold', fontSize: '1.1rem' }}
+                                                    />
+                                                    {errors.amount && <span className="error-message">{errors.amount}</span>}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </>
@@ -2099,7 +2265,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 onChange={handleChange} 
                                 rows="2" 
                                 style={{ resize: 'none' }} 
-                                placeholder={mode === 'TRANSFER' ? t('finance.transferNotesPlaceholder', 'مثال: عهدة موقع لتغطية مشتريات عاجلة...') : t('finance.usagePlaceholder')} 
+                                placeholder={mode === 'TRANSFER' ? t('finance.transferNotesPlaceholder', 'مثال: عهدة موقع لتغطية مشتريات عاجلة...') : (formData.isOfficeExpense ? (isRTL ? 'بيان المصروف بالتفصيل (مثل: فاتورة كهرباء شهر 9، شراء مستلزمات بوفيه، إيجار المقر...)' : 'Office expense details (e.g. Electricity bill, Buffet supplies, Office rent...)') : t('finance.usagePlaceholder'))} 
                             />
                             {errors.description && <span className="error-message">{errors.description}</span>}
                         </div>

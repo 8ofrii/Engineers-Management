@@ -16,10 +16,14 @@ export const getCategories = async (req, res, next) => {
             // Format for frontend
             const formatted = Object.entries(categoriesByGroup).map(([groupKey, items]) => ({
                 group: groupKey,
-                groupNameAr: groupKey === 'MATERIALS' ? 'خامات' :
-                    groupKey === 'LABOR' ? 'مصنعية' : 'أخرى',
-                groupNameEn: groupKey === 'MATERIALS' ? 'Materials' :
-                    groupKey === 'LABOR' ? 'Labor' : 'Services',
+                groupNameAr: groupKey === 'OFFICE' ? '🏢 مصروفات المقر والمكتب والإدارة' :
+                    groupKey === 'MATERIALS' ? '🧱 خامات ومواد بناء' :
+                    groupKey === 'LABOR' ? '👷 مصنعية وعمالة' :
+                    groupKey === 'CONTRACTING' ? '📑 مقاولات باطن' : '🛠️ خدمات وتشغيل ونقل',
+                groupNameEn: groupKey === 'OFFICE' ? 'Office & Admin Expenses' :
+                    groupKey === 'MATERIALS' ? 'Materials' :
+                    groupKey === 'LABOR' ? 'Labor' :
+                    groupKey === 'CONTRACTING' ? 'Contracting' : 'Services & Operations',
                 items: items // items is already an array of {key, ar, en, group}
             }));
 
