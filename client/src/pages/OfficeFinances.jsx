@@ -13,6 +13,7 @@ import {
     CreditCard,
     Smartphone,
     UserCheck,
+    User,
     Search,
     Filter,
     Calendar,
@@ -27,7 +28,7 @@ import {
     Paperclip
 } from 'lucide-react';
 import Layout from '../components/Layout';
-import { safesAPI, transactionsAPI } from '../services/api';
+import { safesAPI, transactionsAPI, userAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
@@ -1389,6 +1390,30 @@ export default function OfficeFinances() {
                                                 {safe.name}
                                             </h3>
 
+                                            {/* Assigned Custodian / Member Badge */}
+                                            {safe.assignedUser && (
+                                                <div style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '3px 9px',
+                                                    borderRadius: '6px',
+                                                    background: 'rgba(59, 130, 246, 0.08)',
+                                                    border: '1px solid rgba(59, 130, 246, 0.22)',
+                                                    fontSize: '0.78rem',
+                                                    color: 'var(--text-primary)',
+                                                    marginBottom: '10px'
+                                                }}>
+                                                    <User size={13} style={{ color: '#3b82f6' }} />
+                                                    <span>
+                                                        <span style={{ color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                                                            {isArabic ? 'المسؤول:' : 'Custodian:'}
+                                                        </span>{' '}
+                                                        <strong>{safe.assignedUser.name}</strong>
+                                                    </span>
+                                                </div>
+                                            )}
+
                                             {/* Bank Name / Account number */}
                                             {(safe.bankName || safe.accountNumber) && (
                                                 <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
@@ -1580,7 +1605,30 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
     const [initialBalance, setInitialBalance] = useState(safe ? String(safe.initialBalance || 0) : '0');
     const [description, setDescription] = useState(safe?.description || '');
     const [isDefault, setIsDefault] = useState(Boolean(safe?.isDefault));
+    const [assignedUserId, setAssignedUserId] = useState(safe?.assignedUserId || safe?.assignedUser?.id || '');
+    const [companyUsers, setCompanyUsers] = useState([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadUsers = async () => {
+            try {
+                setLoadingUsers(true);
+                const res = await userAPI.getAll();
+                if (isMounted && res.data?.data) {
+                    const currentAssignedId = safe?.assignedUserId || safe?.assignedUser?.id;
+                    setCompanyUsers(res.data.data.filter(u => u.isActive !== false || u.id === currentAssignedId));
+                }
+            } catch (err) {
+                console.error('Failed to fetch company members:', err);
+            } finally {
+                if (isMounted) setLoadingUsers(false);
+            }
+        };
+        loadUsers();
+        return () => { isMounted = false; };
+    }, [safe]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -1598,7 +1646,8 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
                 bankName: bankName ? bankName.trim() : null,
                 accountNumber: accountNumber ? accountNumber.trim() : null,
                 description: description ? description.trim() : null,
-                isDefault
+                isDefault,
+                assignedUserId: assignedUserId || null
             };
 
             if (safe) {
@@ -1685,6 +1734,42 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
                                 />
                             </div>
                         )}
+
+                        {/* Assigned Member / Custodian (Optional) */}
+                        <div className="form-group">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <label style={{ fontWeight: 600, margin: 0 }}>
+                                    {isArabic ? 'العضو المسؤول عن الخزينة (اختياري)' : 'Assigned Member / Custodian'}
+                                </label>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                    {isArabic ? 'اختياري' : 'Optional'}
+                                </span>
+                            </div>
+                            <select
+                                value={assignedUserId}
+                                onChange={(e) => setAssignedUserId(e.target.value)}
+                                disabled={loadingUsers}
+                            >
+                                <option value="">
+                                    {loadingUsers
+                                        ? (isArabic ? 'جاري تحميل قائمة الأعضاء...' : 'Loading members...')
+                                        : (isArabic ? '— بدون تعيين (خزينة عامة للشركة) —' : '— None / General Company Safe —')}
+                                </option>
+                                {companyUsers.map((u) => {
+                                    const roleName = u.customRole?.name || u.role?.replace(/_/g, ' ');
+                                    return (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name} {roleName ? `(${roleName})` : ''}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
+                                {isArabic
+                                    ? 'يمكنك ربط الخزينة أو العهدة النقدية بأحد موظفي أو مسؤولي الشركة أو تركها عامة'
+                                    : 'Optionally link this safe or cash account to a specific company employee or leave unassigned'}
+                            </span>
+                        </div>
 
                         {/* Initial Balance (Only for new safe) */}
                         {!safe && (
@@ -2115,6 +2200,17 @@ function SafeStatementModal({
                                     {fmtCurrency(statementData?.safe?.currentBalance || 0)}
                                 </strong>
                             </span>
+                            {(safe.assignedUser || statementData?.safe?.assignedUser) && (
+                                <>
+                                    <span style={{ color: 'var(--border-color)' }}>•</span>
+                                    <span>
+                                        {isArabic ? 'المسؤول:' : 'Custodian:'}{' '}
+                                        <strong style={{ color: '#3b82f6' }}>
+                                            {(safe.assignedUser || statementData?.safe?.assignedUser).name}
+                                        </strong>
+                                    </span>
+                                </>
+                            )}
                         </div>
                     </div>
 

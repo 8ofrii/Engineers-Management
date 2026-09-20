@@ -9,8 +9,8 @@ const router = express.Router();
 // All routes require login
 router.use(protect);
 
-// Get users - Allow managers to see list for transaction payer selection
-router.get('/', authorize('ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER'), getUsers);
+// Get users - Allow managers and accountants to see list for safe custodian and transaction payer selection
+router.get('/', authorize('ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER', 'ACCOUNTANT'), getUsers);
 router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), validate({ body: inviteUserSchema }), inviteUser);
 router.post('/:id/resend-invite', authorize('ADMIN', 'SUPER_ADMIN'), validate({ params: idParamSchema }), resendInvite);
 router.put('/:id', authorize('ADMIN', 'SUPER_ADMIN'), validate({ params: idParamSchema, body: updateUserSchema }), updateUser);

@@ -105,6 +105,7 @@ model User {
   transactionDrafts     TransactionDraft[]
   bankStatements        BankStatement[]
   safeTransfers         SafeTransfer[]
+  assignedSafes         CompanySafe[]     @relation("AssignedSafeUser")
 
   @@unique([email, tenantId])
   @@index([phone, tenantId])
@@ -1149,6 +1150,8 @@ model CompanySafe {
   isDefault      Boolean         @default(false)
   isActive       Boolean         @default(true)
   description    String?
+  assignedUserId String?
+  assignedUser   User?           @relation("AssignedSafeUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
   tenantId       String
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions   Transaction[]
@@ -1158,6 +1161,7 @@ model CompanySafe {
   updatedAt      DateTime        @updatedAt
 
   @@index([tenantId, isActive])
+  @@index([assignedUserId])
   @@map("company_safes")
 }
 

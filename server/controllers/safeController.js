@@ -23,6 +23,15 @@ export const getSafes = async (req, res, next) => {
                 { createdAt: 'asc' }
             ],
             include: {
+                assignedUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                        profilePicture: true
+                    }
+                },
                 _count: {
                     select: {
                         transactions: true,
@@ -88,6 +97,15 @@ export const getSafeById = async (req, res, next) => {
         const safe = await prisma.companySafe.findFirst({
             where: { id, tenantId },
             include: {
+                assignedUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                        profilePicture: true
+                    }
+                },
                 transactions: {
                     take: 10,
                     orderBy: { transactionDate: 'desc' },
@@ -132,7 +150,8 @@ export const createSafe = async (req, res, next) => {
             initialBalance,
             currency,
             isDefault,
-            description
+            description,
+            assignedUserId
         } = req.body;
 
         if (!name || !name.trim()) {
@@ -140,6 +159,21 @@ export const createSafe = async (req, res, next) => {
                 success: false,
                 message: 'Safe name is required'
             });
+        }
+
+        let cleanAssignedUserId = null;
+        if (assignedUserId && typeof assignedUserId === 'string' && assignedUserId.trim()) {
+            const memberId = assignedUserId.trim();
+            const member = await prisma.user.findFirst({
+                where: { id: memberId, tenantId }
+            });
+            if (!member) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Selected company member not found'
+                });
+            }
+            cleanAssignedUserId = memberId;
         }
 
         const startBal = Number(initialBalance) || 0;
@@ -165,7 +199,19 @@ export const createSafe = async (req, res, next) => {
                     currency: currency || 'EGP',
                     isDefault: Boolean(isDefault),
                     description: description ? description.trim() : null,
+                    assignedUserId: cleanAssignedUserId,
                     tenantId
+                },
+                include: {
+                    assignedUser: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                            profilePicture: true
+                        }
+                    }
                 }
             });
 
@@ -210,7 +256,8 @@ export const updateSafe = async (req, res, next) => {
             bankName,
             description,
             isActive,
-            isDefault
+            isDefault,
+            assignedUserId
         } = req.body;
 
         const existingSafe = await prisma.companySafe.findFirst({
@@ -224,6 +271,25 @@ export const updateSafe = async (req, res, next) => {
             });
         }
 
+        let assignedUserUpdate;
+        if (assignedUserId !== undefined) {
+            if (assignedUserId && typeof assignedUserId === 'string' && assignedUserId.trim()) {
+                const memberId = assignedUserId.trim();
+                const member = await prisma.user.findFirst({
+                    where: { id: memberId, tenantId }
+                });
+                if (!member) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Selected company member not found'
+                    });
+                }
+                assignedUserUpdate = memberId;
+            } else {
+                assignedUserUpdate = null;
+            }
+        }
+
         const updated = await prisma.$transaction(async (tx) => {
             if (isDefault) {
                 await tx.companySafe.updateMany({
@@ -232,17 +298,34 @@ export const updateSafe = async (req, res, next) => {
                 });
             }
 
+            const updateData = {
+                name: name !== undefined ? name.trim() : existingSafe.name,
+                nameAr: nameAr !== undefined ? (nameAr ? nameAr.trim() : null) : existingSafe.nameAr,
+                type: type !== undefined ? type : existingSafe.type,
+                accountNumber: accountNumber !== undefined ? (accountNumber ? accountNumber.trim() : null) : existingSafe.accountNumber,
+                bankName: bankName !== undefined ? (bankName ? bankName.trim() : null) : existingSafe.bankName,
+                description: description !== undefined ? (description ? description.trim() : null) : existingSafe.description,
+                isActive: isActive !== undefined ? Boolean(isActive) : existingSafe.isActive,
+                isDefault: isDefault !== undefined ? Boolean(isDefault) : existingSafe.isDefault
+            };
+
+            if (assignedUserId !== undefined) {
+                updateData.assignedUserId = assignedUserUpdate;
+            }
+
             return tx.companySafe.update({
                 where: { id },
-                data: {
-                    name: name !== undefined ? name.trim() : existingSafe.name,
-                    nameAr: nameAr !== undefined ? (nameAr ? nameAr.trim() : null) : existingSafe.nameAr,
-                    type: type !== undefined ? type : existingSafe.type,
-                    accountNumber: accountNumber !== undefined ? (accountNumber ? accountNumber.trim() : null) : existingSafe.accountNumber,
-                    bankName: bankName !== undefined ? (bankName ? bankName.trim() : null) : existingSafe.bankName,
-                    description: description !== undefined ? (description ? description.trim() : null) : existingSafe.description,
-                    isActive: isActive !== undefined ? Boolean(isActive) : existingSafe.isActive,
-                    isDefault: isDefault !== undefined ? Boolean(isDefault) : existingSafe.isDefault
+                data: updateData,
+                include: {
+                    assignedUser: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            role: true,
+                            profilePicture: true
+                        }
+                    }
                 }
             });
         });
@@ -479,7 +562,17 @@ export const getSafeStatement = async (req, res, next) => {
         const { dateFrom, dateTo } = req.query;
 
         const safe = await prisma.companySafe.findFirst({
-            where: { id, tenantId }
+            where: { id, tenantId },
+            include: {
+                assignedUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true
+                    }
+                }
+            }
         });
 
         if (!safe) {

@@ -1500,9 +1500,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             : s.type === 'MOBILE_WALLET' ? (isRTL ? 'محفظة إلكترونية' : 'Mobile Wallet')
                                             : s.type === 'OWNER_ACCOUNT' ? (isRTL ? 'حساب شريك/مدير' : 'Owner/Manager Account')
                                             : (isRTL ? 'خزينة نقدية (كاش)' : 'Cash Safe');
+                                        const custodianText = s.assignedUser ? ` • ${isRTL ? 'المسؤول' : 'Custodian'}: ${s.assignedUser.name}` : '';
                                         return (
                                             <option key={s.id} value={s.id}>
-                                                {s.name} ({typeLabel}) - {isRTL ? 'الرصيد' : 'Balance'}: {fmtCurrency(s.balance)}
+                                                {s.name} ({typeLabel}{custodianText}) - {isRTL ? 'الرصيد' : 'Balance'}: {fmtCurrency(s.balance)}
                                             </option>
                                         );
                                     })}
