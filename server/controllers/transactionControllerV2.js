@@ -497,11 +497,14 @@ export const recordInventoryUsage = async (req, res, next) => {
                 }
             });
 
+            // Resolve target project if any
+            const targetProjectId = projectId || batch.projectId || null;
+
             // Create usage record
             const usage = await tx.materialUsage.create({
                 data: {
                     materialId: effectiveMaterialId,
-                    projectId: projectId || batch.projectId,
+                    projectId: targetProjectId,
                     quantity: usageQty,
                     notes: description || 'Material Usage',
                     recordedBy: req.user.id,
@@ -519,19 +522,24 @@ export const recordInventoryUsage = async (req, res, next) => {
                 });
             }
 
-            // PROFIT RECOGNITION on Usage
-            const profitInfo = await calculateAndTransferProfit(
-                tx,
-                batch.project,
-                valueConsumed,
-                req.user.id
-            );
+            // PROFIT RECOGNITION on Usage (only if linked to a project)
+            let profitInfo = { profit: 0 };
+            const effectiveProject = batch.project || (targetProjectId ? await tx.project.findFirst({ where: { id: targetProjectId, tenantId: req.user.tenantId } }) : null);
+
+            if (effectiveProject) {
+                profitInfo = await calculateAndTransferProfit(
+                    tx,
+                    effectiveProject,
+                    valueConsumed,
+                    req.user.id
+                );
+            }
 
             // ALERT: If project safe becomes negative after profit transfer
-            if (profitInfo.profit > 0) {
+            if (targetProjectId && profitInfo.profit > 0) {
                 const refreshedProject = await tx.project.findFirst({
                     where: {
-                        id: batch.projectId,
+                        id: targetProjectId,
                         tenantId: req.user.tenantId
                     },
                     include: { engineer: true }

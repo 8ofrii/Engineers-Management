@@ -52,15 +52,19 @@ export const consumeBatch = async (req, res, next) => {
             });
         }
 
-        // Import office fee service
-        const officeFeeService = await import('../services/officeFeeService.js');
+        // Check if there is a target project (either on the batch or specified in consumption request)
+        const targetProjectId = req.body.projectId || batch.projectId || null;
 
-        // Calculate office fee on consumed portion
-        const officeFee = await officeFeeService.calculateOfficeFee(
-            batch.projectId,
-            'MATERIALS', // Generic materials category
-            actualConsumedValue
-        );
+        // Calculate office fee on consumed portion if linked to a project
+        let officeFee = 0;
+        if (targetProjectId) {
+            const officeFeeService = await import('../services/officeFeeService.js');
+            officeFee = await officeFeeService.calculateOfficeFee(
+                targetProjectId,
+                'MATERIALS', // Generic materials category
+                actualConsumedValue
+            );
+        }
 
         // Calculate quantity to deduct
         let usageQty = Number(quantityConsumed) || 0;
@@ -95,21 +99,23 @@ export const consumeBatch = async (req, res, next) => {
                 }
             });
 
-            // Apply office fee to project
-            await tx.project.update({
-                where: { id: batch.projectId },
-                data: {
-                    officeRevenue: { increment: officeFee },
-                    projectSafeBalance: { decrement: officeFee }
-                }
-            });
+            // Apply office fee to project if applicable
+            if (targetProjectId && officeFee > 0) {
+                await tx.project.update({
+                    where: { id: targetProjectId },
+                    data: {
+                        officeRevenue: { increment: officeFee },
+                        projectSafeBalance: { decrement: officeFee }
+                    }
+                });
+            }
 
             // Create material usage record & decrement stock
             if (batch.materialId) {
                 await tx.materialUsage.create({
                     data: {
                         materialId: batch.materialId,
-                        projectId: batch.projectId,
+                        projectId: targetProjectId,
                         quantity: usageQty,
                         notes: description || `Consumed from batch: ${batch.description}`,
                         recordedBy: req.user.id,
@@ -199,7 +205,7 @@ export const getAvailableStock = async (req, res, next) => {
 // @access  Private
 export const getAllBatches = async (req, res, next) => {
     try {
-        const { status, projectId } = req.query;
+        const { status, projectId, supplierId } = req.query;
         
         let whereClause = {
             tenantId: req.user.tenantId // Enforce Tenant Isolation
@@ -207,6 +213,10 @@ export const getAllBatches = async (req, res, next) => {
 
         if (projectId) {
             whereClause.projectId = projectId;
+        }
+
+        if (supplierId) {
+            whereClause.supplierId = supplierId;
         }
 
         if (status) {
@@ -220,6 +230,9 @@ export const getAllBatches = async (req, res, next) => {
             include: {
                 project: {
                     select: { id: true, name: true }
+                },
+                supplier: {
+                    select: { id: true, name: true, company: true }
                 },
                 material: {
                     select: { id: true, name: true, nameAr: true, unit: true, unitPrice: true }

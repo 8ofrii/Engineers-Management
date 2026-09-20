@@ -190,6 +190,7 @@ model Supplier {
   deletedAt    DateTime?
   tenantId     String?
   materials    Material[]
+  materialBatches MaterialBatch[]
   tenant       Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 
@@ -290,12 +291,12 @@ model MaterialUsage {
   notes      String?
   usageDate  DateTime @default(now())
   materialId String
-  projectId  String
+  projectId  String?
   recordedBy String
   createdAt  DateTime @default(now())
   tenantId   String?
   material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [recordedBy], references: [id])
   tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -312,7 +313,8 @@ model MaterialBatch {
   officeFeeApplied  Decimal              @default(0) @db.Decimal(15, 2)
   status            BatchStatus          @default(AVAILABLE)
   category          TransactionCategory?
-  projectId         String
+  projectId         String?
+  supplierId        String?
   originalReceiptId String?
   recordedBy        String
   purchaseDate      DateTime             @default(now())
@@ -321,11 +323,13 @@ model MaterialBatch {
   tenantId          String
   materialId        String?
   material          Material?            @relation(fields: [materialId], references: [id])
-  project           Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project           Project?              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  supplier          Supplier?             @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   user              User                 @relation(fields: [recordedBy], references: [id])
   tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([projectId, status])
+  @@index([supplierId, status])
   @@map("material_batches")
 }
 

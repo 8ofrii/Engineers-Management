@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Package, Search, ArrowRight, History, Plus, Trash2, Pencil, X, AlertTriangle } from 'lucide-react';
+import { Package, Search, ArrowRight, History, Plus, Trash2, Pencil, X, AlertTriangle, Store } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddMaterialModal from '../components/AddMaterialModal';
 import InventoryUsageModal from '../components/InventoryUsageModal';
-import { materialsAPI, projectsAPI, materialUsageAPI } from '../services/api';
+import { materialsAPI, projectsAPI, suppliersAPI, materialUsageAPI } from '../services/api';
 import { useFormat } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
 
@@ -17,24 +17,28 @@ export default function Inventory() {
     const [batches, setBatches] = useState([]);
     const [materials, setMaterials] = useState([]);
     const [projects, setProjects] = useState([]);
+    const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedProjectId, setSelectedProjectId] = useState('all');
+    const [selectedInventoryFilter, setSelectedInventoryFilter] = useState('all');
+    const [inventoryTypeFilter, setInventoryTypeFilter] = useState('ALL'); // ALL | PROJECTS | SUPPLIERS
     const [viewMode, setViewMode] = useState('BATCHES'); // BATCHES | MATERIALS
     const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
     const [editingMaterial, setEditingMaterial] = useState(null);
     const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
     const [usageProjectId, setUsageProjectId] = useState(null);
     const [usageBatchId, setUsageBatchId] = useState(null);
+    const [usageBatchItem, setUsageBatchItem] = useState(null);
 
     // Recharge Material Stock State
     const [isRechargeModalOpen, setIsRechargeModalOpen] = useState(false);
     const [rechargingMaterial, setRechargingMaterial] = useState(null);
-    const [suppliers, setSuppliers] = useState([]);
     const [rechargeForm, setRechargeForm] = useState({
         quantity: '',
         unitPrice: '',
+        targetType: 'PROJECT', // 'GENERAL' | 'PROJECT' | 'SUPPLIER'
         projectId: '',
+        supplierId: '',
         paymentMethod: 'CUSTODY_WALLET',
         supplierName: '',
         createTransaction: true,
@@ -52,7 +56,9 @@ export default function Inventory() {
         setRechargeForm({
             quantity: '',
             unitPrice: material.unitPrice ? material.unitPrice.toString() : '',
+            targetType: 'PROJECT',
             projectId: '',
+            supplierId: '',
             paymentMethod: 'CUSTODY_WALLET',
             supplierName: '',
             createTransaction: true,
@@ -79,7 +85,8 @@ export default function Inventory() {
             const res = await materialsAPI.recharge(rechargingMaterial.id, {
                 quantity: qty,
                 unitPrice: price > 0 ? price : undefined,
-                projectId: rechargeForm.projectId || undefined,
+                projectId: rechargeForm.targetType === 'PROJECT' ? (rechargeForm.projectId || undefined) : undefined,
+                supplierId: rechargeForm.targetType === 'SUPPLIER' ? (rechargeForm.supplierId || undefined) : undefined,
                 paymentMethod: rechargeForm.paymentMethod,
                 supplierName: rechargeForm.supplierName || undefined,
                 createTransaction: rechargeForm.createTransaction,
@@ -131,14 +138,16 @@ export default function Inventory() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [batchesRes, projectsRes, materialsRes] = await Promise.all([
+            const [batchesRes, projectsRes, materialsRes, suppliersRes] = await Promise.all([
                 materialUsageAPI.getBatches({ status: 'AVAILABLE,PARTIALLY_USED' }),
                 projectsAPI.getAll(),
-                materialsAPI.getAll()
+                materialsAPI.getAll(),
+                suppliersAPI.getAll().catch(() => ({ data: { data: [] } }))
             ]);
             setBatches(batchesRes.data.data || []);
             setProjects(projectsRes.data.data || []);
             setMaterials(materialsRes.data.data || []);
+            setSuppliers(suppliersRes.data?.data || []);
         } catch (error) {
             console.error("Failed to load inventory data", error);
             showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to load inventory data.') });
@@ -147,11 +156,54 @@ export default function Inventory() {
         }
     };
 
+    const getBatchEntity = (batch) => {
+        if (batch.supplierId && batch.supplier) {
+            const sName = batch.supplier.name || batch.supplier.company || 'Supplier';
+            return {
+                type: 'SUPPLIER',
+                id: `supp_${batch.supplierId}`,
+                rawId: batch.supplierId,
+                name: sName,
+                title: isAr ? `مخزون مورد: ${sName}` : `${sName}'s Inventory`,
+                badge: isAr ? 'مخزون مورد' : 'Supplier Inventory'
+            };
+        }
+        if (batch.projectId && batch.project) {
+            const pName = batch.project.name || 'Project';
+            return {
+                type: 'PROJECT',
+                id: `proj_${batch.projectId}`,
+                rawId: batch.projectId,
+                name: pName,
+                title: isAr ? `مخزون ${pName}` : `${pName}'s Inventory`,
+                badge: isAr ? 'مخزون مشروع' : 'Project Inventory'
+            };
+        }
+        return {
+            type: 'GENERAL',
+            id: 'general',
+            rawId: null,
+            name: isAr ? 'المخزن العام' : 'General Warehouse',
+            title: isAr ? 'مخزون المخزن العام' : 'General Warehouse Inventory',
+            badge: isAr ? 'مخزن عام' : 'General Warehouse'
+        };
+    };
+
     const filteredBatches = batches.filter(batch => {
-        const matchesSearch = (batch.description?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (batch.project?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
-        const matchesProject = selectedProjectId === 'all' || batch.projectId === selectedProjectId;
-        return matchesSearch && matchesProject;
+        const entity = getBatchEntity(batch);
+        const q = searchQuery.toLowerCase();
+        const matchesSearch = (batch.description?.toLowerCase().includes(q)) ||
+            (batch.project?.name?.toLowerCase().includes(q)) ||
+            (batch.supplier?.name?.toLowerCase().includes(q)) ||
+            (batch.supplier?.company?.toLowerCase().includes(q));
+
+        const matchesType = inventoryTypeFilter === 'ALL' ||
+            (inventoryTypeFilter === 'PROJECTS' && entity.type === 'PROJECT') ||
+            (inventoryTypeFilter === 'SUPPLIERS' && entity.type === 'SUPPLIER');
+
+        const matchesEntity = selectedInventoryFilter === 'all' || entity.id === selectedInventoryFilter;
+
+        return matchesSearch && matchesType && matchesEntity;
     });
 
     const filteredMaterials = materials.filter(material => {
@@ -159,11 +211,16 @@ export default function Inventory() {
             material.nameAr?.toLowerCase().includes(searchQuery.toLowerCase());
     });
 
-    // Grouping logic if 'all projects' is selected
+    // Grouping by inventory entity (Project, Supplier, or General)
     const groupedInventory = filteredBatches.reduce((acc, batch) => {
-        const projectName = batch.project?.name || 'Unassigned';
-        if (!acc[projectName]) acc[projectName] = [];
-        acc[projectName].push(batch);
+        const entity = getBatchEntity(batch);
+        if (!acc[entity.id]) {
+            acc[entity.id] = {
+                entity,
+                items: []
+            };
+        }
+        acc[entity.id].items.push(batch);
         return acc;
     }, {});
 
@@ -246,28 +303,75 @@ export default function Inventory() {
                             />
                         </div>
                         {viewMode === 'BATCHES' && (
-                            <div style={{ flex: '0 1 250px', minWidth: '200px' }}>
-                                <select
-                                    value={selectedProjectId}
-                                    onChange={(e) => setSelectedProjectId(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 12px',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '10px',
-                                        outline: 'none',
-                                        backgroundColor: 'var(--bg-tertiary)',
-                                        color: 'var(--text-primary)'
-                                    }}
-                                >
-                                    <option value="all">{t('inventory.allInventories') || t('inventory.allProjects') || (isAr ? 'جميع المخزونات' : 'All Inventories')}</option>
-                                    {projects.map(p => (
-                                        <option key={p.id} value={p.id}>
-                                            {isAr ? `مخزون ${p.name}` : `${p.name}'s Inventory`}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            <>
+                                {/* Type Filter Buttons */}
+                                <div className="flex gap-xs" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <button
+                                        type="button"
+                                        className={`btn btn-sm ${inventoryTypeFilter === 'ALL' ? 'btn-primary' : 'btn-ghost'}`}
+                                        onClick={() => { setInventoryTypeFilter('ALL'); setSelectedInventoryFilter('all'); }}
+                                    >
+                                        {t('common.all') || (isAr ? 'الكل' : 'All')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn btn-sm ${inventoryTypeFilter === 'PROJECTS' ? 'btn-primary' : 'btn-ghost'}`}
+                                        onClick={() => { setInventoryTypeFilter('PROJECTS'); setSelectedInventoryFilter('all'); }}
+                                    >
+                                        {t('inventory.projectInventories') || (isAr ? 'مخزونات المشاريع' : 'Project Inventories')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`btn btn-sm ${inventoryTypeFilter === 'SUPPLIERS' ? 'btn-primary' : 'btn-ghost'}`}
+                                        style={inventoryTypeFilter === 'SUPPLIERS' ? { background: '#7c3aed', borderColor: '#6d28d9', color: '#fff' } : {}}
+                                        onClick={() => { setInventoryTypeFilter('SUPPLIERS'); setSelectedInventoryFilter('all'); }}
+                                    >
+                                        <Store size={14} style={{ marginInlineEnd: 4 }} />
+                                        {t('inventory.supplierInventories') || (isAr ? 'مخزونات الموردين' : 'Supplier Inventories')}
+                                    </button>
+                                </div>
+
+                                <div style={{ flex: '0 1 250px', minWidth: '200px' }}>
+                                    <select
+                                        value={selectedInventoryFilter}
+                                        onChange={(e) => setSelectedInventoryFilter(e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '10px',
+                                            outline: 'none',
+                                            backgroundColor: 'var(--bg-tertiary)',
+                                            color: 'var(--text-primary)'
+                                        }}
+                                    >
+                                        <option value="all">{t('inventory.allInventories') || (isAr ? 'جميع المخزونات' : 'All Inventories')}</option>
+                                        {inventoryTypeFilter !== 'SUPPLIERS' && (
+                                            <optgroup label={t('inventory.projectInventories') || (isAr ? 'مخزونات المشاريع' : 'Project Inventories')}>
+                                                {projects.map(p => (
+                                                    <option key={`proj_${p.id}`} value={`proj_${p.id}`}>
+                                                        {isAr ? `مخزون ${p.name}` : `${p.name}'s Inventory`}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        )}
+                                        {inventoryTypeFilter !== 'PROJECTS' && suppliers.length > 0 && (
+                                            <optgroup label={t('inventory.supplierInventories') || (isAr ? 'مخزونات الموردين' : 'Supplier Inventories')}>
+                                                {suppliers.map(s => (
+                                                    <option key={`supp_${s.id}`} value={`supp_${s.id}`}>
+                                                        {isAr ? `مخزون ${s.name}${s.company ? ` (${s.company})` : ''}` : `${s.name}'s Inventory`}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        )}
+                                        {inventoryTypeFilter === 'ALL' && (
+                                            <optgroup label={isAr ? 'أخرى' : 'Other'}>
+                                                <option value="general">{isAr ? 'المخزن العام' : 'General Warehouse'}</option>
+                                            </optgroup>
+                                        )}
+                                    </select>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
@@ -284,79 +388,145 @@ export default function Inventory() {
                         </div>
                     ) : (
                         <div className="inventory-groups">
-                            {Object.entries(groupedInventory).map(([projectName, items]) => (
-                                <div key={projectName} className="inventory-section mb-xl">
-                                    <h3 className="section-title flex items-center gap-sm mb-md">
-                                        <ArrowRight size={18} className="text-primary" style={isAr ? { transform: 'scaleX(-1)' } : {}} />
-                                        {isAr ? (projectName === 'Unassigned' ? 'مخزون غير محدد' : `مخزون ${projectName}`) : (projectName === 'Unassigned' ? 'Unassigned Inventory' : `${projectName}'s Inventory`)}
-                                        <span className="badge badge-secondary ml-sm">{items.length} {t('inventory.items') || 'بنود'}</span>
-                                    </h3>
-                                    <div className="grid grid-3 gap-md">
-                                        {items.map(item => (
-                                            <div key={item.id} className="card inventory-card">
-                                                <div className="flex-between mb-sm">
-                                                    <h4 className="m-0" style={{ paddingRight: '12px' }}>{item.description}</h4>
-                                                    <div className="flex gap-sm">
-                                                        <span className={`badge ${item.status === 'AVAILABLE' ? 'badge-success' : 'badge-warning'}`}>
-                                                            {t(`inventory.status.${item.status.toLowerCase()}`) || item.status}
-                                                        </span>
-                                                        {/* Low remaining value warning badge (#7) */}
-                                                        {item.initialValue > 0 && (item.remainingValue / item.initialValue) < 0.15 && (
-                                                            <span style={{
-                                                                display: 'inline-flex', alignItems: 'center', gap: 4,
-                                                                background: '#fef2f2', color: '#ef4444',
-                                                                border: '1px solid #fecaca', borderRadius: 6,
-                                                                padding: '2px 7px', fontSize: 11, fontWeight: 700
-                                                            }}><AlertTriangle size={11} /> {t('inventory.lowStock', 'Low')}</span>
-                                                        )}
-                                                        <button
-                                                            className="icon-btn danger"
-                                                            onClick={() => handleDeleteBatch(item.id, item.description)}
-                                                            title={t('common.delete')}
-                                                        >
-                                                            <Trash2 size={15} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="inventory-metrics grid grid-2 gap-sm my-md">
-                                                    <div className="metric">
-                                                        <div className="text-tertiary text-xs">{t('inventory.initialValue') || 'القيمة الأصلية'}</div>
-                                                        <div className="font-bold">{formatCurrency(item.initialValue)}</div>
-                                                    </div>
-                                                    <div className="metric">
-                                                        <div className="text-tertiary text-xs">{t('inventory.remainingValue') || 'القيمة المتبقية'}</div>
-                                                        <div className="font-bold text-primary">{formatCurrency(item.remainingValue)}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="progress-bar-container">
-                                                    <div
-                                                        className="progress-bar"
-                                                        style={{ width: `${(item.remainingValue / item.initialValue) * 100}%` }}
-                                                    ></div>
-                                                </div>
-                                                <div className="flex-between mt-md text-xs text-secondary">
-                                                    <span className="flex items-center gap-xs">
-                                                        <History size={12} />
-                                                        {new Date(item.createdAt).toLocaleDateString()}
-                                                    </span>
-                                                    <span>{((item.remainingValue / item.initialValue) * 100).toFixed(0)}% {t('inventory.remaining') || 'متبقي'}</span>
-                                                </div>
-                                                <button
-                                                    className="btn btn-primary full-width mt-md"
-                                                    style={{ display: 'flex', justifyContent: 'center', padding: '8px' }}
-                                                    onClick={() => {
-                                                        setUsageProjectId(item.projectId);
-                                                        setUsageBatchId(item.id);
-                                                        setIsUsageModalOpen(true);
+                            {Object.entries(groupedInventory).map(([entityId, group]) => {
+                                const isSupplier = group.entity.type === 'SUPPLIER';
+                                return (
+                                    <div key={entityId} className="inventory-section mb-xl">
+                                        <div
+                                            className="flex-between mb-md"
+                                            style={{
+                                                borderBottom: `2px solid ${isSupplier ? 'rgba(124, 58, 237, 0.3)' : 'var(--bg-tertiary)'}`,
+                                                paddingBottom: 'var(--spacing-sm)'
+                                            }}
+                                        >
+                                            <h3 className="section-title flex items-center gap-sm m-0" style={{ border: 'none', padding: 0 }}>
+                                                {isSupplier ? (
+                                                    <Store size={20} style={{ color: '#7c3aed' }} />
+                                                ) : (
+                                                    <ArrowRight size={18} className="text-primary" style={isAr ? { transform: 'scaleX(-1)' } : {}} />
+                                                )}
+                                                <span style={isSupplier ? { color: '#7c3aed', fontWeight: 700 } : {}}>
+                                                    {group.entity.title}
+                                                </span>
+                                                <span
+                                                    className="badge ml-sm"
+                                                    style={isSupplier ? {
+                                                        background: 'rgba(124, 58, 237, 0.15)',
+                                                        color: '#7c3aed',
+                                                        border: '1px solid rgba(124, 58, 237, 0.35)',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700
+                                                    } : {
+                                                        background: 'rgba(255, 90, 31, 0.12)',
+                                                        color: 'var(--color-primary)',
+                                                        border: '1px solid rgba(255, 90, 31, 0.3)',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600
                                                     }}
                                                 >
-                                                    {t('inventory.recordUsage') || 'تسجيل استهلاك'}
-                                                </button>
-                                            </div>
-                                        ))}
+                                                    {group.entity.badge}
+                                                </span>
+                                                <span className="badge badge-secondary ml-xs">{group.items.length} {t('inventory.items') || 'بنود'}</span>
+                                            </h3>
+                                        </div>
+                                        <div className="grid grid-3 gap-md">
+                                            {group.items.map(item => (
+                                                <div
+                                                    key={item.id}
+                                                    className={`card inventory-card ${isSupplier ? 'supplier-card' : ''}`}
+                                                    style={isSupplier ? {
+                                                        borderColor: 'rgba(124, 58, 237, 0.35)',
+                                                        background: 'linear-gradient(180deg, rgba(124, 58, 237, 0.04) 0%, var(--bg-secondary) 100%)'
+                                                    } : {}}
+                                                >
+                                                    <div className="flex-between mb-sm" style={{ alignItems: 'flex-start' }}>
+                                                        <div style={{ flex: 1, minWidth: 0, paddingInlineEnd: '10px' }}>
+                                                            <h4 className="m-0" style={{ wordBreak: 'break-word' }}>{item.description}</h4>
+                                                            {isSupplier && (
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', fontSize: '0.78rem', color: '#7c3aed' }}>
+                                                                    <Store size={12} />
+                                                                    <span>{group.entity.name}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex gap-sm" style={{ flexShrink: 0 }}>
+                                                            <span className={`badge ${item.status === 'AVAILABLE' ? 'badge-success' : 'badge-warning'}`}>
+                                                                {t(`inventory.status.${item.status.toLowerCase()}`) || item.status}
+                                                            </span>
+                                                            {/* Low remaining value warning badge */}
+                                                            {item.initialValue > 0 && (item.remainingValue / item.initialValue) < 0.15 && (
+                                                                <span style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                                    background: '#fef2f2', color: '#ef4444',
+                                                                    border: '1px solid #fecaca', borderRadius: 6,
+                                                                    padding: '2px 7px', fontSize: 11, fontWeight: 700
+                                                                }}><AlertTriangle size={11} /> {t('inventory.lowStock', 'Low')}</span>
+                                                            )}
+                                                            <button
+                                                                className="icon-btn danger"
+                                                                onClick={() => handleDeleteBatch(item.id, item.description)}
+                                                                title={t('common.delete')}
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="inventory-metrics grid grid-2 gap-sm my-md">
+                                                        <div className="metric">
+                                                            <div className="text-tertiary text-xs">{t('inventory.initialValue') || 'القيمة الأصلية'}</div>
+                                                            <div className="font-bold">{formatCurrency(item.initialValue)}</div>
+                                                        </div>
+                                                        <div className="metric">
+                                                            <div className="text-tertiary text-xs">{t('inventory.remainingValue') || 'القيمة المتبقية'}</div>
+                                                            <div className={`font-bold ${isSupplier ? '' : 'text-primary'}`} style={isSupplier ? { color: '#7c3aed' } : {}}>
+                                                                {formatCurrency(item.remainingValue)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="progress-bar-container">
+                                                        <div
+                                                            className={`progress-bar ${isSupplier ? 'supplier-progress' : ''}`}
+                                                            style={{
+                                                                width: `${Math.min(100, Math.max(0, (item.remainingValue / item.initialValue) * 100))}%`,
+                                                                ...(isSupplier ? { background: 'linear-gradient(90deg, #7c3aed, #a855f7)' } : {})
+                                                            }}
+                                                        ></div>
+                                                    </div>
+                                                    <div className="flex-between mt-md text-xs text-secondary">
+                                                        <span className="flex items-center gap-xs">
+                                                            <History size={12} />
+                                                            {new Date(item.createdAt).toLocaleDateString()}
+                                                        </span>
+                                                        <span>{((item.remainingValue / item.initialValue) * 100).toFixed(0)}% {t('inventory.remaining') || 'متبقي'}</span>
+                                                    </div>
+                                                    <button
+                                                        className={`btn full-width mt-md ${isSupplier ? '' : 'btn-primary'}`}
+                                                        style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'center',
+                                                            padding: '8px',
+                                                            ...(isSupplier ? {
+                                                                background: '#7c3aed',
+                                                                color: '#ffffff',
+                                                                border: '1px solid #6d28d9',
+                                                                boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)'
+                                                            } : {})
+                                                        }}
+                                                        onClick={() => {
+                                                            setUsageProjectId(item.projectId || null);
+                                                            setUsageBatchId(item.id);
+                                                            setUsageBatchItem(item);
+                                                            setIsUsageModalOpen(true);
+                                                        }}
+                                                    >
+                                                        {t('inventory.recordUsage') || 'تسجيل استهلاك'}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )
                 ) : (
@@ -573,16 +743,72 @@ export default function Inventory() {
                                 )}
 
                                 <div className="form-group mb-md">
-                                    <label>{isAr ? 'تخصيص لمشروع محدد (اختياري)' : 'Allocate to Project (Optional)'}</label>
-                                    <select
-                                        value={rechargeForm.projectId}
-                                        onChange={(e) => setRechargeForm(prev => ({ ...prev, projectId: e.target.value }))}
-                                    >
-                                        <option value="">-- {isAr ? 'المخزن العام (بدون مشروع محدد)' : 'General Warehouse (No Project)'} --</option>
-                                        {projects.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </select>
+                                    <label>{t('inventory.allocateTo') || (isAr ? 'تخصيص المخزون إلى' : 'Allocate Inventory To')}</label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                                        <button
+                                            type="button"
+                                            className={`btn btn-sm ${rechargeForm.targetType === 'PROJECT' ? 'btn-primary' : 'btn-secondary'}`}
+                                            onClick={() => setRechargeForm(prev => ({ ...prev, targetType: 'PROJECT' }))}
+                                        >
+                                            {t('inventory.allocateProject') || (isAr ? 'مشروع' : 'Project')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`btn btn-sm ${rechargeForm.targetType === 'SUPPLIER' ? 'btn-primary' : 'btn-secondary'}`}
+                                            style={rechargeForm.targetType === 'SUPPLIER' ? { background: '#7c3aed', borderColor: '#6d28d9', color: '#fff' } : {}}
+                                            onClick={() => setRechargeForm(prev => ({ ...prev, targetType: 'SUPPLIER' }))}
+                                        >
+                                            <Store size={14} style={{ marginInlineEnd: 4 }} />
+                                            {t('inventory.allocateSupplier') || (isAr ? 'مورد' : 'Supplier')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`btn btn-sm ${rechargeForm.targetType === 'GENERAL' ? 'btn-primary' : 'btn-secondary'}`}
+                                            onClick={() => setRechargeForm(prev => ({ ...prev, targetType: 'GENERAL', projectId: '', supplierId: '' }))}
+                                        >
+                                            {t('inventory.allocateGeneral') || (isAr ? 'مخزن عام' : 'General')}
+                                        </button>
+                                    </div>
+
+                                    {rechargeForm.targetType === 'PROJECT' && (
+                                        <select
+                                            value={rechargeForm.projectId}
+                                            onChange={(e) => setRechargeForm(prev => ({ ...prev, projectId: e.target.value }))}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+                                        >
+                                            <option value="">-- {isAr ? 'اختر المشروع' : 'Select Project'} --</option>
+                                            {projects.map(p => (
+                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
+
+                                    {rechargeForm.targetType === 'SUPPLIER' && (
+                                        <select
+                                            value={rechargeForm.supplierId}
+                                            onChange={(e) => {
+                                                const sId = e.target.value;
+                                                const supp = suppliers.find(s => s.id === sId);
+                                                setRechargeForm(prev => ({
+                                                    ...prev,
+                                                    supplierId: sId,
+                                                    supplierName: prev.supplierName || (supp ? (supp.name + (supp.company ? ` (${supp.company})` : '')) : '')
+                                                }));
+                                            }}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #8b5cf6', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+                                        >
+                                            <option value="">-- {isAr ? 'اختر المورد' : 'Select Supplier'} --</option>
+                                            {suppliers.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name} {s.company ? `(${s.company})` : ''}</option>
+                                            ))}
+                                        </select>
+                                    )}
+
+                                    {rechargeForm.targetType === 'GENERAL' && (
+                                        <div className="text-secondary text-xs" style={{ padding: '6px 2px' }}>
+                                            {isAr ? 'سيتم حفظ الشحنة في المخزن العام غير مخصصة لمشروع أو مورد محدد.' : 'Batch will be stored in the general warehouse unassigned.'}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="form-group mb-md">
@@ -621,9 +847,15 @@ export default function Inventory() {
 
             <InventoryUsageModal
                 open={isUsageModalOpen}
-                onClose={() => setIsUsageModalOpen(false)}
+                onClose={() => {
+                    setIsUsageModalOpen(false);
+                    setUsageBatchItem(null);
+                    setUsageBatchId(null);
+                }}
                 projectId={usageProjectId}
                 preselectedBatchId={usageBatchId}
+                batchItem={usageBatchItem}
+                projects={projects}
                 onSuccess={() => {
                     showAlert({ type: 'success', title: 'Success', message: 'Usage recorded successfully' });
                     loadData();
@@ -640,6 +872,10 @@ export default function Inventory() {
                 .inventory-card:hover, .material-card:hover {
                     border-color: rgba(255, 90, 31, 0.4);
                     box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.65), 0 0 26px -12px rgba(255, 90, 31, 0.3);
+                }
+                .inventory-card.supplier-card:hover {
+                    border-color: rgba(168, 85, 247, 0.6) !important;
+                    box-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.65), 0 0 26px -12px rgba(168, 85, 247, 0.35) !important;
                 }
                 .progress-bar-container {
                     height: 6px;

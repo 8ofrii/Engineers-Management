@@ -8,6 +8,8 @@ const InventoryUsageModal = ({
     onClose,
     projectId,
     preselectedBatchId,
+    batchItem,
+    projects,
     onSuccess
 }) => {
     const { t, i18n } = useTranslation();
@@ -15,6 +17,7 @@ const InventoryUsageModal = ({
 
     const [formData, setFormData] = useState({
         materialBatchId: '',
+        targetProjectId: '',
         valueConsumed: '',
         quantityConsumed: '',
         description: ''
@@ -25,6 +28,28 @@ const InventoryUsageModal = ({
     const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [profitPreview, setProfitPreview] = useState(null);
+
+    // If batchItem is passed directly, initialize immediately
+    useEffect(() => {
+        if (open && batchItem) {
+            const formatted = {
+                ...batchItem,
+                itemName: batchItem.description,
+                unit: batchItem.material?.unit || 'PIECE',
+                unitPrice: batchItem.material?.unitPrice || 0
+            };
+            setBatches(prev => {
+                if (prev.some(b => b.id === batchItem.id)) return prev;
+                return [formatted, ...prev];
+            });
+            setSelectedBatch(formatted);
+            setFormData(prev => ({
+                ...prev,
+                materialBatchId: batchItem.id,
+                targetProjectId: batchItem.projectId || ''
+            }));
+        }
+    }, [open, batchItem]);
 
     // Fetch available batches
     useEffect(() => {
@@ -185,6 +210,8 @@ const InventoryUsageModal = ({
             const fallbackDescription = formData.description?.trim() || 
                 (isArabic ? `صرف خامات: ${selectedBatch?.itemName || 'مخزون'}` : `Material usage: ${selectedBatch?.itemName || 'Inventory'}`);
 
+            const effectiveProjectId = formData.targetProjectId || projectId || selectedBatch?.projectId || undefined;
+
             const API_URL = import.meta.env.VITE_API_URL || '/api';
             const response = await fetch(`${API_URL}/transactions/inventory-usage`, {
                 method: 'POST',
@@ -195,7 +222,7 @@ const InventoryUsageModal = ({
                 body: JSON.stringify({
                     ...formData,
                     description: fallbackDescription,
-                    projectId,
+                    projectId: effectiveProjectId,
                     valueConsumed: parseFloat(formData.valueConsumed),
                     quantityConsumed: formData.quantityConsumed ? parseFloat(formData.quantityConsumed) : undefined
                 })
@@ -268,6 +295,22 @@ const InventoryUsageModal = ({
                         </select>
                         {errors.materialBatchId && <span className="error-message">{errors.materialBatchId}</span>}
                     </div>
+
+                    {(!projectId && !selectedBatch?.projectId) && projects?.length > 0 && (
+                        <div className="form-group full-width">
+                            <label>{isArabic ? 'المشروع المستلم للاستهلاك (اختياري)' : 'Receiving Project (Optional)'}</label>
+                            <select
+                                name="targetProjectId"
+                                value={formData.targetProjectId}
+                                onChange={handleChange}
+                            >
+                                <option value="">-- {isArabic ? 'استهلاك عام (بدون مشروع)' : 'General Usage (No Project)'} --</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     {selectedBatch && (
                         <div className="card mb-md" style={{ backgroundColor: 'var(--bg-tertiary)', padding: '12px' }}>

@@ -206,6 +206,7 @@ export const rechargeMaterial = async (req, res, next) => {
             quantity,
             notes,
             projectId,
+            supplierId,
             unitPrice,
             paymentMethod,
             payerUserId,
@@ -255,11 +256,12 @@ export const rechargeMaterial = async (req, res, next) => {
                     data: {
                         tenantId: req.user.tenantId,
                         projectId: projectId || null,
+                        supplierId: supplierId || null,
                         type: 'EXPENSE',
                         category: 'MATERIALS',
                         amount: totalCost,
                         description: notes || `شحن رصيد مخزن: ${material.nameAr || material.name} (+${addQty} ${material.unit} @ ${effectivePrice} EGP)`,
-                        costCenter: costCenter || (projectId ? 'المشروع' : 'المخزن الرئيسي'),
+                        costCenter: costCenter || (projectId ? 'المشروع' : (supplierId ? 'مخزون المورد' : 'المخزن الرئيسي')),
                         paymentMethod: paymentMethod || 'CUSTODY_WALLET',
                         transactionTo: supplierName || 'شراء خامات مخزنية',
                         payerUserId: actualPayer,
@@ -281,11 +283,12 @@ export const rechargeMaterial = async (req, res, next) => {
                 }
             }
 
-            // 2. If a project is selected, also create a material batch for site usage tracking
-            if (projectId) {
+            // 2. If a project or supplier is selected, also create a material batch for usage tracking
+            if (projectId || supplierId) {
                 await tx.materialBatch.create({
                     data: {
-                        projectId,
+                        projectId: projectId || null,
+                        supplierId: supplierId || null,
                         materialId: material.id,
                         originalReceiptId: createdTx?.id || null,
                         description: `${material.nameAr || material.name} (+${addQty} ${material.unit})`,
