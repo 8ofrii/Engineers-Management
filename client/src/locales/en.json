@@ -949,6 +949,15 @@
             "to": "To (Email)",
             "message": "Message",
             "sendBtn": "Send Invoice"
+        },
+        "delete": {
+            "title": "Delete Invoice",
+            "titleDraft": "Delete Draft Invoice",
+            "titleCancelled": "Delete Cancelled Invoice",
+            "confirm": "Are you sure you want to permanently delete invoice {{number}}? This action cannot be undone.",
+            "confirmDraft": "Are you sure you want to permanently delete draft invoice {{number}}?",
+            "success": "Invoice deleted successfully.",
+            "successDraft": "Draft invoice deleted."
         }
     },
     "reconcile": {

@@ -644,21 +644,21 @@ export const cancelInvoice = async (req, res, next) => {
     }
 };
 
-// @desc    Delete a DRAFT invoice. Only DRAFTs are deletable; sent/paid stay forever.
+// @desc    Delete a DRAFT or CANCELLED invoice.
 // @route   DELETE /api/invoices/:id
-// @access  Private (creator + admin)
+// @access  Private (creator + admin/manager/accountant)
 export const deleteInvoice = async (req, res, next) => {
     try {
         const invoice = await prisma.invoice.findFirst({
             where: { id: req.params.id, tenantId: req.user.tenantId }
         });
         if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
-        if (invoice.status !== 'DRAFT') {
-            return res.status(400).json({ success: false, message: 'Only DRAFT invoices can be deleted; use Cancel for SENT or PAID.' });
+        if (invoice.status !== 'DRAFT' && invoice.status !== 'CANCELLED') {
+            return res.status(400).json({ success: false, message: 'Only DRAFT or CANCELLED invoices can be deleted; please cancel active invoices first.' });
         }
         const isOwner = invoice.createdBy === req.user.id;
-        const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
-        if (!isOwner && !isAdmin) {
+        const isAuthorizedRole = ['ADMIN', 'SUPER_ADMIN', 'ACCOUNTANT', 'PROJECT_MANAGER'].includes(req.user.role);
+        if (!isOwner && !isAuthorizedRole) {
             return res.status(403).json({ success: false, message: 'Not authorized' });
         }
 
@@ -670,7 +670,7 @@ export const deleteInvoice = async (req, res, next) => {
             action: 'DELETE',
             entity: 'Invoice',
             entityId: invoice.id,
-            before: { invoiceNumber: invoice.invoiceNumber, totalAmount: D(invoice.totalAmount) }
+            before: { invoiceNumber: invoice.invoiceNumber, totalAmount: D(invoice.totalAmount), status: invoice.status }
         });
 
         res.status(200).json({ success: true, data: {} });

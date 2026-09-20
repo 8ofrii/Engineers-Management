@@ -176,17 +176,32 @@ export default function Invoices() {
     };
 
     const onDelete = (inv) => {
+        const isCancelled = inv.status === 'CANCELLED';
         showAlert({
             type: 'warning',
-            title: isArabic ? 'حذف مسودة الفاتورة' : 'Delete Draft Invoice',
-            message: isArabic ? `هل تريد حذف مسودة الفاتورة ${inv.invoiceNumber} نهائياً؟` : `Delete draft invoice ${inv.invoiceNumber}?`,
+            title: isArabic
+                ? (isCancelled ? 'حذف الفاتورة الملغاة' : 'حذف مسودة الفاتورة')
+                : (isCancelled ? 'Delete Cancelled Invoice' : 'Delete Draft Invoice'),
+            message: isArabic
+                ? (isCancelled
+                    ? `هل أنت متأكد من حذف الفاتورة الملغاة ${inv.invoiceNumber} نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`
+                    : `هل تريد حذف مسودة الفاتورة ${inv.invoiceNumber} نهائياً؟`)
+                : (isCancelled
+                    ? `Are you sure you want to permanently delete cancelled invoice ${inv.invoiceNumber}? This action cannot be undone.`
+                    : `Delete draft invoice ${inv.invoiceNumber}?`),
             showCancel: true,
-            confirmText: isArabic ? 'نعم، حذف' : 'Yes, Delete',
+            confirmText: isArabic ? 'نعم، حذف نهائياً' : 'Yes, Delete',
             cancelText: isArabic ? 'تراجع' : 'Back',
             onConfirm: async () => {
                 try {
                     await invoicesAPI.remove(inv.id);
-                    showAlert({ type: 'success', title: isArabic ? 'تم الحذف' : 'Deleted', message: isArabic ? 'تم حذف مسودة الفاتورة.' : 'Draft invoice deleted.' });
+                    showAlert({
+                        type: 'success',
+                        title: isArabic ? 'تم الحذف' : 'Deleted',
+                        message: isArabic
+                            ? (isCancelled ? 'تم حذف الفاتورة الملغاة بنجاح.' : 'تم حذف مسودة الفاتورة.')
+                            : (isCancelled ? 'Cancelled invoice deleted successfully.' : 'Draft invoice deleted.')
+                    });
                     load();
                 } catch (err) {
                     showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
@@ -333,8 +348,14 @@ export default function Invoices() {
                                                 {inv.status !== 'CANCELLED' && inv.status !== 'PAID' && canManage && (
                                                     <button className="btn" onClick={() => onCancel(inv)} title="Cancel"><Ban size={14} color="#ef4444" /></button>
                                                 )}
-                                                {inv.status === 'DRAFT' && canManage && (
-                                                    <button className="btn" onClick={() => onDelete(inv)} title="Delete"><Trash2 size={14} color="#ef4444" /></button>
+                                                {['DRAFT', 'CANCELLED'].includes(inv.status) && canManage && (
+                                                    <button
+                                                        className="btn"
+                                                        onClick={() => onDelete(inv)}
+                                                        title={isArabic ? (inv.status === 'CANCELLED' ? 'حذف الفاتورة الملغاة' : 'حذف المسودة') : (inv.status === 'CANCELLED' ? 'Delete Cancelled Invoice' : 'Delete Draft')}
+                                                    >
+                                                        <Trash2 size={14} color="#ef4444" />
+                                                    </button>
                                                 )}
                                             </div>
                                         </Td>
@@ -363,6 +384,9 @@ export default function Invoices() {
                     invoice={viewing}
                     onClose={() => setViewing(null)}
                     onDownload={() => onDownloadPdf(viewing)}
+                    onDelete={onDelete}
+                    canManage={canManage}
+                    isArabic={isArabic}
                 />
             )}
 
@@ -468,7 +492,7 @@ const Modal = ({ title, onClose, maxWidth = 560, children }) => (
     </div>
 );
 
-const ViewModal = ({ invoice, onClose, onDownload }) => (
+const ViewModal = ({ invoice, onClose, onDownload, onDelete, canManage, isArabic }) => (
     <Modal title={invoice.invoiceNumber} onClose={onClose} maxWidth={680}>
         <div className="grid grid-2 mb-md" style={{ gap: 8 }}>
             <Stat label="Client" value={invoice.client?.name || '-'} />
@@ -513,9 +537,22 @@ const ViewModal = ({ invoice, onClose, onDownload }) => (
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{invoice.terms}</p>
             </div>
         )}
-        <button className="btn btn-primary" onClick={onDownload} style={{ marginTop: 16 }}>
-            <Download size={16} /> Download PDF
-        </button>
+        <div className="flex-between" style={{ marginTop: 20, flexWrap: 'wrap', gap: 12 }}>
+            <button className="btn btn-primary" onClick={onDownload}>
+                <Download size={16} /> {isArabic ? 'تحميل PDF' : 'Download PDF'}
+            </button>
+            {['DRAFT', 'CANCELLED'].includes(invoice.status) && canManage && (
+                <button
+                    className="btn btn-danger"
+                    onClick={() => {
+                        onClose();
+                        onDelete(invoice);
+                    }}
+                >
+                    <Trash2 size={16} /> {isArabic ? (invoice.status === 'CANCELLED' ? 'حذف الفاتورة الملغاة' : 'حذف المسودة') : (invoice.status === 'CANCELLED' ? 'Delete Cancelled Invoice' : 'Delete Draft')}
+                </button>
+            )}
+        </div>
     </Modal>
 );
 

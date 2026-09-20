@@ -30,7 +30,7 @@ router.put(
 );
 router.delete(
     '/:id',
-    authorize('ADMIN', 'SUPER_ADMIN'),
+    authorize('ADMIN', 'SUPER_ADMIN', 'ACCOUNTANT', 'PROJECT_MANAGER'),
     validate({ params: idParamSchema }),
     deleteInvoice
 );
