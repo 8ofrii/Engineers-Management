@@ -1,6 +1,34 @@
 import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
 
+// Helper: Auto-sync a single client's status based on active projects
+export const syncClientStatus = async (clientId, tenantId) => {
+    if (!clientId || !tenantId) return null;
+    try {
+        const activeProjectsCount = await prisma.project.count({
+            where: {
+                clientId,
+                tenantId,
+                deletedAt: null,
+                status: { in: ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'] }
+            }
+        });
+        const targetStatus = activeProjectsCount > 0 ? 'ACTIVE' : 'INACTIVE';
+        await prisma.client.updateMany({
+            where: {
+                id: clientId,
+                tenantId,
+                status: { not: targetStatus }
+            },
+            data: { status: targetStatus }
+        });
+        return targetStatus;
+    } catch (err) {
+        console.error(`Failed to auto-sync client status for ${clientId}:`, err);
+        return null;
+    }
+};
+
 // @desc    Get all clients
 // @route   GET /api/clients
 // @access  Private
@@ -29,10 +57,33 @@ export const getClients = async (req, res, next) => {
             }
         });
 
+        // Auto-sync client statuses based on active projects (PLANNING, IN_PROGRESS, ON_HOLD)
+        const activeProjectStatuses = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'];
+        const outOfSync = [];
+
+        const syncedClients = clients.map(client => {
+            const hasActiveProject = (client.projects || []).some(p => activeProjectStatuses.includes(p.status));
+            const targetStatus = hasActiveProject ? 'ACTIVE' : 'INACTIVE';
+            if (client.status !== targetStatus) {
+                outOfSync.push({ id: client.id, status: targetStatus });
+                return { ...client, status: targetStatus };
+            }
+            return client;
+        });
+
+        if (outOfSync.length > 0) {
+            Promise.all(outOfSync.map(item =>
+                prisma.client.update({
+                    where: { id: item.id },
+                    data: { status: item.status }
+                })
+            )).catch(err => console.error('Error auto-syncing client statuses in background:', err));
+        }
+
         res.status(200).json({
             success: true,
-            count: clients.length,
-            data: clients
+            count: syncedClients.length,
+            data: syncedClients
         });
     } catch (error) {
         next(error);
@@ -51,7 +102,9 @@ export const getClient = async (req, res, next) => {
                 deletedAt: null
             },
             include: {
-                projects: true
+                projects: {
+                    where: { deletedAt: null }
+                }
             }
         });
 
@@ -60,6 +113,18 @@ export const getClient = async (req, res, next) => {
                 success: false,
                 message: 'Client not found'
             });
+        }
+
+        // Auto-sync status with active projects
+        const activeProjectStatuses = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'];
+        const hasActiveProject = (client.projects || []).some(p => activeProjectStatuses.includes(p.status));
+        const targetStatus = hasActiveProject ? 'ACTIVE' : 'INACTIVE';
+        if (client.status !== targetStatus) {
+            await prisma.client.update({
+                where: { id: client.id },
+                data: { status: targetStatus }
+            });
+            client.status = targetStatus;
         }
 
         res.status(200).json({
@@ -77,6 +142,9 @@ export const getClient = async (req, res, next) => {
 export const createClient = async (req, res, next) => {
     try {
         const body = { ...req.body };
+        // Status is auto-derived from active projects; newly added clients start as INACTIVE
+        body.status = 'INACTIVE';
+
         if (Array.isArray(body.phones)) {
             body.phones = body.phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
             if (!body.phone && body.phones.length > 0) {
@@ -133,6 +201,9 @@ export const updateClient = async (req, res, next) => {
         }
 
         const body = { ...req.body };
+        // Status is auto-derived from active projects; prevent manual tampering
+        delete body.status;
+
         if (Array.isArray(body.phones)) {
             body.phones = body.phones.map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
             if (!body.phone && body.phones.length > 0) {
@@ -148,6 +219,11 @@ export const updateClient = async (req, res, next) => {
             where: { id: req.params.id },
             data: body
         });
+
+        const syncedStatus = await syncClientStatus(updatedClient.id, req.user.tenantId);
+        if (syncedStatus) {
+            updatedClient.status = syncedStatus;
+        }
 
         await auditFromReq(req, {
             action: 'UPDATE',

@@ -19,7 +19,6 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
         phones: [''],
         company: '',
         taxId: '',
-        status: 'INACTIVE',
         // Address
         street: '',
         city: '',
@@ -40,7 +39,6 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                 phones: initPhones,
                 company: initialData.company || '',
                 taxId: initialData.taxId || '',
-                status: initialData.status || 'ACTIVE',
                 street: initialData.street || '',
                 city: initialData.city || '',
                 state: initialData.state || '',
@@ -70,7 +68,6 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                     phones: [''],
                     company: '',
                     taxId: '',
-                    status: 'INACTIVE',
                     street: '',
                     city: '',
                     state: '',
@@ -108,7 +105,6 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
             phones: [''],
             company: '',
             taxId: '',
-            status: 'INACTIVE',
             street: '',
             city: '',
             state: '',
@@ -248,26 +244,6 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                                     onChange={handleChange}
                                     placeholder={t('clients.modal.placeholders.taxId')}
                                 />
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="status">{t('clients.modal.fields.status')}</label>
-                                <select
-                                    id="status"
-                                    name="status"
-                                    value={formData.status}
-                                    onChange={handleChange}
-                                    style={{ fontWeight: 600 }}
-                                >
-                                    <option value="ACTIVE">{t('clients.status.active', 'Active')}</option>
-                                    <option value="INACTIVE">{t('clients.status.inactive', 'Inactive')}</option>
-                                    <option value="PENDING">{t('clients.status.pending', 'Pending')}</option>
-                                </select>
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
-                                    {isArabic
-                                        ? 'نشط: لديه مشاريع جارية | غير نشط: لا توجد مشاريع حالية'
-                                        : 'Active: ongoing projects | Inactive: no current projects'}
-                                </span>
                             </div>
                         </div>
                     </div>

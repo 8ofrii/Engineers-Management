@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import { auditFromReq } from '../lib/audit.js';
 import { getPlan } from '../lib/plans.js';
+import { syncClientStatus } from './clientController.js';
 
 // @desc    Get all projects
 // @route   GET /api/projects
@@ -245,6 +246,11 @@ export const createProject = async (req, res, next) => {
             after: project
         });
 
+        // Auto-sync client status based on project state
+        if (project.clientId) {
+            await syncClientStatus(project.clientId, req.user.tenantId);
+        }
+
         res.status(201).json({
             success: true,
             data: project
@@ -349,6 +355,14 @@ export const updateProject = async (req, res, next) => {
             after: updatedProject
         });
 
+        // Auto-sync client status for updated client and old client if changed
+        if (updatedProject.clientId) {
+            await syncClientStatus(updatedProject.clientId, req.user.tenantId);
+        }
+        if (project.clientId && project.clientId !== updatedProject.clientId) {
+            await syncClientStatus(project.clientId, req.user.tenantId);
+        }
+
         res.status(200).json({
             success: true,
             data: updatedProject
@@ -385,6 +399,11 @@ export const restoreProject = async (req, res, next) => {
             entityId: restored.id,
             after: restored
         });
+
+        // Auto-sync client status on restore
+        if (restored.clientId) {
+            await syncClientStatus(restored.clientId, req.user.tenantId);
+        }
 
         res.status(200).json({ success: true, data: restored });
     } catch (error) {
@@ -435,6 +454,11 @@ export const deleteProject = async (req, res, next) => {
             entityId: project.id,
             before: project
         });
+
+        // Auto-sync client status on soft delete
+        if (project.clientId) {
+            await syncClientStatus(project.clientId, req.user.tenantId);
+        }
 
         res.status(200).json({
             success: true,
