@@ -125,7 +125,14 @@ export default function TransactionDetailModal({
     };
 
     const handlePrintSlip = () => {
+        document.body.classList.add('tx-slip-printing');
+        const cleanup = () => {
+            document.body.classList.remove('tx-slip-printing');
+            window.removeEventListener('afterprint', cleanup);
+        };
+        window.addEventListener('afterprint', cleanup);
         window.print();
+        setTimeout(cleanup, 2000);
     };
 
     const fmtCurrency = (amount) => {

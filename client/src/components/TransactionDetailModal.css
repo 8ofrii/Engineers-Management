@@ -583,12 +583,12 @@
         margin: 15mm;
     }
 
-    body * {
+    body.tx-slip-printing * {
         visibility: hidden;
     }
 
-    .tx-detail-modal,
-    .tx-detail-modal * {
+    body.tx-slip-printing .tx-detail-modal,
+    body.tx-slip-printing .tx-detail-modal * {
         visibility: visible;
     }
 

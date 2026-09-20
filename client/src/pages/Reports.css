@@ -16,10 +16,12 @@
 @media print {
     /* Hide screen UI controls, navigation, sidebars and charts */
     .sidebar,
+    .topbar,
     .top-bar,
     .navbar,
     .reports-web-header,
     .reports-filters-ribbon,
+    .reports-kpis-grid,
     .reports-charts-grid,
     .reports-web-table,
     .draft-capture-fab,
@@ -33,10 +35,26 @@
         display: none !important;
     }
 
+    /* Reset all layout containers so print is unconstrained */
+    .layout,
+    .main-content,
+    .content,
+    .container,
+    .reports-page {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-height: auto !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
     /* Configure Page Geometry */
     @page {
         size: A4 portrait;
-        margin: 12mm 14mm 12mm 14mm;
+        margin: 10mm 12mm 10mm 12mm;
     }
 
     html, body {
@@ -52,10 +70,15 @@
     /* Display the executive printable report */
     .printable-report-container {
         display: block !important;
+        visibility: visible !important;
         width: 100% !important;
         box-sizing: border-box !important;
         background: #ffffff !important;
         color: #0f172a !important;
+    }
+
+    .printable-report-container * {
+        visibility: visible !important;
     }
 
     /* Executive Top Accent Bar */

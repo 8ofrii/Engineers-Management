@@ -387,4 +387,15 @@ export const projectCostItemsAPI = {
     delete: (id) => api.delete(`/project-cost-items/${id}`)
 };
 
+// Financial Reports API
+export const reportsAPI = {
+    downloadFinancialPdf: async (params) => {
+        const response = await api.get('/reports/financial-pdf', {
+            params,
+            responseType: 'blob'
+        });
+        return response.data;
+    }
+};
+
 export default api;

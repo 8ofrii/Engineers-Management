@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { transactionsAPI, projectsAPI, clientsAPI } from '../services/api';
+import { transactionsAPI, projectsAPI, clientsAPI, reportsAPI } from '../services/api';
 import { 
     FileText, Download, TrendingUp, TrendingDown, DollarSign, 
     Briefcase, PieChart as PieIcon, BarChart3, Filter, Printer, Calendar
@@ -39,6 +39,7 @@ export default function Reports() {
     const [selectedProjectId, setSelectedProjectId] = useState('ALL');
     const [dateRange, setDateRange] = useState('ALL'); // ALL | THIS_MONTH | THIS_YEAR
     const [loading, setLoading] = useState(true);
+    const [exportingPdf, setExportingPdf] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -260,6 +261,31 @@ export default function Reports() {
         });
     };
 
+    const handleExportPdf = async () => {
+        setExportingPdf(true);
+        try {
+            const blob = await reportsAPI.downloadFinancialPdf({
+                projectId: selectedProjectId,
+                dateRange,
+                lang: i18n.language
+            });
+            const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+            const link = document.createElement('a');
+            link.href = url;
+            const dateSlug = new Date().toISOString().slice(0, 10);
+            link.setAttribute('download', `hesaby-financial-report-${dateSlug}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Failed to export report PDF:', error);
+            showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to export report PDF.') });
+        } finally {
+            setExportingPdf(false);
+        }
+    };
+
     if (loading) {
         return (
             <Layout>
@@ -286,11 +312,25 @@ export default function Reports() {
                     </div>
 
                     <div className="flex gap-sm" style={{ flexWrap: 'wrap' }}>
-                        <button className="btn btn-secondary" onClick={() => window.print()} title={isArabic ? 'طباعة تقرير A4 معتمد أو حفظ كملف PDF' : 'Print official A4 report or Save as PDF'}>
-                            <Printer size={16} /> {isArabic ? 'طباعة / حفظ PDF' : 'Print / Export PDF'}
+                        <button 
+                            className="btn btn-primary" 
+                            onClick={handleExportPdf} 
+                            disabled={exportingPdf}
+                            title={isArabic ? 'تصدير تقرير مالي معتمد كملف PDF عالي الجودة' : 'Export official executive PDF report'}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                        >
+                            {exportingPdf ? (
+                                <span className="spinner" style={{ width: 14, height: 14, margin: 0, borderWidth: 2 }} />
+                            ) : (
+                                <FileText size={16} />
+                            )}
+                            <span>{isArabic ? (exportingPdf ? 'جاري التحميل...' : 'تصدير تقرير PDF') : (exportingPdf ? 'Exporting...' : 'Export PDF')}</span>
                         </button>
-                        <button className="btn btn-primary" onClick={handleExportXLSX}>
+                        <button className="btn btn-secondary" onClick={handleExportXLSX} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             <Download size={16} /> {isArabic ? 'تصدير إكسيل (XLSX)' : 'Export Excel (XLSX)'}
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => window.print()} title={isArabic ? 'طباعة مباشرة A4' : 'Print A4 report'} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            <Printer size={16} /> {isArabic ? 'طباعة' : 'Print'}
                         </button>
                     </div>
                 </div>
