@@ -6,8 +6,9 @@ import {
     FileText, CheckCircle2, Clock, AlertCircle, Copy, Check,
     Image as ImageIcon, TrendingUp, TrendingDown, Building, User,
     Wallet, Calendar, Tag, Maximize2, Printer, Edit3, ArrowUpRight,
-    ArrowDownLeft, CornerDownRight, RotateCcw, Briefcase
+    ArrowDownLeft, CornerDownRight, RotateCcw, Briefcase, Loader2
 } from 'lucide-react';
+import { transactionsAPI } from '../services/api';
 import './TransactionDetailModal.css';
 
 /**
@@ -44,6 +45,9 @@ export default function TransactionDetailModal({
 
     // Image Zoom Modal State
     const [isImageZoomed, setIsImageZoomed] = useState(false);
+    // Voucher Printing & Export State
+    const [isPrintingSlip, setIsPrintingSlip] = useState(false);
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
     useEffect(() => {
         // Reset state on transaction change
@@ -51,6 +55,8 @@ export default function TransactionDetailModal({
         setCurrentTime(0);
         setDuration(0);
         setIsImageZoomed(false);
+        setIsPrintingSlip(false);
+        setIsDownloadingPdf(false);
     }, [transaction?.id]);
 
     if (!isOpen || !transaction) return null;
@@ -124,7 +130,8 @@ export default function TransactionDetailModal({
         }
     };
 
-    const handlePrintSlip = () => {
+    // Clean browser print fallback
+    const handleBrowserPrint = () => {
         document.body.classList.add('tx-slip-printing');
         const cleanup = () => {
             document.body.classList.remove('tx-slip-printing');
@@ -132,7 +139,72 @@ export default function TransactionDetailModal({
         };
         window.addEventListener('afterprint', cleanup);
         window.print();
-        setTimeout(cleanup, 2000);
+        setTimeout(cleanup, 2500);
+    };
+
+    // Official 1-Page Voucher PDF Print
+    const handlePrintSlip = async () => {
+        if (!tx?.id || isPrintingSlip || isDownloadingPdf) return;
+        setIsPrintingSlip(true);
+        try {
+            const blob = await transactionsAPI.downloadVoucherPdf(tx.id);
+            const url = window.URL.createObjectURL(blob);
+
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+
+            iframe.onload = () => {
+                setTimeout(() => {
+                    try {
+                        iframe.contentWindow?.focus();
+                        iframe.contentWindow?.print();
+                    } catch {
+                        window.open(url, '_blank');
+                    }
+                    setTimeout(() => {
+                        try {
+                            document.body.removeChild(iframe);
+                            window.URL.revokeObjectURL(url);
+                        } catch {}
+                    }, 60000);
+                }, 350);
+            };
+        } catch (err) {
+            console.warn('Voucher PDF generation endpoint unavailable, falling back to browser print:', err);
+            handleBrowserPrint();
+        } finally {
+            setIsPrintingSlip(false);
+        }
+    };
+
+    // Direct Voucher PDF Download
+    const handleDownloadVoucherPdf = async () => {
+        if (!tx?.id || isPrintingSlip || isDownloadingPdf) return;
+        setIsDownloadingPdf(true);
+        try {
+            const blob = await transactionsAPI.downloadVoucherPdf(tx.id);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const ref = (tx.id || 'TX').slice(0, 8).toUpperCase();
+            a.download = `hesaby-voucher-${ref}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+        } catch (err) {
+            console.error('Failed to download voucher PDF:', err);
+            handleBrowserPrint();
+        } finally {
+            setIsDownloadingPdf(false);
+        }
     };
 
     const fmtCurrency = (amount) => {
@@ -642,9 +714,21 @@ export default function TransactionDetailModal({
                             type="button"
                             className="btn btn-secondary btn-sm flex items-center gap-xs"
                             onClick={handlePrintSlip}
+                            disabled={isPrintingSlip || isDownloadingPdf}
+                            title={isArabic ? 'طباعة سند مالي معتمد' : 'Print Official Financial Voucher'}
                         >
-                            <Printer size={15} />
+                            {isPrintingSlip ? <Loader2 size={15} className="spin animate-spin" /> : <Printer size={15} />}
                             {isArabic ? 'طباعة السند' : 'Print Voucher'}
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm flex items-center gap-xs"
+                            onClick={handleDownloadVoucherPdf}
+                            disabled={isPrintingSlip || isDownloadingPdf}
+                            title={isArabic ? 'تحميل ملف PDF للسند' : 'Download Voucher PDF'}
+                        >
+                            {isDownloadingPdf ? <Loader2 size={15} className="spin animate-spin" /> : <Download size={15} />}
+                            {isArabic ? 'تحميل PDF' : 'Download PDF'}
                         </button>
                     </div>
 

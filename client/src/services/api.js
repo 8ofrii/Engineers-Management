@@ -283,7 +283,12 @@ export const transactionsAPI = {
     uploadVoice: (id, formData) => api.patch(`/transactions/${id}/voice`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     }),
-    getCostCenters: () => api.get('/transactions/cost-centers')
+    getCostCenters: () => api.get('/transactions/cost-centers'),
+    downloadVoucherPdf: async (id) => {
+        const r = await api.get(`/transactions/${id}/voucher-pdf`, { responseType: 'blob' });
+        return r.data; // Blob
+    },
+    getVoucherPdfUrl: (id) => `${API_URL}/transactions/${id}/voucher-pdf`
 };
 
 // Clients API

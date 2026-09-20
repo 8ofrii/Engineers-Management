@@ -91,6 +91,7 @@ router.post('/', transactionCreateController.createTransaction);
 router.get('/', transactionController.getTransactions);
 
 // Get single transaction
+router.get('/:id/voucher-pdf', transactionController.getTransactionVoucherPdf);
 router.get('/:id', transactionController.getTransaction);
 
 // Update transaction

@@ -2,6 +2,7 @@ import prisma from '../lib/prisma.js';
 import * as transactionV2 from './transactionControllerV2.js';
 import { auditFromReq } from '../lib/audit.js';
 import { deleteByUrl } from '../lib/storage.js';
+import { generateVoucherPdf } from '../lib/voucherPdf.js';
 
 // @desc    Get unique cost centers
 // @route   GET /api/transactions/cost-centers
@@ -440,6 +441,53 @@ export const getTransaction = async (req, res, next) => {
             success: true,
             data: transaction
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Generate and stream official Transaction Voucher PDF
+// @route   GET /api/transactions/:id/voucher-pdf
+// @access  Private
+export const getTransactionVoucherPdf = async (req, res, next) => {
+    try {
+        const transaction = await prisma.transaction.findFirst({
+            where: {
+                id: req.params.id,
+                tenantId: req.user.tenantId
+            },
+            include: {
+                project: true,
+                supplier: true,
+                client: true,
+                workman: true,
+                safe: true,
+                user: { select: { id: true, name: true, email: true, phone: true } },
+                approver: { select: { id: true, name: true, email: true } },
+                payer: { select: { id: true, name: true, email: true } },
+                tenant: true
+            }
+        });
+
+        if (!transaction) {
+            return res.status(404).json({
+                success: false,
+                message: 'Transaction not found'
+            });
+        }
+
+        const tenant = transaction.tenant || (req.user.tenantId ? await prisma.tenant.findUnique({ where: { id: req.user.tenantId } }) : null);
+
+        const buffer = await generateVoucherPdf({
+            transaction,
+            tenant,
+            user: req.user
+        });
+
+        const ref = (transaction.id || 'TX').slice(0, 8).toUpperCase();
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="voucher-${ref}.pdf"`);
+        res.send(buffer);
     } catch (error) {
         next(error);
     }
