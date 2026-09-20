@@ -60,6 +60,99 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         return trade;
     };
 
+    // Auto-detect unit of measure for a material batch
+    const detectBatchUnit = (batch, rawMaterialsList = []) => {
+        if (!batch) return null;
+
+        // 1. Direct unit property on batch (if populated by API or model)
+        if (batch.unit && typeof batch.unit === 'string') {
+            const u = batch.unit.toUpperCase();
+            if (['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG'].includes(u)) {
+                return u;
+            }
+        }
+
+        // 2. Direct material relation on batch
+        if (batch.material?.unit) {
+            const u = batch.material.unit.toUpperCase();
+            if (['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG'].includes(u)) {
+                return u;
+            }
+        }
+
+        // 3. Match by materialId in rawMaterials list
+        if (batch.materialId && rawMaterialsList.length > 0) {
+            const found = rawMaterialsList.find(m => m.id === batch.materialId);
+            if (found?.unit) {
+                return found.unit.toUpperCase();
+            }
+        }
+
+        // 4. Match batch description with rawMaterials list names
+        const desc = ((batch.description || '') + ' ' + (batch.descriptionAr || '')).toLowerCase();
+        if (rawMaterialsList.length > 0) {
+            for (const m of rawMaterialsList) {
+                const nameEn = (m.name || '').toLowerCase().trim();
+                const nameAr = (m.nameAr || '').trim();
+                if (nameEn && (desc === nameEn || desc.includes(nameEn))) {
+                    if (m.unit) return m.unit.toUpperCase();
+                }
+                if (nameAr && desc.includes(nameAr.toLowerCase())) {
+                    if (m.unit) return m.unit.toUpperCase();
+                }
+            }
+        }
+
+        // 5. Explicit unit keywords in description (English & Arabic)
+        const unitPatterns = [
+            { regex: /\b(LITER|LITRE|LITERS|LTR)\b/i, unit: 'LITER' },
+            { regex: /\b(BAG|BAGS|SACK|SACKS)\b/i, unit: 'BAG' },
+            { regex: /\b(TON|TONS|TONNE|TONNES)\b/i, unit: 'TON' },
+            { regex: /\b(KG|KGS|KILO|KILOS|KILOGRAM)\b/i, unit: 'KG' },
+            { regex: /\b(M3|CBM|M\^3|CUBIC\s*METER)\b/i, unit: 'M3' },
+            { regex: /\b(M2|SQM|M\^2|SQUARE\s*METER)\b/i, unit: 'M2' },
+            { regex: /\b(PIECE|PIECES|PCS|PC)\b/i, unit: 'PIECE' },
+            { regex: /\b(METER|METERS|LM|LINEAR\s*METER)\b/i, unit: 'M' }
+        ];
+        for (const { regex, unit } of unitPatterns) {
+            if (regex.test(desc)) return unit;
+        }
+
+        if (/لتر|ليتر/i.test(desc)) return 'LITER';
+        if (/شيكار|شكار|كيس/i.test(desc)) return 'BAG';
+        if (/طن/i.test(desc)) return 'TON';
+        if (/كيلو|كجم|كغ/i.test(desc)) return 'KG';
+        if (/متر\s*مكعب|م3|م³|مكعب/i.test(desc)) return 'M3';
+        if (/متر\s*مربع|م2|م²|مربع/i.test(desc)) return 'M2';
+        if (/متر\s*طولي|م\s*طولي/i.test(desc)) return 'M';
+        if (/قطعة|قطعه|قطع|عدد|حبة|حبه/i.test(desc)) return 'PIECE';
+
+        // 6. Construction material keywords heuristic
+        if (/paint|paints|primer|putty|sealer|thinner|varnish|gloss|emulsion|acrylic|دهان|دهانات|بويات|بوية|معجون|سيلر|ورنيش|نفط|ثنر|لاكيه|بلاستيك|جوتن|سايبس|glc/i.test(desc)) {
+            return 'LITER';
+        }
+        if (/cement|gypsum|lime|plaster|grout|mortar|adhesive|أسمنت|اسمنت|جبس|جير|مونه|مونة|غراء/i.test(desc)) {
+            return 'BAG';
+        }
+        if (/sand|gravel|aggregate|crushed\s*stone|concrete|ready\s*mix|soil|backfill|رمل|رملة|زلط|سن|خرسانة|ركام|ردش|دفان/i.test(desc)) {
+            return 'M3';
+        }
+        if (/steel|rebar|iron|reinforcement|حديد|صلب|تسليح|كانات/i.test(desc)) {
+            return 'TON';
+        }
+        if (/tile|tiles|ceramic|porcelain|marble|granite|parquet|flooring|interlock|plastering|gypsum\s*board|سيراميك|بورسلين|رخام|جرانيت|باركيه|بلاط|ارضيات|جبسوم|بورد/i.test(desc)) {
+            return 'M2';
+        }
+        if (/pipe|pipes|cable|cables|wire|wires|conduit|hose|tube|timber|wood|خشب|مواسير|كابلات|أسلاك|اسلاك|خراطيم/i.test(desc)) {
+            return 'M';
+        }
+        if (/brick|bricks|block|blocks|door|doors|window|windows|switch|switches|valve|valves|lamp|lamps|fitting|طوب|بلوك|ورديات|لمبات|مفاتيح|محابس|أبواب|شبابيك/i.test(desc)) {
+            return 'PIECE';
+        }
+
+        return null;
+    };
+
     // Modes: EXPENSE (default), INCOME, USAGE, TRANSFER
     const [mode, setMode] = useState('EXPENSE');
 
@@ -662,15 +755,42 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 setSelectedProject(proj || null);
                 loadCostItems(batch.projectId);
             }
+
+            const detectedUnit = detectBatchUnit(batch, rawMaterials);
+            const batchUnitPrice = batch.material?.unitPrice 
+                ? batch.material.unitPrice.toString() 
+                : (rawMaterials.find(m => m.id === batch.materialId)?.unitPrice?.toString() || '');
+
             setFormData(prev => ({
                 ...prev,
                 amount: prev.amount || (batch.remainingValue ? batch.remainingValue.toString() : ''),
                 category: prev.category || 'MATERIALS',
-                description: prev.description || (isRTL ? `استهلاك من دفعة: ${batch.description}` : `Usage from batch: ${batch.description}`)
+                description: prev.description || (isRTL ? `استهلاك من دفعة: ${batch.description}` : `Usage from batch: ${batch.description}`),
+                unit: detectedUnit || prev.unit || 'TON',
+                unitPrice: prev.unitPrice || batchUnitPrice
             }));
             if (errors.batchId) setErrors(prev => ({ ...prev, batchId: '' }));
         }
     };
+
+    // Auto-sync selectedBatch and unit when materialBatches or rawMaterials loads
+    useEffect(() => {
+        if (mode === 'USAGE' && selectedBatchId && materialBatches.length > 0) {
+            const batch = materialBatches.find(b => b.id === selectedBatchId);
+            if (batch) {
+                setSelectedBatch(batch);
+                const detectedUnit = detectBatchUnit(batch, rawMaterials);
+                if (detectedUnit) {
+                    setFormData(prev => {
+                        if (!prev.unit || prev.unit === 'TON' || prev.unit !== detectedUnit) {
+                            return { ...prev, unit: detectedUnit };
+                        }
+                        return prev;
+                    });
+                }
+            }
+        }
+    }, [mode, selectedBatchId, materialBatches, rawMaterials]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -820,6 +940,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 payload = {
                     materialBatchId: selectedBatchId,
                     valueConsumed: Number(formData.amount),
+                    quantityConsumed: formData.quantity ? Number(formData.quantity) : undefined,
+                    unit: formData.unit,
                     projectId: selectedProjectId,
                     description: formData.description?.trim() || t('inventory.recordUsage') || 'Material Usage',
                     category: formData.category
@@ -2113,7 +2235,14 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             />
                                         </div>
                                         <div className="form-group">
-                                            <label>{t('finance.uom')}</label>
+                                            <label>
+                                                {t('finance.uom')}
+                                                {selectedBatch && (
+                                                    <span style={{ fontSize: '0.72rem', color: 'var(--color-primary)', marginInlineStart: '6px', fontWeight: 600 }}>
+                                                        ({isRTL ? 'محدد تلقائياً حسب الخامة' : 'Auto-selected for material'})
+                                                    </span>
+                                                )}
+                                            </label>
                                             <select name="unit" value={formData.unit} onChange={handleChange}>
                                                 <option value="TON">{t('finance.uom_options.ton')}</option>
                                                 <option value="KG">{t('finance.uom_options.kg')}</option>

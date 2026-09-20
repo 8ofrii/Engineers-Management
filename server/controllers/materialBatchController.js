@@ -208,13 +208,44 @@ export const getAllBatches = async (req, res, next) => {
             }
         });
 
+        // Preload tenant materials if any batch is missing direct material relation
+        let tenantMaterials = [];
+        if (batches.some(b => !b.material?.unit)) {
+            tenantMaterials = await prisma.material.findMany({
+                where: { tenantId: req.user.tenantId, deletedAt: null },
+                select: { id: true, name: true, nameAr: true, unit: true, unitPrice: true }
+            });
+        }
+
+        const resolveBatchUnit = (b) => {
+            if (b.material?.unit) return b.material.unit;
+            if (b.materialId) {
+                const found = tenantMaterials.find(m => m.id === b.materialId);
+                if (found?.unit) return found.unit;
+            }
+            const desc = ((b.description || '') + ' ' + (b.descriptionAr || '')).toLowerCase();
+            for (const m of tenantMaterials) {
+                if (m.name && desc.includes(m.name.toLowerCase())) return m.unit;
+                if (m.nameAr && desc.includes(m.nameAr.toLowerCase())) return m.unit;
+            }
+            if (/paint|paints|دهان|دهانات|بويات|بوية|معجون|سيلر|ورنيش|ثنر/i.test(desc)) return 'LITER';
+            if (/cement|أسمنت|اسمنت|جبس|جير/i.test(desc)) return 'BAG';
+            if (/sand|gravel|رمل|رملة|زلط|سن|خرسانة|ركام/i.test(desc)) return 'M3';
+            if (/steel|iron|rebar|حديد|تسليح/i.test(desc)) return 'TON';
+            if (/tile|tiles|ceramic|porcelain|marble|granite|سيراميك|بورسلين|رخام|جرانيت|بلاط/i.test(desc)) return 'M2';
+            if (/pipe|pipes|cable|wire|مواسير|كابلات|أسلاك|اسلاك|خشب/i.test(desc)) return 'M';
+            if (/brick|bricks|block|طوب|بلوك/i.test(desc)) return 'PIECE';
+            return null;
+        };
+
         res.status(200).json({
             success: true,
             count: batches.length,
             data: batches.map(b => ({
                 ...b,
                 initialValue: Number(b.initialValue),
-                remainingValue: Number(b.remainingValue)
+                remainingValue: Number(b.remainingValue),
+                unit: resolveBatchUnit(b)
             }))
         });
 
@@ -236,6 +267,9 @@ export const getBatch = async (req, res, next) => {
             include: {
                 project: {
                     select: { name: true }
+                },
+                material: {
+                    select: { id: true, name: true, nameAr: true, unit: true, unitPrice: true }
                 }
             }
         });
@@ -252,7 +286,8 @@ export const getBatch = async (req, res, next) => {
             data: {
                 ...batch,
                 initialValue: Number(batch.initialValue),
-                remainingValue: Number(batch.remainingValue)
+                remainingValue: Number(batch.remainingValue),
+                unit: batch.material?.unit || null
             }
         });
 

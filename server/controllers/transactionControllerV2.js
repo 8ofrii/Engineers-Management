@@ -393,7 +393,8 @@ export const recordInventoryUsage = async (req, res, next) => {
             valueConsumed,
             quantityConsumed,
             projectId,
-            description
+            description,
+            unit
         } = req.body;
 
         const batch = await prisma.materialBatch.findFirst({
@@ -436,21 +437,47 @@ export const recordInventoryUsage = async (req, res, next) => {
             // Resolve materialId: if batch doesn't have materialId linked, find or create default material
             let effectiveMaterialId = batch.materialId;
             if (!effectiveMaterialId) {
-                const defaultMaterial = await tx.material.findFirst({
-                    where: { tenantId: req.user.tenantId, deletedAt: null }
+                // Try finding matching material by batch description
+                const matchedMat = await tx.material.findFirst({
+                    where: {
+                        tenantId: req.user.tenantId,
+                        deletedAt: null,
+                        OR: [
+                            { name: { contains: batch.description, mode: 'insensitive' } },
+                            ...(batch.descriptionAr ? [{ nameAr: { contains: batch.descriptionAr, mode: 'insensitive' } }] : [])
+                        ]
+                    }
                 });
-                if (defaultMaterial) {
-                    effectiveMaterialId = defaultMaterial.id;
+
+                if (matchedMat) {
+                    effectiveMaterialId = matchedMat.id;
                 } else {
-                    const newMat = await tx.material.create({
-                        data: {
-                            name: batch.description || 'General Material',
-                            unit: 'PIECE',
-                            unitPrice: Number(valueConsumed) || 0,
-                            tenantId: req.user.tenantId
-                        }
+                    const defaultMaterial = await tx.material.findFirst({
+                        where: { tenantId: req.user.tenantId, deletedAt: null }
                     });
-                    effectiveMaterialId = newMat.id;
+                    if (defaultMaterial) {
+                        effectiveMaterialId = defaultMaterial.id;
+                    } else {
+                        const validUnits = ['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG'];
+                        const resolvedUnit = (unit && validUnits.includes(unit.toUpperCase())) ? unit.toUpperCase() : 'PIECE';
+                        const newMat = await tx.material.create({
+                            data: {
+                                name: batch.description || 'General Material',
+                                unit: resolvedUnit,
+                                unitPrice: Number(valueConsumed) || 0,
+                                tenantId: req.user.tenantId
+                            }
+                        });
+                        effectiveMaterialId = newMat.id;
+                    }
+                }
+
+                // Backlink materialId to batch
+                if (effectiveMaterialId) {
+                    await tx.materialBatch.update({
+                        where: { id: materialBatchId },
+                        data: { materialId: effectiveMaterialId }
+                    });
                 }
             }
 
