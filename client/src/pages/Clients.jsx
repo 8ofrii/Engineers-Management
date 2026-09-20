@@ -10,11 +10,14 @@ import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 
 export default function Clients() {
     const { t, i18n } = useTranslation();
+    const { showAlert } = useAlert();
     const isArabic = i18n.language === 'ar';
     const [clients, setClients] = useState([]);
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [clientToDelete, setClientToDelete] = useState(null);
     const [editingClient, setEditingClient] = useState(null);
 
     // Status filter
@@ -38,6 +41,10 @@ export default function Clients() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        loadClients();
+    }, []);
 
 
     const handleSaveClient = async (clientData) => {
