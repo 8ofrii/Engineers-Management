@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAlert } from '../context/AlertContext';
 import { clientsAPI, projectsAPI } from '../services/api';
-import { Users, Plus, Phone, Building2, Pencil, Trash2, FolderKanban } from 'lucide-react';
+import { Users, Plus, Phone, Building2, Pencil, Trash2, FolderKanban, ChevronDown, Check, Sparkles, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import AddClientModal from '../components/AddClientModal';
@@ -17,6 +17,11 @@ export default function Clients() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState(null);
 
+    // Status filter & interactive dropdown state
+    const [statusFilter, setStatusFilter] = useState('ALL');
+    const [activeDropdownId, setActiveDropdownId] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+
     // Delete state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [clientToDelete, setClientToDelete] = useState(null);
@@ -24,6 +29,17 @@ export default function Clients() {
 
     useEffect(() => {
         loadClients();
+    }, []);
+
+    // Close status dropdown when clicking outside
+    useEffect(() => {
+        const handleGlobalClick = (e) => {
+            if (!e.target.closest('.client-status-dropdown-wrapper')) {
+                setActiveDropdownId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleGlobalClick);
+        return () => document.removeEventListener('mousedown', handleGlobalClick);
     }, []);
 
     const loadClients = async () => {
@@ -45,14 +61,97 @@ export default function Clients() {
         }
     };
 
+    const handleUpdateStatus = async (clientId, newStatus) => {
+        setActiveDropdownId(null);
+        // Optimistic UI update
+        setClients(prev => prev.map(c => c.id === clientId ? { ...c, status: newStatus } : c));
+        try {
+            await clientsAPI.update(clientId, { status: newStatus });
+            showAlert({
+                type: 'success',
+                title: isArabic ? 'تم بنجاح' : 'Success',
+                message: t('clients.statusUpdated', isArabic ? 'تم تحديث حالة العميل بنجاح' : 'Client status updated successfully.')
+            });
+        } catch (error) {
+            console.error('Failed to update client status:', error);
+            loadClients();
+            showAlert({
+                type: 'error',
+                title: isArabic ? 'خطأ' : 'Error',
+                message: isArabic ? 'فشل تحديث حالة العميل.' : 'Failed to update client status.'
+            });
+        }
+    };
+
+    const handleAutoDetectStatus = async (client) => {
+        const clientProjects = (Array.isArray(client.projects) && client.projects.length > 0)
+            ? client.projects
+            : projects.filter(p => p.clientId === client.id);
+
+        const hasActive = clientProjects.some(p => ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'].includes(p.status));
+        const detectedStatus = hasActive ? 'ACTIVE' : 'INACTIVE';
+        handleUpdateStatus(client.id, detectedStatus);
+    };
+
+    const handleSyncAllStatus = async () => {
+        setIsSyncing(true);
+        try {
+            const res = await clientsAPI.syncStatus();
+            const updated = res.data?.updatedCount ?? 0;
+            await loadClients();
+            showAlert({
+                type: 'success',
+                title: isArabic ? 'تمت المزامنة' : 'Synchronized',
+                message: t('clients.syncSuccess', {
+                    count: updated,
+                    defaultValue: isArabic
+                        ? `تمت مزامنة حالة ${updated} عميل بناءً على المشاريع الجارية.`
+                        : `Synchronized ${updated} client statuses based on active projects.`
+                })
+            });
+        } catch (error) {
+            console.error('Failed to sync client statuses via API, falling back to client-side:', error);
+            try {
+                let updated = 0;
+                for (const client of clients) {
+                    const clientProjects = (Array.isArray(client.projects) && client.projects.length > 0)
+                        ? client.projects
+                        : projects.filter(p => p.clientId === client.id);
+                    const hasActive = clientProjects.some(p => ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'].includes(p.status));
+                    const newStatus = hasActive ? 'ACTIVE' : 'INACTIVE';
+                    if (client.status !== newStatus) {
+                        await clientsAPI.update(client.id, { status: newStatus });
+                        updated++;
+                    }
+                }
+                await loadClients();
+                showAlert({
+                    type: 'success',
+                    title: isArabic ? 'تمت المزامنة' : 'Synchronized',
+                    message: isArabic
+                        ? `تمت مزامنة حالة ${updated} عميل بناءً على المشاريع الجارية.`
+                        : `Synchronized ${updated} client statuses based on active projects.`
+                });
+            } catch (fallbackError) {
+                showAlert({
+                    type: 'error',
+                    title: isArabic ? 'خطأ' : 'Error',
+                    message: isArabic ? 'فشلت المزامنة.' : 'Failed to synchronize client statuses.'
+                });
+            }
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const handleSaveClient = async (clientData) => {
         try {
             if (editingClient) {
                 await clientsAPI.update(editingClient.id, clientData);
-                showAlert({ type: 'success', title: 'Success', message: 'Client updated successfully.' });
+                showAlert({ type: 'success', title: isArabic ? 'تم بنجاح' : 'Success', message: isArabic ? 'تم تعديل العميل بنجاح.' : 'Client updated successfully.' });
             } else {
                 await clientsAPI.create(clientData);
-                showAlert({ type: 'success', title: 'Success', message: 'Client created successfully.' });
+                showAlert({ type: 'success', title: isArabic ? 'تم بنجاح' : 'Success', message: isArabic ? 'تمت إضافة العميل بنجاح.' : 'Client created successfully.' });
             }
             loadClients();
         } catch (error) {
@@ -63,8 +162,8 @@ export default function Clients() {
                 : null;
             showAlert({
                 type: 'error',
-                title: 'Error',
-                message: fieldErrors || data?.message || 'Failed to save client. Please try again.'
+                title: isArabic ? 'خطأ' : 'Error',
+                message: fieldErrors || data?.message || (isArabic ? 'فشل حفظ العميل. يرجى المحاولة مرة أخرى.' : 'Failed to save client. Please try again.')
             });
         }
     };
@@ -78,11 +177,11 @@ export default function Clients() {
         if (!clientToDelete) return;
         try {
             await clientsAPI.delete(clientToDelete.id);
-            showAlert({ type: 'success', title: 'Success', message: 'Client deleted successfully.' });
+            showAlert({ type: 'success', title: isArabic ? 'تم بنجاح' : 'Success', message: isArabic ? 'تم حذف العميل بنجاح.' : 'Client deleted successfully.' });
             loadClients();
         } catch (error) {
             console.error('Failed to delete client:', error);
-            showAlert({ type: 'error', title: 'Error', message: 'Failed to delete client. Please try again.' });
+            showAlert({ type: 'error', title: isArabic ? 'خطأ' : 'Error', message: isArabic ? 'فشل حذف العميل. يرجى المحاولة مرة أخرى.' : 'Failed to delete client. Please try again.' });
         } finally {
             setClientToDelete(null);
         }
@@ -107,6 +206,16 @@ export default function Clients() {
             </Layout>
         );
     }
+
+    const activeCount = clients.filter(c => (c.status || '').toUpperCase() === 'ACTIVE').length;
+    const inactiveCount = clients.filter(c => (c.status || '').toUpperCase() === 'INACTIVE').length;
+    const pendingCount = clients.filter(c => (c.status || '').toUpperCase() === 'PENDING').length;
+
+    const filteredClients = clients.filter(c => {
+        const s = (c.status || 'INACTIVE').toUpperCase();
+        if (statusFilter === 'ALL') return true;
+        return s === statusFilter;
+    });
 
     return (
         <Layout>
@@ -284,10 +393,256 @@ export default function Clients() {
                 body.light-mode .client-action-btn.delete:hover {
                     background: #fee2e2;
                 }
+
+                /* Interactive Status Badge & Dropdown */
+                .client-status-dropdown-wrapper {
+                    position: relative;
+                    display: inline-block;
+                    flex-shrink: 0;
+                }
+                .client-status-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 4px 10px;
+                    border-radius: 9999px;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    letter-spacing: 0.5px;
+                    cursor: pointer;
+                    border: 1px solid transparent;
+                    transition: all 0.2s ease;
+                    outline: none;
+                }
+                .client-status-badge:hover {
+                    filter: brightness(1.15);
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+                }
+                .client-status-badge.badge-active {
+                    background: rgba(16, 185, 129, 0.15);
+                    color: #10b981;
+                    border-color: rgba(16, 185, 129, 0.35);
+                }
+                body.light-mode .client-status-badge.badge-active {
+                    background: #ecfdf5;
+                    color: #047857;
+                    border-color: #a7f3d0;
+                }
+                .client-status-badge.badge-inactive {
+                    background: rgba(148, 163, 184, 0.12);
+                    color: #94a3b8;
+                    border-color: rgba(148, 163, 184, 0.28);
+                }
+                body.light-mode .client-status-badge.badge-inactive {
+                    background: #f1f5f9;
+                    color: #475569;
+                    border-color: #cbd5e1;
+                }
+                .client-status-badge.badge-pending {
+                    background: rgba(245, 158, 11, 0.15);
+                    color: #f59e0b;
+                    border-color: rgba(245, 158, 11, 0.35);
+                }
+                body.light-mode .client-status-badge.badge-pending {
+                    background: #fffbeb;
+                    color: #b45309;
+                    border-color: #fde68a;
+                }
+
+                .status-indicator-dot {
+                    width: 7px;
+                    height: 7px;
+                    border-radius: 50%;
+                    display: inline-block;
+                    flex-shrink: 0;
+                }
+                .status-indicator-dot.active {
+                    background-color: #10b981;
+                    box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+                }
+                .status-indicator-dot.inactive {
+                    background-color: #94a3b8;
+                }
+                .status-indicator-dot.pending {
+                    background-color: #f59e0b;
+                    box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);
+                }
+
+                .status-chevron {
+                    transition: transform 0.2s ease;
+                    opacity: 0.75;
+                }
+                .status-chevron.open {
+                    transform: rotate(180deg);
+                }
+
+                /* Floating Status Menu */
+                .client-status-menu {
+                    position: absolute;
+                    top: calc(100% + 6px);
+                    right: 0;
+                    z-index: 100;
+                    min-width: 230px;
+                    background: var(--bg-card, #1c1c1f);
+                    border: 1px solid var(--border-color);
+                    border-radius: 10px;
+                    padding: 6px;
+                    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.45);
+                    animation: fadeIn 0.15s ease;
+                }
+                [dir="rtl"] .client-status-menu {
+                    right: auto;
+                    left: 0;
+                }
+                body.light-mode .client-status-menu {
+                    background: #ffffff;
+                    border-color: #e2e8f0;
+                    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.14);
+                }
+
+                .status-menu-header {
+                    padding: 6px 10px 4px;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    color: var(--text-tertiary);
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .status-menu-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    padding: 8px 10px;
+                    background: transparent;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    text-align: inherit;
+                    transition: all 0.15s ease;
+                    color: var(--text-primary);
+                }
+                .status-menu-item:hover {
+                    background: rgba(255, 255, 255, 0.06);
+                }
+                body.light-mode .status-menu-item:hover {
+                    background: #f1f5f9;
+                }
+                .status-menu-item.selected {
+                    background: rgba(59, 130, 246, 0.12);
+                }
+                body.light-mode .status-menu-item.selected {
+                    background: #eff6ff;
+                }
+                .status-menu-text {
+                    display: flex;
+                    flex-direction: column;
+                    flex: 1;
+                    min-width: 0;
+                }
+                .status-menu-text .status-name {
+                    font-size: 0.82rem;
+                    font-weight: 600;
+                    color: var(--text-primary);
+                }
+                .status-menu-text .status-desc {
+                    font-size: 0.68rem;
+                    color: var(--text-secondary);
+                    line-height: 1.2;
+                }
+                .status-check {
+                    color: #3b82f6;
+                    flex-shrink: 0;
+                }
+                .status-menu-divider {
+                    height: 1px;
+                    background: var(--border-color);
+                    margin: 4px 0;
+                }
+
+                /* Filter Bar */
+                .client-filter-bar {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    margin-bottom: 20px;
+                    flex-wrap: wrap;
+                }
+                .client-filter-tabs {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: rgba(255, 255, 255, 0.03);
+                    padding: 4px;
+                    border-radius: 8px;
+                    border: 1px solid var(--border-color);
+                }
+                body.light-mode .client-filter-tabs {
+                    background: #f8fafc;
+                    border-color: #e2e8f0;
+                }
+                .filter-tab {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 12px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    color: var(--text-secondary);
+                    background: transparent;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+                .filter-tab:hover {
+                    color: var(--text-primary);
+                }
+                .filter-tab.active {
+                    background: var(--bg-card, #27272a);
+                    color: var(--text-primary);
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+                }
+                body.light-mode .filter-tab.active {
+                    background: #ffffff;
+                    color: #0f172a;
+                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+                }
+                .filter-count {
+                    display: inline-block;
+                    padding: 1px 6px;
+                    border-radius: 9999px;
+                    font-size: 0.7rem;
+                    background: rgba(255, 255, 255, 0.08);
+                }
+                body.light-mode .filter-count {
+                    background: #e2e8f0;
+                }
+
+                .client-project-pill.completed {
+                    background: rgba(148, 163, 184, 0.1);
+                    border-color: rgba(148, 163, 184, 0.25);
+                    color: #94a3b8;
+                }
+                body.light-mode .client-project-pill.completed {
+                    background: #f1f5f9;
+                    border-color: #cbd5e1;
+                    color: #64748b;
+                }
+
+                .spin-icon {
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
             `}</style>
 
             <div>
-                <div className="flex-between mb-xl">
+                <div className="flex-between mb-lg" style={{ flexWrap: 'wrap', gap: '16px' }}>
                     <div>
                         <h1 className="flex gap-md">
                             <Users size={32} />
@@ -295,11 +650,69 @@ export default function Clients() {
                         </h1>
                         <p className="text-secondary">{t('clients.subtitle')}</p>
                     </div>
-                    <button className="btn btn-primary" onClick={openCreateModal}>
-                        <Plus size={20} />
-                        {t('clients.newClient')}
-                    </button>
+                    <div className="flex gap-sm items-center" style={{ flexWrap: 'wrap' }}>
+                        <button
+                            type="button"
+                            className="btn btn-secondary flex items-center gap-xs"
+                            onClick={handleSyncAllStatus}
+                            disabled={isSyncing}
+                            style={{ fontSize: '0.84rem' }}
+                            title={isArabic ? 'مزامنة حالة جميع العملاء تلقائياً بناءً على وجود مشاريع نشطة' : 'Sync all client statuses based on active project status'}
+                        >
+                            <RefreshCw size={15} className={isSyncing ? 'spin-icon' : ''} />
+                            <span>{t('clients.syncWithProjects', isArabic ? 'مزامنة مع المشاريع' : 'Sync with Projects')}</span>
+                        </button>
+                        <button className="btn btn-primary" onClick={openCreateModal}>
+                            <Plus size={20} />
+                            {t('clients.newClient')}
+                        </button>
+                    </div>
                 </div>
+
+                {/* Filter Tabs */}
+                {clients.length > 0 && (
+                    <div className="client-filter-bar">
+                        <div className="client-filter-tabs">
+                            <button
+                                type="button"
+                                className={`filter-tab ${statusFilter === 'ALL' ? 'active' : ''}`}
+                                onClick={() => setStatusFilter('ALL')}
+                            >
+                                {t('clients.filterAll', isArabic ? 'الكل' : 'All')}
+                                <span className="filter-count">{clients.length}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`filter-tab ${statusFilter === 'ACTIVE' ? 'active' : ''}`}
+                                onClick={() => setStatusFilter('ACTIVE')}
+                            >
+                                <span className="status-indicator-dot active" />
+                                {t('clients.filterActive', isArabic ? 'النشطون' : 'Active')}
+                                <span className="filter-count">{activeCount}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={`filter-tab ${statusFilter === 'INACTIVE' ? 'active' : ''}`}
+                                onClick={() => setStatusFilter('INACTIVE')}
+                            >
+                                <span className="status-indicator-dot inactive" />
+                                {t('clients.filterInactive', isArabic ? 'غير النشطين' : 'Inactive')}
+                                <span className="filter-count">{inactiveCount}</span>
+                            </button>
+                            {pendingCount > 0 && (
+                                <button
+                                    type="button"
+                                    className={`filter-tab ${statusFilter === 'PENDING' ? 'active' : ''}`}
+                                    onClick={() => setStatusFilter('PENDING')}
+                                >
+                                    <span className="status-indicator-dot pending" />
+                                    {t('clients.status.pending', isArabic ? 'قيد الانتظار' : 'Pending')}
+                                    <span className="filter-count">{pendingCount}</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {clients.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
@@ -311,9 +724,22 @@ export default function Clients() {
                             {t('clients.newClient')}
                         </button>
                     </div>
+                ) : filteredClients.length === 0 ? (
+                    <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
+                        <Users size={48} style={{ margin: '0 auto var(--spacing-md)', color: 'var(--text-tertiary)' }} />
+                        <h3>{isArabic ? 'لا توجد نتائج مطابقة' : 'No matching clients'}</h3>
+                        <p className="text-secondary">
+                            {isArabic ? 'لا يوجد عملاء بالحالة المحددة.' : 'There are no clients with the selected status filter.'}
+                        </p>
+                        <button className="btn btn-secondary mt-md" onClick={() => setStatusFilter('ALL')}>
+                            {isArabic ? 'عرض كل العملاء' : 'View all clients'}
+                        </button>
+                    </div>
                 ) : (
                     <div className="clients-grid">
-                        {clients.map((client) => {
+                        {filteredClients.map((client) => {
+                            const normStatus = (client.status || 'INACTIVE').toUpperCase();
+
                             const clientPhones = Array.isArray(client.phones) && client.phones.length > 0
                                 ? client.phones.filter(Boolean)
                                 : (client.phone ? [client.phone] : []);
@@ -322,9 +748,12 @@ export default function Clients() {
                                 ? client.projects
                                 : projects.filter(p => p.clientId === client.id);
 
+                            const activeProjects = clientProjects.filter(p => ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'].includes(p.status));
+                            const completedProjects = clientProjects.filter(p => p.status === 'COMPLETED' || p.status === 'CANCELLED');
+
                             return (
                                 <div key={client.id} className="card client-card">
-                                    {/* 1. Header: Full Name and Status Badge (Buttons moved to bottom!) */}
+                                    {/* 1. Header: Full Name and Interactive Status Dropdown */}
                                     <div className="client-card-header">
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <h3 className="client-card-name" title={client.name}>
@@ -337,12 +766,89 @@ export default function Clients() {
                                                 </div>
                                             )}
                                         </div>
-                                        <span className={`badge badge-${client.status?.toLowerCase() === 'active' ? 'success' : 'warning'}`} style={{ flexShrink: 0, fontSize: '0.72rem', letterSpacing: '0.5px' }}>
-                                            {t(`clients.status.${client.status?.toLowerCase()}`) || client.status}
-                                        </span>
+
+                                        {/* Status Dropdown */}
+                                        <div className="client-status-dropdown-wrapper">
+                                            <button
+                                                type="button"
+                                                className={`client-status-badge badge-${normStatus.toLowerCase()}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveDropdownId(activeDropdownId === client.id ? null : client.id);
+                                                }}
+                                                title={t('clients.clickToChange', isArabic ? 'انقر لتغيير الحالة' : 'Click to change status')}
+                                            >
+                                                <span className={`status-indicator-dot ${normStatus.toLowerCase()}`} />
+                                                <span>
+                                                    {normStatus === 'ACTIVE'
+                                                        ? t('clients.status.active', isArabic ? 'نشط' : 'Active')
+                                                        : normStatus === 'PENDING'
+                                                        ? t('clients.status.pending', isArabic ? 'قيد الانتظار' : 'Pending')
+                                                        : t('clients.status.inactive', isArabic ? 'غير نشط' : 'Inactive')}
+                                                </span>
+                                                <ChevronDown size={11} className={`status-chevron ${activeDropdownId === client.id ? 'open' : ''}`} />
+                                            </button>
+
+                                            {activeDropdownId === client.id && (
+                                                <div className="client-status-menu" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="status-menu-header">
+                                                        {t('clients.statusChangeTitle', isArabic ? 'تغيير حالة العميل' : 'Change Status')}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className={`status-menu-item ${normStatus === 'ACTIVE' ? 'selected' : ''}`}
+                                                        onClick={() => handleUpdateStatus(client.id, 'ACTIVE')}
+                                                    >
+                                                        <span className="status-indicator-dot active" />
+                                                        <div className="status-menu-text">
+                                                            <span className="status-name">{t('clients.status.active', isArabic ? 'نشط' : 'Active')}</span>
+                                                            <span className="status-desc">{t('clients.activeDesc', isArabic ? 'مشاريع جارية أو تعاملات نشطة' : 'Active ongoing projects')}</span>
+                                                        </div>
+                                                        {normStatus === 'ACTIVE' && <Check size={14} className="status-check" />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`status-menu-item ${normStatus === 'INACTIVE' ? 'selected' : ''}`}
+                                                        onClick={() => handleUpdateStatus(client.id, 'INACTIVE')}
+                                                    >
+                                                        <span className="status-indicator-dot inactive" />
+                                                        <div className="status-menu-text">
+                                                            <span className="status-name">{t('clients.status.inactive', isArabic ? 'غير نشط' : 'Inactive')}</span>
+                                                            <span className="status-desc">{t('clients.inactiveDesc', isArabic ? 'لا توجد مشاريع نشطة حالياً' : 'No active projects currently')}</span>
+                                                        </div>
+                                                        {normStatus === 'INACTIVE' && <Check size={14} className="status-check" />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`status-menu-item ${normStatus === 'PENDING' ? 'selected' : ''}`}
+                                                        onClick={() => handleUpdateStatus(client.id, 'PENDING')}
+                                                    >
+                                                        <span className="status-indicator-dot pending" />
+                                                        <div className="status-menu-text">
+                                                            <span className="status-name">{t('clients.status.pending', isArabic ? 'قيد الانتظار' : 'Pending')}</span>
+                                                            <span className="status-desc">{t('clients.pendingDesc', isArabic ? 'محتمل / قيد التفاوض والاتفاق' : 'Prospective / In negotiation')}</span>
+                                                        </div>
+                                                        {normStatus === 'PENDING' && <Check size={14} className="status-check" />}
+                                                    </button>
+                                                    <div className="status-menu-divider" />
+                                                    <button
+                                                        type="button"
+                                                        className="status-menu-item auto-sync-item"
+                                                        onClick={() => handleAutoDetectStatus(client)}
+                                                    >
+                                                        <Sparkles size={14} style={{ color: '#3b82f6', flexShrink: 0 }} />
+                                                        <div className="status-menu-text">
+                                                            <span className="status-name" style={{ color: '#3b82f6' }}>
+                                                                {t('clients.autoDetect', isArabic ? 'تحديد تلقائي حسب المشاريع' : 'Auto-detect from projects')}
+                                                            </span>
+                                                        </div>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    {/* 2. Face Stats: Phone & Current Project(s) (Email excluded!) */}
+                                    {/* 2. Face Stats: Phone & Current Project(s) */}
                                     <div className="client-card-stats">
                                         {/* Phone Numbers */}
                                         <div className="client-stat-row">
@@ -371,19 +877,46 @@ export default function Clients() {
 
                                         {/* Current Project(s) Assigned/Belonging to Client */}
                                         <div className="client-stat-row">
-                                            <FolderKanban size={15} style={{ color: '#10b981', marginTop: '3px', flexShrink: 0 }} />
+                                            <FolderKanban
+                                                size={15}
+                                                style={{
+                                                    color: activeProjects.length > 0 ? '#10b981' : 'var(--text-tertiary)',
+                                                    marginTop: '3px',
+                                                    flexShrink: 0
+                                                }}
+                                            />
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                {clientProjects.length > 0 ? (
+                                                {activeProjects.length > 0 ? (
                                                     <div className="flex flex-col gap-xs">
                                                         <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
                                                             {t('clients.currentProject', isArabic ? 'المشروع الحالي:' : 'Current Project:')}
                                                         </div>
                                                         <div className="flex gap-xs flex-wrap">
-                                                            {clientProjects.map((proj) => (
+                                                            {activeProjects.map((proj) => (
                                                                 <Link
                                                                     key={proj.id}
                                                                     to={`/projects/${proj.id}`}
                                                                     className="client-project-pill"
+                                                                    title={proj.name}
+                                                                >
+                                                                    <span className="truncate" style={{ maxWidth: '200px' }}>
+                                                                        {proj.name}
+                                                                    </span>
+                                                                </Link>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ) : completedProjects.length > 0 ? (
+                                                    <div className="flex flex-col gap-xs">
+                                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+                                                            {isArabic ? 'المشاريع السابقة:' : 'Past Projects:'}
+                                                        </div>
+                                                        <div className="flex gap-xs flex-wrap">
+                                                            {completedProjects.map((proj) => (
+                                                                <Link
+                                                                    key={proj.id}
+                                                                    to={`/projects/${proj.id}`}
+                                                                    className="client-project-pill completed"
                                                                     title={proj.name}
                                                                 >
                                                                     <span className="truncate" style={{ maxWidth: '200px' }}>

@@ -247,6 +247,18 @@
             "inactive": "غير نشط",
             "pending": "قيد الانتظار"
         },
+        "syncWithProjects": "مزامنة مع المشاريع",
+        "syncSuccess": "تمت مزامنة حالة {{count}} عميل بناءً على المشاريع الجارية",
+        "statusUpdated": "تم تحديث حالة العميل بنجاح",
+        "statusChangeTitle": "تغيير حالة العميل",
+        "filterAll": "الكل",
+        "filterActive": "النشطون",
+        "filterInactive": "غير النشطين",
+        "autoDetect": "تحديد تلقائي حسب المشاريع",
+        "activeDesc": "مشاريع جارية أو تعاملات نشطة",
+        "inactiveDesc": "لا توجد مشاريع نشطة حالياً",
+        "pendingDesc": "محتمل / قيد التفاوض والاتفاق",
+        "clickToChange": "انقر لتغيير الحالة",
         "modal": {
             "title": "إضافة عميل جديد",
             "editTitle": "تعديل بيانات العميل",

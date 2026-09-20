@@ -246,6 +246,18 @@
             "inactive": "Inactive",
             "pending": "Pending"
         },
+        "syncWithProjects": "Sync with Projects",
+        "syncSuccess": "Synchronized {{count}} client statuses based on active projects",
+        "statusUpdated": "Client status updated successfully",
+        "statusChangeTitle": "Change Status",
+        "filterAll": "All",
+        "filterActive": "Active",
+        "filterInactive": "Inactive",
+        "autoDetect": "Auto-detect from projects",
+        "activeDesc": "Active ongoing projects",
+        "inactiveDesc": "No active projects currently",
+        "pendingDesc": "Prospective / In negotiation",
+        "clickToChange": "Click to change status",
         "modal": {
             "title": "Add New Client",
             "editTitle": "Edit Client Details",

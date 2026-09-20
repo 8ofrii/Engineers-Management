@@ -9,7 +9,8 @@ import './Modal.css';
 const CLIENT_DRAFT_KEY = 'hesaby_draft_client';
 
 export default function AddClientModal({ isOpen, onClose, onSubmit, initialData = null }) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -18,7 +19,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
         phones: [''],
         company: '',
         taxId: '',
-        status: 'ACTIVE',
+        status: 'INACTIVE',
         // Address
         street: '',
         city: '',
@@ -69,7 +70,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                     phones: [''],
                     company: '',
                     taxId: '',
-                    status: 'ACTIVE',
+                    status: 'INACTIVE',
                     street: '',
                     city: '',
                     state: '',
@@ -107,7 +108,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
             phones: [''],
             company: '',
             taxId: '',
-            status: 'ACTIVE',
+            status: 'INACTIVE',
             street: '',
             city: '',
             state: '',
@@ -256,11 +257,17 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                                     name="status"
                                     value={formData.status}
                                     onChange={handleChange}
+                                    style={{ fontWeight: 600 }}
                                 >
                                     <option value="ACTIVE">{t('clients.status.active', 'Active')}</option>
                                     <option value="INACTIVE">{t('clients.status.inactive', 'Inactive')}</option>
                                     <option value="PENDING">{t('clients.status.pending', 'Pending')}</option>
                                 </select>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
+                                    {isArabic
+                                        ? 'نشط: لديه مشاريع جارية | غير نشط: لا توجد مشاريع حالية'
+                                        : 'Active: ongoing projects | Inactive: no current projects'}
+                                </span>
                             </div>
                         </div>
                     </div>

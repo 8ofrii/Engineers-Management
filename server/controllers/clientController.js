@@ -236,3 +236,47 @@ export const deleteClient = async (req, res, next) => {
         next(error);
     }
 };
+
+// @desc    Sync client statuses based on active projects
+// @route   POST /api/clients/sync-status
+// @access  Private
+export const syncClientsStatus = async (req, res, next) => {
+    try {
+        const clients = await prisma.client.findMany({
+            where: {
+                tenantId: req.user.tenantId,
+                deletedAt: null
+            },
+            include: {
+                projects: {
+                    where: { deletedAt: null },
+                    select: { id: true, status: true }
+                }
+            }
+        });
+
+        const activeProjectStatuses = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'];
+        let updatedCount = 0;
+
+        for (const client of clients) {
+            const hasActiveProject = client.projects.some(p => activeProjectStatuses.includes(p.status));
+            const newStatus = hasActiveProject ? 'ACTIVE' : 'INACTIVE';
+            if (client.status !== newStatus) {
+                await prisma.client.update({
+                    where: { id: client.id },
+                    data: { status: newStatus }
+                });
+                updatedCount++;
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Synchronized ${updatedCount} client statuses`,
+            updatedCount
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
