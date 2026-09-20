@@ -562,6 +562,33 @@ export default function Layout({ children }) {
                             <ShieldCheck size={18} />
                         </button>
                     </div>
+
+                    {/* Subtle platform branding footer */}
+                    {!sidebarCollapsed && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            marginTop: '12px',
+                            paddingTop: '10px',
+                            borderTop: '1px solid var(--border-color)',
+                            fontSize: '0.72rem',
+                            color: 'var(--text-tertiary)',
+                            letterSpacing: '0.01em',
+                            userSelect: 'none'
+                        }}>
+                            <img
+                                src="/hesaby_logo_icon.svg"
+                                alt="Hesaby"
+                                style={{ width: 14, height: 14, opacity: 0.8, objectFit: 'contain' }}
+                            />
+                            <span>
+                                {isArabic ? 'مشغّل بواسطة ' : 'Powered by '}
+                                <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Hesaby ERP</strong>
+                            </span>
+                        </div>
+                    )}
                 </div>
             </aside>
 
@@ -579,7 +606,7 @@ export default function Layout({ children }) {
                             <button
                                 className="expand-sidebar-btn"
                                 onClick={toggleSidebarCollapse}
-                                title="Expand Sidebar"
+                                title={isArabic ? 'إظهار القائمة الجانبية' : 'Expand Sidebar'}
                             >
                                 <PanelLeft size={20} />
                             </button>
@@ -588,26 +615,30 @@ export default function Layout({ children }) {
                                 <Menu size={24} />
                             </button>
                         )}
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            padding: '6px 14px 6px 8px',
-                            background: 'var(--bg-tertiary)',
-                            borderRadius: '12px',
-                            border: '1px solid var(--border-color)'
-                        }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, background: '#fff', overflow: 'hidden', flexShrink: 0 }}>
-                                <img
-                                    src="/hesaby_logo_icon.svg"
-                                    alt="Hesaby Logo"
-                                    style={{ width: 27, height: 27, objectFit: 'contain' }}
-                                />
-                            </span>
-                            <span style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-                                Hesaby
-                            </span>
-                        </div>
+                        {/* Show Hesaby brand pill in topbar ONLY when sidebar is collapsed (full-width view) */}
+                        {sidebarCollapsed && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '6px 14px 6px 8px',
+                                background: 'var(--bg-tertiary)',
+                                borderRadius: '12px',
+                                border: '1px solid var(--border-color)',
+                                userSelect: 'none'
+                            }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, background: '#fff', overflow: 'hidden', flexShrink: 0 }}>
+                                    <img
+                                        src="/hesaby_logo_icon.svg"
+                                        alt="Hesaby Logo"
+                                        style={{ width: 27, height: 27, objectFit: 'contain' }}
+                                    />
+                                </span>
+                                <span style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+                                    Hesaby
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="topbar-actions">
