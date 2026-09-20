@@ -311,6 +311,40 @@ export default function Clients() {
                     background-color: #94a3b8;
                 }
 
+                .client-static-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 4px 10px;
+                    border-radius: 9999px;
+                    font-size: 0.72rem;
+                    font-weight: 600;
+                    letter-spacing: 0.3px;
+                    line-height: 1;
+                    flex-shrink: 0;
+                    user-select: none;
+                }
+                .client-static-badge.active {
+                    background: rgba(16, 185, 129, 0.12);
+                    border: 1px solid rgba(16, 185, 129, 0.3);
+                    color: #34d399;
+                }
+                .client-static-badge.inactive {
+                    background: rgba(148, 163, 184, 0.1);
+                    border: 1px solid rgba(148, 163, 184, 0.25);
+                    color: #94a3b8;
+                }
+                body.light-mode .client-static-badge.active {
+                    background: #ecfdf5;
+                    border-color: #a7f3d0;
+                    color: #065f46;
+                }
+                body.light-mode .client-static-badge.inactive {
+                    background: #f1f5f9;
+                    border-color: #cbd5e1;
+                    color: #475569;
+                }
+
                 /* Filter Bar */
                 .client-filter-bar {
                     display: flex;
@@ -471,6 +505,7 @@ export default function Clients() {
 
                             const activeProjects = clientProjects.filter(p => ['PLANNING', 'IN_PROGRESS', 'ON_HOLD'].includes(p.status));
                             const completedProjects = clientProjects.filter(p => p.status === 'COMPLETED' || p.status === 'CANCELLED');
+                            const isActive = activeProjects.length > 0;
 
                             return (
                                 <div key={client.id} className="card client-card">
@@ -488,13 +523,13 @@ export default function Clients() {
                                             )}
                                         </div>
 
-                                        <span
-                                            className={`badge badge-${isActive ? 'success' : 'warning'}`}
-                                            style={{ flexShrink: 0, fontSize: '0.72rem', letterSpacing: '0.5px' }}
-                                        >
-                                            {isActive
-                                                ? (isArabic ? 'نشط' : 'Active')
-                                                : (isArabic ? 'غير نشط' : 'Inactive')}
+                                        <span className={`client-static-badge ${isActive ? 'active' : 'inactive'}`}>
+                                            <span className={`status-indicator-dot ${isActive ? 'active' : 'inactive'}`} />
+                                            <span>
+                                                {isActive
+                                                    ? (isArabic ? 'نشط' : 'Active')
+                                                    : (isArabic ? 'غير نشط' : 'Inactive')}
+                                            </span>
                                         </span>
                                     </div>
 
