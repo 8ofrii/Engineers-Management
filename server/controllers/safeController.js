@@ -375,6 +375,10 @@ export const transferBetweenSafes = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Destination safe not found or inactive' });
         }
 
+        const receiptUrl = req.file
+            ? (req.file.key ? `/uploads/${req.file.key}` : (req.file.location || `/uploads/receipts/${req.file.filename}`))
+            : (req.body.receiptUrl ? String(req.body.receiptUrl).trim() : null);
+
         const result = await prisma.$transaction(async (tx) => {
             // 1. Decrement source safe balance
             const updatedFrom = await tx.companySafe.update({
@@ -395,6 +399,7 @@ export const transferBetweenSafes = async (req, res, next) => {
                     fromSafeId,
                     toSafeId,
                     notes: notes ? notes.trim() : null,
+                    receiptUrl,
                     transferDate: transferDate ? new Date(transferDate) : new Date(),
                     createdBy: req.user.id,
                     tenantId
@@ -416,7 +421,8 @@ export const transferBetweenSafes = async (req, res, next) => {
             after: {
                 fromSafe: fromSafe.name,
                 toSafe: toSafe.name,
-                amount: transferAmount
+                amount: transferAmount,
+                hasReceipt: Boolean(receiptUrl)
             }
         });
 
@@ -559,7 +565,8 @@ export const getSafeStatement = async (req, res, next) => {
                 category: t.category,
                 projectName: t.project?.name || (t.isOfficeExpense ? 'المكتب الرئيسي' : null),
                 partyName: t.client?.name || t.supplier?.name || t.workman?.name || null,
-                userName: t.user?.name || null
+                userName: t.user?.name || null,
+                receiptUrl: t.receiptPhotoUrl || null
             });
         });
 
@@ -575,7 +582,8 @@ export const getSafeStatement = async (req, res, next) => {
                 category: 'INTERNAL_TRANSFER',
                 projectName: 'تحويل داخلي',
                 partyName: tr.fromSafe?.name,
-                userName: tr.user?.name || null
+                userName: tr.user?.name || null,
+                receiptUrl: tr.receiptUrl || null
             });
         });
 
@@ -591,7 +599,8 @@ export const getSafeStatement = async (req, res, next) => {
                 category: 'INTERNAL_TRANSFER',
                 projectName: 'تحويل داخلي',
                 partyName: tr.toSafe?.name,
-                userName: tr.user?.name || null
+                userName: tr.user?.name || null,
+                receiptUrl: tr.receiptUrl || null
             });
         });
 

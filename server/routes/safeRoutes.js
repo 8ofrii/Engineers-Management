@@ -11,6 +11,7 @@ import {
     getOfficeFinancesSummary
 } from '../controllers/safeController.js';
 import { protect, authorize } from '../middleware/auth.js';
+import { receiptUpload } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -23,7 +24,11 @@ router.get('/office-summary', getOfficeFinancesSummary);
 // Safe transfers
 router.route('/transfers')
     .get(getSafeTransfers)
-    .post(authorize('ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER', 'ACCOUNTANT'), transferBetweenSafes);
+    .post(
+        authorize('ADMIN', 'SUPER_ADMIN', 'PROJECT_MANAGER', 'ACCOUNTANT'),
+        receiptUpload.single('file'),
+        transferBetweenSafes
+    );
 
 // Safe statement / ledger
 router.get('/:id/statement', getSafeStatement);

@@ -22,7 +22,9 @@ import {
     CheckCircle,
     AlertCircle,
     Eye,
-    Folder
+    Folder,
+    UploadCloud,
+    Paperclip
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { safesAPI, transactionsAPI } from '../services/api';
@@ -1725,10 +1727,49 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
     const [amount, setAmount] = useState('');
     const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
     const [notes, setNotes] = useState('');
+    const [attachmentFile, setAttachmentFile] = useState(null);
+    const [attachmentPreview, setAttachmentPreview] = useState(null);
+    const [isDragging, setIsDragging] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const sourceSafe = safes.find(s => s.id === fromSafeId);
     const destSafe = safes.find(s => s.id === toSafeId);
+
+    const handleFileSelection = (file) => {
+        if (!file) return;
+        if (file.size > 25 * 1024 * 1024) {
+            showAlert({
+                type: 'warning',
+                message: isArabic ? 'الحد الأقصى لحجم الملف هو 25 ميجابايت' : 'Maximum allowed file size is 25 MB'
+            });
+            return;
+        }
+        setAttachmentFile(file);
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (ev) => setAttachmentPreview(ev.target.result);
+            reader.readAsDataURL(file);
+        } else {
+            setAttachmentPreview(null);
+        }
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files?.[0];
+        handleFileSelection(file);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer?.files?.[0];
+        handleFileSelection(file);
+    };
+
+    const handleRemoveFile = () => {
+        setAttachmentFile(null);
+        setAttachmentPreview(null);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -1750,13 +1791,19 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
 
         try {
             setLoading(true);
-            await safesAPI.transfer({
-                fromSafeId,
-                toSafeId,
-                amount: numAmount,
-                transferDate,
-                notes: notes.trim() || undefined
-            });
+            const formData = new FormData();
+            formData.append('fromSafeId', fromSafeId);
+            formData.append('toSafeId', toSafeId);
+            formData.append('amount', numAmount);
+            formData.append('transferDate', transferDate);
+            if (notes.trim()) {
+                formData.append('notes', notes.trim());
+            }
+            if (attachmentFile) {
+                formData.append('file', attachmentFile);
+            }
+
+            await safesAPI.transfer(formData);
 
             showAlert({ type: 'success', message: isArabic ? 'تم التحويل بنجاح بين الخزائن' : 'Transfer completed successfully' });
             onSuccess();
@@ -1857,6 +1904,120 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                                 rows={2}
                                 placeholder={isArabic ? 'مثال: تغذية الخزينة النقدية من البنك، تحويل عهدة...' : 'e.g. Cash replenishment from bank'}
                             />
+                        </div>
+
+                        {/* Optional Receipt / Bank Transfer Statement Upload */}
+                        <div className="form-group">
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                <Paperclip size={15} style={{ color: 'var(--color-primary)' }} />
+                                <span>{isArabic ? 'إيصال أو إشعار التحويل البنكي (اختياري)' : 'Receipt or Transfer Statement (Optional)'}</span>
+                            </label>
+
+                            {attachmentFile ? (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '10px 14px',
+                                    borderRadius: '10px',
+                                    background: 'var(--bg-tertiary)',
+                                    border: '1px solid var(--border-color)',
+                                    gap: '12px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                        {attachmentPreview ? (
+                                            <img
+                                                src={attachmentPreview}
+                                                alt="Receipt preview"
+                                                style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)', flexShrink: 0 }}
+                                            />
+                                        ) : (
+                                            <div style={{
+                                                width: '42px',
+                                                height: '42px',
+                                                borderRadius: '6px',
+                                                background: 'rgba(255, 90, 31, 0.12)',
+                                                border: '1px solid rgba(255, 90, 31, 0.25)',
+                                                color: 'var(--color-primary)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0
+                                            }}>
+                                                <FileText size={18} />
+                                                <span style={{ fontSize: '0.6rem', fontWeight: 700, marginTop: '2px' }}>
+                                                    {(attachmentFile.name.split('.').pop() || 'FILE').toUpperCase()}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                            <div className="truncate" style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                                                {attachmentFile.name}
+                                            </div>
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                                                {attachmentFile.size > 1024 * 1024
+                                                    ? `${(attachmentFile.size / (1024 * 1024)).toFixed(2)} MB`
+                                                    : `${(attachmentFile.size / 1024).toFixed(1)} KB`}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleRemoveFile}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--text-tertiary)',
+                                            cursor: 'pointer',
+                                            padding: '6px',
+                                            borderRadius: '6px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                        title={isArabic ? 'حذف الملف' : 'Remove file'}
+                                        onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <label
+                                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={handleDrop}
+                                    style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '16px 20px',
+                                        border: `2px dashed ${isDragging ? 'var(--color-primary)' : 'var(--border-color)'}`,
+                                        borderRadius: '10px',
+                                        background: isDragging ? 'rgba(255, 90, 31, 0.05)' : 'var(--bg-tertiary)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        textAlign: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <input
+                                        type="file"
+                                        accept="image/*,application/pdf"
+                                        onChange={handleFileChange}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <UploadCloud size={24} style={{ color: isDragging ? 'var(--color-primary)' : 'var(--text-tertiary)' }} />
+                                    <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                        {isArabic ? 'انقر لرفع ملف أو اسحبه إلى هنا' : 'Click to upload or drag & drop'}
+                                    </div>
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                                        {isArabic ? 'صورة إيصال (PNG, JPG, WebP) أو مستند PDF (حتى 25 ميجابايت)' : 'Receipt image (PNG, JPG, WebP) or PDF (up to 25 MB)'}
+                                    </div>
+                                </label>
+                            )}
                         </div>
                     </div>
 
@@ -2008,11 +2169,37 @@ function SafeStatementModal({
                                             <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.86rem', lineHeight: '1.4' }}>
                                                 {item.description}
                                             </div>
-                                            {item.reference && (
-                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '3px' }}>
-                                                    {isArabic ? 'مرجع:' : 'Ref:'} {item.reference}
-                                                </div>
-                                            )}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '3px' }}>
+                                                {item.reference && (
+                                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                                                        {isArabic ? 'مرجع:' : 'Ref:'} {item.reference}
+                                                    </span>
+                                                )}
+                                                {item.receiptUrl && (
+                                                    <a
+                                                        href={item.receiptUrl.startsWith('http') ? item.receiptUrl : `/uploads/${item.receiptUrl.replace(/^(\/?uploads\/|\/+)/, '')}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            fontSize: '0.72rem',
+                                                            color: 'var(--color-primary)',
+                                                            background: 'rgba(255, 90, 31, 0.08)',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '5px',
+                                                            border: '1px solid rgba(255, 90, 31, 0.22)',
+                                                            textDecoration: 'none',
+                                                            fontWeight: 600
+                                                        }}
+                                                        title={isArabic ? 'عرض المستند أو الإيصال المرفق' : 'View attached receipt / statement'}
+                                                    >
+                                                        <Paperclip size={12} />
+                                                        <span>{isArabic ? 'عرض الإيصال' : 'View Receipt'}</span>
+                                                    </a>
+                                                )}
+                                            </div>
                                         </td>
                                         <td style={{ textAlign: 'start' }}>
                                             {item.projectName || item.partyName ? (

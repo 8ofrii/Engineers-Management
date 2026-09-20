@@ -1165,6 +1165,7 @@ model SafeTransfer {
   fromSafeId   String
   toSafeId     String
   notes        String?
+  receiptUrl   String?
   transferDate DateTime    @default(now())
   createdBy    String
   tenantId     String

@@ -152,7 +152,14 @@ export const safesAPI = {
     create: (data) => api.post('/safes', data),
     update: (id, data) => api.put(`/safes/${id}`, data),
     remove: (id) => api.delete(`/safes/${id}`),
-    transfer: (data) => api.post('/safes/transfers', data),
+    transfer: (data) => {
+        if (data instanceof FormData) {
+            return api.post('/safes/transfers', data, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+        }
+        return api.post('/safes/transfers', data);
+    },
     getTransfers: (params) => api.get('/safes/transfers', { params }),
     getStatement: (id, params) => api.get(`/safes/${id}/statement`, { params }),
     getOfficeFinancesSummary: (params) => api.get('/safes/office-summary', { params })
