@@ -370,7 +370,7 @@ export default function OfficeFinances() {
                         {/* 1. Total Office Profit */}
                         <div className="card" style={{
                             padding: '22px 24px',
-                            background: 'linear-gradient(145deg, var(--bg-surface), rgba(16, 185, 129, 0.06))',
+                            background: 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(16, 185, 129, 0.06))',
                             border: '1px solid rgba(16, 185, 129, 0.25)',
                             borderRadius: '14px',
                             display: 'flex',
@@ -403,7 +403,7 @@ export default function OfficeFinances() {
                         {/* 2. Total Office Expenses */}
                         <div className="card" style={{
                             padding: '22px 24px',
-                            background: 'linear-gradient(145deg, var(--bg-surface), rgba(239, 68, 68, 0.06))',
+                            background: 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(239, 68, 68, 0.06))',
                             border: '1px solid rgba(239, 68, 68, 0.25)',
                             borderRadius: '14px',
                             display: 'flex',
@@ -437,8 +437,8 @@ export default function OfficeFinances() {
                         <div className="card" style={{
                             padding: '22px 24px',
                             background: (summary?.netOfficeProfit || 0) >= 0
-                                ? 'linear-gradient(145deg, var(--bg-surface), rgba(59, 130, 246, 0.06))'
-                                : 'linear-gradient(145deg, var(--bg-surface), rgba(239, 68, 68, 0.06))',
+                                ? 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(59, 130, 246, 0.06))'
+                                : 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(239, 68, 68, 0.06))',
                             border: (summary?.netOfficeProfit || 0) >= 0
                                 ? '1px solid rgba(59, 130, 246, 0.3)'
                                 : '1px solid rgba(239, 68, 68, 0.3)',
@@ -521,6 +521,13 @@ export default function OfficeFinances() {
 
                     {/* Scoped CSS for Table, Safe Cards, Modals & Badges */}
                     <style>{`
+                        .office-finances-page {
+                            --bg-surface: var(--bg-elevated, var(--bg-secondary));
+                        }
+                        body.light-mode .office-finances-page {
+                            --bg-surface: #fdfaf2;
+                        }
+
                         .office-finances-page .tx-table-card {
                             background: var(--bg-surface);
                             border: 1px solid var(--border-color);
@@ -528,12 +535,21 @@ export default function OfficeFinances() {
                             padding: 24px;
                             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
                         }
+                        body.light-mode .office-finances-page .tx-table-card {
+                            background: #fdfaf2;
+                            border-color: #d8cbaf;
+                            box-shadow: 0 4px 20px rgba(60, 45, 20, 0.06);
+                        }
                         .office-finances-page .tx-table-container {
                             overflow-x: auto;
                             width: 100%;
                             border-radius: 10px;
                             border: 1px solid var(--border-color);
                             background: var(--bg-secondary);
+                        }
+                        body.light-mode .office-finances-page .tx-table-container {
+                            border-color: #d8cbaf;
+                            background: #fdfaf2;
                         }
                         .office-finances-page .office-tx-table {
                             width: 100%;
@@ -552,6 +568,11 @@ export default function OfficeFinances() {
                             border-bottom: 1px solid var(--border-color);
                             white-space: nowrap;
                         }
+                        body.light-mode .office-finances-page .office-tx-table th {
+                            background: #eee5d1;
+                            color: #6b5f4d;
+                            border-bottom-color: #d8cbaf;
+                        }
                         .office-finances-page .office-tx-table td {
                             padding: 14px 18px;
                             font-size: 0.86rem;
@@ -559,11 +580,18 @@ export default function OfficeFinances() {
                             border-bottom: 1px solid var(--border-color);
                             vertical-align: middle;
                         }
+                        body.light-mode .office-finances-page .office-tx-table td {
+                            color: #1c1710;
+                            border-bottom-color: #e5dcc7;
+                        }
                         .office-finances-page .office-tx-table tbody tr {
                             transition: background 0.15s ease;
                         }
                         .office-finances-page .office-tx-table tbody tr:hover {
                             background: rgba(255, 255, 255, 0.03);
+                        }
+                        body.light-mode .office-finances-page .office-tx-table tbody tr:hover {
+                            background: rgba(60, 45, 20, 0.03);
                         }
                         .office-finances-page .office-tx-table tbody tr:last-child td {
                             border-bottom: none;
@@ -581,6 +609,11 @@ export default function OfficeFinances() {
                             font-weight: 600;
                             white-space: nowrap;
                             max-width: 220px;
+                        }
+                        body.light-mode .office-finances-page .safe-badge-pill {
+                            background: rgba(194, 65, 12, 0.08);
+                            border-color: rgba(194, 65, 12, 0.25);
+                            color: #c2410c;
                         }
                         .office-finances-page .status-badge-pill {
                             display: inline-flex;
@@ -602,7 +635,7 @@ export default function OfficeFinances() {
                         .office-finances-page .status-badge-pill.pending {
                             background: rgba(245, 158, 11, 0.12);
                             color: #f59e0b;
-                            border: 1px solid rgba(16, 185, 129, 0.3);
+                            border: 1px solid rgba(245, 158, 11, 0.3);
                         }
                         .office-finances-page .status-badge-pill.rejected {
                             background: rgba(239, 68, 68, 0.12);
@@ -629,12 +662,47 @@ export default function OfficeFinances() {
                             transition: all 0.15s ease;
                         }
                         .office-finances-page .tx-action-btn-circle:hover {
-                            background: rgba(59, 130, 246, 0.15);
-                            border-color: rgba(59, 130, 246, 0.35);
-                            color: #3b82f6;
+                            background: rgba(255, 90, 31, 0.12);
+                            border-color: var(--color-primary);
+                            color: var(--color-primary-light, #ff8a50);
                             transform: translateY(-1px);
                         }
-                        /* Safe Card Actions & Edit Button */
+                        body.light-mode .office-finances-page .tx-action-btn-circle {
+                            background: #eee5d1;
+                            border-color: #d8cbaf;
+                            color: #6b5f4d;
+                        }
+                        body.light-mode .office-finances-page .tx-action-btn-circle:hover {
+                            background: rgba(194, 65, 12, 0.12);
+                            border-color: #c2410c;
+                            color: #c2410c;
+                        }
+
+                        /* Safe Card Container & Actions */
+                        .office-finances-page .safe-card {
+                            background: var(--bg-surface);
+                            border: 1px solid var(--border-color);
+                            border-radius: 14px;
+                            padding: 20px;
+                            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+                            transition: transform 0.2s, box-shadow 0.2s;
+                        }
+                        body.light-mode .office-finances-page .safe-card {
+                            background: #fdfaf2;
+                            border-color: #d8cbaf;
+                            box-shadow: 0 8px 24px rgba(60, 45, 20, 0.08);
+                        }
+                        .office-finances-page .safe-card-balance-box {
+                            padding: 12px 16px;
+                            border-radius: 10px;
+                            background: var(--bg-secondary);
+                            border: 1px solid var(--border-color);
+                            margin-bottom: 16px;
+                        }
+                        body.light-mode .office-finances-page .safe-card-balance-box {
+                            background: #f7f1e5;
+                            border-color: #d8cbaf;
+                        }
                         .office-finances-page .safe-edit-btn {
                             width: 32px;
                             height: 32px;
@@ -649,10 +717,20 @@ export default function OfficeFinances() {
                             transition: all 0.15s ease;
                         }
                         .office-finances-page .safe-edit-btn:hover {
-                            background: rgba(59, 130, 246, 0.15);
-                            border-color: rgba(59, 130, 246, 0.35);
-                            color: #3b82f6;
+                            background: rgba(255, 90, 31, 0.12);
+                            border-color: var(--color-primary);
+                            color: var(--color-primary-light, #ff8a50);
                             transform: translateY(-1px);
+                        }
+                        body.light-mode .office-finances-page .safe-edit-btn {
+                            background: #eee5d1;
+                            border-color: #d8cbaf;
+                            color: #6b5f4d;
+                        }
+                        body.light-mode .office-finances-page .safe-edit-btn:hover {
+                            background: rgba(194, 65, 12, 0.12);
+                            border-color: #c2410c;
+                            color: #c2410c;
                         }
                         .office-finances-page .safe-action-btn {
                             display: inline-flex;
@@ -672,14 +750,24 @@ export default function OfficeFinances() {
                         .office-finances-page .safe-action-btn:hover {
                             background: var(--bg-tertiary);
                             border-color: var(--color-primary);
-                            color: var(--color-primary);
+                            color: var(--color-primary-light, #ff8a50);
                             transform: translateY(-1px);
+                        }
+                        body.light-mode .office-finances-page .safe-action-btn {
+                            background: #fdfaf2;
+                            border-color: #d8cbaf;
+                            color: #1c1710;
+                        }
+                        body.light-mode .office-finances-page .safe-action-btn:hover {
+                            background: #eee5d1;
+                            border-color: #c2410c;
+                            color: #c2410c;
                         }
                         .office-finances-page .safe-action-btn.statement {
                             flex: 1;
                         }
 
-                        /* Solid Modal Overlay & Containers */
+                        /* Solid Modal Overlay & Containers (Dark & Light) */
                         .modal-overlay {
                             position: fixed;
                             inset: 0;
@@ -691,23 +779,44 @@ export default function OfficeFinances() {
                             z-index: 1050;
                             padding: 20px;
                         }
+                        body.light-mode .modal-overlay {
+                            background: rgba(28, 23, 16, 0.55);
+                        }
                         .modal-container.office-modal {
-                            background: var(--bg-surface, #18181b) !important;
+                            background: var(--bg-elevated, #17171d) !important;
                             border: 1px solid var(--border-color) !important;
                             border-radius: 16px !important;
                             box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6) !important;
+                            color: var(--text-primary) !important;
                             overflow: hidden;
                             max-height: 90vh;
                             display: flex;
                             flex-direction: column;
                         }
+                        body.light-mode .modal-container.office-modal {
+                            background: #fdfaf2 !important;
+                            border-color: #d8cbaf !important;
+                            box-shadow: 0 25px 60px rgba(60, 45, 20, 0.22) !important;
+                            color: #1c1710 !important;
+                        }
                         .modal-container.office-modal .modal-header {
-                            background: var(--bg-surface, #18181b);
-                            border-bottom: 1px solid var(--border-color);
+                            background: var(--bg-elevated, #17171d) !important;
+                            border-bottom: 1px solid var(--border-color) !important;
                             padding: 20px 24px;
                             display: flex;
                             align-items: center;
                             justify-content: space-between;
+                        }
+                        body.light-mode .modal-container.office-modal .modal-header {
+                            background: #fdfaf2 !important;
+                            border-bottom-color: #d8cbaf !important;
+                        }
+                        .modal-container.office-modal .modal-header h2 {
+                            color: var(--text-primary) !important;
+                            margin: 0;
+                        }
+                        body.light-mode .modal-container.office-modal .modal-header h2 {
+                            color: #1c1710 !important;
                         }
                         .modal-container.office-modal .modal-close {
                             width: 32px;
@@ -728,19 +837,38 @@ export default function OfficeFinances() {
                             color: #ef4444;
                             transform: translateY(-1px);
                         }
+                        body.light-mode .modal-container.office-modal .modal-close {
+                            background: #eee5d1 !important;
+                            border-color: #d8cbaf !important;
+                            color: #6b5f4d !important;
+                        }
+                        body.light-mode .modal-container.office-modal .modal-close:hover {
+                            background: rgba(239, 68, 68, 0.12) !important;
+                            border-color: rgba(239, 68, 68, 0.3) !important;
+                            color: #ef4444 !important;
+                        }
                         .modal-container.office-modal .modal-body {
-                            background: var(--bg-surface, #18181b);
+                            background: var(--bg-elevated, #17171d) !important;
+                            color: var(--text-primary) !important;
                             padding: 24px;
                             overflow-y: auto;
                         }
+                        body.light-mode .modal-container.office-modal .modal-body {
+                            background: #fdfaf2 !important;
+                            color: #1c1710 !important;
+                        }
                         .modal-container.office-modal .modal-footer {
-                            background: var(--bg-secondary, #121214);
-                            border-top: 1px solid var(--border-color);
+                            background: var(--bg-secondary, #0e0e12) !important;
+                            border-top: 1px solid var(--border-color) !important;
                             padding: 16px 24px;
                             display: flex;
                             align-items: center;
                             justify-content: flex-end;
                             gap: 12px;
+                        }
+                        body.light-mode .modal-container.office-modal .modal-footer {
+                            background: #f7f1e5 !important;
+                            border-top-color: #d8cbaf !important;
                         }
                         .modal-container.office-modal .form-group label {
                             font-size: 0.86rem;
@@ -749,7 +877,10 @@ export default function OfficeFinances() {
                             margin-bottom: 6px;
                             display: block;
                         }
-                        .modal-container.office-modal input,
+                        body.light-mode .modal-container.office-modal .form-group label {
+                            color: #1c1710 !important;
+                        }
+                        .modal-container.office-modal input:not([type="checkbox"]),
                         .modal-container.office-modal select,
                         .modal-container.office-modal textarea {
                             background: var(--bg-secondary) !important;
@@ -762,24 +893,107 @@ export default function OfficeFinances() {
                             font-size: 0.9rem;
                             transition: border-color 0.2s, box-shadow 0.2s;
                         }
+                        .modal-container.office-modal input[type="checkbox"] {
+                            width: 18px !important;
+                            height: 18px !important;
+                            cursor: pointer;
+                            accent-color: var(--color-primary);
+                        }
+                        .modal-container.office-modal select option {
+                            background: var(--bg-secondary);
+                            color: var(--text-primary);
+                        }
                         .modal-container.office-modal input:focus,
                         .modal-container.office-modal select:focus,
                         .modal-container.office-modal textarea:focus {
                             border-color: var(--color-primary) !important;
-                            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+                            box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.16) !important;
+                        }
+                        body.light-mode .modal-container.office-modal input:not([type="checkbox"]),
+                        body.light-mode .modal-container.office-modal select,
+                        body.light-mode .modal-container.office-modal textarea {
+                            background: #ffffff !important;
+                            border-color: #d8cbaf !important;
+                            color: #1c1710 !important;
+                        }
+                        body.light-mode .modal-container.office-modal select option {
+                            background: #ffffff !important;
+                            color: #1c1710 !important;
+                        }
+                        body.light-mode .modal-container.office-modal input:focus,
+                        body.light-mode .modal-container.office-modal select:focus,
+                        body.light-mode .modal-container.office-modal textarea:focus {
+                            border-color: #c2410c !important;
+                            box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.16) !important;
+                        }
+
+                        /* Safe Statement Toolbar & Table */
+                        .statement-filter-toolbar {
+                            padding: 12px 24px;
+                            background: var(--bg-secondary);
+                            border-bottom: 1px solid var(--border-color);
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            flex-wrap: wrap;
+                        }
+                        body.light-mode .statement-filter-toolbar {
+                            background: #f7f1e5 !important;
+                            border-bottom-color: #d8cbaf !important;
+                        }
+                        .statement-filter-toolbar input[type="date"] {
+                            padding: 6px 10px;
+                            border-radius: 8px;
+                            border: 1px solid var(--border-color);
+                            background: var(--bg-tertiary);
+                            color: var(--text-primary);
+                            font-size: 0.84rem;
+                            outline: none;
+                        }
+                        body.light-mode .statement-filter-toolbar input[type="date"] {
+                            background: #ffffff !important;
+                            border-color: #d8cbaf !important;
+                            color: #1c1710 !important;
                         }
                         .statement-table th {
                             background: var(--bg-tertiary) !important;
+                            color: var(--text-secondary);
+                            border-bottom: 1px solid var(--border-color);
+                        }
+                        body.light-mode .statement-table th {
+                            background: #eee5d1 !important;
+                            color: #6b5f4d !important;
+                            border-bottom-color: #d8cbaf !important;
+                        }
+                        .statement-table td {
+                            border-bottom: 1px solid var(--border-color);
+                            color: var(--text-primary);
+                        }
+                        body.light-mode .statement-table td {
+                            border-bottom-color: #e5dcc7 !important;
+                            color: #1c1710 !important;
                         }
                         .statement-table tbody tr:hover {
                             background: rgba(255, 255, 255, 0.035) !important;
                         }
-
-                        body.light-mode .office-finances-page .office-tx-table th {
-                            background: #f1f5f9;
+                        body.light-mode .statement-table tbody tr:hover {
+                            background: rgba(60, 45, 20, 0.04) !important;
                         }
-                        body.light-mode .office-finances-page .office-tx-table tbody tr:hover {
-                            background: rgba(0, 0, 0, 0.025);
+                        .statement-project-pill {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 4px;
+                            padding: 2px 8px;
+                            border-radius: 6px;
+                            background: var(--bg-tertiary);
+                            border: 1px solid var(--border-color);
+                            font-size: 0.78rem;
+                            color: var(--text-secondary);
+                        }
+                        body.light-mode .statement-project-pill {
+                            background: #eee5d1 !important;
+                            border-color: #d8cbaf !important;
+                            color: #6b5f4d !important;
                         }
                     `}</style>
 
@@ -1078,26 +1292,21 @@ export default function OfficeFinances() {
                                 return (
                                     <div
                                         key={safe.id}
-                                        className="card"
+                                        className="card safe-card"
                                         style={{
                                             padding: '20px',
                                             borderRadius: '14px',
-                                            border: '1px solid var(--border-color)',
-                                            background: 'var(--bg-surface)',
                                             display: 'flex',
                                             flexDirection: 'column',
                                             justifyContent: 'space-between',
                                             position: 'relative',
-                                            overflow: 'hidden',
-                                            transition: 'transform 0.2s, box-shadow 0.2s'
+                                            overflow: 'hidden'
                                         }}
                                         onMouseEnter={(e) => {
                                             e.currentTarget.style.transform = 'translateY(-2px)';
-                                            e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)';
                                         }}
                                         onMouseLeave={(e) => {
                                             e.currentTarget.style.transform = 'none';
-                                            e.currentTarget.style.boxShadow = 'none';
                                         }}
                                     >
                                         {/* Top bar with Safe Type & Default Badge */}
@@ -1159,13 +1368,7 @@ export default function OfficeFinances() {
                                             )}
 
                                             {/* Live Balance */}
-                                            <div style={{
-                                                padding: '12px 16px',
-                                                borderRadius: '10px',
-                                                background: 'var(--bg-secondary)',
-                                                border: '1px solid var(--border-color)',
-                                                marginBottom: '16px'
-                                            }}>
+                                            <div className="safe-card-balance-box">
                                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
                                                     {isArabic ? 'الرصيد المتاح الحالي' : 'Current Available Balance'}
                                                 </div>
@@ -1735,30 +1938,13 @@ function SafeStatementModal({
                 </div>
 
                 {/* Filter Toolbar */}
-                <div style={{
-                    padding: '12px 24px',
-                    background: 'var(--bg-secondary)',
-                    borderBottom: '1px solid var(--border-color)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    flexWrap: 'wrap'
-                }}>
+                <div className="statement-filter-toolbar">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem' }}>
                         <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>{isArabic ? 'من:' : 'From:'}</span>
                         <input
                             type="date"
                             value={dateFrom}
                             onChange={(e) => setDateFrom(e.target.value)}
-                            style={{
-                                padding: '6px 10px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-surface)',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.84rem',
-                                outline: 'none'
-                            }}
                         />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem' }}>
@@ -1767,15 +1953,6 @@ function SafeStatementModal({
                             type="date"
                             value={dateTo}
                             onChange={(e) => setDateTo(e.target.value)}
-                            style={{
-                                padding: '6px 10px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-surface)',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.84rem',
-                                outline: 'none'
-                            }}
                         />
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={onFilter} style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.84rem', fontWeight: 600 }}>
@@ -1839,17 +2016,7 @@ function SafeStatementModal({
                                         </td>
                                         <td style={{ textAlign: 'start' }}>
                                             {item.projectName || item.partyName ? (
-                                                <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '6px',
-                                                    background: 'var(--bg-tertiary)',
-                                                    border: '1px solid var(--border-color)',
-                                                    fontSize: '0.78rem',
-                                                    color: 'var(--text-secondary)'
-                                                }}>
+                                                <span className="statement-project-pill">
                                                     {item.projectName || item.partyName}
                                                 </span>
                                             ) : (
