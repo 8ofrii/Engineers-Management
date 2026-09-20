@@ -274,30 +274,63 @@ export const createTransaction = async (req, res, next) => {
                 }
 
                 // V1.2 PROFIT CALCULATION / BATCH CREATION
-                if (createBatch && projectId) {
-                    // Inventory Purchase: Create batch, defer profit
+                if (createBatch && (projectId || req.body.supplierId)) {
+                    // Inventory Purchase: Coalesce into active batch or create new, defer profit
                     let parsedQty = Number(req.body.quantity) || 0;
                     if (!parsedQty && req.body.unitPrice && Number(req.body.unitPrice) > 0) {
                         parsedQty = Number(amount) / Number(req.body.unitPrice);
                     }
 
-                    await tx.materialBatch.create({
-                        data: {
-                            projectId,
-                            originalReceiptId: transaction.id,
-                            description: description || 'Material Purchase',
-                            initialValue: Number(amount),
-                            remainingValue: Number(amount),
-                            status: 'AVAILABLE',
-                            recordedBy: actualPayer,
+                    const targetProjectId = projectId || null;
+                    const targetSupplierId = req.body.supplierId || null;
+                    const effectiveMatId = req.body.materialId || null;
+
+                    const existingBatch = await tx.materialBatch.findFirst({
+                        where: {
                             tenantId: req.user.tenantId,
-                            materialId: req.body.materialId || null
-                        }
+                            projectId: targetProjectId,
+                            supplierId: targetSupplierId,
+                            status: { in: ['AVAILABLE', 'PARTIALLY_USED'] },
+                            ...(effectiveMatId
+                                ? { materialId: effectiveMatId }
+                                : { description: { equals: description || 'Material Purchase', mode: 'insensitive' } }
+                            )
+                        },
+                        orderBy: { createdAt: 'desc' }
                     });
 
-                    if (req.body.materialId) {
+                    if (existingBatch) {
+                        await tx.materialBatch.update({
+                            where: { id: existingBatch.id },
+                            data: {
+                                initialValue: { increment: Number(amount) },
+                                remainingValue: { increment: Number(amount) },
+                                status: Number(existingBatch.remainingValue) + Number(amount) === Number(existingBatch.initialValue) + Number(amount) && !existingBatch.quantityUsed
+                                    ? 'AVAILABLE'
+                                    : 'PARTIALLY_USED',
+                                updatedAt: new Date()
+                            }
+                        });
+                    } else {
+                        await tx.materialBatch.create({
+                            data: {
+                                projectId: targetProjectId,
+                                supplierId: targetSupplierId,
+                                originalReceiptId: transaction.id,
+                                description: description || 'Material Purchase',
+                                initialValue: Number(amount),
+                                remainingValue: Number(amount),
+                                status: 'AVAILABLE',
+                                recordedBy: actualPayer,
+                                tenantId: req.user.tenantId,
+                                materialId: effectiveMatId
+                            }
+                        });
+                    }
+
+                    if (effectiveMatId) {
                         await tx.material.update({
-                            where: { id: req.body.materialId },
+                            where: { id: effectiveMatId },
                             data: {
                                 stockLevel: { increment: parsedQty > 0 ? parsedQty : 1 }
                             }

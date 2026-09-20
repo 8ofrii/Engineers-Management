@@ -283,22 +283,47 @@ export const rechargeMaterial = async (req, res, next) => {
                 }
             }
 
-            // 2. If a project or supplier is selected, also create a material batch for usage tracking
+            // 2. If a project or supplier is selected, coalesce into existing active batch or create new
             if (projectId || supplierId) {
-                await tx.materialBatch.create({
-                    data: {
+                const existingBatch = await tx.materialBatch.findFirst({
+                    where: {
+                        tenantId: req.user.tenantId,
+                        materialId: material.id,
                         projectId: projectId || null,
                         supplierId: supplierId || null,
-                        materialId: material.id,
-                        originalReceiptId: createdTx?.id || null,
-                        description: `${material.nameAr || material.name} (+${addQty} ${material.unit})`,
-                        initialValue: totalCost,
-                        remainingValue: totalCost,
-                        status: 'AVAILABLE',
-                        recordedBy: actualPayer,
-                        tenantId: req.user.tenantId
-                    }
+                        status: { in: ['AVAILABLE', 'PARTIALLY_USED'] }
+                    },
+                    orderBy: { createdAt: 'desc' }
                 });
+
+                if (existingBatch) {
+                    await tx.materialBatch.update({
+                        where: { id: existingBatch.id },
+                        data: {
+                            initialValue: { increment: totalCost },
+                            remainingValue: { increment: totalCost },
+                            status: Number(existingBatch.remainingValue) + totalCost === Number(existingBatch.initialValue) + totalCost && !existingBatch.quantityUsed
+                                ? 'AVAILABLE'
+                                : 'PARTIALLY_USED',
+                            updatedAt: new Date()
+                        }
+                    });
+                } else {
+                    await tx.materialBatch.create({
+                        data: {
+                            projectId: projectId || null,
+                            supplierId: supplierId || null,
+                            materialId: material.id,
+                            originalReceiptId: createdTx?.id || null,
+                            description: material.nameAr || material.name,
+                            initialValue: totalCost,
+                            remainingValue: totalCost,
+                            status: 'AVAILABLE',
+                            recordedBy: actualPayer,
+                            tenantId: req.user.tenantId
+                        }
+                    });
+                }
             }
 
             return { updatedMaterial: mat, transactionRecord: createdTx };

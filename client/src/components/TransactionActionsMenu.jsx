@@ -148,7 +148,7 @@ export default function TransactionActionsMenu({
                         >
                             <Eye size={14} className="item-icon" />
                             <span className="item-label">
-                                {isArabic ? 'عرض التفاصيل' : (t ? t('common.view') || 'View Details' : 'View Details')}
+                                {t ? t('common.view', isArabic ? 'عرض التفاصيل' : 'View Details') : (isArabic ? 'عرض التفاصيل' : 'View Details')}
                             </span>
                         </button>
 

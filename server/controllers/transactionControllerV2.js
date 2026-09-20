@@ -116,31 +116,41 @@ export const createTransactionV2 = async (req, res, next) => {
             voiceNoteUrl,
             receiptPhotoUrl,
             aiRawText,
-            aiExtractedData
+            aiExtractedData,
+            safeId,
+            isOfficeExpense,
+            inventoryDestination,
+            targetSupplierId
         } = req.body;
+
+        const isSupplierInventory = (createBatch || req.body.materialId) && (inventoryDestination === 'SUPPLIER' || (!projectId && (targetSupplierId || supplierId)));
+        const isOffice = Boolean(isOfficeExpense);
 
         // Validate required fields
         const parsedAmount = Number(amount);
-        if (!type || isNaN(parsedAmount) || parsedAmount <= 0 || parsedAmount > 999999999999 || !projectId) {
+        if (!type || isNaN(parsedAmount) || parsedAmount <= 0 || parsedAmount > 999999999999 || (!projectId && !isOffice && !isSupplierInventory)) {
             return res.status(400).json({
                 success: false,
-                message: 'A valid type, positive amount, and projectId are required'
+                message: 'A valid type, positive amount, and projectId (or office/supplier destination) are required'
             });
         }
 
-        // Fetch project
-        const project = await prisma.project.findFirst({
-            where: {
-                id: projectId,
-                tenantId: req.user.tenantId
-            }
-        });
-
-        if (!project) {
-            return res.status(404).json({
-                success: false,
-                message: 'Project not found'
+        // Fetch project if projectId provided
+        let project = null;
+        if (projectId) {
+            project = await prisma.project.findFirst({
+                where: {
+                    id: projectId,
+                    tenantId: req.user.tenantId
+                }
             });
+
+            if (!project) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Project not found'
+                });
+            }
         }
 
         // Determine payer (Manager can assign, Engineer defaults to self)
@@ -168,7 +178,6 @@ export const createTransactionV2 = async (req, res, next) => {
 
             // ========== INCOME LOGIC ==========
             if (type === 'INCOME') {
-                // V1.2: Add full amount to Project Safe
                 const transaction = await tx.transaction.create({
                     data: {
                         type: 'INCOME',
@@ -176,9 +185,11 @@ export const createTransactionV2 = async (req, res, next) => {
                         amount: Number(amount),
                         description: description || 'Client Payment',
                         status: initialStatus,
-                        projectId,
+                        projectId: projectId || null,
                         projectCostItemId,
-                        clientId: clientId || project.clientId,
+                        clientId: clientId || project?.clientId || null,
+                        safeId: safeId || null,
+                        isOfficeExpense: isOffice,
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
                         paymentMethod: paymentMethod || 'BANK_TRANSFER',
@@ -195,12 +206,19 @@ export const createTransactionV2 = async (req, res, next) => {
                     }
                 });
 
-                // Only Update Project Safe Balance if APPROVED
                 if (initialStatus === 'APPROVED') {
-                    await tx.project.update({
-                        where: { id: projectId, tenantId: req.user.tenantId },
-                        data: { projectSafeBalance: { increment: Number(amount) } }
-                    });
+                    if (safeId) {
+                        await tx.companySafe.update({
+                            where: { id: safeId, tenantId: req.user.tenantId },
+                            data: { balance: { increment: Number(amount) } }
+                        });
+                    }
+                    if (projectId) {
+                        await tx.project.update({
+                            where: { id: projectId, tenantId: req.user.tenantId },
+                            data: { projectSafeBalance: { increment: Number(amount) } }
+                        });
+                    }
                 }
 
                 return {
@@ -209,7 +227,7 @@ export const createTransactionV2 = async (req, res, next) => {
                         type: 'INCOME',
                         amountToSafe: initialStatus === 'APPROVED' ? Number(amount) : 0,
                         profitRecognized: 0,
-                        message: initialStatus === 'APPROVED' ? 'Full amount added to Project Safe. Profit deferred.' : 'Transaction pending approval.'
+                        message: initialStatus === 'APPROVED' ? 'Full amount added to Safe. Profit deferred.' : 'Transaction pending approval.'
                     }
                 };
             }
@@ -218,7 +236,7 @@ export const createTransactionV2 = async (req, res, next) => {
             if (type === 'EXPENSE') {
                 // V1.2: If projectCostItemId is missing but itemName is provided, create a new ProjectCostItem (Work Order/Band)
                 let finalCostItemId = projectCostItemId;
-                if (!finalCostItemId && itemName && type === 'EXPENSE') {
+                if (!finalCostItemId && itemName && type === 'EXPENSE' && projectId) {
                     const newItem = await tx.projectCostItem.create({
                         data: {
                             projectId,
@@ -235,6 +253,8 @@ export const createTransactionV2 = async (req, res, next) => {
                     finalCostItemId = newItem.id;
                 }
 
+                const effectiveSupplierId = isSupplierInventory ? (targetSupplierId || supplierId || null) : (supplierId || null);
+
                 const transaction = await tx.transaction.create({
                     data: {
                         type: 'EXPENSE',
@@ -242,9 +262,11 @@ export const createTransactionV2 = async (req, res, next) => {
                         amount: Number(amount),
                         description,
                         status: initialStatus,
-                        projectId,
+                        projectId: isSupplierInventory ? null : (projectId || null),
                         projectCostItemId: finalCostItemId,
-                        supplierId,
+                        supplierId: effectiveSupplierId,
+                        safeId: safeId || null,
+                        isOfficeExpense: isOffice,
                         workmanId,
                         beneficiary: beneficiary || null,
                         createdBy: actualPayer,
@@ -265,7 +287,6 @@ export const createTransactionV2 = async (req, res, next) => {
 
                 // If DRAFT, we skip safe deduction and profit calculation
                 if (initialStatus === 'PENDING_APPROVAL') {
-                    // Just return the transaction without calculating profit or deductions
                     return {
                         transaction,
                         profitInfo: {
@@ -275,29 +296,40 @@ export const createTransactionV2 = async (req, res, next) => {
                     };
                 }
 
-                // If APPROVED, Deduct from Project Safe
-                const updatedProject = await tx.project.update({
-                    where: { id: projectId, tenantId: req.user.tenantId },
-                    data: {
-                        projectSafeBalance: { decrement: Number(amount) },
-                        actualCost: { increment: Number(amount) }
-                    },
-                    include: { engineer: true }
-                });
-
-                // ALERT: If project safe becomes negative, notify manager and admin
-                if (Number(updatedProject.projectSafeBalance) < 0) {
-                    await tx.notification.create({
-                        data: {
-                            userId: updatedProject.engineerId, // Project manager/engineer
-                            tenantId: req.user.tenantId,
-                            type: 'ALERT',
-                            title: '⚠️ Project Safe Balance Negative',
-                            message: `Project "${updatedProject.name}" has a negative safe balance: ${updatedProject.projectSafeBalance} EGP`,
-                            resourceId: projectId,
-                            resourceType: 'project'
-                        }
+                // If APPROVED, Deduct from Company Safe if specified
+                if (safeId) {
+                    await tx.companySafe.update({
+                        where: { id: safeId, tenantId: req.user.tenantId },
+                        data: { balance: { decrement: Number(amount) } }
                     });
+                }
+
+                // If APPROVED, Deduct from Project Safe if project linked
+                let updatedProject = null;
+                if (projectId && !isSupplierInventory) {
+                    updatedProject = await tx.project.update({
+                        where: { id: projectId, tenantId: req.user.tenantId },
+                        data: {
+                            projectSafeBalance: { decrement: Number(amount) },
+                            actualCost: { increment: Number(amount) }
+                        },
+                        include: { engineer: true }
+                    });
+
+                    // ALERT: If project safe becomes negative, notify manager and admin
+                    if (Number(updatedProject.projectSafeBalance) < 0) {
+                        await tx.notification.create({
+                            data: {
+                                userId: updatedProject.engineerId, // Project manager/engineer
+                                tenantId: req.user.tenantId,
+                                type: 'ALERT',
+                                title: '⚠️ Project Safe Balance Negative',
+                                message: `Project "${updatedProject.name}" has a negative safe balance: ${updatedProject.projectSafeBalance} EGP`,
+                                resourceId: projectId,
+                                resourceType: 'project'
+                            }
+                        });
+                    }
                 }
 
                 // Update Cost Item if linked
@@ -329,28 +361,65 @@ export const createTransactionV2 = async (req, res, next) => {
                 // PROFIT CALCULATION
                 // If it's NOT an inventory purchase and is APPROVED, recognize profit immediately
                 if (!createBatch && !req.body.materialId) {
-                    profitInfo = await calculateAndTransferProfit(tx, updatedProject, amount, actualPayer, transaction.id);
+                    if (updatedProject) {
+                        profitInfo = await calculateAndTransferProfit(tx, updatedProject, amount, actualPayer, transaction.id);
+                    } else {
+                        profitInfo = { profit: 0, message: 'General expense recorded. No project profit applicable.' };
+                    }
                 } else {
-                    // Inventory Purchase: Create batch, defer profit, and recharge material stock
+                    // Inventory Purchase: Coalesce into existing active batch or create new batch, defer profit, and recharge material stock
                     const parsedQty = Number(quantity) || (unitPrice && Number(unitPrice) > 0 ? Number(amount) / Number(unitPrice) : 0);
+                    const targetProjectId = isSupplierInventory ? null : (projectId || null);
+                    const targetSupplierId = isSupplierInventory ? effectiveSupplierId : null;
+                    const effectiveMatId = req.body.materialId || null;
 
-                    await tx.materialBatch.create({
-                        data: {
-                            projectId,
-                            originalReceiptId: transaction.id,
-                            description: description || 'Material Purchase',
-                            initialValue: Number(amount),
-                            remainingValue: Number(amount),
-                            status: 'AVAILABLE',
-                            recordedBy: actualPayer,
+                    // Look for existing active batch
+                    const existingBatch = await tx.materialBatch.findFirst({
+                        where: {
                             tenantId: req.user.tenantId,
-                            materialId: req.body.materialId || null
-                        }
+                            projectId: targetProjectId,
+                            supplierId: targetSupplierId,
+                            status: { in: ['AVAILABLE', 'PARTIALLY_USED'] },
+                            ...(effectiveMatId
+                                ? { materialId: effectiveMatId }
+                                : { description: { equals: description || 'Material Purchase', mode: 'insensitive' } }
+                            )
+                        },
+                        orderBy: { createdAt: 'desc' }
                     });
 
-                    if (req.body.materialId) {
+                    if (existingBatch) {
+                        await tx.materialBatch.update({
+                            where: { id: existingBatch.id },
+                            data: {
+                                initialValue: { increment: Number(amount) },
+                                remainingValue: { increment: Number(amount) },
+                                status: Number(existingBatch.remainingValue) + Number(amount) === Number(existingBatch.initialValue) + Number(amount) && !existingBatch.quantityUsed
+                                    ? 'AVAILABLE'
+                                    : 'PARTIALLY_USED',
+                                updatedAt: new Date()
+                            }
+                        });
+                    } else {
+                        await tx.materialBatch.create({
+                            data: {
+                                projectId: targetProjectId,
+                                supplierId: targetSupplierId,
+                                originalReceiptId: transaction.id,
+                                description: description || 'Material Purchase',
+                                initialValue: Number(amount),
+                                remainingValue: Number(amount),
+                                status: 'AVAILABLE',
+                                recordedBy: actualPayer,
+                                tenantId: req.user.tenantId,
+                                materialId: effectiveMatId
+                            }
+                        });
+                    }
+
+                    if (effectiveMatId) {
                         await tx.material.update({
-                            where: { id: req.body.materialId },
+                            where: { id: effectiveMatId },
                             data: {
                                 stockLevel: { increment: parsedQty > 0 ? parsedQty : 1 },
                                 ...(unitPrice && Number(unitPrice) > 0 ? { unitPrice: Number(unitPrice) } : {})
@@ -360,7 +429,9 @@ export const createTransactionV2 = async (req, res, next) => {
 
                     profitInfo = {
                         profit: 0,
-                        message: 'Inventory batch created & material stock recharged. Profit deferred until site usage.'
+                        message: isSupplierInventory
+                            ? 'Material stock added to Supplier Inventory. Profit deferred until site usage.'
+                            : 'Inventory batch created & material stock recharged. Profit deferred until site usage.'
                     };
                 }
 

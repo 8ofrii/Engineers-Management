@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText, FileSpreadsheet, ExternalLink, File } from 'lucide-react';
+import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText, FileSpreadsheet, ExternalLink, File, Store } from 'lucide-react';
 import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI, documentsAPI, safesAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
@@ -195,6 +195,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
     // Expense Mode Specific
     const [isStockPurchase, setIsStockPurchase] = useState(false);
+    const [inventoryDestination, setInventoryDestination] = useState('PROJECT'); // 'PROJECT' | 'SUPPLIER'
 
     // Usage Mode Specific
     const [selectedBatchId, setSelectedBatchId] = useState('');
@@ -221,6 +222,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         payerUserId: user?.id || '', // Who paid for this transaction
         projectCostItemId: '', // The linked Work Order
         workmanId: '', // The workman receiving payment (if labor)
+        targetSupplierId: '',
 
         // Income
         invoiceNumber: '',
@@ -480,6 +482,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     }
                     if (savedDraft.costItemMode) setCostItemMode(savedDraft.costItemMode);
                     if (savedDraft.isStockPurchase !== undefined) setIsStockPurchase(savedDraft.isStockPurchase);
+                    if (savedDraft.inventoryDestination) setInventoryDestination(savedDraft.inventoryDestination);
                     if (savedDraft.selectedBatchId) setSelectedBatchId(savedDraft.selectedBatchId);
 
                     setFormData({
@@ -505,6 +508,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         paidByClientContact: savedDraft.formData?.paidByClientContact || '',
                         toEngineerId: savedDraft.formData?.toEngineerId || '',
                         safeId: savedDraft.formData?.safeId || formData.safeId || '',
+                        targetSupplierId: savedDraft.formData?.targetSupplierId || '',
                         isOfficeExpense: Boolean(savedDraft.formData?.isOfficeExpense)
                     });
                     setHasRestoredDraft(true);
@@ -515,6 +519,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     setSelectedProjectId('');
                     setSelectedProject(null);
                     setIsStockPurchase(false);
+                    setInventoryDestination('PROJECT');
                     setMaterialBatches([]);
                     setSelectedBatchId('');
                     setSelectedBatch(null);
@@ -574,11 +579,12 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 selectedProjectId,
                 costItemMode,
                 isStockPurchase,
+                inventoryDestination,
                 selectedBatchId,
                 formData
             });
         }
-    }, [formData, selectedProjectId, mode, costItemMode, isStockPurchase, selectedBatchId, isOpen, initialData]);
+    }, [formData, selectedProjectId, mode, costItemMode, isStockPurchase, inventoryDestination, selectedBatchId, isOpen, initialData]);
 
     // Load Batches in USAGE mode or on open
     useEffect(() => {
@@ -832,14 +838,19 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         const newErrors = {};
 
         if (mode === 'EXPENSE') {
-            if (!formData.isOfficeExpense && !selectedProjectId) newErrors.projectId = t('common.required');
+            const isSupplierInv = (costItemMode === 'MATERIAL' || isStockPurchase) && inventoryDestination === 'SUPPLIER';
+
+            if (!formData.isOfficeExpense && !isSupplierInv && !selectedProjectId) newErrors.projectId = t('common.required');
             if (!formData.safeId) newErrors.safeId = isRTL ? 'يرجى تحديد خزينة الصرف (إلزامي)' : 'Source safe is mandatory';
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
-            if (!formData.beneficiary?.trim() && !formData.workmanId && !formData.supplierId) {
+            if (!formData.beneficiary?.trim() && !formData.workmanId && !formData.supplierId && !formData.targetSupplierId) {
                 newErrors.beneficiary = t('finance.beneficiaryRequired') || (isRTL ? 'يرجى تحديد أو إدخال اسم المستفيد' : 'Beneficiary is required');
             }
             if (costItemMode === 'MATERIAL' || isStockPurchase) {
                 if (!formData.materialId) newErrors.materialId = isRTL ? 'يرجى اختيار الخامة' : 'Please select material';
+                if (isSupplierInv && !formData.targetSupplierId && !formData.supplierId) {
+                    newErrors.targetSupplierId = isRTL ? 'يرجى اختيار المورد صاحب المخزون' : 'Please select supplier holding the inventory';
+                }
             } else if (costItemMode === 'EXISTING') {
                 if (!formData.projectCostItemId) newErrors.projectCostItemId = t('common.required');
             } else {
@@ -878,25 +889,32 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             if (mode === 'EXPENSE') {
                 const isOffice = Boolean(formData.isOfficeExpense);
                 const isMaterial = (costItemMode === 'MATERIAL' || isStockPurchase) && !isOffice;
+                const isSupplierInv = isMaterial && inventoryDestination === 'SUPPLIER';
                 const chosenMaterial = isMaterial ? rawMaterials.find(m => m.id === formData.materialId) : null;
                 const resolvedCategory = isMaterial ? 'MATERIALS' : (formData.category || (isOffice ? 'OFFICE_EXPENSES' : 'MATERIALS'));
                 const resolvedItemName = isMaterial
                     ? (formData.itemName || (chosenMaterial ? (isRTL ? (chosenMaterial.nameAr || chosenMaterial.name) : chosenMaterial.name) : 'خامة مخزنية'))
                     : undefined;
 
-                const resolvedBeneficiary = formData.beneficiary?.trim() || (!isOffice && formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (formData.supplierId ? suppliers.find(s => s.id === formData.supplierId)?.name : undefined));
+                const effectiveSupplierId = isSupplierInv
+                    ? (formData.targetSupplierId || formData.supplierId)
+                    : (chosenMaterial?.supplierId || formData.supplierId);
+
+                const resolvedBeneficiary = formData.beneficiary?.trim() || (!isOffice && formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (effectiveSupplierId ? suppliers.find(s => s.id === effectiveSupplierId)?.name : undefined));
 
                 payload = {
                     type: 'EXPENSE',
                     category: resolvedCategory,
                     amount: Number(formData.amount),
-                    projectId: isOffice ? undefined : (selectedProjectId || undefined),
+                    projectId: (isOffice || isSupplierInv) ? undefined : (selectedProjectId || undefined),
                     safeId: formData.safeId || undefined,
                     isOfficeExpense: isOffice,
                     projectCostItemId: (!isOffice && costItemMode === 'EXISTING') ? formData.projectCostItemId : undefined,
                     payerUserId: formData.payerUserId || user?.id,
                     workmanId: isOffice ? undefined : (formData.workmanId || undefined),
-                    supplierId: (isMaterial && chosenMaterial?.supplierId) ? chosenMaterial.supplierId : undefined,
+                    supplierId: effectiveSupplierId || undefined,
+                    targetSupplierId: isSupplierInv ? effectiveSupplierId : undefined,
+                    inventoryDestination: isSupplierInv ? 'SUPPLIER' : 'PROJECT',
                     beneficiary: resolvedBeneficiary || undefined,
                     createBatch: isMaterial,
                     materialId: (isMaterial && formData.materialId) ? formData.materialId : undefined,
@@ -907,7 +925,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     unit: isOffice ? (formData.unit || undefined) : (isMaterial ? (formData.unit || chosenMaterial?.unit) : (costItemMode === 'NEW' ? formData.unit : undefined)),
                     unitPrice: isOffice ? (formData.unitPrice ? Number(formData.unitPrice) : undefined) : (isMaterial ? (formData.unitPrice ? Number(formData.unitPrice) : (chosenMaterial?.unitPrice ? Number(chosenMaterial.unitPrice) : undefined)) : (costItemMode === 'NEW' && formData.unitPrice ? Number(formData.unitPrice) : undefined)),
                     quantity: formData.quantity ? Number(formData.quantity) : undefined,
-                    costCenter: formData.costCenter || (isOffice ? (isRTL ? 'المقر الرئيسي' : 'Headquarters') : (isMaterial ? (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')) : undefined)),
+                    costCenter: formData.costCenter || (isOffice ? (isRTL ? 'المقر الرئيسي' : 'Headquarters') : (isSupplierInv ? (isRTL ? 'مخزون مورد' : 'Supplier Inventory') : (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')))),
                     transactionTo: formData.transactionTo?.trim() || undefined,
                     invoiceNumber: formData.invoiceNumber
                 };
@@ -1449,7 +1467,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         {/* Project Selection */}
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label style={{ fontSize: '0.85rem', marginBottom: '4px' }}>
-                                {t('nav.projects')} {mode !== 'TRANSFER' && !formData.isOfficeExpense ? <span className="required">*</span> : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>({isRTL ? 'غير مطلوب للمقر' : 'Not required for HQ'})</span>}
+                                {t('nav.projects')} {mode !== 'TRANSFER' && !formData.isOfficeExpense && !(costItemMode === 'MATERIAL' && inventoryDestination === 'SUPPLIER') ? <span className="required">*</span> : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>({isRTL ? 'غير مطلوب' : 'Not required'})</span>}
                             </label>
                             {formData.isOfficeExpense ? (
                                 <div style={{
@@ -1472,6 +1490,27 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                         </div>
                                     </div>
                                 </div>
+                            ) : (costItemMode === 'MATERIAL' && inventoryDestination === 'SUPPLIER') ? (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    padding: '9px 12px',
+                                    borderRadius: '8px',
+                                    background: 'rgba(124, 58, 237, 0.09)',
+                                    border: '1px solid rgba(124, 58, 237, 0.35)',
+                                    color: 'var(--text-primary)'
+                                }}>
+                                    <Store size={22} style={{ color: '#7c3aed', flexShrink: 0 }} />
+                                    <div>
+                                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#7c3aed' }}>
+                                            {isRTL ? 'مخزون مورد (بدون مشروع)' : "Supplier's Inventory (No Project)"}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                            {isRTL ? 'يُحفظ برصيد المورد كأصل خامات للاستهلاك لاحقاً بالمشاريع' : 'Stored in supplier balance as a material asset for future site usage'}
+                                        </div>
+                                    </div>
+                                </div>
                             ) : (
                                 <select
                                     value={selectedProjectId}
@@ -1485,7 +1524,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                     ))}
                                 </select>
                             )}
-                            {errors.projectId && <span className="error-message">{errors.projectId}</span>}
+                            {errors.projectId && !(costItemMode === 'MATERIAL' && inventoryDestination === 'SUPPLIER') && <span className="error-message">{errors.projectId}</span>}
                         </div>
 
                         {/* Compact Transaction Date & Time */}
@@ -1699,45 +1738,138 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             </div>
                                         )}
 
-                                        {/* Option 1: Registered Raw Material Selector */}
+                                        {/* Option 1: Registered Raw Material Selector & Inventory Destination */}
                                         {!formData.isOfficeExpense && costItemMode === 'MATERIAL' && (
-                                            <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                                <label>{isRTL ? 'اختر الخامة المسجلة لشحن رصيدها المخزني' : 'Select Registered Material to Recharge'} <span className="required">*</span></label>
-                                                <select
-                                                    name="materialId"
-                                                    value={formData.materialId || ''}
-                                                    onChange={(e) => {
-                                                        const matId = e.target.value;
-                                                        const found = rawMaterials.find(m => m.id === matId);
-                                                        setFormData(prev => {
-                                                            const uPrice = found?.unitPrice ? found.unitPrice.toString() : prev.unitPrice;
-                                                            const qty = prev.quantity ? parseFloat(prev.quantity) : 0;
-                                                            const amt = (qty > 0 && uPrice) ? (qty * parseFloat(uPrice)).toString() : prev.amount;
-                                                            return {
-                                                                ...prev,
-                                                                materialId: matId,
-                                                                itemName: found ? (isRTL ? (found.nameAr || found.name) : found.name) : '',
-                                                                category: 'MATERIALS',
-                                                                unit: found?.unit || prev.unit,
-                                                                unitPrice: uPrice,
-                                                                amount: amt,
-                                                                costCenter: prev.costCenter || (selectedProject ? (isRTL ? `مخزن مشروع ${selectedProject.name}` : `${selectedProject.name} Site Warehouse`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
-                                                            };
-                                                        });
-                                                        if (errors.materialId) setErrors(prev => ({ ...prev, materialId: '' }));
-                                                    }}
-                                                    className={errors.materialId ? 'error' : ''}
-                                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.95rem', fontWeight: '600' }}
-                                                >
-                                                    <option value="">-- {isRTL ? 'اختر خامة من المخزن لتزويد رصيدها' : 'Select Material to Recharge Stock'} --</option>
-                                                    {rawMaterials.map(m => (
-                                                        <option key={m.id} value={m.id}>
-                                                            {isRTL ? (m.nameAr || m.name) : m.name} ({m.unit}) — {isRTL ? 'الرصيد الحالي:' : 'Current Stock:'} {m.stockLevel} {m.unit} {m.unitPrice ? `(${m.unitPrice} EGP)` : ''}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {errors.materialId && <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>{errors.materialId}</span>}
-                                            </div>
+                                            <>
+                                                <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: '8px' }}>
+                                                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+                                                        {isRTL ? 'جهة تخزين وتوريد الخامة (أين سيتم حفظ الرصيد؟):' : 'Stock Destination (Where will the stock be stored?):'}
+                                                    </label>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '4px', background: 'var(--bg-tertiary, rgba(0,0,0,0.05))', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm ${inventoryDestination === 'PROJECT' ? 'btn-primary' : 'btn-ghost'}`}
+                                                            onClick={() => {
+                                                                setInventoryDestination('PROJECT');
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    costCenter: selectedProject ? (isRTL ? `مخزن مشروع ${selectedProject.name}` : `${selectedProject.name} Site Warehouse`) : prev.costCenter
+                                                                }));
+                                                            }}
+                                                            style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: inventoryDestination === 'PROJECT' ? '700' : '500' }}
+                                                        >
+                                                            🏗️ {isRTL ? 'مخزون المشروع (في الموقع)' : 'Project Inventory (On Site)'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`btn btn-sm ${inventoryDestination === 'SUPPLIER' ? 'btn-primary' : 'btn-ghost'}`}
+                                                            onClick={() => {
+                                                                setInventoryDestination('SUPPLIER');
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    costCenter: isRTL ? 'مخزن لدى المورد' : 'Supplier Inventory'
+                                                                }));
+                                                            }}
+                                                            style={{ 
+                                                                borderRadius: '7px', 
+                                                                fontSize: '0.85rem', 
+                                                                fontWeight: inventoryDestination === 'SUPPLIER' ? '700' : '500',
+                                                                background: inventoryDestination === 'SUPPLIER' ? '#8b5cf6' : 'transparent',
+                                                                color: inventoryDestination === 'SUPPLIER' ? '#ffffff' : 'inherit'
+                                                            }}
+                                                        >
+                                                            🏬 {isRTL ? 'مخزون لدى المورد (حساب المورد)' : 'Supplier Inventory (Held at Supplier)'}
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '5px', padding: '0 4px' }}>
+                                                        {inventoryDestination === 'SUPPLIER'
+                                                            ? (isRTL 
+                                                                ? 'ℹ️ سيتم شراء الخامة وإضافتها في رصيد مخزن المورد دون خصم تكلفة من المشروع الآن. وعند صرفها لاحقاً لأي مشروع يتم توجيه التكلفة والأرباح للمشروع المستفيد.'
+                                                                : 'ℹ️ Material is held in the supplier’s inventory balance without debiting a project now. When disbursed later, costs & profits are assigned to the consuming project.')
+                                                            : (isRTL 
+                                                                ? 'ℹ️ سيتم إدخال الخامة مباشرة في رصيد ومخزن المشروع المختار وتظهر في بطاقات مخزون المشروع.'
+                                                                : 'ℹ️ Material will be stored directly in the selected project inventory.')
+                                                        }
+                                                    </div>
+                                                </div>
+
+                                                {inventoryDestination === 'SUPPLIER' && (
+                                                    <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: '8px' }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                                            <Store size={16} style={{ color: '#8b5cf6' }} />
+                                                            <span>{isRTL ? 'المورد المحتفظ بالمخزون لديه' : 'Supplier Storing the Stock'}</span>
+                                                            <span className="required" style={{ color: '#ef4444' }}>*</span>
+                                                        </label>
+                                                        <select
+                                                            name="targetSupplierId"
+                                                            value={formData.targetSupplierId || ''}
+                                                            onChange={(e) => {
+                                                                const sId = e.target.value;
+                                                                const supp = suppliers.find(s => s.id === sId);
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    targetSupplierId: sId,
+                                                                    beneficiary: supp?.name || prev.beneficiary,
+                                                                    costCenter: supp ? (isRTL ? `مخزن مورد: ${supp.name}` : `Supplier: ${supp.name}`) : prev.costCenter
+                                                                }));
+                                                                if (errors.targetSupplierId) setErrors(prev => ({ ...prev, targetSupplierId: '' }));
+                                                            }}
+                                                            className={errors.targetSupplierId ? 'error' : ''}
+                                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.95rem', fontWeight: '600' }}
+                                                        >
+                                                            <option value="">-- {isRTL ? 'اختر المورد الذي ستبقى الخامة في مخزنه' : 'Select Supplier Holding the Inventory'} --</option>
+                                                            {suppliers.map(s => (
+                                                                <option key={s.id} value={s.id}>
+                                                                    {s.name} {s.phone ? `(${s.phone})` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        {errors.targetSupplierId && (
+                                                            <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                                                                {errors.targetSupplierId}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                                    <label>{isRTL ? 'اختر الخامة المسجلة لشحن رصيدها المخزني' : 'Select Registered Material to Recharge'} <span className="required">*</span></label>
+                                                    <select
+                                                        name="materialId"
+                                                        value={formData.materialId || ''}
+                                                        onChange={(e) => {
+                                                            const matId = e.target.value;
+                                                            const found = rawMaterials.find(m => m.id === matId);
+                                                            setFormData(prev => {
+                                                                const uPrice = found?.unitPrice ? found.unitPrice.toString() : prev.unitPrice;
+                                                                const qty = prev.quantity ? parseFloat(prev.quantity) : 0;
+                                                                const amt = (qty > 0 && uPrice) ? (qty * parseFloat(uPrice)).toString() : prev.amount;
+                                                                return {
+                                                                    ...prev,
+                                                                    materialId: matId,
+                                                                    itemName: found ? (isRTL ? (found.nameAr || found.name) : found.name) : '',
+                                                                    category: 'MATERIALS',
+                                                                    unit: found?.unit || prev.unit,
+                                                                    unitPrice: uPrice,
+                                                                    amount: amt,
+                                                                    costCenter: prev.costCenter || (selectedProject ? (isRTL ? `مخزن مشروع ${selectedProject.name}` : `${selectedProject.name} Site Warehouse`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
+                                                                };
+                                                            });
+                                                            if (errors.materialId) setErrors(prev => ({ ...prev, materialId: '' }));
+                                                        }}
+                                                        className={errors.materialId ? 'error' : ''}
+                                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '0.95rem', fontWeight: '600' }}
+                                                    >
+                                                        <option value="">-- {isRTL ? 'اختر خامة من المخزن لتزويد رصيدها' : 'Select Material to Recharge Stock'} --</option>
+                                                        {rawMaterials.map(m => (
+                                                            <option key={m.id} value={m.id}>
+                                                                {isRTL ? (m.nameAr || m.name) : m.name} ({m.unit}) — {isRTL ? 'الرصيد الحالي:' : 'Current Stock:'} {m.stockLevel} {m.unit} {m.unitPrice ? `(${m.unitPrice} EGP)` : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {errors.materialId && <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>{errors.materialId}</span>}
+                                                </div>
+                                            </>
                                         )}
 
                                         {/* Option 2: Band Selection (If Existing Band) */}

@@ -645,6 +645,7 @@
     },
     "common": {
         "loading": "Loading...",
+        "view": "View Details",
         "save": "Save",
         "cancel": "Cancel",
         "delete": "Delete",
