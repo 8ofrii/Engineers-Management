@@ -243,12 +243,15 @@ export const getInvoicePdf = async (req, res, next) => {
         }
         companyName = companyName || req.user?.company || 'Hesaby ERP';
 
+        const companyLogo = tenant?.logo || req.user?.companyLogo || null;
+
         const buffer = await generateInvoicePdf({
             invoice: { ...invoice, lineItems: invoice.lineItems || [] },
             client: invoice.client,
             tenant: {
                 ...tenant,
                 name: companyName,
+                logo: companyLogo,
                 email: tenant?.email || req.user?.email || '',
                 phone: tenant?.phone || req.user?.phone || '',
                 address: tenant?.address || ''
@@ -303,10 +306,19 @@ export const sendInvoice = async (req, res, next) => {
         const senderName = req.user?.name || 'Hesaby Representative';
         const senderRole = (req.user?.role || 'PROJECT_MANAGER').replace(/_/g, ' ');
 
+        const companyLogo = tenant?.logo || req.user?.companyLogo || null;
+
         const buffer = await generateInvoicePdf({
             invoice: { ...invoice, lineItems: invoice.lineItems || [] },
             client: invoice.client,
-            tenant: { ...tenant, name: companyName, email: companyEmail, phone: companyPhone, address: companyAddress },
+            tenant: {
+                ...tenant,
+                name: companyName,
+                logo: companyLogo,
+                email: companyEmail,
+                phone: companyPhone,
+                address: companyAddress
+            },
             project: invoice.project
         });
 

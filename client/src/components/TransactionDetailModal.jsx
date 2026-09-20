@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 import {
     X, Sparkles, Mic, Volume2, Play, Pause, Download, ExternalLink,
     FileText, CheckCircle2, Clock, AlertCircle, Copy, Check,
@@ -31,6 +32,7 @@ export default function TransactionDetailModal({
 }) {
     const { t, i18n } = useTranslation();
     const isArabic = i18n.language === 'ar';
+    const { user } = useAuth();
 
     // Audio Player State
     const audioRef = useRef(null);
@@ -153,6 +155,46 @@ export default function TransactionDetailModal({
                 onClick={(e) => e.stopPropagation()}
                 dir={isArabic ? 'rtl' : 'ltr'}
             >
+                {/* PRINTABLE OFFICIAL VOUCHER HEADER (Visible only during window.print) */}
+                <div className="voucher-print-header">
+                    <div className="voucher-print-brand">
+                        {user?.companyLogo ? (
+                            <img
+                                src={resolveMediaUrl(user.companyLogo)}
+                                alt={user?.company || 'Company Logo'}
+                                className="voucher-print-logo"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                        ) : (
+                            <div className="voucher-print-fallback">
+                                {(user?.company || 'H').charAt(0).toUpperCase()}
+                            </div>
+                        )}
+                        <div>
+                            <h2 className="voucher-print-company">{user?.company || 'Hesaby Construction ERP'}</h2>
+                            <div className="voucher-print-meta">
+                                {user?.email ? `${user.email} ` : ''}
+                                {user?.phone ? `• ${user.phone}` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="voucher-print-title-box">
+                        <div className="voucher-print-title">
+                            {isIncome
+                                ? (isArabic ? 'سند قبض معتمد' : 'OFFICIAL RECEIPT VOUCHER')
+                                : isProfit
+                                    ? (isArabic ? 'إذن تحويل أرباح إدارة' : 'PROFIT TRANSFER VOUCHER')
+                                    : (isArabic ? 'سند صرف معتمد' : 'PAYMENT VOUCHER')}
+                        </div>
+                        <div className="voucher-print-ref">
+                            REF #{tx.id ? tx.id.slice(0, 8).toUpperCase() : 'TX-001'}
+                        </div>
+                        <div className="voucher-print-date">
+                            {formatDate(tx.transactionDate || tx.createdAt)}
+                        </div>
+                    </div>
+                </div>
+
                 {/* MODAL HEADER */}
                 <div className="tx-detail-header">
                     <div className="flex items-center gap-md">
@@ -563,6 +605,26 @@ export default function TransactionDetailModal({
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* PRINTABLE OFFICIAL SIGNATURES (Visible only during print) */}
+                    <div className="voucher-print-signatures">
+                        <div className="voucher-sign-col">
+                            <div className="voucher-sign-title">{isArabic ? 'المحاسب المسؤول / الصراف' : 'Accountant / Cashier'}</div>
+                            <div className="voucher-sign-line">{tx.user?.name || user?.name || 'Authorized'}</div>
+                        </div>
+                        <div className="voucher-sign-col">
+                            <div className="voucher-sign-title">{isArabic ? 'المستلم / المستفيد' : 'Beneficiary / Recipient'}</div>
+                            <div className="voucher-sign-line">____________________</div>
+                        </div>
+                        <div className="voucher-sign-col">
+                            <div className="voucher-sign-title">{isArabic ? 'اعتماد الإدارة المالية' : 'Financial Approval'}</div>
+                            <div className="voucher-sign-line">{tx.approver?.name || '____________________'}</div>
+                        </div>
+                    </div>
+                    <div className="voucher-print-footer">
+                        <span>{user?.company || 'Hesaby ERP'} &mdash; {isArabic ? 'إشعار مالي معتمد صالح للقيد والمراجعة' : 'Official Verified Financial Slip'}</span>
+                        <span>{isArabic ? 'نسخة أصلية' : 'Original Copy'}</span>
                     </div>
                 </div>
 

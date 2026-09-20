@@ -1,0 +1,341 @@
+/* ==========================================================================
+   Reports Page Styles & Executive A4 Printable Document Layout
+   ========================================================================== */
+
+/* Screen layout helpers */
+.reports-page {
+    width: 100%;
+}
+
+/* Printable Report Container - Hidden on screen by default */
+.printable-report-container {
+    display: none;
+}
+
+/* Print Optimization */
+@media print {
+    /* Hide screen UI controls, navigation, sidebars and charts */
+    .sidebar,
+    .top-bar,
+    .navbar,
+    .reports-web-header,
+    .reports-filters-ribbon,
+    .reports-charts-grid,
+    .reports-web-table,
+    .draft-capture-fab,
+    .floating-action-button,
+    header,
+    nav,
+    aside,
+    button,
+    .btn,
+    .spinner {
+        display: none !important;
+    }
+
+    /* Configure Page Geometry */
+    @page {
+        size: A4 portrait;
+        margin: 12mm 14mm 12mm 14mm;
+    }
+
+    html, body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Display the executive printable report */
+    .printable-report-container {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+
+    /* Executive Top Accent Bar */
+    .print-accent-bar {
+        height: 6px;
+        background: linear-gradient(90deg, #0f172a 0%, #1e293b 60%, #f59e0b 60%, #f59e0b 100%);
+        border-radius: 3px;
+        margin-bottom: 16px;
+    }
+
+    /* Header Grid */
+    .print-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 16px;
+        margin-bottom: 20px;
+    }
+
+    .print-header-brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        max-width: 58%;
+    }
+
+    .print-logo-img {
+        max-height: 52px;
+        max-width: 130px;
+        object-fit: contain;
+        border-radius: 6px;
+    }
+
+    .print-logo-fallback {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #f59e0b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 20px;
+        letter-spacing: 1px;
+    }
+
+    .print-company-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    .print-company-meta {
+        margin: 4px 0 0 0;
+        font-size: 10px;
+        color: #64748b;
+        line-height: 1.4;
+    }
+
+    .print-header-meta {
+        text-align: right;
+        max-width: 40%;
+    }
+
+    [dir="rtl"] .print-header-meta {
+        text-align: left;
+    }
+
+    .print-doc-badge {
+        display: inline-block;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .print-doc-date {
+        font-size: 10px;
+        color: #475569;
+        margin: 2px 0;
+    }
+
+    .print-filter-badge {
+        display: inline-block;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        font-size: 9.5px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+
+    /* Executive KPI Summary Cards */
+    .print-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 22px;
+    }
+
+    .print-kpi-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        box-sizing: border-box;
+    }
+
+    .print-kpi-card.highlight-green {
+        border-top: 3px solid #10b981;
+    }
+
+    .print-kpi-card.highlight-slate {
+        border-top: 3px solid #64748b;
+    }
+
+    .print-kpi-card.highlight-amber {
+        border-top: 3px solid #f59e0b;
+    }
+
+    .print-kpi-card.highlight-navy {
+        border-top: 3px solid #0f172a;
+    }
+
+    .print-kpi-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+
+    .print-kpi-val {
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    /* Tables */
+    .print-section-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 18px 0 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10.5px;
+        margin-bottom: 18px;
+        page-break-inside: avoid;
+    }
+
+    .print-table th {
+        background: #0f172a !important;
+        color: #ffffff !important;
+        font-weight: 700;
+        padding: 7px 10px;
+        text-align: left;
+        border: 1px solid #0f172a;
+    }
+
+    [dir="rtl"] .print-table th {
+        text-align: right;
+    }
+
+    .print-table th.align-right {
+        text-align: right;
+    }
+
+    [dir="rtl"] .print-table th.align-right {
+        text-align: left;
+    }
+
+    .print-table th.align-center {
+        text-align: center;
+    }
+
+    .print-table td {
+        padding: 6px 10px;
+        border-bottom: 1px solid #e2e8f0;
+        border-left: 1px solid #f1f5f9;
+        border-right: 1px solid #f1f5f9;
+        color: #1e293b;
+    }
+
+    .print-table tr:nth-child(even) td {
+        background: #f8fafc !important;
+    }
+
+    .print-table td.align-right {
+        text-align: right;
+    }
+
+    [dir="rtl"] .print-table td.align-right {
+        text-align: left;
+    }
+
+    .print-table td.align-center {
+        text-align: center;
+    }
+
+    .print-table-total td {
+        background: #f1f5f9 !important;
+        font-weight: 800;
+        border-top: 2px solid #cbd5e1;
+        border-bottom: 2px solid #cbd5e1;
+        color: #0f172a;
+    }
+
+    /* Category Mini Grid / Bar */
+    .print-cat-badge {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+
+    [dir="rtl"] .print-cat-badge {
+        margin-right: 0;
+        margin-left: 6px;
+    }
+
+    /* Sign-off / Approval Block */
+    .print-sign-block {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-top: 28px;
+        padding-top: 14px;
+        page-break-inside: avoid;
+    }
+
+    .print-sign-col {
+        border-top: 1px dashed #94a3b8;
+        padding-top: 8px;
+        text-align: center;
+    }
+
+    .print-sign-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        margin-bottom: 30px;
+    }
+
+    .print-sign-name {
+        font-size: 11px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    /* Print Footer */
+    .print-footer {
+        border-top: 1px solid #e2e8f0;
+        margin-top: 24px;
+        padding-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 9px;
+        color: #94a3b8;
+    }
+}

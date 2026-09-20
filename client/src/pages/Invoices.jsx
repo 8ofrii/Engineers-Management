@@ -128,6 +128,34 @@ export default function Invoices() {
         }
     };
 
+    const onPrintPdf = async (inv) => {
+        try {
+            const blob = await invoicesAPI.downloadPdf(inv.id);
+            const url = URL.createObjectURL(blob);
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+            iframe.onload = () => {
+                setTimeout(() => {
+                    try {
+                        iframe.contentWindow?.focus();
+                        iframe.contentWindow?.print();
+                    } catch {
+                        window.open(url, '_blank');
+                    }
+                }, 300);
+            };
+        } catch (err) {
+            showAlert({ type: 'error', title: t('common.error') || 'Error', message: err.response?.data?.message || err.message });
+        }
+    };
+
     const onSend = async () => {
         if (!sending) return;
         try {
@@ -306,30 +334,7 @@ export default function Invoices() {
                                             <div className="flex gap-sm">
                                                 <button className="btn" onClick={() => setViewing(inv)} title={isArabic ? 'معاينة' : 'View'}><Eye size={14} /></button>
                                                 <button className="btn" onClick={() => onDownloadPdf(inv)} title="PDF"><Download size={14} /></button>
-                                                <button className="btn" title={isArabic ? 'طباعة' : 'Print'} onClick={() => {
-                                                    // Open a print-friendly tab with invoice details
-                                                    const w = window.open('', '_blank');
-                                                    w.document.write(`<html><head><title>${inv.invoiceNumber}</title><style>
-                                                        body{font-family:sans-serif;padding:40px;color:#111}
-                                                        h1{margin:0 0 4px}h2{margin:0 0 20px;color:#666;font-weight:400}
-                                                        table{width:100%;border-collapse:collapse;margin:20px 0}
-                                                        th{text-align:left;border-bottom:2px solid #ddd;padding:8px}
-                                                        td{padding:8px;border-bottom:1px solid #eee}
-                                                        .total{font-size:1.2rem;font-weight:bold;text-align:right;margin-top:20px}
-                                                        @media print{button{display:none}}
-                                                    </style></head><body>
-                                                        <h1>${inv.invoiceNumber}</h1>
-                                                        <h2>${inv.client?.name || ''} &mdash; ${inv.project?.name || ''}</h2>
-                                                        <p>Issue Date: ${fmtDate(inv.issueDate)} | Due: ${fmtDate(inv.dueDate)} | Status: ${inv.status}</p>
-                                                        <table><thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-                                                        <tbody>${(inv.lineItems || []).map(li => `<tr><td>${li.description}</td><td>${li.quantity}</td><td>${fmtMoney(li.unitPrice, inv.currency)}</td><td>${fmtMoney(li.total, inv.currency)}</td></tr>`).join('')}</tbody>
-                                                        </table>
-                                                        <div class="total">Total: ${fmtMoney(inv.totalAmount, inv.currency)}</div>
-                                                        <div class="total" style="font-size:1rem;color:#10b981">Paid: ${fmtMoney(inv.paidAmount, inv.currency)}</div>
-                                                        <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;font-size:1rem;cursor:pointer">🖨️ Print</button>
-                                                    </body></html>`);
-                                                    w.document.close();
-                                                }}><Printer size={14} /></button>
+                                                <button className="btn" title={isArabic ? 'طباعة الفاتورة' : 'Print Invoice'} onClick={() => onPrintPdf(inv)}><Printer size={14} /></button>
                                                 {inv.status === 'DRAFT' && canManage && (
                                                     <button className="btn" onClick={() => setEditing(inv)} title="Edit"><Edit3 size={14} /></button>
                                                 )}
@@ -384,6 +389,7 @@ export default function Invoices() {
                     invoice={viewing}
                     onClose={() => setViewing(null)}
                     onDownload={() => onDownloadPdf(viewing)}
+                    onPrint={() => onPrintPdf(viewing)}
                     onDelete={onDelete}
                     canManage={canManage}
                     isArabic={isArabic}
@@ -492,7 +498,7 @@ const Modal = ({ title, onClose, maxWidth = 560, children }) => (
     </div>
 );
 
-const ViewModal = ({ invoice, onClose, onDownload, onDelete, canManage, isArabic }) => (
+const ViewModal = ({ invoice, onClose, onDownload, onPrint, onDelete, canManage, isArabic }) => (
     <Modal title={invoice.invoiceNumber} onClose={onClose} maxWidth={680}>
         <div className="grid grid-2 mb-md" style={{ gap: 8 }}>
             <Stat label="Client" value={invoice.client?.name || '-'} />
@@ -538,9 +544,14 @@ const ViewModal = ({ invoice, onClose, onDownload, onDelete, canManage, isArabic
             </div>
         )}
         <div className="flex-between" style={{ marginTop: 20, flexWrap: 'wrap', gap: 12 }}>
-            <button className="btn btn-primary" onClick={onDownload}>
-                <Download size={16} /> {isArabic ? 'تحميل PDF' : 'Download PDF'}
-            </button>
+            <div className="flex gap-sm">
+                <button className="btn btn-primary" onClick={onDownload}>
+                    <Download size={16} /> {isArabic ? 'تحميل PDF' : 'Download PDF'}
+                </button>
+                <button className="btn btn-secondary" onClick={onPrint}>
+                    <Printer size={16} /> {isArabic ? 'طباعة' : 'Print'}
+                </button>
+            </div>
             {['DRAFT', 'CANCELLED'].includes(invoice.status) && canManage && (
                 <button
                     className="btn btn-danger"

@@ -2,7 +2,14 @@
 // Returns a Buffer that controllers can either pipe to a response or attach to an email.
 
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { setupDocFonts, formatPdfText, isArabic } from './arabicPdfHelper.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.join(__dirname, '..');
 
 const fmtMoney = (amount, currency = 'EGP') => {
     const num = Number(amount || 0);
@@ -15,7 +22,47 @@ const fmtDate = (d) => {
 };
 
 /**
- * Render an invoice to a PDF buffer with full Arabic / Bilingual support.
+ * Resolves a logo buffer from local disk or URL.
+ * Returns null if not found or on error.
+ */
+async function resolveLogoBuffer(logoPath) {
+    if (!logoPath || typeof logoPath !== 'string') return null;
+    try {
+        // 1. Remote HTTP/HTTPS URL
+        if (logoPath.startsWith('http://') || logoPath.startsWith('https://')) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
+            const res = await fetch(logoPath, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                const arrayBuf = await res.arrayBuffer();
+                return Buffer.from(arrayBuf);
+            }
+            return null;
+        }
+
+        // 2. Local relative path (e.g. /uploads/images/xyz.png)
+        const cleanPath = logoPath.replace(/^\//, '');
+        const candidatePaths = [
+            path.join(rootDir, cleanPath),
+            path.join(rootDir, 'uploads', 'images', path.basename(cleanPath)),
+            path.join(rootDir, '../client/public', path.basename(cleanPath))
+        ];
+
+        for (const p of candidatePaths) {
+            if (fs.existsSync(p)) {
+                return fs.readFileSync(p);
+            }
+        }
+    } catch (e) {
+        console.warn('PDF logo load failed:', e.message);
+    }
+    return null;
+}
+
+/**
+ * Render an invoice to a PDF buffer with executive styling, company branding,
+ * and full Arabic / Bilingual support.
  *
  * @param {Object} ctx
  * @param {Object} ctx.invoice  Prisma Invoice record (with `lineItems` array)
@@ -25,9 +72,9 @@ const fmtDate = (d) => {
  * @returns {Promise<Buffer>}
  */
 export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
-            const doc = new PDFDocument({ margin: 50, size: 'A4' });
+            const doc = new PDFDocument({ margin: 45, size: 'A4' });
             setupDocFonts(doc);
 
             const chunks = [];
@@ -35,186 +82,336 @@ export const generateInvoicePdf = ({ invoice, client, tenant, project }) => {
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);
 
-            const PRIMARY = '#2563eb';
-            const TEXT = '#111827';
-            const MUTED = '#6b7280';
+            // Palette — Modern Executive Slate & Gold/Amber theme
+            const PRIMARY_DARK = '#0f172a'; // Deep Slate Navy
+            const PRIMARY = '#1e293b';      // Slate Card Header
+            const ACCENT_GOLD = '#f59e0b';  // Warm Amber / Gold
+            const SUCCESS = '#10b981';      // Emerald Green
+            const DANGER = '#ef4444';       // Coral Red
+            const TEXT = '#0f172a';         // Slate Dark
+            const TEXT_MUTED = '#64748b';   // Secondary Muted
+            const CARD_BG = '#f8fafc';      // Soft fill
+            const BORDER = '#e2e8f0';       // Border line
 
             const useFont = (bold = false) => {
                 try {
                     doc.font(bold ? 'AppFont-Bold' : 'AppFont');
                 } catch {
-                    // Fallback if font registration was skipped
+                    // Fallback
                 }
             };
 
-            useFont(true);
-            // Header — company name + invoice title
+            // 1. Top Decorative Accent Banner
+            doc.rect(45, 22, 505, 5).fillColor(PRIMARY_DARK).fill();
+            doc.rect(45, 27, 160, 2).fillColor(ACCENT_GOLD).fill();
+
+            // 2. Resolve & Render Logo / Monogram (Top-Left)
+            const logoBuffer = await resolveLogoBuffer(tenant?.logo);
+            let imageRendered = false;
+            if (logoBuffer) {
+                try {
+                    doc.image(logoBuffer, 45, 38, { fit: [130, 48], align: 'left' });
+                    imageRendered = true;
+                } catch (imgErr) {
+                    imageRendered = false;
+                }
+            }
+
+            if (!imageRendered) {
+                // Render elegant vector monogram emblem
+                doc.roundedRect(45, 38, 44, 44, 8).fillColor(PRIMARY_DARK).fill();
+                doc.roundedRect(45, 38, 44, 44, 8).lineWidth(1.5).strokeColor(ACCENT_GOLD).stroke();
+                useFont(true);
+                const initial = (tenant?.name || 'H').trim().charAt(0).toUpperCase();
+                doc.fillColor(ACCENT_GOLD).fontSize(20).text(initial, 45, 50, { width: 44, align: 'center' });
+            }
+
+            // Company info block (beside or below emblem)
+            const companyX = imageRendered ? 185 : 98;
+            const companyY = 40;
+            const companyWidth = imageRendered ? 170 : 255;
             const isArCompany = isArabic(tenant?.name);
-            const companyTitle = formatPdfText(tenant?.name || 'Hesaby ERP', doc, 300);
-            doc.fillColor(TEXT).fontSize(18).text(companyTitle, 50, 50, {
-                width: 300,
+            const companyTitle = formatPdfText(tenant?.name || 'Hesaby Construction ERP', doc, companyWidth);
+
+            useFont(true);
+            doc.fillColor(TEXT).fontSize(14).text(companyTitle, companyX, companyY, {
+                width: companyWidth,
                 align: isArCompany ? 'right' : 'left'
             });
 
             useFont(false);
+            let currentCompanyY = companyY + doc.heightOfString(companyTitle, { width: companyWidth }) + 4;
+
             if (tenant?.address) {
                 const isArAddr = isArabic(tenant.address);
-                doc.fontSize(9).fillColor(MUTED).text(formatPdfText(tenant.address, doc, 300), 50, 75, {
-                    width: 300,
+                doc.fontSize(8.5).fillColor(TEXT_MUTED).text(formatPdfText(tenant.address, doc, companyWidth), companyX, currentCompanyY, {
+                    width: companyWidth,
                     align: isArAddr ? 'right' : 'left'
                 });
+                currentCompanyY += 12;
             }
-            if (tenant?.email) doc.fontSize(9).fillColor(MUTED).text(tenant.email, 50, 88, { width: 300 });
-            if (tenant?.phone) doc.fontSize(9).fillColor(MUTED).text(tenant.phone, 50, 101, { width: 300 });
+            if (tenant?.email) {
+                doc.fontSize(8.5).fillColor(TEXT_MUTED).text(tenant.email, companyX, currentCompanyY, { width: companyWidth });
+                currentCompanyY += 12;
+            }
+            if (tenant?.phone) {
+                doc.fontSize(8.5).fillColor(TEXT_MUTED).text(tenant.phone, companyX, currentCompanyY, { width: companyWidth });
+            }
 
+            // 3. Document Meta (Top-Right)
             useFont(true);
-            doc.fillColor(PRIMARY).fontSize(26).text('INVOICE', 400, 50, { align: 'right' });
-            useFont(false);
-            doc.fontSize(10).fillColor(TEXT).text(invoice.invoiceNumber, 400, 82, { align: 'right' });
-            doc.fontSize(9).fillColor(MUTED)
-                .text(`Issue date: ${fmtDate(invoice.issueDate)}`, 400, 98, { align: 'right' })
-                .text(`Due date: ${fmtDate(invoice.dueDate)}`, 400, 112, { align: 'right' });
+            doc.fillColor(PRIMARY_DARK).fontSize(24).text('INVOICE', 370, 38, { align: 'right', width: 180 });
+            doc.fillColor(ACCENT_GOLD).fontSize(11).text(formatPdfText('فاتورة مبيعات', doc, 180), 370, 64, { align: 'right', width: 180 });
 
-            // Bill-to + project box
-            doc.moveTo(50, 140).lineTo(545, 140).strokeColor('#e5e7eb').stroke();
-
-            useFont(true);
-            doc.fillColor(MUTED).fontSize(9).text('BILL TO', 50, 155);
-            const isArClient = isArabic(client?.name);
-            doc.fillColor(TEXT).fontSize(11).text(formatPdfText(client?.name || '-', doc, 225), 50, 170, {
-                width: 225,
-                align: isArClient ? 'right' : 'left'
-            });
-            useFont(false);
-            if (client?.company) {
-                const isArClientCo = isArabic(client.company);
-                doc.fontSize(10).fillColor(TEXT).text(formatPdfText(client.company, doc, 225), 50, 186, {
-                    width: 225,
-                    align: isArClientCo ? 'right' : 'left'
-                });
-            }
-            if (client?.email) doc.fontSize(9).fillColor(MUTED).text(client.email, 50, 202);
-            if (client?.phone) doc.fontSize(9).fillColor(MUTED).text(client.phone, 50, 216);
-
-            if (project) {
-                useFont(true);
-                doc.fillColor(MUTED).fontSize(9).text('PROJECT', 320, 155);
-                const isArProj = isArabic(project.name);
-                doc.fillColor(TEXT).fontSize(11).text(formatPdfText(project.name, doc, 225), 320, 170, {
-                    width: 225,
-                    align: isArProj ? 'right' : 'left'
-                });
-                useFont(false);
-                if (project.location) {
-                    const isArLoc = isArabic(project.location);
-                    doc.fontSize(9).fillColor(MUTED).text(formatPdfText(project.location, doc, 225), 320, 190, {
-                        width: 225,
-                        align: isArLoc ? 'right' : 'left'
-                    });
-                }
-            }
-
-            // Status badge top-right area
-            const statusY = 235;
+            // Status Badge
             const statusColor = {
-                DRAFT: '#9ca3af',
-                SENT: '#2563eb',
+                DRAFT: '#64748b',
+                SENT: '#0284c7',
                 PARTIALLY_PAID: '#f59e0b',
                 PAID: '#10b981',
                 OVERDUE: '#ef4444',
-                CANCELLED: '#6b7280'
-            }[invoice.status] || '#6b7280';
-            doc.roundedRect(450, statusY, 95, 22, 4).fillColor(statusColor).fill();
+                CANCELLED: '#94a3b8'
+            }[invoice.status] || '#64748b';
+
+            const badgeWidth = 90;
+            const badgeHeight = 20;
+            const badgeX = 460;
+            const badgeY = 80;
+            doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 4).fillColor(statusColor).fill();
             useFont(true);
-            doc.fillColor('#ffffff').fontSize(10).text(invoice.status, 450, statusY + 6, { width: 95, align: 'center' });
+            doc.fillColor('#ffffff').fontSize(8.5).text(invoice.status.replace(/_/g, ' '), badgeX, badgeY + 5, {
+                width: badgeWidth,
+                align: 'center'
+            });
 
-            // Line items table
-            const tableTop = 275;
-            doc.moveTo(50, tableTop - 5).lineTo(545, tableTop - 5).strokeColor('#e5e7eb').stroke();
-            doc.fillColor(MUTED).fontSize(9)
-                .text('DESCRIPTION', 50, tableTop)
-                .text('QTY', 300, tableTop, { width: 50, align: 'right' })
-                .text('UNIT PRICE', 360, tableTop, { width: 85, align: 'right' })
-                .text('TOTAL', 455, tableTop, { width: 90, align: 'right' });
-            doc.moveTo(50, tableTop + 14).lineTo(545, tableTop + 14).strokeColor('#e5e7eb').stroke();
+            useFont(true);
+            doc.fontSize(10).fillColor(TEXT).text(invoice.invoiceNumber, 370, 106, { align: 'right', width: 180 });
+            useFont(false);
+            doc.fontSize(8.5).fillColor(TEXT_MUTED)
+                .text(`Issue date: ${fmtDate(invoice.issueDate)}`, 370, 120, { align: 'right', width: 180 })
+                .text(`Due date: ${fmtDate(invoice.dueDate)}`, 370, 133, { align: 'right', width: 180 });
 
-            let y = tableTop + 22;
+            // 4. Dual Cards for Bill-To and Project Details
+            const cardY = 156;
+            const cardH = 88;
+            const cardW = 246;
+
+            // Card 1: Bill To
+            doc.roundedRect(45, cardY, cardW, cardH, 6).fillColor(CARD_BG).fill();
+            doc.roundedRect(45, cardY, cardW, cardH, 6).lineWidth(1).strokeColor(BORDER).stroke();
+
+            useFont(true);
+            doc.fillColor(ACCENT_GOLD).fontSize(8).text('BILL TO / العميل', 57, cardY + 10, { width: cardW - 24 });
+            const isArClient = isArabic(client?.name);
+            doc.fillColor(TEXT).fontSize(11).text(formatPdfText(client?.name || '-', doc, cardW - 24), 57, cardY + 24, {
+                width: cardW - 24,
+                align: isArClient ? 'right' : 'left'
+            });
+
+            useFont(false);
+            let clientSubY = cardY + 40;
+            if (client?.company) {
+                const isArClientCo = isArabic(client.company);
+                doc.fontSize(9.5).fillColor(PRIMARY).text(formatPdfText(client.company, doc, cardW - 24), 57, clientSubY, {
+                    width: cardW - 24,
+                    align: isArClientCo ? 'right' : 'left'
+                });
+                clientSubY += 14;
+            }
+            if (client?.email) {
+                doc.fontSize(8.5).fillColor(TEXT_MUTED).text(client.email, 57, clientSubY, { width: cardW - 24 });
+                clientSubY += 13;
+            }
+            if (client?.phone) {
+                doc.fontSize(8.5).fillColor(TEXT_MUTED).text(client.phone, 57, clientSubY, { width: cardW - 24 });
+            }
+
+            // Card 2: Project Details
+            const projCardX = 304;
+            doc.roundedRect(projCardX, cardY, cardW, cardH, 6).fillColor(CARD_BG).fill();
+            doc.roundedRect(projCardX, cardY, cardW, cardH, 6).lineWidth(1).strokeColor(BORDER).stroke();
+
+            useFont(true);
+            doc.fillColor(ACCENT_GOLD).fontSize(8).text('PROJECT / بيانات المشروع', projCardX + 12, cardY + 10, { width: cardW - 24 });
+            if (project) {
+                const isArProj = isArabic(project.name);
+                doc.fillColor(TEXT).fontSize(11).text(formatPdfText(project.name, doc, cardW - 24), projCardX + 12, cardY + 24, {
+                    width: cardW - 24,
+                    align: isArProj ? 'right' : 'left'
+                });
+                useFont(false);
+                let projSubY = cardY + 40;
+                if (project.location) {
+                    const isArLoc = isArabic(project.location);
+                    doc.fontSize(9).fillColor(TEXT_MUTED).text(formatPdfText(project.location, doc, cardW - 24), projCardX + 12, projSubY, {
+                        width: cardW - 24,
+                        align: isArLoc ? 'right' : 'left'
+                    });
+                    projSubY += 14;
+                }
+                if (project.code) {
+                    doc.fontSize(8.5).fillColor(TEXT_MUTED).text(`Code: ${project.code}`, projCardX + 12, projSubY, { width: cardW - 24 });
+                }
+            } else {
+                useFont(false);
+                doc.fillColor(TEXT_MUTED).fontSize(9.5).text('General Services / خدمات عامة', projCardX + 12, cardY + 28);
+            }
+
+            // 5. Line Items Table
+            const tableTop = 260;
+            // Header Bar
+            doc.roundedRect(45, tableTop, 505, 24, 4).fillColor(PRIMARY_DARK).fill();
+            useFont(true);
+            doc.fillColor('#ffffff').fontSize(8.5)
+                .text('DESCRIPTION / البيان', 55, tableTop + 7, { width: 235 })
+                .text('QTY / الكمية', 295, tableTop + 7, { width: 45, align: 'right' })
+                .text('UNIT PRICE / سعر الوحدة', 345, tableTop + 7, { width: 95, align: 'right' })
+                .text('TOTAL / الإجمالي', 445, tableTop + 7, { width: 95, align: 'right' });
+
+            let y = tableTop + 27;
             const items = Array.isArray(invoice.lineItems) ? invoice.lineItems : [];
             useFont(false);
 
-            for (const item of items) {
-                if (y > 700) { doc.addPage(); y = 50; }
-                const isArDesc = isArabic(item.description);
-                const formattedDesc = formatPdfText(item.description || '-', doc, 240);
+            items.forEach((item, idx) => {
+                if (y > 690) {
+                    doc.addPage();
+                    y = 50;
+                    // Draw mini header on next page
+                    doc.roundedRect(45, y, 505, 20, 4).fillColor(PRIMARY_DARK).fill();
+                    useFont(true);
+                    doc.fillColor('#ffffff').fontSize(8)
+                        .text('DESCRIPTION', 55, y + 6, { width: 235 })
+                        .text('QTY', 295, y + 6, { width: 45, align: 'right' })
+                        .text('UNIT PRICE', 345, y + 6, { width: 95, align: 'right' })
+                        .text('TOTAL', 445, y + 6, { width: 95, align: 'right' });
+                    y += 24;
+                    useFont(false);
+                }
 
-                doc.fillColor(TEXT).fontSize(10).text(formattedDesc, 50, y, {
-                    width: 240,
+                const isArDesc = isArabic(item.description);
+                const formattedDesc = formatPdfText(item.description || '-', doc, 235);
+                const descHeight = doc.heightOfString(formattedDesc, { width: 235 });
+                const rowHeight = Math.max(24, descHeight + 10);
+
+                // Alternating zebra row background
+                if (idx % 2 === 1) {
+                    doc.rect(45, y - 2, 505, rowHeight).fillColor(CARD_BG).fill();
+                }
+
+                doc.fillColor(TEXT).fontSize(9.5).text(formattedDesc, 55, y + 3, {
+                    width: 235,
                     align: isArDesc ? 'right' : 'left'
                 });
-                doc.text(String(item.quantity ?? '-'), 300, y, { width: 50, align: 'right' });
-                doc.text(fmtMoney(item.unitPrice, invoice.currency), 360, y, { width: 85, align: 'right' });
-                doc.text(fmtMoney(item.total, invoice.currency), 455, y, { width: 90, align: 'right' });
+                doc.fontSize(9.5).text(String(item.quantity ?? '-'), 295, y + 3, { width: 45, align: 'right' });
+                doc.text(fmtMoney(item.unitPrice, invoice.currency), 345, y + 3, { width: 95, align: 'right' });
+                useFont(true);
+                doc.text(fmtMoney(item.total, invoice.currency), 445, y + 3, { width: 95, align: 'right' });
+                useFont(false);
 
-                const descHeight = doc.heightOfString(formattedDesc, { width: 240 });
-                y += Math.max(22, descHeight + 6);
+                // Row bottom separator line
+                doc.moveTo(45, y + rowHeight - 2).lineTo(550, y + rowHeight - 2).strokeColor('#f1f5f9').stroke();
+                y += rowHeight;
+            });
+
+            // 6. Summary Totals Card (Right) & Notes/Terms Card (Left)
+            y = Math.max(y + 14, 520);
+            if (y > 670) {
+                doc.addPage();
+                y = 50;
             }
 
-            // Totals box, right-aligned
-            y = Math.max(y + 10, 530);
-            const totalsX = 330;
-            doc.moveTo(totalsX, y).lineTo(545, y).strokeColor('#e5e7eb').stroke();
-            y += 8;
+            const totalsBoxX = 315;
+            const totalsBoxW = 235;
+            const totalsStartY = y;
 
-            const writeTotal = (label, value, bold = false) => {
-                useFont(bold);
-                doc.fontSize(bold ? 11 : 9.5).fillColor(bold ? TEXT : MUTED);
-                doc.text(label, totalsX, y, { width: 110 });
-                doc.fillColor(TEXT).text(fmtMoney(value, invoice.currency), totalsX + 110, y, { width: 105, align: 'right' });
-                y += bold ? 18 : 16;
+            // Totals Box Container
+            doc.roundedRect(totalsBoxX, totalsStartY, totalsBoxW, 140, 6).fillColor(CARD_BG).fill();
+            doc.roundedRect(totalsBoxX, totalsStartY, totalsBoxW, 140, 6).lineWidth(1).strokeColor(BORDER).stroke();
+
+            let totalLineY = totalsStartY + 10;
+            const writeTotalRow = (label, value, isBold = false, valColor = TEXT) => {
+                useFont(isBold);
+                doc.fontSize(isBold ? 10.5 : 9).fillColor(isBold ? TEXT : TEXT_MUTED);
+                doc.text(label, totalsBoxX + 12, totalLineY, { width: 110 });
+                doc.fillColor(valColor).text(fmtMoney(value, invoice.currency), totalsBoxX + 120, totalLineY, {
+                    width: totalsBoxW - 132,
+                    align: 'right'
+                });
+                totalLineY += isBold ? 20 : 17;
             };
 
-            writeTotal('Subtotal', invoice.subtotal);
+            writeTotalRow('Subtotal / المجموع الفرعي', invoice.subtotal);
             if (Number(invoice.discountAmount || 0) > 0) {
-                writeTotal('Discount', -Number(invoice.discountAmount));
+                writeTotalRow('Discount / الخصم', -Number(invoice.discountAmount), false, DANGER);
             }
             if (Number(invoice.taxAmount || 0) > 0) {
-                writeTotal(`Tax (${invoice.taxRate}%)`, invoice.taxAmount);
-            }
-            doc.moveTo(totalsX, y).lineTo(545, y).strokeColor('#e5e7eb').stroke();
-            y += 6;
-            writeTotal('TOTAL DUE', invoice.totalAmount, true);
-            if (Number(invoice.paidAmount || 0) > 0) {
-                writeTotal('Paid', invoice.paidAmount);
-                writeTotal('Balance', Number(invoice.totalAmount) - Number(invoice.paidAmount), true);
+                writeTotalRow(`Tax / الضريبة (${invoice.taxRate}%)`, invoice.taxAmount);
             }
 
-            // Notes + terms at the bottom
-            if (invoice.notes || invoice.terms) {
-                y = Math.max(y + 25, 680);
-                if (invoice.notes) {
-                    useFont(true);
-                    doc.fontSize(9).fillColor(MUTED).text('NOTES', 50, y);
-                    useFont(false);
-                    const isArNotes = isArabic(invoice.notes);
-                    const formattedNotes = formatPdfText(invoice.notes, doc, 495);
-                    doc.fontSize(9.5).fillColor(TEXT).text(formattedNotes, 50, y + 14, {
-                        width: 495,
-                        align: isArNotes ? 'right' : 'left'
-                    });
-                    y += 14 + doc.heightOfString(formattedNotes, { width: 495 }) + 10;
-                }
-                if (invoice.terms) {
-                    useFont(true);
-                    doc.fontSize(9).fillColor(MUTED).text('TERMS', 50, y);
-                    useFont(false);
-                    const isArTerms = isArabic(invoice.terms);
-                    const formattedTerms = formatPdfText(invoice.terms, doc, 495);
-                    doc.fontSize(9.5).fillColor(TEXT).text(formattedTerms, 50, y + 14, {
-                        width: 495,
-                        align: isArTerms ? 'right' : 'left'
-                    });
-                }
+            // TOTAL DUE Highlight Banner
+            const dueBannerH = 28;
+            doc.roundedRect(totalsBoxX + 8, totalLineY, totalsBoxW - 16, dueBannerH, 4).fillColor(PRIMARY_DARK).fill();
+            useFont(true);
+            doc.fillColor('#ffffff').fontSize(10).text('TOTAL DUE / الإجمالي المستحق', totalsBoxX + 16, totalLineY + 8, { width: 110 });
+            doc.fillColor(ACCENT_GOLD).fontSize(11).text(fmtMoney(invoice.totalAmount, invoice.currency), totalsBoxX + 120, totalLineY + 8, {
+                width: totalsBoxW - 136,
+                align: 'right'
+            });
+            totalLineY += dueBannerH + 10;
+
+            if (Number(invoice.paidAmount || 0) > 0) {
+                writeTotalRow('Paid / المسدد', invoice.paidAmount, false, SUCCESS);
+                const balance = Number(invoice.totalAmount) - Number(invoice.paidAmount);
+                writeTotalRow('Balance / المتبقي', balance, true, balance > 0 ? ACCENT_GOLD : SUCCESS);
             }
+
+            // Notes / Terms / Bank Details (Left Card)
+            const notesBoxX = 45;
+            const notesBoxW = 255;
+            doc.roundedRect(notesBoxX, totalsStartY, notesBoxW, 140, 6).fillColor(CARD_BG).fill();
+            doc.roundedRect(notesBoxX, totalsStartY, notesBoxW, 140, 6).lineWidth(1).strokeColor(BORDER).stroke();
+
+            useFont(true);
+            doc.fillColor(PRIMARY).fontSize(8.5).text('PAYMENT INSTRUCTIONS & NOTES / ملاحظات الفاتورة', notesBoxX + 12, totalsStartY + 10, { width: notesBoxW - 24 });
+            useFont(false);
+
+            let notesContentY = totalsStartY + 26;
+            if (invoice.notes) {
+                const isArNotes = isArabic(invoice.notes);
+                const formattedNotes = formatPdfText(invoice.notes, doc, notesBoxW - 24);
+                doc.fontSize(8.5).fillColor(TEXT).text(formattedNotes, notesBoxX + 12, notesContentY, {
+                    width: notesBoxW - 24,
+                    align: isArNotes ? 'right' : 'left'
+                });
+                notesContentY += doc.heightOfString(formattedNotes, { width: notesBoxW - 24 }) + 8;
+            }
+            if (invoice.terms) {
+                useFont(true);
+                doc.fontSize(8).fillColor(TEXT_MUTED).text('TERMS & CONDITIONS:', notesBoxX + 12, notesContentY, { width: notesBoxW - 24 });
+                useFont(false);
+                const isArTerms = isArabic(invoice.terms);
+                const formattedTerms = formatPdfText(invoice.terms, doc, notesBoxW - 24);
+                doc.fontSize(8.5).fillColor(TEXT).text(formattedTerms, notesBoxX + 12, notesContentY + 12, {
+                    width: notesBoxW - 24,
+                    align: isArTerms ? 'right' : 'left'
+                });
+            }
+
+            // 7. Official Footer
+            const footerY = 780;
+            doc.moveTo(45, footerY).lineTo(550, footerY).strokeColor(BORDER).stroke();
+            useFont(true);
+            doc.fontSize(8.5).fillColor(PRIMARY_DARK).text(
+                formatPdfText('شكراً لتعاملكم معنا — Thank you for your business', doc, 505),
+                45, footerY + 8,
+                { width: 505, align: 'center' }
+            );
+            useFont(false);
+            doc.fontSize(7.5).fillColor(TEXT_MUTED).text(
+                `${tenant?.name || 'Hesaby ERP'} • Official Invoice Document • Page 1 of 1`,
+                45, footerY + 22,
+                { width: 505, align: 'center' }
+            );
 
             doc.end();
         } catch (err) {

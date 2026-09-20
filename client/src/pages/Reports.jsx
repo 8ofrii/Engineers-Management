@@ -10,16 +10,27 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import Layout from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
 import { exportToXLSX } from '../utils/excelExport';
+import './Reports.css';
 
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#64748b'];
+
+const getImageUrl = (path) => {
+    if (!path || typeof path !== 'string') return null;
+    if (path.startsWith('blob:') || path.startsWith('data:')) return path;
+    const cleanPath = path.replace(/^https?:\/\/(localhost|127\.0\.0\.1):5000/i, '');
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) return cleanPath;
+    return cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+};
 
 export default function Reports() {
     const { t, i18n } = useTranslation();
     const isArabic = i18n.language === 'ar';
+    const { user } = useAuth();
     const { showAlert } = useAlert();
     const { currency: formatCurrency } = useFormat();
 
@@ -263,7 +274,7 @@ export default function Reports() {
         <Layout>
             <div className="reports-page">
                 {/* Header with quick filters and export */}
-                <div className="flex-between mb-xl" style={{ flexWrap: 'wrap', gap: 16 }}>
+                <div className="reports-web-header flex-between mb-xl" style={{ flexWrap: 'wrap', gap: 16 }}>
                     <div>
                         <h1 className="flex gap-md" style={{ margin: 0 }}>
                             <FileText size={32} />
@@ -275,8 +286,8 @@ export default function Reports() {
                     </div>
 
                     <div className="flex gap-sm" style={{ flexWrap: 'wrap' }}>
-                        <button className="btn btn-secondary" onClick={() => window.print()}>
-                            <Printer size={16} /> {isArabic ? 'طباعة' : 'Print'}
+                        <button className="btn btn-secondary" onClick={() => window.print()} title={isArabic ? 'طباعة تقرير A4 معتمد أو حفظ كملف PDF' : 'Print official A4 report or Save as PDF'}>
+                            <Printer size={16} /> {isArabic ? 'طباعة / حفظ PDF' : 'Print / Export PDF'}
                         </button>
                         <button className="btn btn-primary" onClick={handleExportXLSX}>
                             <Download size={16} /> {isArabic ? 'تصدير إكسيل (XLSX)' : 'Export Excel (XLSX)'}
@@ -285,7 +296,7 @@ export default function Reports() {
                 </div>
 
                 {/* Filters Ribbon */}
-                <div className="card mb-xl" style={{ padding: '16px 20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                <div className="reports-filters-ribbon card mb-xl" style={{ padding: '16px 20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
                     <div className="flex gap-md" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                         <div className="flex items-center gap-xs text-secondary" style={{ fontWeight: 600 }}>
                             <Filter size={18} /> {isArabic ? 'تصفية حسب:' : 'Filter by:'}
@@ -321,7 +332,7 @@ export default function Reports() {
                 </div>
 
                 {/* Top Executive KPI Cards */}
-                <div className="grid grid-4 gap-md mb-xl">
+                <div className="reports-kpis-grid grid grid-4 gap-md mb-xl">
                     <div className="card" style={{ padding: '20px', borderLeft: '4px solid #10b981' }}>
                         <div className="flex-between text-secondary mb-xs">
                             <span style={{ fontSize: 13, fontWeight: 600 }}>{isArabic ? 'إجمالي المقبوضات' : 'Total Incomes'}</span>
@@ -368,7 +379,7 @@ export default function Reports() {
                 </div>
 
                 {/* Charts Grid */}
-                <div className="grid grid-2 gap-lg mb-xl">
+                <div className="reports-charts-grid grid grid-2 gap-lg mb-xl">
                     {/* Monthly Cashflow Bar Chart */}
                     <div className="card" style={{ padding: 20 }}>
                         <div className="flex items-center gap-sm mb-md">
@@ -380,7 +391,18 @@ export default function Reports() {
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
                                 <XAxis dataKey="month" stroke="var(--text-secondary)" />
                                 <YAxis stroke="var(--text-secondary)" />
-                                <Tooltip formatter={(v) => formatCurrency(v)} contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
+                                <Tooltip 
+                                    formatter={(v) => [formatCurrency(v), '']} 
+                                    contentStyle={{ 
+                                        backgroundColor: '#1e293b', 
+                                        borderColor: '#334155', 
+                                        borderRadius: 8,
+                                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                                        color: '#f8fafc'
+                                    }} 
+                                    itemStyle={{ color: '#f8fafc', fontWeight: 600, fontSize: 13 }}
+                                    labelStyle={{ color: '#94a3b8', fontWeight: 500, fontSize: 12, marginBottom: 4 }}
+                                />
                                 <Legend />
                                 <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
                                 <Bar dataKey="Expense" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -402,12 +424,39 @@ export default function Reports() {
                             <div className="grid grid-2" style={{ alignItems: 'center' }}>
                                 <ResponsiveContainer width="100%" height={250}>
                                     <PieChart>
-                                        <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} innerRadius={45} paddingAngle={2}>
+                                        <Pie 
+                                            data={categoryData} 
+                                            dataKey="value" 
+                                            nameKey="name" 
+                                            cx="50%" 
+                                            cy="50%" 
+                                            outerRadius={85} 
+                                            innerRadius={45} 
+                                            paddingAngle={3}
+                                            stroke="var(--bg-secondary, #1e293b)"
+                                            strokeWidth={2}
+                                        >
                                             {categoryData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                                <Cell 
+                                                    key={`cell-${index}`} 
+                                                    fill={PIE_COLORS[index % PIE_COLORS.length]} 
+                                                    stroke="var(--bg-secondary, #1e293b)"
+                                                    strokeWidth={2}
+                                                />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(v) => formatCurrency(v)} contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 8 }} />
+                                        <Tooltip 
+                                            formatter={(v) => [formatCurrency(v), '']} 
+                                            contentStyle={{ 
+                                                backgroundColor: '#1e293b', 
+                                                borderColor: '#334155', 
+                                                borderRadius: 8,
+                                                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                                                color: '#f8fafc'
+                                            }} 
+                                            itemStyle={{ color: '#f8fafc', fontWeight: 600, fontSize: 13 }}
+                                            labelStyle={{ color: '#94a3b8', fontWeight: 500, fontSize: 12, marginBottom: 4 }}
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div style={{ maxHeight: 250, overflowY: 'auto', paddingRight: 8 }}>
@@ -427,7 +476,7 @@ export default function Reports() {
                 </div>
 
                 {/* Project Financial Performance Table */}
-                <div className="card" style={{ padding: 20 }}>
+                <div className="reports-web-table card" style={{ padding: 20 }}>
                     <div className="flex-between mb-md">
                         <div className="flex items-center gap-sm">
                             <Briefcase size={20} className="text-primary" />
@@ -474,6 +523,160 @@ export default function Reports() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                {/* ===================================================================
+                    EXECUTIVE PRINTABLE REPORT (Visible during window.print / PDF export)
+                    =================================================================== */}
+                <div className="printable-report-container">
+                    <div className="print-accent-bar" />
+                    
+                    {/* Header with Company Logo and Metadata */}
+                    <div className="print-header">
+                        <div className="print-header-brand">
+                            {user?.companyLogo ? (
+                                <img 
+                                    src={getImageUrl(user.companyLogo)} 
+                                    alt={user?.company || 'Company Logo'} 
+                                    className="print-logo-img"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                            ) : (
+                                <div className="print-logo-fallback">
+                                    {(user?.company || 'H').charAt(0).toUpperCase()}
+                                </div>
+                            )}
+                            <div>
+                                <h1 className="print-company-title">{user?.company || 'Hesaby Construction Management'}</h1>
+                                <p className="print-company-meta">
+                                    {user?.email ? `${user.email} ` : ''}
+                                    {user?.phone ? `• ${user.phone}` : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="print-header-meta">
+                            <div className="print-doc-badge">{isArabic ? 'تقرير مالي معتمد' : 'Financial Report'}</div>
+                            <div className="print-doc-date">
+                                <strong>{isArabic ? 'تاريخ الاستخراج:' : 'Generated:'}</strong> {new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')} {new Date().toLocaleTimeString(isArabic ? 'ar-EG' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div className="print-doc-date">
+                                <strong>{isArabic ? 'المسؤول:' : 'Prepared By:'}</strong> {user?.name || 'Authorized User'}
+                            </div>
+                            <div className="print-filter-badge">
+                                {isArabic ? 'النطاق: ' : 'Scope: '}
+                                {selectedProjectId === 'ALL' ? (isArabic ? 'كافة المشاريع' : 'All Projects') : (projects.find(p => p.id === selectedProjectId)?.name || selectedProjectId)}
+                                {' | '}
+                                {dateRange === 'THIS_MONTH' ? (isArabic ? 'هذا الشهر' : 'This Month') : dateRange === 'THIS_YEAR' ? (isArabic ? 'هذا العام' : 'This Year') : (isArabic ? 'كل الفترات' : 'All Time')}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Executive KPI Summary Cards */}
+                    <div className="print-kpi-grid">
+                        <div className="print-kpi-card highlight-green">
+                            <div className="print-kpi-label">{isArabic ? 'إجمالي المقبوضات' : 'Collected Income'}</div>
+                            <div className="print-kpi-val" style={{ color: '#10b981' }}>{formatCurrency(approvedIncomes)}</div>
+                        </div>
+                        <div className="print-kpi-card highlight-slate">
+                            <div className="print-kpi-label">{isArabic ? 'مصروفات المواقع' : 'Site Expenses'}</div>
+                            <div className="print-kpi-val" style={{ color: '#0f172a' }}>{formatCurrency(approvedExpenses)}</div>
+                        </div>
+                        <div className="print-kpi-card highlight-amber">
+                            <div className="print-kpi-label">{isArabic ? 'أرباح المكتب' : 'Office Profit'}</div>
+                            <div className="print-kpi-val" style={{ color: '#d97706' }}>{formatCurrency(totalProfitRecognized)}</div>
+                        </div>
+                        <div className="print-kpi-card highlight-navy">
+                            <div className="print-kpi-label">{isArabic ? 'صافي السيولة النقدية' : 'Net Cash Balance'}</div>
+                            <div className="print-kpi-val" style={{ color: '#0284c7' }}>{formatCurrency(netBalance)}</div>
+                        </div>
+                    </div>
+
+                    {/* Expense Breakdown by Category */}
+                    <div className="print-section-title">
+                        <PieIcon size={14} /> {isArabic ? 'توزيع المصروفات حسب البند' : 'Expense Distribution by Category'}
+                    </div>
+                    <table className="print-table">
+                        <thead>
+                            <tr>
+                                <th>{isArabic ? 'البند / التصنيف' : 'Category'}</th>
+                                <th className="align-right">{isArabic ? 'المبلغ المستهلك' : 'Amount'}</th>
+                                <th className="align-center">{isArabic ? 'النسبة من الإجمالي' : '% Share'}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {categoryData.map((cat, idx) => {
+                                const pct = approvedExpenses > 0 ? ((cat.value / approvedExpenses) * 100).toFixed(1) : '0.0';
+                                return (
+                                    <tr key={idx}>
+                                        <td>
+                                            <span className="print-cat-badge" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}></span>
+                                            <strong>{cat.name}</strong>
+                                        </td>
+                                        <td className="align-right">{formatCurrency(cat.value)}</td>
+                                        <td className="align-center">{pct}%</td>
+                                    </tr>
+                                );
+                            })}
+                            <tr className="print-table-total">
+                                <td>{isArabic ? 'الإجمالي الكلي للمصروفات' : 'Grand Total Expenses'}</td>
+                                <td className="align-right">{formatCurrency(approvedExpenses)}</td>
+                                <td className="align-center">100.0%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    {/* Project Financial Performance Table */}
+                    <div className="print-section-title">
+                        <Briefcase size={14} /> {isArabic ? 'بيان الموقف المالي للمشاريع' : 'Project Financial Performance'}
+                    </div>
+                    <table className="print-table">
+                        <thead>
+                            <tr>
+                                <th>{isArabic ? 'المشروع' : 'Project Name'}</th>
+                                <th className="align-right">{isArabic ? 'الميزانية' : 'Budget'}</th>
+                                <th className="align-right">{isArabic ? 'المقبوضات' : 'Income'}</th>
+                                <th className="align-right">{isArabic ? 'المصروف' : 'Spent'}</th>
+                                <th className="align-right">{isArabic ? 'رصيد الخزينة' : 'Safe Balance'}</th>
+                                <th className="align-right">{isArabic ? 'أرباح المكتب' : 'Profit'}</th>
+                                <th className="align-center">{isArabic ? 'الاستهلاك' : 'Burn Rate'}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {projectBreakdown.map((p) => (
+                                <tr key={p.id}>
+                                    <td><strong>{p.name}</strong></td>
+                                    <td className="align-right">{formatCurrency(p.budget)}</td>
+                                    <td className="align-right">{formatCurrency(p.income)}</td>
+                                    <td className="align-right">{formatCurrency(p.spent)}</td>
+                                    <td className="align-right">{formatCurrency(p.safe)}</td>
+                                    <td className="align-right">{formatCurrency(p.profit)}</td>
+                                    <td className="align-center">{p.burnRate}%</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    {/* Official Signatures Block */}
+                    <div className="print-sign-block">
+                        <div className="print-sign-col">
+                            <div className="print-sign-title">{isArabic ? 'إعداد الحسابات' : 'Prepared By'}</div>
+                            <div className="print-sign-name">{user?.name || 'Authorized Accountant'}</div>
+                        </div>
+                        <div className="print-sign-col">
+                            <div className="print-sign-title">{isArabic ? 'المراجعة المالية والتدقيق' : 'Financial Auditor'}</div>
+                            <div className="print-sign-name">__________________</div>
+                        </div>
+                        <div className="print-sign-col">
+                            <div className="print-sign-title">{isArabic ? 'الاعتماد الإداري والختم' : 'General Management Approval'}</div>
+                            <div className="print-sign-name">__________________</div>
+                        </div>
+                    </div>
+
+                    {/* Print Footer */}
+                    <div className="print-footer">
+                        <span>{user?.company || 'Hesaby ERP'} &mdash; {isArabic ? 'وثيقة مالية رسمية صادرة آلياً' : 'Official Financial Summary'}</span>
+                        <span>{isArabic ? 'صفحة 1 من 1' : 'Page 1 of 1'}</span>
                     </div>
                 </div>
             </div>
