@@ -74,7 +74,7 @@ export function formatPdfText(input, doc = null, maxWidth = null) {
                 renderedCandidate = candidate;
             }
 
-            const measuredWidth = doc.widthOfString(renderedCandidate);
+            const measuredWidth = doc.widthOfString(renderedCandidate, { features: [] });
 
             if (measuredWidth > maxWidth && currentLine) {
                 try {
@@ -103,6 +103,26 @@ export function formatPdfText(input, doc = null, maxWidth = null) {
 }
 
 /**
+ * High-level helper to draw text in PDFKit with automatic Arabic detection,
+ * line wrapping, and features: [] to prevent double-reversal.
+ */
+export function drawPdfText(doc, text, x, y, options = {}) {
+    if (text === null || text === undefined) return doc;
+    const str = String(text);
+    const hasArabic = isArabic(str);
+    const width = options.width;
+    const formatted = hasArabic ? formatPdfText(str, doc, width) : str;
+    const opts = {
+        ...options,
+        ...(hasArabic ? { features: [] } : {})
+    };
+    if (x !== undefined && y !== undefined) {
+        return doc.text(formatted, x, y, opts);
+    }
+    return doc.text(formatted, opts);
+}
+
+/**
  * Registers Unicode TrueType fonts (Regular and Bold) into a PDFKit document.
  */
 export function setupDocFonts(doc) {
@@ -128,3 +148,4 @@ export function setupDocFonts(doc) {
         doc.registerFont('AppFont-Bold', boldPath);
     }
 }
+
