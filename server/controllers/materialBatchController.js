@@ -23,7 +23,8 @@ export const consumeBatch = async (req, res, next) => {
                 tenantId: req.user.tenantId
             },
             include: {
-                project: true
+                project: true,
+                material: true
             }
         });
 
@@ -61,9 +62,21 @@ export const consumeBatch = async (req, res, next) => {
             actualConsumedValue
         );
 
+        // Calculate quantity to deduct
+        let usageQty = Number(quantityConsumed) || 0;
+        if (!usageQty && actualConsumedValue > 0) {
+            const price = Number(batch.material?.unitPrice || 0);
+            if (price > 0) {
+                usageQty = Number((actualConsumedValue / price).toFixed(2));
+            } else {
+                usageQty = 1;
+            }
+        }
+        if (!usageQty || usageQty <= 0) usageQty = 1;
+
         // Calculate new values
         const newRemainingValue = Number(batch.remainingValue) - actualConsumedValue;
-        const newQuantityUsed = Number(batch.quantityUsed || 0) + (quantityConsumed || 0);
+        const newQuantityUsed = Number(batch.quantityUsed || 0) + usageQty;
         const newOfficeFeeApplied = Number(batch.officeFeeApplied) + officeFee;
         const newStatus = newRemainingValue <= 0 ? 'CONSUMED' :
             newRemainingValue < batch.initialValue ? 'PARTIALLY_USED' :
@@ -91,18 +104,27 @@ export const consumeBatch = async (req, res, next) => {
                 }
             });
 
-            // Create material usage record
+            // Create material usage record & decrement stock
             if (batch.materialId) {
                 await tx.materialUsage.create({
                     data: {
                         materialId: batch.materialId,
                         projectId: batch.projectId,
-                        quantity: quantityConsumed || 0,
+                        quantity: usageQty,
                         notes: description || `Consumed from batch: ${batch.description}`,
                         recordedBy: req.user.id,
                         tenantId: req.user.tenantId
                     }
                 });
+
+                if (usageQty > 0) {
+                    await tx.material.update({
+                        where: { id: batch.materialId },
+                        data: {
+                            stockLevel: { decrement: usageQty }
+                        }
+                    });
+                }
             }
 
             return updatedBatch;

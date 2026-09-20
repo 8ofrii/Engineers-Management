@@ -402,7 +402,7 @@ export const recordInventoryUsage = async (req, res, next) => {
                 id: materialBatchId,
                 tenantId: req.user.tenantId
             },
-            include: { project: true }
+            include: { project: true, material: true }
         });
 
         if (!batch) {
@@ -420,22 +420,9 @@ export const recordInventoryUsage = async (req, res, next) => {
         }
 
         const result = await prisma.$transaction(async (tx) => {
-            // Update batch
-            const newRemaining = Number(batch.remainingValue) - Number(valueConsumed);
-            await tx.materialBatch.update({
-                where: {
-                    id: materialBatchId,
-                    tenantId: req.user.tenantId
-                },
-                data: {
-                    remainingValue: newRemaining,
-                    status: newRemaining === 0 ? 'CONSUMED' : 'PARTIALLY_USED',
-                    ...(quantityConsumed && { quantityUsed: { increment: Number(quantityConsumed) } })
-                }
-            });
-
             // Resolve materialId: if batch doesn't have materialId linked, find or create default material
             let effectiveMaterialId = batch.materialId;
+            let effectiveMaterial = batch.material;
             if (!effectiveMaterialId) {
                 // Try finding matching material by batch description
                 const matchedMat = await tx.material.findFirst({
@@ -451,12 +438,14 @@ export const recordInventoryUsage = async (req, res, next) => {
 
                 if (matchedMat) {
                     effectiveMaterialId = matchedMat.id;
+                    effectiveMaterial = matchedMat;
                 } else {
                     const defaultMaterial = await tx.material.findFirst({
                         where: { tenantId: req.user.tenantId, deletedAt: null }
                     });
                     if (defaultMaterial) {
                         effectiveMaterialId = defaultMaterial.id;
+                        effectiveMaterial = defaultMaterial;
                     } else {
                         const validUnits = ['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG'];
                         const resolvedUnit = (unit && validUnits.includes(unit.toUpperCase())) ? unit.toUpperCase() : 'PIECE';
@@ -469,6 +458,7 @@ export const recordInventoryUsage = async (req, res, next) => {
                             }
                         });
                         effectiveMaterialId = newMat.id;
+                        effectiveMaterial = newMat;
                     }
                 }
 
@@ -481,17 +471,53 @@ export const recordInventoryUsage = async (req, res, next) => {
                 }
             }
 
+            // Calculate accurate consumed quantity
+            let usageQty = quantityConsumed && Number(quantityConsumed) > 0 ? Number(quantityConsumed) : 0;
+            if (!usageQty && Number(valueConsumed) > 0) {
+                const uPrice = Number(effectiveMaterial?.unitPrice || batch.material?.unitPrice || 0);
+                if (uPrice > 0) {
+                    usageQty = Number((Number(valueConsumed) / uPrice).toFixed(2));
+                } else {
+                    usageQty = 1;
+                }
+            }
+            if (!usageQty || usageQty <= 0) usageQty = 1;
+
+            // Update batch
+            const newRemaining = Number(batch.remainingValue) - Number(valueConsumed);
+            await tx.materialBatch.update({
+                where: {
+                    id: materialBatchId,
+                    tenantId: req.user.tenantId
+                },
+                data: {
+                    remainingValue: newRemaining,
+                    status: newRemaining === 0 ? 'CONSUMED' : 'PARTIALLY_USED',
+                    quantityUsed: { increment: usageQty }
+                }
+            });
+
             // Create usage record
             const usage = await tx.materialUsage.create({
                 data: {
                     materialId: effectiveMaterialId,
                     projectId: projectId || batch.projectId,
-                    quantity: quantityConsumed && Number(quantityConsumed) > 0 ? Number(quantityConsumed) : 1,
+                    quantity: usageQty,
                     notes: description || 'Material Usage',
                     recordedBy: req.user.id,
                     tenantId: req.user.tenantId
                 }
             });
+
+            // Deduct from Raw Material stockLevel
+            if (effectiveMaterialId && usageQty > 0) {
+                await tx.material.update({
+                    where: { id: effectiveMaterialId },
+                    data: {
+                        stockLevel: { decrement: usageQty }
+                    }
+                });
+            }
 
             // PROFIT RECOGNITION on Usage
             const profitInfo = await calculateAndTransferProfit(
