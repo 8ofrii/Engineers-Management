@@ -560,7 +560,15 @@
             "insulation_labor": "مصنعية عزل",
             "hvac_prep": "تاسيس تكيف",
             "alumetal": "الوميتال",
-            "civil_works": "أعمال مدنية / خرسانة"
+            "civil_works": "أعمال مدنية / خرسانة",
+            "blacksmith_labor": "مصنعية حدادة",
+            "contracting": "مقاولات عامة",
+            "contracting_concrete": "مقاولة خرسانات",
+            "contracting_stocking": "مقاولة تشوين",
+            "contracting_demolition": "مقاولة هدم",
+            "contracting_marble": "مقاولة رخام",
+            "contracting_pool": "مقاولة حمامات سباحة",
+            "contracting_landscape": "مقاولة لاندسكيب"
         },
         "methods": {
             "cash": "كاش",

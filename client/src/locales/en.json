@@ -562,7 +562,15 @@
             "insulation_labor": "Insulation Labor",
             "hvac_prep": "HVAC Prep",
             "alumetal": "Alumetal",
-            "civil_works": "Civil Works / Concrete"
+            "civil_works": "Civil Works / Concrete",
+            "blacksmith_labor": "Blacksmith Labor",
+            "contracting": "General Contracting",
+            "contracting_concrete": "Concrete Subcontracting",
+            "contracting_stocking": "Stocking Subcontracting",
+            "contracting_demolition": "Demolition Subcontracting",
+            "contracting_marble": "Marble Subcontracting",
+            "contracting_pool": "Pool Subcontracting",
+            "contracting_landscape": "Landscape Subcontracting"
         },
         "methods": {
             "cash": "Cash",
