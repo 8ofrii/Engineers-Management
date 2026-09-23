@@ -237,12 +237,14 @@ export default function Projects() {
                 ) : (
                     <div className="grid grid-2">
                         {displayedProjects.map((project) => {
+                            const displayBudget = Number(project.totalContractValue || project.budget || 0);
+                            const totalPaid = Number(project.totalPaid ?? 0);
                             const totalExpenses = Number(project.actualCost || 0) + Number(project.officeRevenue || 0);
                             const remaining = project.projectSafeBalance !== undefined && project.projectSafeBalance !== null
                                 ? Number(project.projectSafeBalance)
-                                : (Number(project.budget || 0) - totalExpenses);
-                            const budgetPct = project.budget > 0
-                                ? Math.round((totalExpenses / Number(project.budget)) * 100)
+                                : (totalPaid - totalExpenses);
+                            const budgetPct = displayBudget > 0
+                                ? Math.round((totalExpenses / displayBudget) * 100)
                                 : 0;
                             const budgetBarColor = budgetPct >= 90 ? '#ef4444' : budgetPct >= 70 ? '#f59e0b' : '#10b981';
                             const completionPct = project.status?.toUpperCase() === 'COMPLETED'
@@ -338,29 +340,42 @@ export default function Projects() {
                                     </div>
                                 </div>
 
-                                <div className="flex-between">
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(4, 1fr)',
+                                    gap: '8px',
+                                    paddingTop: '4px'
+                                }}>
                                     <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
                                             {t('projects.budget')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
-                                            {formatCurrency(project.budget)}
+                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }} title={isArabic ? 'قيمة العقد / الميزانية المسجلة للمشروع' : 'Registered Project Budget / Contract Value'}>
+                                            {formatCurrency(displayBudget)}
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
+                                            {t('projects.totalPaid') || (isArabic ? 'إجمالي المدفوع' : 'Total Paid')}
+                                        </div>
+                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-primary-light, #3b82f6)' }} title={isArabic ? 'إجمالي المقبوض من العميل' : 'Total Collected from Client'}>
+                                            {formatCurrency(totalPaid)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
                                             {t('projects.spent')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
+                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }} title={isArabic ? 'منصرفات الموقع الفعلية' : 'Actual Site Cost'}>
                                             {formatCurrency(project.actualCost)}
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
                                             {t('projects.remaining')}
                                         </div>
                                         <div
-                                            title={isArabic ? 'المتبقي = الميزانية - (المنصرف + أرباح المكتب)' : 'Remaining = Budget - (Spent + Office Profit)'}
+                                            title={isArabic ? 'المتبقي = إجمالي المدفوع - (المنصرف + أرباح المكتب)' : 'Remaining = Total Paid - (Spent + Office Profit)'}
                                             style={{
                                                 fontSize: 'var(--font-size-md)',
                                                 fontWeight: 600,

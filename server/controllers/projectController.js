@@ -82,10 +82,9 @@ export const getProjects = async (req, res, next) => {
                 p.officeRevenue = ledger.profit;
                 p.projectSafeBalance = safeBal;
 
-                // For Cost-Plus projects or when income is tracked, harmonize budget with actual client funding from finance
-                if (ledger.income > 0 && (Number(p.budget || 0) < ledger.income || p.revenueModel === 'EXECUTION_COST_PLUS')) {
-                    p.budget = Math.max(Number(p.budget || 0), ledger.income);
-                }
+                p.totalPaid = ledger.income;
+            } else {
+                p.totalPaid = 0;
             }
             return p;
         });
@@ -166,10 +165,9 @@ export const getProject = async (req, res, next) => {
             project.actualCost = siteCost;
             project.officeRevenue = profit;
             project.projectSafeBalance = income - siteCost - profit;
-
-            if (income > 0 && (Number(project.budget || 0) < income || project.revenueModel === 'EXECUTION_COST_PLUS')) {
-                project.budget = Math.max(Number(project.budget || 0), income);
-            }
+            project.totalPaid = income;
+        } else {
+            project.totalPaid = 0;
         }
 
         res.status(200).json({
