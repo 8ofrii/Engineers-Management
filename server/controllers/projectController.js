@@ -443,6 +443,35 @@ export const deleteProject = async (req, res, next) => {
             });
         }
 
+        const deleteTransactions = req.query.deleteTransactions === 'true' || req.body?.deleteTransactions === true;
+        let deletedTransactionCount = 0;
+
+        if (deleteTransactions) {
+            // Delete related transactions
+            const txResult = await prisma.transaction.deleteMany({
+                where: {
+                    projectId: project.id,
+                    tenantId: req.user.tenantId
+                }
+            });
+            deletedTransactionCount = txResult.count;
+
+            // Also clean up project cost items
+            await prisma.projectCostItem.deleteMany({
+                where: { projectId: project.id }
+            });
+
+            // Clean up project category fees
+            await prisma.projectCategoryFee.deleteMany({
+                where: { projectId: project.id }
+            });
+
+            // Clean up project documents
+            await prisma.document.deleteMany({
+                where: { projectId: project.id }
+            });
+        }
+
         await prisma.project.update({
             where: { id: req.params.id },
             data: { deletedAt: new Date() }
@@ -452,7 +481,7 @@ export const deleteProject = async (req, res, next) => {
             action: 'DELETE',
             entity: 'Project',
             entityId: project.id,
-            before: project
+            before: { ...project, deletedTransactionsCount: deletedTransactionCount }
         });
 
         // Auto-sync client status on soft delete
@@ -462,7 +491,9 @@ export const deleteProject = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            data: {}
+            data: {
+                deletedTransactionsCount: deletedTransactionCount
+            }
         });
     } catch (error) {
         next(error);

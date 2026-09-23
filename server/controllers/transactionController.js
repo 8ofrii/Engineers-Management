@@ -70,6 +70,16 @@ export const getTransactions = async (req, res, next) => {
             whereClause.createdBy = req.user.id;
         }
 
+        if (req.query.projectId) {
+            whereClause.projectId = req.query.projectId;
+        } else {
+            // Exclude transactions belonging to soft-deleted projects
+            whereClause.OR = [
+                { projectId: null },
+                { project: { deletedAt: null } }
+            ];
+        }
+
         // PROJECT_MANAGER, ADMIN, ACCOUNTANT, SUPER_ADMIN all see every
         // transaction in the tenant — managers need full visibility to
         // approve/reject submissions raised by any engineer.

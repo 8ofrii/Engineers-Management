@@ -10,7 +10,7 @@ import { useFormat } from '../utils/format';
 
 export default function Projects() {
     const { t, i18n } = useTranslation();
-    const isArabic = i18n.language === 'ar';
+    const isArabic = (i18n.language || '').startsWith('ar');
     const { showAlert } = useAlert();
     const navigate = useNavigate();
     const { projectId: urlProjectId } = useParams();
@@ -22,8 +22,10 @@ export default function Projects() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProject, setEditingProject] = useState(null);
 
-    // Delete state managed via Alert now, but keeping local var for reference if needed
-    // However, the CustomAlert handles the confirmation internally via callbacks.
+    // Delete project with optional transaction cascade deletion
+    const [deleteProjectTarget, setDeleteProjectTarget] = useState(null);
+    const [deleteRelatedTransactions, setDeleteRelatedTransactions] = useState(true);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         loadProjects();
@@ -121,23 +123,39 @@ export default function Projects() {
     };
 
     const handleDeleteClick = (project) => {
-        showAlert({
-            type: 'warning',
-            title: t('common.deleteConfirmTitle'),
-            message: `${t('common.deleteConfirmMessage')} "${project.name}"?`,
-            showCancel: true,
-            confirmText: t('common.delete'),
-            onConfirm: async () => {
-                try {
-                    await projectsAPI.delete(project.id);
-                    showAlert({ type: 'success', title: 'Deleted', message: 'Project deleted successfully' });
-                    loadProjects();
-                } catch (error) {
-                    console.error('Failed to delete project:', error);
-                    showAlert({ type: 'error', title: 'Error', message: 'Failed to delete project' });
-                }
-            }
-        });
+        setDeleteProjectTarget(project);
+        setDeleteRelatedTransactions(true);
+    };
+
+    const confirmDeleteProject = async () => {
+        if (!deleteProjectTarget) return;
+        setIsDeleting(true);
+        try {
+            const res = await projectsAPI.delete(deleteProjectTarget.id, {
+                deleteTransactions: deleteRelatedTransactions
+            });
+            const deletedTxCount = res.data?.data?.deletedTransactionsCount || 0;
+            const targetName = deleteProjectTarget.name;
+            setDeleteProjectTarget(null);
+            showAlert({
+                type: 'success',
+                title: t('common.success', 'نجاح'),
+                message: deleteRelatedTransactions && deletedTxCount > 0
+                    ? (isArabic ? `تم حذف المشروع "${targetName}" وحذف ${deletedTxCount} معاملة ومصروف مرتبطة به بنجاح.` : `Project "${targetName}" and ${deletedTxCount} related transactions deleted successfully.`)
+                    : (isArabic ? `تم حذف المشروع "${targetName}" بنجاح.` : `Project "${targetName}" deleted successfully.`)
+            });
+            loadProjects();
+        } catch (error) {
+            console.error('Failed to delete project:', error);
+            const errorMsg = error.response?.data?.message || (isArabic ? 'فشل حذف المشروع' : 'Failed to delete project');
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'خطأ'),
+                message: errorMsg
+            });
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const openCreateModal = () => {
@@ -401,6 +419,110 @@ export default function Projects() {
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleSaveProject}
             />
+
+            {/* Delete Project Confirmation Modal with Related Transactions Option */}
+            {deleteProjectTarget && (
+                <div className="modal-overlay" onClick={() => !isDeleting && setDeleteProjectTarget(null)}>
+                    <div 
+                        className="modal-container" 
+                        style={{ maxWidth: '480px', padding: '32px', position: 'relative' }} 
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button 
+                            className="modal-close" 
+                            onClick={() => setDeleteProjectTarget(null)} 
+                            disabled={isDeleting}
+                            style={{ position: 'absolute', [isArabic ? 'left' : 'right']: '24px', top: '24px' }}
+                        >
+                            <X size={24} />
+                        </button>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                            <div style={{ 
+                                width: '64px', 
+                                height: '64px', 
+                                borderRadius: '50%', 
+                                background: 'rgba(239, 68, 68, 0.12)', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                marginBottom: '20px'
+                            }}>
+                                <AlertTriangle size={32} color="var(--color-danger, #ef4444)" />
+                            </div>
+
+                            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--text-primary)' }}>
+                                {t('common.deleteConfirmTitle', 'تأكيد الحذف')}
+                            </h2>
+
+                            <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.6' }}>
+                                {t('common.deleteConfirmMessage', 'هل أنت متأكد من رغبتك في حذف')} <strong style={{ color: 'var(--text-primary)' }}>"{deleteProjectTarget.name}"</strong>؟
+                            </p>
+
+                            {/* Option to delete related transactions */}
+                            <div style={{ 
+                                width: '100%', 
+                                background: 'var(--bg-secondary)', 
+                                border: '1px solid var(--border-color)', 
+                                borderRadius: 'var(--radius-md)', 
+                                padding: '14px 16px', 
+                                marginBottom: '24px',
+                                textAlign: isArabic ? 'right' : 'left'
+                            }}>
+                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={deleteRelatedTransactions}
+                                        onChange={(e) => setDeleteRelatedTransactions(e.target.checked)}
+                                        style={{ marginTop: '4px', cursor: 'pointer', width: '16px', height: '16px' }}
+                                    />
+                                    <div>
+                                        <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', display: 'block' }}>
+                                            {t('projects.deleteWithTransactions', 'حذف كافة المعاملات والمصاريف التابعة لهذا المشروع')}
+                                        </span>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
+                                            {deleteRelatedTransactions 
+                                                ? t('projects.deleteWithTransactionsHint', 'سيتم مسح جميع المصاريف والقيود المسجلة على المشروع نهائياً لتفادي بقائها.')
+                                                : t('projects.keepTransactionsHint', 'ستبقى المعاملات مسجلة كمعاملات عامة بدون مشروع.')
+                                            }
+                                        </span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => setDeleteProjectTarget(null)}
+                                    disabled={isDeleting}
+                                    style={{ flex: 1, padding: '10px', fontSize: '15px', fontWeight: '600', justifyContent: 'center' }}
+                                >
+                                    {t('common.cancel', 'إلغاء')}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-danger"
+                                    disabled={isDeleting}
+                                    onClick={confirmDeleteProject}
+                                    style={{ 
+                                        flex: 1, 
+                                        padding: '10px', 
+                                        fontSize: '15px',
+                                        fontWeight: '600', 
+                                        background: 'var(--color-danger, #ef4444)', 
+                                        color: 'white', 
+                                        border: 'none',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    {isDeleting ? (t('common.loading') || '...') : t('common.delete', 'حذف')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Layout >
     );
 }

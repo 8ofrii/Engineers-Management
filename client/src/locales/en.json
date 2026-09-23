@@ -164,6 +164,9 @@
         "negativeBalanceAlert": "Negative Safe Balance",
         "viewTransactions": "View Transactions",
         "viewDocuments": "Documents & Contracts",
+        "deleteWithTransactions": "Delete all transactions and expenses related to this project",
+        "deleteWithTransactionsHint": "All recorded expenses and entries on this project will be permanently removed.",
+        "keepTransactionsHint": "Transactions will remain as general unassigned entries.",
         "status": {
             "planning": "Planning",
             "inProgress": "In Progress",

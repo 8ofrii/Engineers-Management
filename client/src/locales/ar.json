@@ -165,6 +165,9 @@
         "negativeBalanceAlert": "عجز في خزينة المشروع",
         "viewTransactions": "عرض المعاملات",
         "viewDocuments": "الوثائق والعقود",
+        "deleteWithTransactions": "حذف كافة المعاملات والمصاريف التابعة لهذا المشروع",
+        "deleteWithTransactionsHint": "سيتم مسح جميع المصاريف والقيود المسجلة على المشروع نهائياً لتفادي بقائها.",
+        "keepTransactionsHint": "ستبقى المعاملات مسجلة كمعاملات عامة بدون مشروع.",
         "status": {
             "planning": "تخطيط",
             "inProgress": "شغال",
