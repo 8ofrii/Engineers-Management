@@ -303,13 +303,18 @@ export default function Projects() {
                                     </div>
                                 </div>
                                 <p className="text-secondary mb-md">{project.description || t('common.noData')}</p>
-                                <div className="grid grid-2 gap-md mb-md">
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                    gap: '10px',
+                                    marginBottom: 'var(--spacing-md)'
+                                }}>
                                     <div className="stat-cell">
                                         <label>
-                                            {t('projects.safeBalance') || 'خزينة المشروع'}
+                                            {t('projects.totalPaid') || (isArabic ? 'إجمالي المدفوع' : 'Total Paid')}
                                         </label>
-                                        <b className={project.projectSafeBalance < 0 ? 'neg' : 'pos'}>
-                                            {formatCurrency(project.projectSafeBalance)}
+                                        <b className="pos">
+                                            {formatCurrency(totalPaid)}
                                         </b>
                                     </div>
                                     <div className="stat-cell">
@@ -318,6 +323,14 @@ export default function Projects() {
                                         </label>
                                         <b className="acc">
                                             {formatCurrency(project.officeRevenue)}
+                                        </b>
+                                    </div>
+                                    <div className="stat-cell">
+                                        <label>
+                                            {t('projects.safeBalance') || 'خزينة المشروع'}
+                                        </label>
+                                        <b className={project.projectSafeBalance < 0 ? 'neg' : 'pos'}>
+                                            {formatCurrency(project.projectSafeBalance)}
                                         </b>
                                     </div>
                                 </div>
@@ -340,38 +353,25 @@ export default function Projects() {
                                     </div>
                                 </div>
 
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(4, 1fr)',
-                                    gap: '8px',
-                                    paddingTop: '4px'
-                                }}>
+                                <div className="flex-between">
                                     <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                             {t('projects.budget')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }} title={isArabic ? 'قيمة العقد / الميزانية المسجلة للمشروع' : 'Registered Project Budget / Contract Value'}>
+                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
                                             {formatCurrency(displayBudget)}
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
-                                            {t('projects.totalPaid') || (isArabic ? 'إجمالي المدفوع' : 'Total Paid')}
-                                        </div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-primary-light, #3b82f6)' }} title={isArabic ? 'إجمالي المقبوض من العميل' : 'Total Collected from Client'}>
-                                            {formatCurrency(totalPaid)}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                             {t('projects.spent')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }} title={isArabic ? 'منصرفات الموقع الفعلية' : 'Actual Site Cost'}>
+                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
                                             {formatCurrency(project.actualCost)}
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}>
+                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                             {t('projects.remaining')}
                                         </div>
                                         <div
