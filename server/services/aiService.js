@@ -641,8 +641,9 @@ export const processReceiptImage = async (imageBuffer, mimeType, context = {}) =
             const client = getOpenAI();
             if (client) {
                 const dynamicContextText = buildDynamicContext(context);
+                const extractionModel = process.env.OPENAI_EXTRACTION_MODEL || 'gpt-6-luna';
                 const completion = await client.chat.completions.create({
-                    model: 'gpt-4o-mini',
+                    model: extractionModel,
                     messages: [
                         { role: 'system', content: `${RECEIPT_SYSTEM_PROMPT}\n${dynamicContextText}` },
                         {
@@ -732,14 +733,15 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
         }
     }
 
-    // Step 3: Secondary Option: OpenAI GPT-4o-mini with complete dynamic company context
+    // Step 3: Secondary Option: OpenAI (defaulting to gpt-6-luna) with complete dynamic company context
     if (process.env.OPENAI_API_KEY && transcriptText) {
         try {
             const client = getOpenAI();
             if (client) {
                 const dynamicContextText = buildDynamicContext(context);
+                const extractionModel = process.env.OPENAI_EXTRACTION_MODEL || 'gpt-6-luna';
                 const completion = await client.chat.completions.create({
-                    model: 'gpt-4o-mini',
+                    model: extractionModel,
                     messages: [
                         { role: 'system', content: `${SYSTEM_PROMPT}\n${dynamicContextText}` },
                         {
