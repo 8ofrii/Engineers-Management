@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { suppliersAPI } from '../services/api';
-import { Package, Plus, Mail, Phone, Edit2, Trash2 } from 'lucide-react';
+import { Package, Plus, Mail, Phone, Edit2, Trash2, Search, Tag } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddSupplierModal from '../components/AddSupplierModal';
@@ -14,6 +14,7 @@ export default function Suppliers() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         loadSuppliers();
@@ -22,7 +23,7 @@ export default function Suppliers() {
     const loadSuppliers = async () => {
         try {
             const response = await suppliersAPI.getAll();
-            setSuppliers(response.data.data);
+            setSuppliers(response.data.data || []);
         } catch (error) {
             console.error('Failed to load suppliers:', error);
             showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to load suppliers.') });
@@ -72,6 +73,21 @@ export default function Suppliers() {
         });
     };
 
+    const filteredSuppliers = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return suppliers;
+        return suppliers.filter(s => {
+            const matchName = (s.name || '').toLowerCase().includes(q);
+            const matchCompany = (s.company || '').toLowerCase().includes(q);
+            const matchEmail = (s.email || '').toLowerCase().includes(q);
+            const matchPhone = (s.phone || '').toLowerCase().includes(q) || (Array.isArray(s.phones) && s.phones.some(p => (p || '').toLowerCase().includes(q)));
+            const matchCategory = (s.category || '').toLowerCase().includes(q) ||
+                (Array.isArray(s.categories) && s.categories.some(c => (c || '').toLowerCase().includes(q) || (t(`suppliers.categories.${c}`) || '').toLowerCase().includes(q)));
+            const matchItems = Array.isArray(s.suppliedItems) && s.suppliedItems.some(item => (item || '').toLowerCase().includes(q));
+            return matchName || matchCompany || matchEmail || matchPhone || matchCategory || matchItems;
+        });
+    }, [suppliers, searchQuery, t]);
+
     if (loading) {
         return (
             <Layout>
@@ -99,6 +115,28 @@ export default function Suppliers() {
                     </button>
                 </div>
 
+                {/* Search Bar */}
+                {suppliers.length > 0 && (
+                    <div style={{ position: 'relative', marginBottom: '20px', maxWidth: '500px' }}>
+                        <Search size={18} style={{ position: 'absolute', top: '12px', right: '14px', color: 'var(--text-tertiary)', pointerEvents: 'none' }} />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={t('suppliers.placeholders.search', 'بحث باسم المورد أو مجالات التوريد أو الأصناف المحددة...')}
+                            style={{
+                                width: '100%',
+                                padding: '10px 40px 10px 14px',
+                                borderRadius: '10px',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-secondary)',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.9rem'
+                            }}
+                        />
+                    </div>
+                )}
+
                 {suppliers.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
                         <Package size={64} style={{ margin: '0 auto var(--spacing-lg)', color: 'var(--text-tertiary)' }} />
@@ -109,9 +147,13 @@ export default function Suppliers() {
                             {t('suppliers.newSupplier')}
                         </button>
                     </div>
+                ) : filteredSuppliers.length === 0 ? (
+                    <div className="card text-center" style={{ padding: 'var(--spacing-xl)' }}>
+                        <p className="text-secondary">لا توجد نتائج مطابقة لبحثك: "{searchQuery}"</p>
+                    </div>
                 ) : (
                     <div className="grid grid-3">
-                        {suppliers.map((supplier) => (
+                        {filteredSuppliers.map((supplier) => (
                             <div key={supplier.id} className="card">
                                 <div className="flex-between mb-md">
                                     <h3 style={{ margin: 0 }}>{supplier.name}</h3>
@@ -134,9 +176,45 @@ export default function Suppliers() {
                                         </button>
                                     </div>
                                 </div>
-                                <span className="badge badge-primary mb-md" style={{ display: 'inline-block' }}>
-                                    {t(`suppliers.categories.${supplier.category}`, supplier.category)}
-                                </span>
+
+                                {/* Multi-Categories Badges */}
+                                {(() => {
+                                    const cats = Array.isArray(supplier.categories) && supplier.categories.length > 0
+                                        ? supplier.categories
+                                        : (supplier.category ? [supplier.category] : []);
+                                    if (cats.length === 0) return null;
+                                    return (
+                                        <div className="flex gap-xs mb-sm" style={{ flexWrap: 'wrap' }}>
+                                            {cats.map((c, i) => (
+                                                <span key={i} className="badge badge-primary" style={{ display: 'inline-block', fontSize: '0.78rem' }}>
+                                                    {t(`suppliers.categories.${c}`, c)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Supplied Items Tags */}
+                                {Array.isArray(supplier.suppliedItems) && supplier.suppliedItems.length > 0 && (
+                                    <div className="flex gap-xs mb-md" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <Tag size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                                        {supplier.suppliedItems.map((item, idx) => (
+                                            <span
+                                                key={idx}
+                                                style={{
+                                                    background: 'var(--bg-tertiary, rgba(0,0,0,0.04))',
+                                                    border: '1px solid var(--border-color)',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.75rem',
+                                                    color: 'var(--text-secondary)'
+                                                }}
+                                            >
+                                                {item}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
 
                                 <div className="flex gap-sm mb-sm text-secondary">
                                     <Mail size={16} />

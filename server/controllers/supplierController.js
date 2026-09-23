@@ -16,10 +16,16 @@ export const getSuppliers = async (req, res, next) => {
             }
         });
 
+        const formatted = suppliers.map(s => ({
+            ...s,
+            categories: (Array.isArray(s.categories) && s.categories.length > 0) ? s.categories : (s.category ? [s.category] : []),
+            suppliedItems: Array.isArray(s.suppliedItems) ? s.suppliedItems : []
+        }));
+
         res.status(200).json({
             success: true,
-            count: suppliers.length,
-            data: suppliers
+            count: formatted.length,
+            data: formatted
         });
     } catch (error) {
         next(error);
@@ -46,9 +52,15 @@ export const getSupplier = async (req, res, next) => {
             });
         }
 
+        const formatted = {
+            ...supplier,
+            categories: (Array.isArray(supplier.categories) && supplier.categories.length > 0) ? supplier.categories : (supplier.category ? [supplier.category] : []),
+            suppliedItems: Array.isArray(supplier.suppliedItems) ? supplier.suppliedItems : []
+        };
+
         res.status(200).json({
             success: true,
-            data: supplier
+            data: formatted
         });
     } catch (error) {
         next(error);
@@ -74,6 +86,24 @@ export const createSupplier = async (req, res, next) => {
         if (!data.email) data.email = "-";
         if (!data.phone) data.phone = data.phones?.[0] || "-";
 
+        // Multi-category & supplied items normalization
+        if (Array.isArray(data.categories)) {
+            data.categories = [...new Set(data.categories.filter(Boolean))];
+            if (data.categories.length > 0) {
+                data.category = data.categories[0];
+            } else if (data.category) {
+                data.categories = [data.category];
+            }
+        } else if (data.category) {
+            data.categories = [data.category];
+        }
+
+        if (Array.isArray(data.suppliedItems)) {
+            data.suppliedItems = [...new Set(data.suppliedItems.map(item => (typeof item === 'string' ? item.trim() : '')).filter(Boolean))];
+        } else if (typeof data.suppliedItems === 'string') {
+            data.suppliedItems = data.suppliedItems.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
         const supplier = await prisma.supplier.create({
             data: data
         });
@@ -87,7 +117,11 @@ export const createSupplier = async (req, res, next) => {
 
         res.status(201).json({
             success: true,
-            data: supplier
+            data: {
+                ...supplier,
+                categories: (Array.isArray(supplier.categories) && supplier.categories.length > 0) ? supplier.categories : (supplier.category ? [supplier.category] : []),
+                suppliedItems: Array.isArray(supplier.suppliedItems) ? supplier.suppliedItems : []
+            }
         });
     } catch (error) {
         next(error);
@@ -122,6 +156,22 @@ export const updateSupplier = async (req, res, next) => {
             data.phones = data.phone ? [data.phone.trim()] : [];
         }
 
+        // Multi-category & supplied items normalization
+        if (Array.isArray(data.categories)) {
+            data.categories = [...new Set(data.categories.filter(Boolean))];
+            if (data.categories.length > 0) {
+                data.category = data.categories[0];
+            }
+        } else if (data.category && (!data.categories || data.categories.length === 0)) {
+            data.categories = [data.category];
+        }
+
+        if (Array.isArray(data.suppliedItems)) {
+            data.suppliedItems = [...new Set(data.suppliedItems.map(item => (typeof item === 'string' ? item.trim() : '')).filter(Boolean))];
+        } else if (typeof data.suppliedItems === 'string') {
+            data.suppliedItems = data.suppliedItems.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
         const updated = await prisma.supplier.update({
             where: { id: req.params.id },
             data: data
@@ -137,7 +187,11 @@ export const updateSupplier = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            data: updated
+            data: {
+                ...updated,
+                categories: (Array.isArray(updated.categories) && updated.categories.length > 0) ? updated.categories : (updated.category ? [updated.category] : []),
+                suppliedItems: Array.isArray(updated.suppliedItems) ? updated.suppliedItems : []
+            }
         });
     } catch (error) {
         next(error);

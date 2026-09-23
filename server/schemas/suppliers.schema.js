@@ -4,7 +4,7 @@ const SupplierStatus = z.enum(['ACTIVE', 'INACTIVE', 'BLACKLISTED']);
 const SupplierCategory = z.enum([
     'MATERIALS', 'EQUIPMENT', 'SERVICES', 'LABOR', 'OTHER',
     'CONCRETE', 'STEEL', 'CEMENT', 'BRICKS', 'ELECTRICAL',
-    'PLUMBING', 'PAINT', 'WOOD', 'TOOLS'
+    'PLUMBING', 'PAINT', 'WOOD', 'TOOLS', 'SAND'
 ]);
 
 const baseSupplier = z.object({
@@ -14,6 +14,9 @@ const baseSupplier = z.object({
     phones: z.array(z.string().max(30)).optional().default([]),
     company: z.string().max(200).optional().nullable(),
     category: SupplierCategory.optional(),
+    customCategory: z.string().max(100).optional().nullable(),
+    categories: z.array(SupplierCategory).optional().default([]),
+    suppliedItems: z.array(z.string().max(100)).optional().default([]),
     taxId: z.string().max(50).optional().nullable(),
     paymentTerms: z.string().max(100).optional(),
     rating: z.coerce.number().int().min(1).max(5).optional(),

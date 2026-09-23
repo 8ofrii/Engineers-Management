@@ -320,6 +320,8 @@
         "fields": {
             "name": "Supplier Name",
             "category": "Category",
+            "categories": "Supply Categories (Multi-select)",
+            "suppliedItems": "Supplied Items / Products (Optional)",
             "customCategory": "Specify Category",
             "phone": "Phone Number",
             "email": "Email Address",
@@ -329,6 +331,8 @@
         "placeholders": {
             "name": "Enter supplier name",
             "customCategory": "Enter custom category",
+            "suppliedItems": "Type item and press Enter (e.g. Rebar 12mm, Portland Cement)",
+            "addItem": "Add Item",
             "phone": "+20 123 456 7890",
             "email": "supplier@example.com",
             "contactPerson": "Contact person name",
@@ -340,6 +344,7 @@
             "STEEL": "Steel & Rebar",
             "CEMENT": "Cement & Gypsum",
             "BRICKS": "Bricks & Blocks",
+            "SAND": "Sand & Aggregates",
             "ELECTRICAL": "Electrical Supplies",
             "PLUMBING": "Plumbing & Piping",
             "PAINT": "Paints & Coatings",

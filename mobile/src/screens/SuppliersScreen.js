@@ -45,12 +45,38 @@ export default function SuppliersScreen({ navigation }) {
 
     const onRefresh = () => { setRefreshing(true); load(); };
 
-    const filtered = items.filter(s =>
-        (s.name || '').toLowerCase().includes(search.toLowerCase()) ||
-        (s.company || '').toLowerCase().includes(search.toLowerCase()) ||
-        (s.category || '').toLowerCase().includes(search.toLowerCase()) ||
-        (s.phone || '').toLowerCase().includes(search.toLowerCase())
-    );
+
+    const getCategoryLabel = (category) => {
+        const c = (category || '').toUpperCase();
+        if (c === 'CONCRETE') return isArabic ? 'خرسانة جاهزة' : 'Concrete';
+        if (c === 'STEEL') return isArabic ? 'حديد تسليح' : 'Steel & Rebar';
+        if (c === 'CEMENT') return isArabic ? 'أسمنت وجبس' : 'Cement';
+        if (c === 'BRICKS') return isArabic ? 'طوب وبلوك' : 'Bricks';
+        if (c === 'ELECTRICAL') return isArabic ? 'مهمات كهربائية' : 'Electrical';
+        if (c === 'PLUMBING') return isArabic ? 'سباكة ومواسير' : 'Plumbing';
+        if (c === 'PAINT') return isArabic ? 'دهانات' : 'Paint';
+        if (c === 'WOOD') return isArabic ? 'أخشاب' : 'Wood';
+        if (c === 'TOOLS') return isArabic ? 'عدد وأدوات' : 'Tools';
+        if (c === 'MATERIALS') return isArabic ? 'مواد بناء وتوريدات' : 'Materials';
+        if (c === 'EQUIPMENT') return isArabic ? 'معدات وآليات' : 'Equipment';
+        if (c === 'SERVICES') return isArabic ? 'خدمات ومقاولات' : 'Services';
+        if (c === 'LABOR') return isArabic ? 'توريد عمالة' : 'Labor';
+        if (c === 'SUB_CONTRACTOR') return isArabic ? 'مقاول باطن' : 'Subcontractor';
+        return category || (isArabic ? 'توريدات عامة' : 'General');
+    };
+
+    const filtered = items.filter(s => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        const matchName = (s.name || '').toLowerCase().includes(q);
+        const matchCompany = (s.company || '').toLowerCase().includes(q);
+        const matchPhone = (s.phone || '').toLowerCase().includes(q) || (Array.isArray(s.phones) && s.phones.some(p => (p || '').toLowerCase().includes(q)));
+        const matchCategory = (s.category || '').toLowerCase().includes(q) ||
+            getCategoryLabel(s.category).toLowerCase().includes(q) ||
+            (Array.isArray(s.categories) && s.categories.some(c => (c || '').toLowerCase().includes(q) || getCategoryLabel(c).toLowerCase().includes(q)));
+        const matchItems = Array.isArray(s.suppliedItems) && s.suppliedItems.some(it => (it || '').toLowerCase().includes(q));
+        return matchName || matchCompany || matchPhone || matchCategory || matchItems;
+    });
 
     const handleCall = (phone) => {
         if (!phone) return;
@@ -62,15 +88,6 @@ export default function SuppliersScreen({ navigation }) {
         if (s === 'ACTIVE') return isArabic ? 'نشط' : 'Active';
         if (s === 'INACTIVE') return isArabic ? 'غير نشط' : 'Inactive';
         return status;
-    };
-
-    const getCategoryLabel = (category) => {
-        const c = (category || '').toUpperCase();
-        if (c === 'MATERIALS') return isArabic ? 'مواد بناء وتوريدات' : 'Materials';
-        if (c === 'EQUIPMENT') return isArabic ? 'معدات وآليات' : 'Equipment';
-        if (c === 'SERVICES') return isArabic ? 'خدمات هندسية' : 'Services';
-        if (c === 'SUB_CONTRACTOR') return isArabic ? 'مقاول باطن' : 'Subcontractor';
-        return category || (isArabic ? 'توريدات عامة' : 'General');
     };
 
     return (
@@ -93,7 +110,7 @@ export default function SuppliersScreen({ navigation }) {
                 <Ionicons name="search-outline" size={18} color={theme.subtext} />
                 <TextInput
                     style={[styles.searchInput, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]}
-                    placeholder={isArabic ? 'بحث باسم المورد أو نوع التوريد (حديد، أسمنت)...' : 'Search supplier name or category...'}
+                    placeholder={isArabic ? 'بحث باسم المورد أو مجالات التوريد أو الأصناف...' : 'Search supplier name, categories, or items...'}
                     placeholderTextColor={theme.subtext}
                     value={search}
                     onChangeText={setSearch}
@@ -113,21 +130,48 @@ export default function SuppliersScreen({ navigation }) {
                         <Text style={[styles.emptyText, { color: theme.subtext }]}>{isArabic ? 'لا يوجد موردين مطابقين' : 'No suppliers found'}</Text>
                     </View>
                 ) : (
-                    filtered.map((s) => (
-                        <View key={s.id} style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                            <View style={[styles.cardHeader, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={[styles.name, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]} numberOfLines={1}>{s.name}</Text>
-                                    <Text style={[styles.category, { color: theme.primary, textAlign: isArabic ? 'right' : 'left' }]}>
-                                        {getCategoryLabel(s.category)}
-                                    </Text>
+                    filtered.map((s) => {
+                        const cats = Array.isArray(s.categories) && s.categories.length > 0
+                            ? s.categories
+                            : (s.category ? [s.category] : []);
+
+                        return (
+                            <View key={s.id} style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                                <View style={[styles.cardHeader, { flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.name, { color: theme.text, textAlign: isArabic ? 'right' : 'left' }]} numberOfLines={1}>{s.name}</Text>
+                                        
+                                        {/* Multi-Category Badges */}
+                                        <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                                            {cats.map((c, idx) => (
+                                                <View key={idx} style={{ backgroundColor: theme.primaryLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                                                    <Text style={{ fontSize: 11, fontWeight: '600', color: theme.primary }}>
+                                                        {getCategoryLabel(c)}
+                                                    </Text>
+                                                </View>
+                                            ))}
+                                        </View>
+
+                                        {/* Supplied Items Chips */}
+                                        {Array.isArray(s.suppliedItems) && s.suppliedItems.length > 0 && (
+                                            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 4, marginTop: 6, alignItems: 'center' }}>
+                                                <Ionicons name="pricetag-outline" size={12} color={theme.subtext} />
+                                                {s.suppliedItems.map((item, idx) => (
+                                                    <View key={idx} style={{ backgroundColor: theme.bgSecondary || 'rgba(0,0,0,0.05)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: theme.border }}>
+                                                        <Text style={{ fontSize: 10, color: theme.subtext }}>
+                                                            {item}
+                                                        </Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
+                                    </View>
+                                    <View style={[styles.badge, { backgroundColor: theme.successLight }]}>
+                                        <Text style={[styles.badgeText, { color: theme.success }]}>
+                                            {getStatusLabel(s.status)}
+                                        </Text>
+                                    </View>
                                 </View>
-                                <View style={[styles.badge, { backgroundColor: theme.successLight }]}>
-                                    <Text style={[styles.badgeText, { color: theme.success }]}>
-                                        {getStatusLabel(s.status)}
-                                    </Text>
-                                </View>
-                            </View>
 
                             <View style={[styles.metaBlock, { alignItems: isArabic ? 'flex-end' : 'flex-start' }]}>
                                 {s.rating ? (

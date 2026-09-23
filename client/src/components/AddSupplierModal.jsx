@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
+import { X, Plus, Check, Tag } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
 import DraftBanner from './DraftBanner';
@@ -13,9 +13,12 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
     const { t } = useTranslation();
     const { showAlert } = useAlert();
     const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+    const [newItemInput, setNewItemInput] = useState('');
     const [formData, setFormData] = useState({
         name: '',
         category: 'OTHER',
+        categories: ['OTHER'],
+        suppliedItems: [],
         customCategory: '',
         contactName: '',
         email: '',
@@ -33,6 +36,8 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
         setFormData({
             name: '',
             category: 'OTHER',
+            categories: ['OTHER'],
+            suppliedItems: [],
             customCategory: '',
             contactName: '',
             email: '',
@@ -50,9 +55,16 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             const initPhones = Array.isArray(initialData.phones) && initialData.phones.length > 0
                 ? initialData.phones
                 : (initialData.phone ? [initialData.phone] : ['']);
+            const initCategories = Array.isArray(initialData.categories) && initialData.categories.length > 0
+                ? initialData.categories
+                : (initialData.category ? [initialData.category] : ['OTHER']);
+            const initItems = Array.isArray(initialData.suppliedItems) ? initialData.suppliedItems : [];
+
             setFormData({
                 name: initialData.name || '',
-                category: initialData.category || 'OTHER',
+                category: initCategories[0] || initialData.category || 'OTHER',
+                categories: initCategories,
+                suppliedItems: initItems,
                 customCategory: initialData.customCategory || '',
                 contactName: initialData.contactName || '',
                 email: initialData.email || '',
@@ -67,9 +79,16 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                 const draftPhones = Array.isArray(savedDraft.phones) && savedDraft.phones.length > 0
                     ? savedDraft.phones
                     : (savedDraft.phone ? [savedDraft.phone] : ['']);
+                const draftCategories = Array.isArray(savedDraft.categories) && savedDraft.categories.length > 0
+                    ? savedDraft.categories
+                    : (savedDraft.category ? [savedDraft.category] : ['OTHER']);
+                const draftItems = Array.isArray(savedDraft.suppliedItems) ? savedDraft.suppliedItems : [];
+
                 setFormData({
                     name: savedDraft.name || '',
-                    category: savedDraft.category || 'OTHER',
+                    category: draftCategories[0] || savedDraft.category || 'OTHER',
+                    categories: draftCategories,
+                    suppliedItems: draftItems,
                     customCategory: savedDraft.customCategory || '',
                     contactName: savedDraft.contactName || '',
                     email: savedDraft.email || '',
@@ -84,6 +103,8 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                 setFormData({
                     name: '',
                     category: 'OTHER',
+                    categories: ['OTHER'],
+                    suppliedItems: [],
                     customCategory: '',
                     contactName: '',
                     email: '',
@@ -94,22 +115,73 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                 });
             }
         }
+        setNewItemInput('');
         setErrors({});
     }, [initialData, isOpen]);
 
     useEffect(() => {
         if (!isOpen || initialData) return;
-        const hasContent = formData.name || formData.phone || formData.phones?.some(Boolean) || formData.email || formData.contactName || formData.street || formData.notes;
+        const hasContent = formData.name || formData.phone || formData.phones?.some(Boolean) || formData.email || formData.contactName || formData.street || formData.notes || (formData.suppliedItems && formData.suppliedItems.length > 0);
         if (hasContent) {
             saveFormDraft(SUPPLIER_DRAFT_KEY, formData);
         }
     }, [formData, isOpen, initialData]);
 
     const categories = [
-        'CONCRETE', 'STEEL', 'CEMENT', 'BRICKS',
+        'CONCRETE', 'STEEL', 'CEMENT', 'BRICKS', 'SAND',
         'ELECTRICAL', 'PLUMBING', 'PAINT', 'WOOD', 'TOOLS',
         'MATERIALS', 'EQUIPMENT', 'SERVICES', 'LABOR', 'OTHER'
     ];
+
+    const handleToggleCategory = (cat) => {
+        setFormData(prev => {
+            const currentCats = Array.isArray(prev.categories) ? prev.categories : [prev.category || 'OTHER'];
+            const exists = currentCats.includes(cat);
+            let nextCategories;
+            if (exists) {
+                nextCategories = currentCats.filter(c => c !== cat);
+                if (nextCategories.length === 0) nextCategories = ['OTHER'];
+            } else {
+                nextCategories = [...currentCats.filter(c => c !== 'OTHER'), cat];
+            }
+            return {
+                ...prev,
+                categories: nextCategories,
+                category: nextCategories[0] || 'OTHER'
+            };
+        });
+        if (errors.categories) {
+            setErrors(prev => ({ ...prev, categories: '' }));
+        }
+    };
+
+    const handleAddItem = () => {
+        const trimmed = newItemInput.trim();
+        if (!trimmed) return;
+        setFormData(prev => {
+            const current = Array.isArray(prev.suppliedItems) ? prev.suppliedItems : [];
+            if (current.includes(trimmed)) return prev;
+            return {
+                ...prev,
+                suppliedItems: [...current, trimmed]
+            };
+        });
+        setNewItemInput('');
+    };
+
+    const handleRemoveItem = (itemToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            suppliedItems: (prev.suppliedItems || []).filter(item => item !== itemToRemove)
+        }));
+    };
+
+    const handleItemKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleAddItem();
+        }
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -134,7 +206,8 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
             newErrors.phone = t('common.required');
         }
 
-        if (formData.category === 'OTHER' && !formData.customCategory?.trim()) {
+        const hasOther = (formData.categories || []).includes('OTHER');
+        if (hasOther && formData.categories.length === 1 && !formData.customCategory?.trim()) {
             newErrors.customCategory = t('common.required');
         }
         setErrors(newErrors);
@@ -150,8 +223,16 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
 
         try {
             const cleanPhones = (formData.phones || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            const cleanCategories = Array.isArray(formData.categories) && formData.categories.length > 0
+                ? formData.categories
+                : [formData.category || 'OTHER'];
+            const cleanItems = (formData.suppliedItems || []).map(item => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
+
             const payload = {
                 ...formData,
+                category: cleanCategories[0] || 'OTHER',
+                categories: cleanCategories,
+                suppliedItems: cleanItems,
                 phone: cleanPhones[0] || formData.phone?.trim() || '',
                 phones: cleanPhones
             };
@@ -186,7 +267,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
 
     return (
         <div className="modal-overlay" onClick={handleClose}>
-            <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px' }}>
                 <div className="modal-header">
                     <h2>{initialData ? t('suppliers.editTitle') : t('suppliers.newTitle')}</h2>
                     <button className="modal-close" onClick={handleClose}>
@@ -215,26 +296,49 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                             {errors.name && <span className="error-message">{errors.name}</span>}
                         </div>
 
-                        <div className="form-group">
-                            <label htmlFor="category">
-                                {t('suppliers.fields.category', 'Category')}
+                        {/* Multi-Category Selector */}
+                        <div className="form-group full-width">
+                            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <span style={{ fontWeight: 600 }}>
+                                    {t('suppliers.fields.categories', 'مجالات وتصنيفات التوريد')}
+                                </span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                    ({t('common.multiSelect', 'يمكن اختيار أكثر من مجال')})
+                                </span>
                             </label>
-                            <select
-                                id="category"
-                                name="category"
-                                value={formData.category}
-                                onChange={handleChange}
-                            >
-                                {categories.map(cat => (
-                                    <option key={cat} value={cat}>
-                                        {t(`suppliers.categories.${cat}`, cat)}
-                                    </option>
-                                ))}
-                            </select>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '4px 0' }}>
+                                {categories.map(cat => {
+                                    const isSelected = (formData.categories || []).includes(cat);
+                                    return (
+                                        <button
+                                            key={cat}
+                                            type="button"
+                                            onClick={() => handleToggleCategory(cat)}
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: '20px',
+                                                border: isSelected ? '1px solid var(--color-primary, #3b82f6)' : '1px solid var(--border-color)',
+                                                background: isSelected ? 'var(--color-primary, #3b82f6)' : 'var(--bg-secondary)',
+                                                color: isSelected ? '#ffffff' : 'var(--text-primary)',
+                                                fontSize: '0.85rem',
+                                                fontWeight: isSelected ? '600' : '400',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                        >
+                                            {isSelected && <Check size={14} />}
+                                            <span>{t(`suppliers.categories.${cat}`, cat)}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
 
-                        {formData.category === 'OTHER' && (
-                            <div className="form-group">
+                        {(formData.categories || []).includes('OTHER') && (
+                            <div className="form-group full-width">
                                 <label htmlFor="customCategory">
                                     {t('suppliers.fields.customCategory', 'Specify Category')} <span className="required">*</span>
                                 </label>
@@ -250,6 +354,76 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 {errors.customCategory && <span className="error-message">{errors.customCategory}</span>}
                             </div>
                         )}
+
+                        {/* Specific Supplied Items / Products Tags Input */}
+                        <div className="form-group full-width" style={{ marginTop: '4px' }}>
+                            <label style={{ fontWeight: 600, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Tag size={16} style={{ color: 'var(--color-primary, #3b82f6)' }} />
+                                <span>{t('suppliers.fields.suppliedItems', 'الأصناف والمواد الموردة المحددة')}</span>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: 'normal' }}>
+                                    ({t('common.optional', 'اختياري')})
+                                </span>
+                            </label>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={newItemInput}
+                                    onChange={(e) => setNewItemInput(e.target.value)}
+                                    onKeyDown={handleItemKeyDown}
+                                    placeholder={t('suppliers.placeholders.suppliedItems', 'اكتب الصنف واضغط Enter (مثال: حديد عز 12مم، أسمنت السويس)')}
+                                    style={{ flex: 1 }}
+                                />
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={handleAddItem}
+                                    disabled={!newItemInput.trim()}
+                                    style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                    <Plus size={16} />
+                                    <span>{t('suppliers.placeholders.addItem', 'إضافة صنف')}</span>
+                                </button>
+                            </div>
+
+                            {Array.isArray(formData.suppliedItems) && formData.suppliedItems.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                                    {formData.suppliedItems.map((item, idx) => (
+                                        <span
+                                            key={idx}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                background: 'var(--bg-tertiary, rgba(59, 130, 246, 0.1))',
+                                                color: 'var(--text-primary)',
+                                                padding: '4px 10px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.82rem',
+                                                fontWeight: 500,
+                                                border: '1px solid var(--border-color)'
+                                            }}
+                                        >
+                                            <span>{item}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveItem(item)}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    padding: 0,
+                                                    cursor: 'pointer',
+                                                    color: 'var(--text-secondary)',
+                                                    display: 'flex',
+                                                    alignItems: 'center'
+                                                }}
+                                            >
+                                                <X size={13} />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         <div style={{ gridColumn: 'span 2' }}>
                             <MultiPhoneInput
                                 phones={formData.phones}
