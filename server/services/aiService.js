@@ -691,20 +691,26 @@ export const processReceiptImage = async (imageBuffer, mimeType, context = {}) =
  * @returns {Promise<{raw_text: string, parsed_data: object}>}
  */
 export const processVoiceNote = async (filePath, clientTranscript = '', context = {}) => {
-    let transcriptText = clientTranscript?.trim() || '';
+    let transcriptText = (typeof clientTranscript === 'string' && clientTranscript !== 'undefined' && clientTranscript !== 'null') 
+        ? clientTranscript.trim() 
+        : '';
 
-    // Step 1: If client didn't supply live transcript, try OpenAI Whisper if configured
-    if (!transcriptText && process.env.OPENAI_API_KEY) {
+    // Step 1: If client didn't supply live transcript (or it's too short to be meaningful), transcribe via Whisper
+    if ((!transcriptText || transcriptText.length < 4) && process.env.OPENAI_API_KEY) {
         try {
             const client = getOpenAI();
             if (client && fs.existsSync(filePath)) {
+                logger.info({ filePath }, 'Initiating Whisper-1 voice transcription on server');
                 const transcription = await client.audio.transcriptions.create({
                     file: fs.createReadStream(filePath),
                     model: "whisper-1",
                     language: "ar",
-                    prompt: "Construction, EGP, geneh, musanaiyah, kharsana, mahara, tashweeb"
+                    prompt: "تسجيل صوتي لمهندس موقع مقاولات وإنشاءات مصرية: جنيه، ألف، دفعة، مصنعية، خرسانة، محارة، سباكة، كهرباء، دهانات، تشوين، نجار، حداد، نقاش، مبلط، أسمنت، رمل، طوب، سيراميك، عهدة، كاش، تحويل، فودافون كاش، انستاباي"
                 });
-                transcriptText = transcription?.text || '';
+                if (transcription?.text && transcription.text.trim()) {
+                    transcriptText = transcription.text.trim();
+                    logger.info({ transcriptText }, 'Whisper-1 successfully transcribed audio');
+                }
             }
         } catch (error) {
             logger.warn({ err: error }, 'Whisper voice transcription failed');
@@ -726,7 +732,40 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
         }
     }
 
-    // Step 3: Heuristic extraction from transcript if available
+    // Step 3: Secondary Option: OpenAI GPT-4o-mini with complete dynamic company context
+    if (process.env.OPENAI_API_KEY && transcriptText) {
+        try {
+            const client = getOpenAI();
+            if (client) {
+                const dynamicContextText = buildDynamicContext(context);
+                const completion = await client.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: `${SYSTEM_PROMPT}\n${dynamicContextText}` },
+                        {
+                            role: 'user',
+                            content: `Extract structured construction transaction details from this site voice note:\n\n"${transcriptText}"`
+                        }
+                    ],
+                    response_format: { type: 'json_object' },
+                    temperature: 0.1
+                });
+
+                const parsed = JSON.parse(completion.choices[0].message.content);
+                const normalized = normalizeExtractedData(parsed, transcriptText, context);
+                if (normalized) {
+                    return {
+                        raw_text: transcriptText,
+                        parsed_data: normalized
+                    };
+                }
+            }
+        } catch (aiErr) {
+            logger.warn({ err: aiErr }, 'OpenAI voice extraction fallback failed');
+        }
+    }
+
+    // Step 4: Fallback: Heuristic extraction from transcript if available
     if (transcriptText) {
         const heuristic = extractHeuristicsFromText(transcriptText);
         if (heuristic) {

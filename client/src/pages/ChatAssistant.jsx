@@ -51,9 +51,26 @@ export default function ChatAssistant() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            mediaRecorderRef.current = new MediaRecorder(stream, {
-                mimeType: 'audio/webm'
-            });
+            const candidates = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+                'audio/aac',
+                'audio/ogg;codecs=opus',
+                'audio/ogg',
+                'audio/wav'
+            ];
+            let selectedMime = '';
+            for (const cand of candidates) {
+                if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cand)) {
+                    selectedMime = cand;
+                    break;
+                }
+            }
+
+            mediaRecorderRef.current = selectedMime 
+                ? new MediaRecorder(stream, { mimeType: selectedMime }) 
+                : new MediaRecorder(stream);
 
             audioChunksRef.current = [];
 
@@ -64,7 +81,8 @@ export default function ChatAssistant() {
             };
 
             mediaRecorderRef.current.onstop = async () => {
-                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const actualMime = mediaRecorderRef.current?.mimeType || selectedMime || 'audio/webm';
+                const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
                 await sendVoiceMessage(audioBlob);
 
                 // Stop all tracks

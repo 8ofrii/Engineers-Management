@@ -132,7 +132,27 @@ export default function VoiceRecorderModal({
             streamRef.current = stream;
             setAudioStream(stream);
 
-            const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            // Dynamically select the best supported audio MIME type across Chrome, Safari/iOS, Firefox, Edge
+            const candidates = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+                'audio/aac',
+                'audio/ogg;codecs=opus',
+                'audio/ogg',
+                'audio/wav'
+            ];
+            let selectedMime = '';
+            for (const cand of candidates) {
+                if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cand)) {
+                    selectedMime = cand;
+                    break;
+                }
+            }
+
+            const recorder = selectedMime 
+                ? new MediaRecorder(stream, { mimeType: selectedMime }) 
+                : new MediaRecorder(stream);
             recorderRef.current = recorder;
             chunksRef.current = [];
 
@@ -141,7 +161,8 @@ export default function VoiceRecorderModal({
             };
 
             recorder.onstop = () => {
-                const b = new Blob(chunksRef.current, { type: 'audio/webm' });
+                const actualMime = recorder.mimeType || selectedMime || 'audio/webm';
+                const b = new Blob(chunksRef.current, { type: actualMime });
                 setBlob(b);
                 const url = URL.createObjectURL(b);
                 setAudioUrl(url);
@@ -150,7 +171,7 @@ export default function VoiceRecorderModal({
 
             recorder.start(100);
 
-            // Background Speech Recognition (captures text silently for LLM without showing in UI)
+            // Optional Browser Speech Recognition (best-effort assistance; server Whisper handles the audio authoritatively)
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (SpeechRec) {
                 try {
@@ -165,10 +186,13 @@ export default function VoiceRecorderModal({
                         }
                         transcriptRef.current = text.trim();
                     };
+                    rec.onerror = (recErr) => {
+                        console.warn('Browser SpeechRecognition error (server Whisper fallback active):', recErr?.error || recErr);
+                    };
                     rec.start();
                     recognitionRef.current = rec;
                 } catch (recErr) {
-                    console.warn('Speech recognition fallback to audio-only:', recErr);
+                    console.warn('Speech recognition fallback to server Whisper:', recErr);
                 }
             }
 

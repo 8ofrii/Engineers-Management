@@ -169,9 +169,16 @@ export const safesAPI = {
 export const aiExtractAPI = {
     voice: (audioBlob, transcript = '') => {
         const fd = new FormData();
-        fd.append('audio', audioBlob, 'voice.webm');
-        if (transcript) {
-            fd.append('transcript', transcript);
+        const type = audioBlob.type || '';
+        const ext = type.includes('mp4') ? 'mp4' 
+            : type.includes('aac') ? 'aac' 
+            : type.includes('m4a') ? 'm4a' 
+            : type.includes('ogg') ? 'ogg' 
+            : type.includes('wav') ? 'wav' 
+            : 'webm';
+        fd.append('audio', audioBlob, `voice.${ext}`);
+        if (transcript && typeof transcript === 'string' && transcript.trim()) {
+            fd.append('transcript', transcript.trim());
         }
         return api.post('/ai/extract/voice', fd, {
             headers: { 'Content-Type': 'multipart/form-data' }

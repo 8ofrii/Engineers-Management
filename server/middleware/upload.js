@@ -42,7 +42,11 @@ const AUDIO_MIME_MAP = {
     'audio/x-m4a': '.m4a',
     'audio/mp4': '.mp4',
     'audio/webm': '.webm',
-    'audio/ogg': '.ogg'
+    'audio/ogg': '.ogg',
+    'audio/aac': '.aac',
+    'audio/x-aac': '.aac',
+    'audio/3gpp': '.3gp',
+    'audio/flac': '.flac'
 };
 
 const getSafeImageExt = (file) => IMAGE_MIME_MAP[file.mimetype] || '.jpg';
@@ -62,7 +66,11 @@ const localAudioStorage = multer.diskStorage({
 const audioUpload = multer({
     storage: localAudioStorage,
     fileFilter: (req, file, cb) => {
-        const allowedTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/x-m4a', 'audio/mp4', 'audio/webm', 'audio/ogg'];
+        const allowedTypes = [
+            'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/m4a', 'audio/x-m4a',
+            'audio/mp4', 'audio/webm', 'audio/ogg', 'audio/aac', 'audio/x-aac',
+            'audio/3gpp', 'audio/flac'
+        ];
         if (allowedTypes.includes(file.mimetype)) cb(null, true);
         else cb(new Error('Invalid file type. Only audio files are allowed'), false);
     },
