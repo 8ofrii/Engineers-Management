@@ -237,8 +237,12 @@ export default function Projects() {
                 ) : (
                     <div className="grid grid-2">
                         {displayedProjects.map((project) => {
+                            const totalExpenses = Number(project.actualCost || 0) + Number(project.officeRevenue || 0);
+                            const remaining = project.projectSafeBalance !== undefined && project.projectSafeBalance !== null
+                                ? Number(project.projectSafeBalance)
+                                : (Number(project.budget || 0) - totalExpenses);
                             const budgetPct = project.budget > 0
-                                ? Math.min(100, Math.round((Number(project.actualCost) / Number(project.budget)) * 100))
+                                ? Math.round((totalExpenses / Number(project.budget)) * 100)
                                 : 0;
                             const budgetBarColor = budgetPct >= 90 ? '#ef4444' : budgetPct >= 70 ? '#f59e0b' : '#10b981';
                             const completionPct = project.status?.toUpperCase() === 'COMPLETED'
@@ -329,8 +333,8 @@ export default function Projects() {
                                                     : (t('projects.budgetHealthy', 'Healthy'))}
                                         </span>
                                     </div>
-                                    <div className="meter" style={{ '--w': `${budgetPct}%` }}>
-                                        <i style={{ width: `${budgetPct}%`, background: budgetBarColor }} />
+                                    <div className="meter" style={{ '--w': `${Math.min(100, Math.max(0, budgetPct))}%` }}>
+                                        <i style={{ width: `${Math.min(100, Math.max(0, budgetPct))}%`, background: budgetBarColor }} />
                                     </div>
                                 </div>
 
@@ -355,12 +359,15 @@ export default function Projects() {
                                         <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                             {t('projects.remaining')}
                                         </div>
-                                        <div style={{
-                                            fontSize: 'var(--font-size-md)',
-                                            fontWeight: 600,
-                                            color: (project.budget - project.actualCost) < 0 ? 'var(--color-danger)' : 'var(--color-success)'
-                                        }}>
-                                            {formatCurrency(project.budget - project.actualCost)}
+                                        <div
+                                            title={isArabic ? 'المتبقي = الميزانية - (المنصرف + أرباح المكتب)' : 'Remaining = Budget - (Spent + Office Profit)'}
+                                            style={{
+                                                fontSize: 'var(--font-size-md)',
+                                                fontWeight: 600,
+                                                color: remaining < 0 ? 'var(--color-danger)' : 'var(--color-success)'
+                                            }}
+                                        >
+                                            {formatCurrency(remaining)}
                                         </div>
                                     </div>
                                 </div>

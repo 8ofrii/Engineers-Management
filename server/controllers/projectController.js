@@ -76,8 +76,8 @@ export const getProjects = async (req, res, next) => {
         const reconciledProjects = projects.map(p => {
             const ledger = projectLedgerMap[p.id];
             if (ledger && ledger.hasTx) {
-                // Project safe balance represents net available project funds (Income - Site Costs)
-                const safeBal = ledger.income - ledger.siteCost;
+                // Project safe balance represents net available project funds (Income - Site Costs - Office Profit)
+                const safeBal = ledger.income - ledger.siteCost - ledger.profit;
                 p.actualCost = ledger.siteCost;
                 p.officeRevenue = ledger.profit;
                 p.projectSafeBalance = safeBal;
@@ -165,7 +165,7 @@ export const getProject = async (req, res, next) => {
             });
             project.actualCost = siteCost;
             project.officeRevenue = profit;
-            project.projectSafeBalance = income - siteCost;
+            project.projectSafeBalance = income - siteCost - profit;
 
             if (income > 0 && (Number(project.budget || 0) < income || project.revenueModel === 'EXECUTION_COST_PLUS')) {
                 project.budget = Math.max(Number(project.budget || 0), income);
