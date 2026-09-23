@@ -240,9 +240,7 @@ export default function Projects() {
                             const displayBudget = Number(project.totalContractValue || project.budget || 0);
                             const totalPaid = Number(project.totalPaid ?? 0);
                             const totalExpenses = Number(project.actualCost || 0) + Number(project.officeRevenue || 0);
-                            const remaining = project.projectSafeBalance !== undefined && project.projectSafeBalance !== null
-                                ? Number(project.projectSafeBalance)
-                                : (totalPaid - totalExpenses);
+                            const remaining = displayBudget - totalExpenses;
                             const budgetPct = displayBudget > 0
                                 ? Math.round((totalExpenses / displayBudget) * 100)
                                 : 0;
@@ -311,7 +309,7 @@ export default function Projects() {
                                 }}>
                                     <div className="stat-cell">
                                         <label>
-                                            {t('projects.totalPaid') || (isArabic ? 'إجمالي المدفوع' : 'Total Paid')}
+                                            {isArabic ? 'إجمالي المدفوع' : (t('projects.totalPaid') || 'Total Paid')}
                                         </label>
                                         <b className="pos">
                                             {formatCurrency(totalPaid)}
@@ -375,7 +373,7 @@ export default function Projects() {
                                             {t('projects.remaining')}
                                         </div>
                                         <div
-                                            title={isArabic ? 'المتبقي = إجمالي المدفوع - (المنصرف + أرباح المكتب)' : 'Remaining = Total Paid - (Spent + Office Profit)'}
+                                            title={isArabic ? 'المتبقي = إجمالي الميزانية - إجمالي المصروفات' : 'Remaining = Total Budget - Total Expenses'}
                                             style={{
                                                 fontSize: 'var(--font-size-md)',
                                                 fontWeight: 600,

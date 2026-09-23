@@ -162,6 +162,7 @@
         "complete": "مكتمل",
         "safeBalance": "خزينة المشروع",
         "officeProfit": "أرباح المكتب",
+        "totalPaid": "إجمالي المدفوع",
         "negativeBalanceAlert": "عجز في خزينة المشروع",
         "viewTransactions": "عرض المعاملات",
         "viewDocuments": "الوثائق والعقود",

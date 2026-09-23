@@ -161,6 +161,7 @@
         "complete": "complete",
         "safeBalance": "Project Safe",
         "officeProfit": "Office Profit",
+        "totalPaid": "Total Paid",
         "negativeBalanceAlert": "Negative Safe Balance",
         "viewTransactions": "View Transactions",
         "viewDocuments": "Documents & Contracts",
