@@ -34,7 +34,11 @@ export const AuthProvider = ({ children }) => {
     const loadUser = async () => {
         try {
             const response = await authAPI.getMe();
-            setUser(response.data.data);
+            const freshUser = response.data?.data;
+            if (freshUser) {
+                localStorage.setItem('user', JSON.stringify(freshUser));
+                setUser(freshUser);
+            }
         } catch (error) {
             console.error('Failed to load user:', error);
             logout();

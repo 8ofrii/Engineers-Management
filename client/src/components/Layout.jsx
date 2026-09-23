@@ -186,10 +186,19 @@ export default function Layout({ children }) {
         i18n.changeLanguage(newLang);
     };
 
+    const isPlatformAdmin = user?.role === 'SUPER_ADMIN' || user?.email === 'admin@demo.local';
+
     // 1. Standalone Top Items (Dashboard & Projects)
     const mainItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard', 'Dashboard') },
-        { path: '/projects', icon: FolderKanban, label: t('nav.projects', 'Projects') }
+        { path: '/projects', icon: FolderKanban, label: t('nav.projects', 'Projects') },
+        ...(isPlatformAdmin ? [
+            {
+                path: '/platform/payments',
+                icon: Shield,
+                label: isArabic ? 'اعتمادات المنصة' : 'Platform Approvals'
+            }
+        ] : [])
     ];
 
     // 2. Navigation Categories / Groups
@@ -222,7 +231,7 @@ export default function Layout({ children }) {
                 { path: '/reports', icon: FileText, label: t('nav.reports', 'Reports') }
             ]
         },
-        ...( ['ADMIN', 'SUPER_ADMIN'].includes(user?.role) ? [
+        ...( (['ADMIN', 'SUPER_ADMIN'].includes(user?.role) || isPlatformAdmin) ? [
             {
                 id: 'cockpit',
                 title: t('nav.groupCockpit', 'Management'),
@@ -232,7 +241,7 @@ export default function Layout({ children }) {
                     { path: '/settings', icon: Settings, label: i18n.language === 'ar' ? 'إعدادات الشركة' : 'Company Settings' },
                     { path: '/settings/approval-thresholds', icon: ShieldCheck, label: t('nav.approvalThresholds', 'Approval Thresholds') },
                     { path: '/billing', icon: CreditCard, label: t('nav.billing', 'Billing & Plans') },
-                    ...( user?.role === 'SUPER_ADMIN' ? [
+                    ...( isPlatformAdmin ? [
                         { path: '/audit-log', icon: Activity, label: t('nav.auditLog', 'Activity Log') },
                         { path: '/platform/payments', icon: Shield, label: i18n.language === 'ar' ? 'اعتمادات المنصة' : 'Platform Approvals' }
                     ] : [])
