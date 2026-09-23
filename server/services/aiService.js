@@ -692,20 +692,17 @@ export const processReceiptImage = async (imageBuffer, mimeType, context = {}) =
  * @returns {Promise<{raw_text: string, parsed_data: object}>}
  */
 export const processVoiceNote = async (filePath, clientTranscript = '', context = {}) => {
-    let transcriptText = (typeof clientTranscript === 'string' && clientTranscript !== 'undefined' && clientTranscript !== 'null') 
-        ? clientTranscript.trim() 
-        : '';
+    let transcriptText = '';
 
-    // Step 1: If client didn't supply live transcript (or it's too short to be meaningful), transcribe via Whisper
-    if ((!transcriptText || transcriptText.length < 4) && process.env.OPENAI_API_KEY) {
+    // Step 1: Authoritative Server-side Whisper-1 transcription directly from raw audio file
+    if (process.env.OPENAI_API_KEY && filePath && fs.existsSync(filePath)) {
         try {
             const client = getOpenAI();
-            if (client && fs.existsSync(filePath)) {
+            if (client) {
                 logger.info({ filePath }, 'Initiating Whisper-1 voice transcription on server');
                 const transcription = await client.audio.transcriptions.create({
                     file: fs.createReadStream(filePath),
                     model: "whisper-1",
-                    language: "ar",
                     prompt: "تسجيل صوتي لمهندس موقع مقاولات وإنشاءات مصرية: جنيه، ألف، دفعة، مصنعية، خرسانة، محارة، سباكة، كهرباء، دهانات، تشوين، نجار، حداد، نقاش، مبلط، أسمنت، رمل، طوب، سيراميك، عهدة، كاش، تحويل، فودافون كاش، انستاباي"
                 });
                 if (transcription?.text && transcription.text.trim()) {
@@ -714,8 +711,13 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
                 }
             }
         } catch (error) {
-            logger.warn({ err: error }, 'Whisper voice transcription failed');
+            logger.warn({ err: error }, 'Whisper voice transcription failed, attempting client fallback');
         }
+    }
+
+    // Step 1b: Fallback to client transcript only if Whisper failed or was unavailable
+    if (!transcriptText && typeof clientTranscript === 'string' && clientTranscript !== 'undefined' && clientTranscript !== 'null' && clientTranscript.trim()) {
+        transcriptText = clientTranscript.trim();
     }
 
     // Step 2: Primary Option: Call MicroMind Agent (GPT 5.6 Luna Pro) with dynamic context!

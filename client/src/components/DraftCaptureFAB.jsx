@@ -131,7 +131,7 @@ export default function DraftCaptureFAB() {
         startProgressSimulation('voice');
 
         try {
-            const r = await aiExtractAPI.voice(blob, transcript);
+            const r = await aiExtractAPI.voice(blob);
             stopProgressSimulation();
 
             // Finish to 100%

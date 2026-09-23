@@ -170,32 +170,6 @@ export default function VoiceRecorderModal({
             };
 
             recorder.start(100);
-
-            // Optional Browser Speech Recognition (best-effort assistance; server Whisper handles the audio authoritatively)
-            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRec) {
-                try {
-                    const rec = new SpeechRec();
-                    rec.continuous = true;
-                    rec.interimResults = true;
-                    rec.lang = (i18n.language === 'ar' || isRTL) ? 'ar-EG' : 'en-US';
-                    rec.onresult = (e) => {
-                        let text = '';
-                        for (let i = 0; i < e.results.length; i++) {
-                            text += e.results[i][0].transcript + ' ';
-                        }
-                        transcriptRef.current = text.trim();
-                    };
-                    rec.onerror = (recErr) => {
-                        console.warn('Browser SpeechRecognition error (server Whisper fallback active):', recErr?.error || recErr);
-                    };
-                    rec.start();
-                    recognitionRef.current = rec;
-                } catch (recErr) {
-                    console.warn('Speech recognition fallback to server Whisper:', recErr);
-                }
-            }
-
             setPhase('recording');
             setSeconds(0);
 
@@ -228,7 +202,7 @@ export default function VoiceRecorderModal({
         if (!blob) return;
         setPhase('uploading');
         try {
-            await onCaptured?.(blob, transcriptRef.current);
+            await onCaptured?.(blob);
         } catch (err) {
             console.error('Upload failed:', err);
             setErrorMsg(err?.response?.data?.message || err?.message || (isRTL ? 'فشل معالجة التسجيل الصوتي' : 'Voice processing failed'));

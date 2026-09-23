@@ -167,7 +167,7 @@ export const safesAPI = {
 
 // Phase 7 — AI extraction (voice / receipt → persisted draft) + draft CRUD
 export const aiExtractAPI = {
-    voice: (audioBlob, transcript = '') => {
+    voice: (audioBlob) => {
         const fd = new FormData();
         const type = audioBlob.type || '';
         const ext = type.includes('mp4') ? 'mp4' 
@@ -177,9 +177,7 @@ export const aiExtractAPI = {
             : type.includes('wav') ? 'wav' 
             : 'webm';
         fd.append('audio', audioBlob, `voice.${ext}`);
-        if (transcript && typeof transcript === 'string' && transcript.trim()) {
-            fd.append('transcript', transcript.trim());
-        }
+        // Audio is transcribed authoritatively by server Whisper-1 (avoiding browser language mismatch)
         return api.post('/ai/extract/voice', fd, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });

@@ -94,24 +94,27 @@ function parseDsrHeuristics(transcript, projects = []) {
  * Process a site engineer's voice note to generate a structured Daily Site Report (DSR).
  */
 export async function processDsrVoiceNote(filePath, clientTranscript = '', projects = []) {
-    let transcriptText = clientTranscript?.trim() || '';
+    let transcriptText = '';
 
-    // 1. Transcribe audio via OpenAI Whisper if client didn't supply transcript
-    if (!transcriptText && process.env.OPENAI_API_KEY && filePath && fs.existsSync(filePath)) {
+    // 1. Authoritative transcription via OpenAI Whisper from raw audio file
+    if (process.env.OPENAI_API_KEY && filePath && fs.existsSync(filePath)) {
         try {
             const client = getOpenAI();
             if (client) {
                 const transcription = await client.audio.transcriptions.create({
                     file: fs.createReadStream(filePath),
                     model: 'whisper-1',
-                    language: 'ar',
-                    prompt: 'Daily site report, DSR, engineering, construction, project, weather, hours, progress, issues, visitors'
+                    prompt: 'Daily site report, DSR, engineering, construction, project, weather, hours, progress, issues, visitors, تقرير موقع يومي, خرسانة, حدادة, نجارة'
                 });
-                transcriptText = transcription?.text || '';
+                transcriptText = transcription?.text?.trim() || '';
             }
         } catch (err) {
             logger.warn({ err }, 'Whisper DSR transcription error, using fallback');
         }
+    }
+
+    if (!transcriptText && typeof clientTranscript === 'string' && clientTranscript.trim()) {
+        transcriptText = clientTranscript.trim();
     }
 
     if (!transcriptText) {

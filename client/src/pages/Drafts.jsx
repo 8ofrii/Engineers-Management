@@ -82,7 +82,7 @@ export default function Drafts() {
         setVoiceOpen(false);
         try {
             setUploading(true);
-            const r = await aiExtractAPI.voice(blob, transcript);
+            const r = await aiExtractAPI.voice(blob);
             // Open review locally (no full-page navigation)
             setReviewId(r.data.draft.id);
             load();
