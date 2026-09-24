@@ -46,13 +46,6 @@ export default function DraftCaptureFAB() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open]);
 
-    // Clean up timer on unmount
-    useEffect(() => {
-        return () => {
-            if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-        };
-    }, []);
-
     // Hide on the review screen — its own action buttons would clash with the FAB.
     if (HIDE_ON_PATHS.some(p => location.pathname.startsWith(p) && location.pathname !== '/drafts')) {
         return null;
