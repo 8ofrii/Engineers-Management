@@ -49,8 +49,31 @@ export const ARABIC_CATEGORIES = [
     { key: 'CONTRACTING_LANDSCAPE', ar: 'مقاولة Landscape', en: 'Landscape Subcontracting', group: 'CONTRACTING' },
 
     // General & Office Expenses (مصروفات المقر ومصروفات عامة)
-    { key: 'OFFICE_EXPENSES', ar: 'مصروفات مقر ومكتب', en: 'Office & HQ Expenses', group: 'OFFICE' },
-    { key: 'OTHER', ar: 'أخرى / عام', en: 'Other / General', group: 'OFFICE' }
+    { key: 'OFFICE_RENT', ar: 'إيجار المقر / المكتب', en: 'Office Rent', group: 'OFFICE' },
+    { key: 'OFFICE_ELECTRICITY', ar: 'فاتورة الكهرباء', en: 'Electricity Bill', group: 'OFFICE' },
+    { key: 'OFFICE_WATER', ar: 'فاتورة المياه', en: 'Water Bill', group: 'OFFICE' },
+    { key: 'OFFICE_INTERNET', ar: 'الإنترنت والاتصالات', en: 'Internet & Wi-Fi', group: 'OFFICE' },
+    { key: 'OFFICE_PHONE', ar: 'فواتير الهواتف المحمولة', en: 'Mobile & Telephone Bills', group: 'OFFICE' },
+    { key: 'OFFICE_BUFFET', ar: 'بوفيه وضيافة ومشروبات', en: 'Buffet & Hospitality', group: 'OFFICE' },
+    { key: 'OFFICE_STATIONERY', ar: 'أدوات مكتبية ومستلزمات ورقية', en: 'Office Stationery & Supplies', group: 'OFFICE' },
+    { key: 'OFFICE_PRINTING', ar: 'طباعة ورسومات ومخططات', en: 'Printing & Plotting', group: 'OFFICE' },
+    { key: 'OFFICE_CLEANING', ar: 'نظافة ومطهرات ومستلزمات', en: 'Cleaning & Janitorial', group: 'OFFICE' },
+    { key: 'OFFICE_MAINTENANCE', ar: 'صيانة المقر والتكييفات والأجهزة', en: 'Office & AC Maintenance', group: 'OFFICE' },
+    { key: 'OFFICE_SOFTWARE', ar: 'اشتراكات البرامج والسحابة', en: 'Software & Subscriptions', group: 'OFFICE' },
+    { key: 'OFFICE_MARKETING', ar: 'تسويق وإعلانات ودعاية', en: 'Marketing & Advertising', group: 'OFFICE' },
+    { key: 'OFFICE_LEGAL_ACCOUNTING', ar: 'استشارات قانونية ومحاسبية ومراجعة', en: 'Legal & Accounting Fees', group: 'OFFICE' },
+    { key: 'OFFICE_GOVERNMENT_FEES', ar: 'رسوم حكومية ورخص وضرائب وتأمينات', en: 'Government, Taxes & Licenses', group: 'OFFICE' },
+    { key: 'OFFICE_TRANSPORT', ar: 'انتقالات ومواصلات وبنزين للإدارة', en: 'HQ Transportation & Fuel', group: 'OFFICE' },
+    { key: 'OFFICE_POSTAL', ar: 'شحن سريع وطرد وبريد', en: 'Courier & Postal Services', group: 'OFFICE' },
+    { key: 'OFFICE_FURNITURE', ar: 'أثاث وتجهيزات مكتبية', en: 'Furniture & Fixtures', group: 'OFFICE' },
+    { key: 'OFFICE_IT_HARDWARE', ar: 'أجهزة كمبيوتر ومعدات IT وشاشات', en: 'IT Hardware & Computers', group: 'OFFICE' },
+    { key: 'OFFICE_STAFF_WELFARE', ar: 'إكراميات ورعاية وضيافة موظفين', en: 'Staff Welfare & Medical', group: 'OFFICE' },
+    { key: 'OFFICE_BONUSES', ar: 'مكافآت وحوافز إدارية', en: 'Administrative Bonuses', group: 'OFFICE' },
+    { key: 'OFFICE_BANK_FEES', ar: 'مصاريف بنكية وعمولات', en: 'Bank Fees & Service Charges', group: 'OFFICE' },
+    { key: 'OFFICE_HOSPITALITY', ar: 'استضافة واجتماعات عملاء ومناسبات', en: 'Client Meetings & Hospitality', group: 'OFFICE' },
+    { key: 'OFFICE_SERVICES', ar: 'خدمات متفرقة وصيانة طارئة', en: 'One-time & Miscellaneous Services', group: 'OFFICE' },
+    { key: 'OFFICE_EXPENSES', ar: 'مصروفات إدارية عامة', en: 'General Office Expenses', group: 'OFFICE' },
+    { key: 'OTHER', ar: 'أخرى / متنوع', en: 'Other / General', group: 'OFFICE' }
 ];
 
 /**

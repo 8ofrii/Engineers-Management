@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText, FileSpreadsheet, ExternalLink, File, Store } from 'lucide-react';
+import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText, FileSpreadsheet, ExternalLink, File, Store, Building2, Briefcase } from 'lucide-react';
 import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI, documentsAPI, safesAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { useFormat } from '../utils/format';
@@ -11,6 +11,34 @@ import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft'
 import DraftBanner from './DraftBanner';
 
 const TRANSACTION_DRAFT_KEY = 'hesaby_draft_transaction';
+
+const DEFAULT_OFFICE_CATEGORIES = [
+    { key: 'OFFICE_RENT', ar: 'إيجار المقر / المكتب', en: 'Office Rent' },
+    { key: 'OFFICE_ELECTRICITY', ar: 'فاتورة الكهرباء', en: 'Electricity Bill' },
+    { key: 'OFFICE_WATER', ar: 'فاتورة المياه', en: 'Water Bill' },
+    { key: 'OFFICE_INTERNET', ar: 'الإنترنت والاتصالات', en: 'Internet & Wi-Fi' },
+    { key: 'OFFICE_PHONE', ar: 'فواتير الهواتف المحمولة', en: 'Mobile & Telephone Bills' },
+    { key: 'OFFICE_BUFFET', ar: 'بوفيه وضيافة ومشروبات', en: 'Buffet & Hospitality' },
+    { key: 'OFFICE_STATIONERY', ar: 'أدوات مكتبية ومستلزمات ورقية', en: 'Office Stationery & Supplies' },
+    { key: 'OFFICE_PRINTING', ar: 'طباعة ورسومات ومخططات', en: 'Printing & Plotting' },
+    { key: 'OFFICE_CLEANING', ar: 'نظافة ومطهرات ومستلزمات', en: 'Cleaning & Janitorial' },
+    { key: 'OFFICE_MAINTENANCE', ar: 'صيانة المقر والتكييفات والأجهزة', en: 'Office & AC Maintenance' },
+    { key: 'OFFICE_SOFTWARE', ar: 'اشتراكات البرامج والسحابة', en: 'Software & Subscriptions' },
+    { key: 'OFFICE_MARKETING', ar: 'تسويق وإعلانات ودعاية', en: 'Marketing & Advertising' },
+    { key: 'OFFICE_LEGAL_ACCOUNTING', ar: 'استشارات قانونية ومحاسبية ومراجعة', en: 'Legal & Accounting Fees' },
+    { key: 'OFFICE_GOVERNMENT_FEES', ar: 'رسوم حكومية ورخص وضرائب وتأمينات', en: 'Government, Taxes & Licenses' },
+    { key: 'OFFICE_TRANSPORT', ar: 'انتقالات ومواصلات وبنزين للإدارة', en: 'HQ Transportation & Fuel' },
+    { key: 'OFFICE_POSTAL', ar: 'شحن سريع وطرد وبريد', en: 'Courier & Postal Services' },
+    { key: 'OFFICE_FURNITURE', ar: 'أثاث وتجهيزات مكتبية', en: 'Furniture & Fixtures' },
+    { key: 'OFFICE_IT_HARDWARE', ar: 'أجهزة كمبيوتر ومعدات IT وشاشات', en: 'IT Hardware & Computers' },
+    { key: 'OFFICE_STAFF_WELFARE', ar: 'إكراميات ورعاية وضيافة موظفين', en: 'Staff Welfare & Medical' },
+    { key: 'OFFICE_BONUSES', ar: 'مكافآت وحوافز إدارية', en: 'Administrative Bonuses' },
+    { key: 'OFFICE_BANK_FEES', ar: 'مصاريف بنكية وعمولات', en: 'Bank Fees & Service Charges' },
+    { key: 'OFFICE_HOSPITALITY', ar: 'استضافة واجتماعات عملاء ومناسبات', en: 'Client Meetings & Hospitality' },
+    { key: 'OFFICE_SERVICES', ar: 'خدمات متفرقة وصيانة طارئة', en: 'One-time & Miscellaneous Services' },
+    { key: 'OFFICE_EXPENSES', ar: 'مصروفات إدارية عامة', en: 'General Office Expenses' },
+    { key: 'OTHER', ar: 'أخرى / متنوع', en: 'Other / General' }
+];
 
 export default function AddTransactionModal({ isOpen, onClose, onSubmit, initialData = null, user }) {
     const { t, i18n } = useTranslation();
@@ -280,16 +308,45 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     const [isRecording, setIsRecording] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Dynamic categories ordering: Prioritize Office & Services when isOfficeExpense is active
+    // Strict category filtering: Office expenses show ONLY Office categories; Project expenses show ONLY Site/Project categories
     const displayCategories = useMemo(() => {
-        if (!categories || categories.length === 0) return [];
         if (formData.isOfficeExpense) {
-            const rank = { 'OFFICE': 1, 'SERVICES': 2, 'EQUIPMENT': 3, 'MATERIALS': 4, 'LABOR': 5, 'CONTRACTING': 6 };
-            return [...categories].sort((a, b) => (rank[a.group] || 99) - (rank[b.group] || 99));
+            const officeGroup = (categories || []).find(g => g.group === 'OFFICE');
+            if (officeGroup && officeGroup.items?.length > 0) {
+                return [officeGroup];
+            }
+            return [{
+                group: 'OFFICE',
+                groupNameAr: '🏢 مصروفات المقر والمكتب والإدارة',
+                groupNameEn: 'Office & Admin Expenses',
+                items: DEFAULT_OFFICE_CATEGORIES
+            }];
         }
-        const normalRank = { 'MATERIALS': 1, 'LABOR': 2, 'CONTRACTING': 3, 'SERVICES': 4, 'OFFICE': 5 };
-        return [...categories].sort((a, b) => (normalRank[a.group] || 99) - (normalRank[b.group] || 99));
+        if (!categories || categories.length === 0) return [];
+        return categories.filter(g => g.group !== 'OFFICE');
     }, [categories, formData.isOfficeExpense]);
+
+    const handleExpenseTypeChange = (isOffice) => {
+        setFormData(prev => ({
+            ...prev,
+            isOfficeExpense: isOffice,
+            category: isOffice
+                ? (prev.category && (prev.category.startsWith('OFFICE_') || prev.category === 'OTHER') ? prev.category : '')
+                : (prev.category && !prev.category.startsWith('OFFICE_') && prev.category !== 'OTHER' ? prev.category : ''),
+            costCenter: isOffice
+                ? (prev.costCenter || (isRTL ? 'المقر الرئيسي' : 'Headquarters'))
+                : (prev.costCenter === 'Headquarters' || prev.costCenter === 'المقر الرئيسي' ? '' : prev.costCenter),
+            unit: isOffice ? 'PIECE' : (prev.unit === 'PIECE' ? 'TON' : prev.unit),
+            workmanId: isOffice ? '' : prev.workmanId
+        }));
+        if (isOffice) {
+            setSelectedProjectId('');
+            setSelectedProject(null);
+            setCostItemMode('NEW');
+            setIsStockPurchase(false);
+            if (errors.projectId) setErrors(prev => ({ ...prev, projectId: '' }));
+        }
+    };
 
     // Contextual cost center suggestions for office vs site
     const officeCostCenterSuggestions = useMemo(() => {
@@ -1449,6 +1506,63 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     </button>
                 </div>
 
+                {/* Sub-Tabs under Expense Mode */}
+                {mode === 'EXPENSE' && (
+                    <div style={{
+                        display: 'flex',
+                        background: 'var(--bg-tertiary, rgba(0,0,0,0.03))',
+                        borderBottom: '2px solid var(--border-color)',
+                        marginBottom: 'var(--spacing-md)'
+                    }}>
+                        <button
+                            type="button"
+                            onClick={() => handleExpenseTypeChange(false)}
+                            style={{
+                                flex: 1,
+                                padding: '12px 16px',
+                                background: !formData.isOfficeExpense ? 'var(--bg-primary, #ffffff)' : 'transparent',
+                                border: 'none',
+                                borderBottom: !formData.isOfficeExpense ? '3px solid var(--color-primary)' : '3px solid transparent',
+                                color: !formData.isOfficeExpense ? 'var(--color-primary)' : 'var(--text-secondary)',
+                                fontWeight: '700',
+                                fontSize: '0.92rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <Building2 size={16} />
+                            <span>{isRTL ? 'مصاريف المشاريع والمواقع' : 'Project / Site Expense'}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleExpenseTypeChange(true)}
+                            style={{
+                                flex: 1,
+                                padding: '12px 16px',
+                                background: formData.isOfficeExpense ? 'var(--bg-primary, #ffffff)' : 'transparent',
+                                border: 'none',
+                                borderBottom: formData.isOfficeExpense ? '3px solid var(--color-primary)' : '3px solid transparent',
+                                color: formData.isOfficeExpense ? 'var(--color-primary)' : 'var(--text-secondary)',
+                                fontWeight: '700',
+                                fontSize: '0.92rem',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <Briefcase size={16} />
+                            <span>{isRTL ? 'مصاريف المقر والمكتب الإداري' : 'Office & Headquarters Expense'}</span>
+                        </button>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="modal-body">
                     {hasRestoredDraft && !initialData && (
                         <DraftBanner onDiscard={handleDiscardDraft} />
@@ -1593,37 +1707,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             </div>
                         )}
 
-                        {/* Office Expense Toggle for Expenses */}
-                        {mode === 'EXPENSE' && (
-                            <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 600, color: formData.isOfficeExpense ? 'var(--color-primary)' : 'var(--text-secondary)' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(formData.isOfficeExpense)}
-                                        onChange={(e) => {
-                                            const checked = e.target.checked;
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                isOfficeExpense: checked,
-                                                category: checked ? (prev.category && prev.category !== 'MATERIALS' ? prev.category : 'OFFICE_EXPENSES') : (prev.category === 'OFFICE_EXPENSES' ? '' : prev.category),
-                                                costCenter: checked ? (prev.costCenter || (isRTL ? 'المقر الرئيسي' : 'Headquarters')) : prev.costCenter,
-                                                unit: checked ? (prev.unit === 'TON' ? 'PIECE' : prev.unit) : prev.unit,
-                                                workmanId: checked ? '' : prev.workmanId
-                                            }));
-                                            if (checked) {
-                                                setSelectedProjectId('');
-                                                setSelectedProject(null);
-                                                setCostItemMode('NEW');
-                                                setIsStockPurchase(false);
-                                                if (errors.projectId) setErrors(prev => ({ ...prev, projectId: '' }));
-                                            }
-                                        }}
-                                        style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
-                                    />
-                                    <span>🏢 {isRTL ? 'مصروف للمقر الرئيسي / المكتب (غير مرتبط بمشروع محدد)' : 'Office / Headquarters Expense (No Project)'}</span>
-                                </label>
-                            </div>
-                        )}
+
 
                         {/* Mandatory Safe Selector for Expense and Income */}
                         {(mode === 'EXPENSE' || mode === 'INCOME') && (
@@ -1915,11 +1999,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                                     <label style={{ marginBottom: 0 }}>
-                                                        {t('finance.category')} <span className="required">*</span>
+                                                        {formData.isOfficeExpense
+                                                            ? (isRTL ? 'بند مصروفات المقر والمكتب' : 'Office Cost Category')
+                                                            : t('finance.category')} <span className="required">*</span>
                                                     </label>
                                                     {formData.isOfficeExpense && (
                                                         <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600 }}>
-                                                            🏢 {isRTL ? 'مصروفات المقر والمكتب معروضة أولاً' : 'HQ & Office categories prioritized'}
+                                                            🏢 {isRTL ? 'تصنيفات خاصة بالمقر والمكتب الإداري' : 'Dedicated HQ & Office Categories'}
                                                         </span>
                                                     )}
                                                 </div>
@@ -1930,7 +2016,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                     className={errors.category ? 'error' : ''}
                                                     style={{ fontSize: '0.95rem', padding: '10px' }}
                                                 >
-                                                    <option value="">-- {t('finance.selectCategory')} --</option>
+                                                    <option value="">
+                                                        -- {formData.isOfficeExpense
+                                                            ? (isRTL ? 'اختر بند مصروف المقر (إيجار، فواتير، صيانة...)' : 'Select Office Category (Rent, Bills, etc.)')
+                                                            : t('finance.selectCategory')} --
+                                                    </option>
                                                     {displayCategories.map(group => (
                                                         <optgroup key={group.group} label={isRTL ? group.groupNameAr : (group.groupNameEn || group.groupNameAr)}>
                                                             {group.items.map(item => (
