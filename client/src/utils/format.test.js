@@ -47,6 +47,17 @@ describe('formatCurrency', () => {
         expect(out).toMatch(/99/);
         expect(out).not.toMatch(/[٠-٩]/);
     });
+
+    it('formats negative amounts in English with minus sign attached to number, not before EGP', () => {
+        const out = formatCurrency(-12000, 'en');
+        expect(out).toMatch(/EGP\s+-12,000/);
+        expect(out).not.toMatch(/^-EGP/);
+    });
+
+    it('formats negative amounts in Arabic with minus sign attached to number', () => {
+        const out = formatCurrency(-12000, 'ar');
+        expect(out).toMatch(/-\u200f?[٠-٩]/);
+    });
 });
 
 describe('formatNumber', () => {
