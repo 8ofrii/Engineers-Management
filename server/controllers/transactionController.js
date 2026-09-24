@@ -553,7 +553,7 @@ export const getTransactionsLedgerPdf = async (req, res, next) => {
                     supplier: true,
                     safe: true,
                     projectCostItem: true,
-                    creator: { select: { id: true, name: true, email: true } },
+                    user: { select: { id: true, name: true, email: true } },
                     payer: { select: { id: true, name: true, email: true } }
                 },
                 orderBy: [
@@ -620,7 +620,7 @@ export const getTransactionsLedgerPdf = async (req, res, next) => {
                     supplier: true,
                     safe: true,
                     projectCostItem: true,
-                    creator: { select: { id: true, name: true, email: true } },
+                    user: { select: { id: true, name: true, email: true } },
                     payer: { select: { id: true, name: true, email: true } }
                 },
                 orderBy: [
