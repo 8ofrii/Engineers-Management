@@ -303,7 +303,7 @@ export default function TransactionDetailModal({
                                 )}
                             </div>
                             <div className="tx-detail-subtitle">
-                                {tx.project?.name || (isArabic ? 'غير مسند لمشروع' : 'Unassigned Project')} · {formatDate(tx.transactionDate || tx.createdAt)}
+                                {tx.project?.name || (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر والشركة' : '🏢 Office & HQ Expenses') : (isArabic ? 'غير مسند لمشروع' : 'Unassigned Project'))} · {formatDate(tx.transactionDate || tx.createdAt)}
                             </div>
                         </div>
                     </div>

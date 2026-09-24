@@ -1662,7 +1662,9 @@ export default function Finance() {
                                             {pendingTransactions.map((tx) => (
                                                 <tr key={tx.id} className="tx-row" style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
                                                     <td style={{ textAlign: 'start', fontWeight: '500', fontSize: '0.82rem' }}>{formatDate(tx.transactionDate)}</td>
-                                                    <td style={{ textAlign: 'start' }}>{tx.project?.name || '-'}</td>
+                                                    <td style={{ textAlign: 'start' }}>
+                                                        {tx.project?.name || (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر' : '🏢 Office & HQ') : '-')}
+                                                    </td>
                                                     <td style={{ textAlign: 'start', fontWeight: '600' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
                                                     <td style={{ textAlign: 'start', maxWidth: '220px' }} className="truncate" title={tx.description}>{tx.description}</td>
                                                     <td style={{ textAlign: 'start', maxWidth: '165px' }}>
@@ -1712,14 +1714,36 @@ export default function Finance() {
                         {(() => {
                             // If filterProjectId is set, we don't need to group (or we group by Category/Band)
                             // If NOT set, group by Project
-                            const groups = transactions.reduce((acc, tx) => {
-                                const key = tx.project?.name || t('common.unassigned') || 'Unassigned';
-                                if (!acc[key]) acc[key] = [];
-                                acc[key].push(tx);
-                                return acc;
-                            }, {});
+                            const groupMap = new Map();
 
-                            return Object.entries(groups).map(([projectName, txs]) => {
+                            transactions.forEach((tx) => {
+                                const isOffice = Boolean(tx.isOfficeExpense || !tx.projectId || !tx.project);
+                                const groupKey = isOffice ? '__OFFICE__' : (tx.project?.id || tx.project?.name || '__UNASSIGNED__');
+
+                                if (!groupMap.has(groupKey)) {
+                                    let displayName;
+                                    if (isOffice) {
+                                        displayName = isArabic ? 'مصروفات المقر والشركة' : 'Office & HQ Expenses';
+                                    } else if (tx.project?.name) {
+                                        displayName = tx.project.name;
+                                    } else {
+                                        displayName = t('common.unassigned') || (isArabic ? 'غير محدد' : 'Unassigned');
+                                    }
+
+                                    groupMap.set(groupKey, {
+                                        groupKey,
+                                        isOffice,
+                                        project: tx.project || null,
+                                        displayName,
+                                        txs: []
+                                    });
+                                }
+
+                                groupMap.get(groupKey).txs.push(tx);
+                            });
+
+                            return Array.from(groupMap.values()).map((group) => {
+                                const { groupKey, isOffice, project, displayName, txs } = group;
                                 const totalAmount = txs.reduce((sum, tx) => {
                                     if (tx.status === 'CANCELLED') return sum; // Refunded transactions do not affect net total
                                     if (filterType === 'MY_LEDGER') {
@@ -1747,29 +1771,38 @@ export default function Finance() {
                                 }, 0);
 
                                 return (
-                                    <div key={projectName} className="project-group" style={{ overflow: 'hidden' }}>
+                                    <div key={groupKey} className="project-group" style={{ overflow: 'hidden' }}>
                                         <div className="project-header">
-                                            <h3 className="project-title">
-                                                {/* #14 — Clickable project name link */}
-                                                {txs[0]?.project?.id ? (
+                                            <h3 className="project-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {isOffice ? (
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                                        <Building2 size={18} style={{ color: 'var(--color-primary)' }} />
+                                                        <span>{displayName}</span>
+                                                    </span>
+                                                ) : project?.id ? (
                                                     <Link
-                                                        to={`/projects/${txs[0].project.id}`}
+                                                        to={`/projects/${project.id}`}
                                                         style={{
-                                                             color: 'var(--color-primary)',
+                                                            color: 'var(--color-primary)',
                                                             textDecoration: 'none',
                                                             borderBottom: '1px dashed var(--color-primary)',
                                                             paddingBottom: 2
                                                         }}
-                                                        title={`Go to project: ${projectName}`}
+                                                        title={`Go to project: ${displayName}`}
                                                     >
-                                                        {projectName}
+                                                        {displayName}
                                                     </Link>
-                                                ) : projectName}</h3>
+                                                ) : (
+                                                    displayName
+                                                )}
+                                            </h3>
                                             <div className="project-summary">
                                                 {filterType === 'MY_LEDGER'
                                                     ? (t('finance.myNetCustody') || 'صافي العهدة')
                                                     : filterType === 'COMPANY_SHARE'
                                                     ? (t('finance.totalCompanyShare') || (isArabic ? 'إجمالي ارباح المكتب' : 'Total Office Profit'))
+                                                    : isOffice
+                                                    ? (isArabic ? 'إجمالي مصروفات المقر' : 'Total Office Expenses')
                                                     : (t('finance.projectNet') || 'صافي المشروع')}:
                                                 <span className={`project-net-val ${totalAmount >= 0 ? 'positive' : 'negative'}`}>
                                                     {fmtCurrency(Math.abs(totalAmount))}
