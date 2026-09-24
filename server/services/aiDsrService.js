@@ -104,7 +104,9 @@ export async function processDsrVoiceNote(filePath, clientTranscript = '', proje
                 const transcription = await client.audio.transcriptions.create({
                     file: fs.createReadStream(filePath),
                     model: 'whisper-1',
-                    prompt: 'Daily site report, DSR, engineering, construction, project, weather, hours, progress, issues, visitors, تقرير موقع يومي, خرسانة, حدادة, نجارة'
+                    language: 'ar',
+                    temperature: 0,
+                    prompt: 'تقرير موقع يومي صوتي بالعامية المصرية لمشروع مقاولات وإنشاءات: أعمال خرسانة، نجارة، حدادة، محارة، طن، متر، يوميات، مهندسين، عمال، استشاري، طقس، مشكلات'
                 });
                 transcriptText = transcription?.text?.trim() || '';
             }

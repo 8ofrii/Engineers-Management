@@ -206,6 +206,7 @@ You natively understand Egyptian Arabic, all regional accents (Cairo, Delta, Upp
   "category": "Exact enum key from Allowed Cost Categories list",
   "paymentMethod": "CASH | CUSTODY_WALLET | BANK_TRANSFER | CHECK | CREDIT_CARD | OTHER",
   "is_stock_purchase": Boolean (True for physical building materials. False for labor/services/wages),
+  "cleanedTranscript": "String (Accurate verbatim Egyptian Arabic transcript of what was spoken, fixing phonetic speech-to-text slips or misheard words e.g. correcting 'تم' to 'طن' before materials and numbers like 'طن أسمنت', and restoring proper names of suppliers like 'عبده رزق' and projects to their true spelling as registered in company master data, keeping the user's natural spoken words and numbers intact)",
   "items": [
     { "name": "String", "materialId": "String or null", "quantity": Number, "unit": "String", "unitPrice": Number or null, "total": Number or null }
   ]
@@ -471,6 +472,9 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
         category,
         paymentMethod,
         is_stock_purchase: !!data.is_stock_purchase,
+        cleanedTranscript: (typeof (data.cleanedTranscript || data.cleaned_transcript || data.verbatimTranscript) === 'string' && (data.cleanedTranscript || data.cleaned_transcript || data.verbatimTranscript).trim())
+            ? (data.cleanedTranscript || data.cleaned_transcript || data.verbatimTranscript).trim()
+            : null,
         items,
         summary,
         confidence: data.confidence || 'high'
@@ -685,6 +689,52 @@ export const processReceiptImage = async (imageBuffer, mimeType, context = {}) =
 };
 
 /**
+ * Build dynamic Whisper prompt biased towards Egyptian construction vocabulary,
+ * units of measure (طن، متر، شيكارة، نقلة), and the tenant's actual registered suppliers and projects.
+ */
+export function buildWhisperPrompt(context = {}) {
+    const baseTerms = "تسجيل صوتي لملاحظات ومصروفات موقع بالعامية المصرية: طن، متر، شيكارة، نقلة، لوح، لتر، يومية، جنيه، ألف، دفعة، مصنعية، توريد، تشوين، نولون، أسمنت، حديد، رمل، سن، طوب، سيراميك، سباكة، كهرباء، دهانات، خرسانة، محارة، عهدة، كاش، تحويل، فودافون كاش، انستاباي";
+    
+    const entities = [];
+    if (Array.isArray(context.suppliers)) {
+        for (const s of context.suppliers) {
+            if (s.name && typeof s.name === 'string') {
+                const clean = s.name.trim();
+                if (clean && clean.length <= 25 && !entities.includes(clean)) {
+                    entities.push(clean);
+                }
+            }
+            if (entities.length >= 12) break;
+        }
+    }
+    if (Array.isArray(context.projects)) {
+        for (const p of context.projects) {
+            if (p.name && typeof p.name === 'string') {
+                const clean = p.name.trim();
+                if (clean && clean.length <= 25 && !entities.includes(clean)) {
+                    entities.push(clean);
+                }
+            }
+            if (entities.length >= 20) break;
+        }
+    }
+    if (Array.isArray(context.materials)) {
+        for (const m of context.materials) {
+            const clean = (m.nameAr || m.name || '').trim();
+            if (clean && clean.length <= 20 && !entities.includes(clean)) {
+                entities.push(clean);
+            }
+            if (entities.length >= 26) break;
+        }
+    }
+
+    if (entities.length > 0) {
+        return `${baseTerms} | موردين ومشاريع: ${entities.join('، ')}`;
+    }
+    return baseTerms;
+}
+
+/**
  * Process a voice note file to transcribe and extract structured financial data.
  * @param {string} filePath - Absolute path to the audio file.
  * @param {string} clientTranscript - Spoken text from client
@@ -699,11 +749,14 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
         try {
             const client = getOpenAI();
             if (client) {
-                logger.info({ filePath }, 'Initiating Whisper-1 voice transcription on server');
+                const whisperPrompt = buildWhisperPrompt(context);
+                logger.info({ filePath, promptLength: whisperPrompt.length }, 'Initiating Whisper-1 voice transcription on server');
                 const transcription = await client.audio.transcriptions.create({
                     file: fs.createReadStream(filePath),
                     model: "whisper-1",
-                    prompt: "تسجيل صوتي لمهندس موقع مقاولات وإنشاءات مصرية: جنيه، ألف، دفعة، مصنعية، خرسانة، محارة، سباكة، كهرباء، دهانات، تشوين، نجار، حداد، نقاش، مبلط، أسمنت، رمل، طوب، سيراميك، عهدة، كاش، تحويل، فودافون كاش، انستاباي"
+                    language: "ar",
+                    temperature: 0,
+                    prompt: whisperPrompt
                 });
                 if (transcription?.text && transcription.text.trim()) {
                     transcriptText = transcription.text.trim();
@@ -725,8 +778,9 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
         try {
             const parsed = await callMicroMindExtraction(transcriptText, context);
             if (parsed) {
+                const finalTranscript = parsed.cleanedTranscript || transcriptText;
                 return {
-                    raw_text: transcriptText,
+                    raw_text: finalTranscript,
                     parsed_data: parsed
                 };
             }
@@ -748,7 +802,7 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
                         { role: 'system', content: `${SYSTEM_PROMPT}\n${dynamicContextText}` },
                         {
                             role: 'user',
-                            content: `Extract structured construction transaction details from this site voice note:\n\n"${transcriptText}"`
+                            content: `Extract structured construction transaction details and restore the verbatim spoken transcript from this site voice note:\n\n"${transcriptText}"`
                         }
                     ],
                     response_format: { type: 'json_object' },
@@ -758,8 +812,9 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
                 const parsed = JSON.parse(completion.choices[0].message.content);
                 const normalized = normalizeExtractedData(parsed, transcriptText, context);
                 if (normalized) {
+                    const finalTranscript = normalized.cleanedTranscript || transcriptText;
                     return {
-                        raw_text: transcriptText,
+                        raw_text: finalTranscript,
                         parsed_data: normalized
                     };
                 }
