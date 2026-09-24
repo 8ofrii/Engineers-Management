@@ -90,6 +90,10 @@ router.post('/', transactionCreateController.createTransaction);
 // Get all transactions (role-based filtering)
 router.get('/', transactionController.getTransactions);
 
+// Executive Accounting Ledger PDF Report (Print & Export)
+router.get('/ledger-pdf', transactionController.getTransactionsLedgerPdf);
+router.post('/ledger-pdf', transactionController.getTransactionsLedgerPdf);
+
 // Get single transaction
 router.get('/:id/voucher-pdf', transactionController.getTransactionVoucherPdf);
 router.get('/:id', transactionController.getTransaction);

@@ -3,6 +3,7 @@ import * as transactionV2 from './transactionControllerV2.js';
 import { auditFromReq } from '../lib/audit.js';
 import { deleteByUrl } from '../lib/storage.js';
 import { generateVoucherPdf } from '../lib/voucherPdf.js';
+import { generateTransactionsLedgerPdf } from '../lib/transactionsLedgerPdf.js';
 
 // @desc    Get unique cost centers
 // @route   GET /api/transactions/cost-centers
@@ -502,6 +503,187 @@ export const getTransactionVoucherPdf = async (req, res, next) => {
         next(error);
     }
 };
+
+/**
+ * @desc    Generate and stream an Executive Accounting Transactions Ledger PDF
+ * @route   GET/POST /api/transactions/ledger-pdf
+ * @access  Private (Authenticated tenant users)
+ */
+export const getTransactionsLedgerPdf = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId;
+        const bodyOrQuery = req.method === 'POST' ? req.body : req.query;
+        const {
+            transactionIds,
+            filterProjectId,
+            filterType,
+            filterWorkmanId,
+            dateFrom,
+            dateTo,
+            lang
+        } = bodyOrQuery;
+
+        const isArabic = lang ? lang.startsWith('ar') : true;
+
+        // Fetch Tenant and User details
+        const tenant = tenantId ? await prisma.tenant.findUnique({ where: { id: tenantId } }) : null;
+
+        // Resolve branding name
+        let companyName = tenant?.name;
+        if (!companyName || companyName === 'Demo Construction Co.') {
+            if (req.user?.company && req.user.company !== 'Demo Construction Co.') {
+                companyName = req.user.company;
+            }
+        }
+        companyName = companyName || req.user?.company || 'Hesaby ERP';
+
+        let transactions = [];
+
+        // If client provided explicit transaction IDs (representing exact on-screen table)
+        if (Array.isArray(transactionIds) && transactionIds.length > 0) {
+            transactions = await prisma.transaction.findMany({
+                where: {
+                    id: { in: transactionIds },
+                    tenantId
+                },
+                include: {
+                    project: true,
+                    client: true,
+                    workman: true,
+                    supplier: true,
+                    safe: true,
+                    projectCostItem: true,
+                    creator: { select: { id: true, name: true, email: true } },
+                    payer: { select: { id: true, name: true, email: true } }
+                },
+                orderBy: [
+                    { transactionDate: 'desc' },
+                    { createdAt: 'desc' }
+                ]
+            });
+        } else {
+            // Build query based on filters
+            const where = { tenantId };
+
+            if (filterType && filterType !== 'ALL') {
+                if (filterType === 'COMPANY_SHARE') {
+                    where.OR = [
+                        { category: 'MANAGEMENT_FEE_TRANSFER' },
+                        { description: { contains: 'management fee', mode: 'insensitive' } },
+                        { description: { contains: 'أتعاب' } }
+                    ];
+                } else if (filterType === 'EXPENSE') {
+                    where.type = 'EXPENSE';
+                    where.category = { not: 'MANAGEMENT_FEE_TRANSFER' };
+                } else if (filterType === 'INCOME') {
+                    where.type = 'INCOME';
+                } else if (filterType === 'MY_LEDGER') {
+                    where.OR = [
+                        { createdBy: req.user.id },
+                        { payerUserId: req.user.id },
+                        { toEngineerId: req.user.id }
+                    ];
+                }
+            }
+
+            if (filterProjectId && filterProjectId !== 'ALL') {
+                if (filterProjectId === 'OFFICE') {
+                    where.OR = [
+                        { isOfficeExpense: true },
+                        { projectId: null }
+                    ];
+                } else {
+                    where.projectId = filterProjectId;
+                }
+            }
+
+            if (filterWorkmanId && filterWorkmanId !== 'ALL') {
+                where.workmanId = filterWorkmanId;
+            }
+
+            if (dateFrom || dateTo) {
+                where.transactionDate = {};
+                if (dateFrom) where.transactionDate.gte = new Date(dateFrom);
+                if (dateTo) {
+                    const toDate = new Date(dateTo);
+                    toDate.setHours(23, 59, 59, 999);
+                    where.transactionDate.lte = toDate;
+                }
+            }
+
+            transactions = await prisma.transaction.findMany({
+                where,
+                include: {
+                    project: true,
+                    client: true,
+                    workman: true,
+                    supplier: true,
+                    safe: true,
+                    projectCostItem: true,
+                    creator: { select: { id: true, name: true, email: true } },
+                    payer: { select: { id: true, name: true, email: true } }
+                },
+                orderBy: [
+                    { transactionDate: 'desc' },
+                    { createdAt: 'desc' }
+                ]
+            });
+        }
+
+        // Resolve Project Name for Scope
+        let scopeProjectName = isArabic ? 'كافة المشاريع' : 'All Projects';
+        if (filterProjectId === 'OFFICE') {
+            scopeProjectName = isArabic ? 'مصروفات المقر الرئيسي' : 'Headquarters / Office';
+        } else if (filterProjectId && filterProjectId !== 'ALL') {
+            const proj = await prisma.project.findUnique({ where: { id: filterProjectId }, select: { name: true } });
+            if (proj?.name) scopeProjectName = proj.name;
+        }
+
+        let dateRangeLabel = '';
+        if (dateFrom && dateTo) {
+            dateRangeLabel = `${dateFrom} ${isArabic ? 'إلى' : 'to'} ${dateTo}`;
+        } else if (dateFrom) {
+            dateRangeLabel = `${isArabic ? 'من' : 'From'} ${dateFrom}`;
+        } else if (dateTo) {
+            dateRangeLabel = `${isArabic ? 'حتى' : 'Until'} ${dateTo}`;
+        }
+
+        let typeLabel = '';
+        if (filterType && filterType !== 'ALL') {
+            if (filterType === 'INCOME') typeLabel = isArabic ? 'إيرادات' : 'Income';
+            else if (filterType === 'EXPENSE') typeLabel = isArabic ? 'مصروفات' : 'Expenses';
+            else if (filterType === 'COMPANY_SHARE') typeLabel = isArabic ? 'أرباح الشركة' : 'Office Profit';
+            else if (filterType === 'MY_LEDGER') typeLabel = isArabic ? 'عهدي ومعاملاتي' : 'My Ledger';
+        }
+
+        const buffer = await generateTransactionsLedgerPdf({
+            transactions,
+            tenant: {
+                ...tenant,
+                name: companyName,
+                logo: tenant?.logo || req.user?.companyLogo || null,
+                email: tenant?.email || req.user?.email || '',
+                phone: tenant?.phone || req.user?.phone || '',
+                address: tenant?.address || ''
+            },
+            user: req.user,
+            scope: {
+                projectName: scopeProjectName,
+                filterType: typeLabel,
+                dateRangeLabel
+            },
+            isArabic
+        });
+
+        const dateSlug = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="hesaby-transactions-${dateSlug}.pdf"`);
+        res.send(buffer);
+    } catch (error) {
+        next(error);
+    }
+};
+
 
 // Helper: Find linked MANAGEMENT_FEE_TRANSFER for an expense
 export const findLinkedManagementFee = async (tx, parentTransaction, project = null) => {

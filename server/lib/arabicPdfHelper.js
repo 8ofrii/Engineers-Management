@@ -155,8 +155,8 @@ export function drawPdfText(doc, text, x, y, options = {}) {
     }
     const str = String(text);
     const hasArabic = isArabic(str);
-    const width = options.width;
-    const formatted = hasArabic ? formatPdfText(str, doc, width) : str;
+    const wrapWidth = options.lineBreak === false ? null : options.width;
+    const formatted = hasArabic ? formatPdfText(str, doc, wrapWidth) : str;
     const opts = {
         ...options,
         ...(hasArabic ? { features: [] } : {})

@@ -15,67 +15,67 @@ import XLSX from 'xlsx-js-style';
 
 const FONT_NAME = 'Segoe UI, Calibri, Arial, Tahoma';
 
-// Border presets
+// Border presets - Hesaby Warm Sandstone Palette
 const borderThin = {
-    top: { style: 'thin', color: { rgb: 'E2E8F0' } },
-    bottom: { style: 'thin', color: { rgb: 'E2E8F0' } },
-    left: { style: 'thin', color: { rgb: 'E2E8F0' } },
-    right: { style: 'thin', color: { rgb: 'E2E8F0' } }
+    top: { style: 'thin', color: { rgb: 'D8CBAF' } },
+    bottom: { style: 'thin', color: { rgb: 'D8CBAF' } },
+    left: { style: 'thin', color: { rgb: 'D8CBAF' } },
+    right: { style: 'thin', color: { rgb: 'D8CBAF' } }
 };
 
 const borderHeader = {
-    top: { style: 'medium', color: { rgb: '0F172A' } },
-    bottom: { style: 'medium', color: { rgb: '0F172A' } },
-    left: { style: 'thin', color: { rgb: '334155' } },
-    right: { style: 'thin', color: { rgb: '334155' } }
+    top: { style: 'medium', color: { rgb: '9A3412' } },
+    bottom: { style: 'medium', color: { rgb: '9A3412' } },
+    left: { style: 'thin', color: { rgb: '473B2B' } },
+    right: { style: 'thin', color: { rgb: '473B2B' } }
 };
 
 const borderTotal = {
-    top: { style: 'thin', color: { rgb: '64748B' } },
-    bottom: { style: 'double', color: { rgb: '0F172A' } },
-    left: { style: 'thin', color: { rgb: 'CBD5E1' } },
-    right: { style: 'thin', color: { rgb: 'CBD5E1' } }
+    top: { style: 'thin', color: { rgb: 'D8CBAF' } },
+    bottom: { style: 'double', color: { rgb: '9A3412' } },
+    left: { style: 'thin', color: { rgb: 'D8CBAF' } },
+    right: { style: 'thin', color: { rgb: 'D8CBAF' } }
 };
 
-// Core Style Presets
+// Core Style Presets - Warm Cafe & Ember Brand Palette
 const STYLES = {
     titleBanner: {
         font: { name: FONT_NAME, sz: 14, bold: true, color: { rgb: 'FFFFFF' } },
-        fill: { fgColor: { rgb: '0F172A' } }, // Slate 900
+        fill: { fgColor: { rgb: '9A3412' } }, // Deep Terracotta / Ember
         alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
         border: {
-            bottom: { style: 'medium', color: { rgb: '38BDF8' } } // Sky blue accent
+            bottom: { style: 'medium', color: { rgb: 'D97706' } } // Warm Gold accent
         }
     },
     subtitle: {
-        font: { name: FONT_NAME, sz: 9.5, italic: true, color: { rgb: '475569' } },
-        fill: { fgColor: { rgb: 'F1F5F9' } }, // Slate 100
+        font: { name: FONT_NAME, sz: 9.5, italic: true, color: { rgb: '6B5F4D' } }, // Warm Coffee
+        fill: { fgColor: { rgb: 'FAF6EF' } }, // Warm Ivory
         alignment: { horizontal: 'center', vertical: 'center' },
         border: {
-            bottom: { style: 'thin', color: { rgb: 'CBD5E1' } }
+            bottom: { style: 'thin', color: { rgb: 'D8CBAF' } }
         }
     },
     tableHeader: {
         font: { name: FONT_NAME, sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
-        fill: { fgColor: { rgb: '1E293B' } }, // Corporate Navy / Slate 800
+        fill: { fgColor: { rgb: '1C1710' } }, // Deep Espresso
         alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
         border: borderHeader
     },
     rowEven: {
-        font: { name: FONT_NAME, sz: 10, color: { rgb: '1E293B' } },
+        font: { name: FONT_NAME, sz: 10, color: { rgb: '1C1710' } },
         fill: { fgColor: { rgb: 'FFFFFF' } },
         alignment: { vertical: 'center' },
         border: borderThin
     },
     rowOdd: {
-        font: { name: FONT_NAME, sz: 10, color: { rgb: '1E293B' } },
-        fill: { fgColor: { rgb: 'F8FAFC' } }, // Slate 50
+        font: { name: FONT_NAME, sz: 10, color: { rgb: '1C1710' } },
+        fill: { fgColor: { rgb: 'FAF6EF' } }, // Warm Ivory (Zebra)
         alignment: { vertical: 'center' },
         border: borderThin
     },
     totalRow: {
-        font: { name: FONT_NAME, sz: 11, bold: true, color: { rgb: '0F172A' } },
-        fill: { fgColor: { rgb: 'E2E8F0' } }, // Slate 200
+        font: { name: FONT_NAME, sz: 11, bold: true, color: { rgb: '1C1710' } },
+        fill: { fgColor: { rgb: 'F5EEDF' } }, // Warm Amber Sand
         alignment: { vertical: 'center' },
         border: borderTotal
     },
@@ -88,7 +88,7 @@ const STYLES = {
     },
     badgeDanger: {
         font: { name: FONT_NAME, sz: 10, bold: true, color: { rgb: '991B1B' } },
-        fill: { fgColor: { rgb: 'FEE2E2' } }, // Light Rose / Red
+        fill: { fgColor: { rgb: 'FEE2E2' } }, // Light Rose / Crimson
         alignment: { horizontal: 'center', vertical: 'center' },
         border: borderThin
     },
@@ -99,8 +99,8 @@ const STYLES = {
         border: borderThin
     },
     badgeInfo: {
-        font: { name: FONT_NAME, sz: 10, bold: true, color: { rgb: '3730A3' } },
-        fill: { fgColor: { rgb: 'E0E7FF' } }, // Light Indigo
+        font: { name: FONT_NAME, sz: 10, bold: true, color: { rgb: '854D0E' } },
+        fill: { fgColor: { rgb: 'FEF9C3' } }, // Warm Gold / Profit
         alignment: { horizontal: 'center', vertical: 'center' },
         border: borderThin
     }
@@ -211,8 +211,8 @@ export function exportToXLSX({ filename, sheets = [], isRTL = true }) {
                 subtitleRowIndex = 1;
             }
             // Locate the first row with full column count as the table header
-            for (let r = 1; r < Math.min(data.length, 6); r++) {
-                if (Array.isArray(data[r]) && data[r].filter(c => c !== null && c !== undefined && c !== '').length >= Math.max(2, maxCols - 1)) {
+            for (let r = 1; r < Math.min(data.length, 20); r++) {
+                if (Array.isArray(data[r]) && data[r].filter(c => c !== null && c !== undefined && c !== '').length >= Math.max(2, maxCols - 2)) {
                     headerRowIndex = r;
                     break;
                 }
@@ -223,8 +223,15 @@ export function exportToXLSX({ filename, sheets = [], isRTL = true }) {
         if (bannerRowIndex >= 0 && maxCols > 1) {
             merges.push({ s: { r: bannerRowIndex, c: 0 }, e: { r: bannerRowIndex, c: maxCols - 1 } });
         }
-        if (subtitleRowIndex >= 0 && maxCols > 1 && data[subtitleRowIndex].length === 1) {
-            merges.push({ s: { r: subtitleRowIndex, c: 0 }, e: { r: subtitleRowIndex, c: maxCols - 1 } });
+        
+        // Merge any full-width metadata / subtitle rows before headerRowIndex
+        for (let r = 1; r < headerRowIndex; r++) {
+            const row = data[r];
+            if (Array.isArray(row) && row.length > 0 && row.slice(1).every(c => c === null || c === undefined || c === '')) {
+                if (maxCols > 1 && String(row[0] || '').trim().length > 0) {
+                    merges.push({ s: { r, c: 0 }, e: { r, c: maxCols - 1 } });
+                }
+            }
         }
         if (merges.length > 0) {
             ws['!merges'] = merges;
@@ -235,8 +242,8 @@ export function exportToXLSX({ filename, sheets = [], isRTL = true }) {
         data.forEach((row, rIdx) => {
             if (rIdx === bannerRowIndex) {
                 rowsConfig.push({ hpt: 34 });
-            } else if (rIdx === subtitleRowIndex) {
-                rowsConfig.push({ hpt: 22 });
+            } else if (rIdx < headerRowIndex && (row.length === 1 || row.slice(1).every(c => !c))) {
+                rowsConfig.push({ hpt: 22 }); // Subtitle / Metadata ribbon
             } else if (rIdx === headerRowIndex) {
                 rowsConfig.push({ hpt: 28 });
             } else if (isTotalRow(row)) {
@@ -257,7 +264,7 @@ export function exportToXLSX({ filename, sheets = [], isRTL = true }) {
             if (!Array.isArray(row)) return;
 
             const isBanner = rIdx === bannerRowIndex;
-            const isSub = rIdx === subtitleRowIndex;
+            const isSub = rIdx < headerRowIndex && (row.length === 1 || row.slice(1).every(c => !c)) && String(row[0] || '').trim().length > 0;
             const isHeader = rIdx === headerRowIndex;
             const isTotal = isTotalRow(row);
             const isZebraOdd = rIdx % 2 === 1;

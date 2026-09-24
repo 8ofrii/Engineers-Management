@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight, Eye, Mic, Image as ImageIcon, Sparkles, Building2 } from 'lucide-react';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight, Eye, Mic, Image as ImageIcon, Sparkles, Building2, Printer } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
@@ -12,6 +12,7 @@ import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionActionsMenu from '../components/TransactionActionsMenu';
 import { useFormat } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
+import { apiErrorMessage } from '../utils/apiError';
 
 export default function Finance() {
     const { t, i18n } = useTranslation();
@@ -42,6 +43,10 @@ export default function Finance() {
 
     // Detail & Media Evidence state
     const [selectedDetailTx, setSelectedDetailTx] = useState(null);
+
+    // Export PDF & Print states
+    const [exportingPdf, setExportingPdf] = useState(false);
+    const [printingPdf, setPrintingPdf] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     const handleOpenDetail = (tx) => {
@@ -268,11 +273,56 @@ export default function Finance() {
             return;
         }
 
+        const companyName = user?.company || user?.tenant?.name || 'Hesaby ERP';
+        const titleBanner = `${companyName} — ${isArabic ? 'سجل المعاملات والقيود المالية المعتمد' : 'Official Financial Transactions Register'}`;
+        
+        const compMeta = [
+            user?.email,
+            user?.phone,
+            isArabic ? 'نظام حسابي لإدارة المقاولات والمشاريع' : 'Hesaby ERP Construction Management'
+        ].filter(Boolean).join(' • ');
+
+        const projectName = filterProjectId === 'OFFICE'
+            ? (isArabic ? 'المقر الرئيسي (مصروفات عامة)' : 'HQ / Office Expenses')
+            : (filterProjectId
+                ? (projects.find(p => p.id === filterProjectId)?.name || filterProjectName || filterProjectId)
+                : (isArabic ? 'كافة المشاريع' : 'All Projects'));
+
+        const dateRange = (dateFrom && dateTo)
+            ? `${dateFrom} ${isArabic ? 'إلى' : 'to'} ${dateTo}`
+            : (dateFrom ? `${isArabic ? 'من' : 'From'} ${dateFrom}` : (dateTo ? `${isArabic ? 'حتى' : 'Until'} ${dateTo}` : (isArabic ? 'كل الفترات' : 'All Time')));
+
+        const scopeLine = `${isArabic ? 'نطاق التقرير:' : 'Scope:'} ${projectName} | ${isArabic ? 'الفترة:' : 'Period:'} ${dateRange} | ${isArabic ? 'تاريخ التصدير:' : 'Exported:'} ${new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')} | ${isArabic ? 'المسؤول:' : 'By:'} ${user?.name || ''}`;
+
+        // Compute KPIs for sheet summary
+        const approvedIncomes = transactions
+            .filter(t => (t.type === 'INCOME' || t.type === 'income') && (t.status === 'APPROVED' || !t.status))
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const approvedExpenses = transactions
+            .filter(t => (t.type === 'EXPENSE' || t.type === 'expense') && (t.status === 'APPROVED' || !t.status) && t.category !== 'MANAGEMENT_FEE_TRANSFER')
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const totalProfit = transactions
+            .filter(t => t.category === 'MANAGEMENT_FEE_TRANSFER' && (t.status === 'APPROVED' || !t.status))
+            .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+        const netCash = approvedIncomes - approvedExpenses - totalProfit;
+
         const rows = [
-            [isArabic ? 'حسابي ERP — سجل المعاملات والقيود المالية' : 'Hesaby ERP — Financial Transactions Register'],
-            [`${isArabic ? 'تاريخ التصدير:' : 'Exported:'} ${new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')} | ${isArabic ? 'إجمالي السجلات:' : 'Total Records:'} ${transactions.length}`],
+            [titleBanner],
+            [compMeta],
+            [scopeLine],
+            [],
+            [isArabic ? 'الملخص المالي والسيولة النقدية' : 'Executive Financial Summary', ''],
+            [isArabic ? 'إجمالي المقبوضات المحصلة' : 'Total Collected Income', Number(approvedIncomes.toFixed(2))],
+            [isArabic ? 'إجمالي مصروفات المواقع والمقر' : 'Total Expenses', Number(approvedExpenses.toFixed(2))],
+            [isArabic ? 'أرباح الشركة المحققة' : 'Recognized Office Profit', Number(totalProfit.toFixed(2))],
+            [isArabic ? 'صافي السيولة النقدية التشغيلية' : 'Net Operational Cash', Number(netCash.toFixed(2))],
+            [isArabic ? 'إجمالي عدد القيود المسجلة' : 'Total Registered Transactions', transactions.length],
             [],
             [
+                isArabic ? 'م' : '#',
                 isArabic ? 'التاريخ' : 'Date',
                 isArabic ? 'نوع المعاملة' : 'Type',
                 isArabic ? 'المشروع' : 'Project',
@@ -292,7 +342,7 @@ export default function Finance() {
         ];
 
         let totalAmountSum = 0;
-        transactions.forEach(tx => {
+        transactions.forEach((tx, idx) => {
             const txType = tx.category === 'MANAGEMENT_FEE_TRANSFER'
                 ? (isArabic ? 'ارباح المكتب' : 'Office Profit')
                 : (tx.type === 'INCOME' ? (isArabic ? 'إيراد' : 'Income') : (isArabic ? 'مصروف' : 'Expense'));
@@ -323,9 +373,10 @@ export default function Finance() {
             totalAmountSum += numAmount;
 
             rows.push([
+                idx + 1,
                 formatDate(tx.transactionDate || tx.createdAt),
                 txType,
-                tx.project?.name || (isArabic ? 'عام / غير محدد' : 'General'),
+                tx.project?.name || (isArabic ? 'عام / المقر' : 'General / HQ'),
                 catLabel,
                 tx.description || '',
                 tx.projectCostItem?.name || '',
@@ -370,6 +421,83 @@ export default function Finance() {
             ],
             isRTL: isArabic
         });
+    };
+
+    const handleExportTransactionsPDF = async (mode = 'download') => {
+        if (!transactions || transactions.length === 0) {
+            showAlert({
+                type: 'info',
+                title: isArabic ? 'لا توجد بيانات' : 'No Data',
+                message: isArabic ? 'لا توجد معاملات متاحة للتصدير أو الطباعة' : 'No transactions available to export or print'
+            });
+            return;
+        }
+
+        if (mode === 'print') setPrintingPdf(true);
+        else setExportingPdf(true);
+
+        try {
+            const payload = {
+                transactionIds: transactions.map(t => t.id),
+                filterProjectId,
+                filterType,
+                filterWorkmanId,
+                dateFrom,
+                dateTo,
+                lang: i18n.language
+            };
+
+            const blob = await transactionsAPI.downloadLedgerPdf(payload);
+            const url = window.URL.createObjectURL(blob);
+            const dateSlug = new Date().toISOString().slice(0, 10);
+
+            if (mode === 'print') {
+                const iframe = document.createElement('iframe');
+                iframe.style.position = 'fixed';
+                iframe.style.right = '0';
+                iframe.style.bottom = '0';
+                iframe.style.width = '0';
+                iframe.style.height = '0';
+                iframe.style.border = '0';
+                iframe.src = url;
+                document.body.appendChild(iframe);
+
+                iframe.onload = () => {
+                    setTimeout(() => {
+                        try {
+                            iframe.contentWindow?.focus();
+                            iframe.contentWindow?.print();
+                        } catch {
+                            window.open(url, '_blank');
+                        }
+                        setTimeout(() => {
+                            try {
+                                document.body.removeChild(iframe);
+                                window.URL.revokeObjectURL(url);
+                            } catch {}
+                        }, 60000);
+                    }, 350);
+                };
+            } else {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hesaby-transactions-ledger-${dateSlug}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+            }
+        } catch (error) {
+            console.error('Failed to export transactions PDF:', error);
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: apiErrorMessage(error, isArabic ? 'فشل في استخراج ملف PDF' : 'Failed to export PDF')
+            });
+        } finally {
+            setExportingPdf(false);
+            setPrintingPdf(false);
+        }
     };
 
     const renderPaymentMethod = (method, txOrUrl = null) => {
@@ -705,6 +833,34 @@ export default function Finance() {
                         >
                             <Download size={18} />
                             {isArabic ? 'تصدير إكسيل (XLSX)' : 'Export Excel (XLSX)'}
+                        </button>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => handleExportTransactionsPDF('download')}
+                            disabled={transactions.length === 0 || exportingPdf}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                            title={isArabic ? 'تصدير سجل المعاملات كملف PDF معتمد' : 'Export official transactions ledger as PDF'}
+                        >
+                            {exportingPdf ? (
+                                <span className="spinner" style={{ width: 16, height: 16, margin: 0, borderWidth: 2 }} />
+                            ) : (
+                                <FileText size={18} />
+                            )}
+                            {isArabic ? (exportingPdf ? 'جاري التصدير...' : 'تصدير PDF') : (exportingPdf ? 'Exporting...' : 'Export PDF')}
+                        </button>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => handleExportTransactionsPDF('print')}
+                            disabled={transactions.length === 0 || printingPdf}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                            title={isArabic ? 'طباعة مباشرة A4 لسجل المعاملات' : 'Print A4 Transactions Ledger'}
+                        >
+                            {printingPdf ? (
+                                <span className="spinner" style={{ width: 16, height: 16, margin: 0, borderWidth: 2 }} />
+                            ) : (
+                                <Printer size={18} />
+                            )}
+                            {isArabic ? (printingPdf ? 'جاري الفتح...' : 'طباعة') : (printingPdf ? 'Opening...' : 'Print')}
                         </button>
                         <button className="btn btn-primary" onClick={openCreateModal}>
                             <Plus size={20} />

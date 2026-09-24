@@ -293,7 +293,11 @@ export const transactionsAPI = {
         const r = await api.get(`/transactions/${id}/voucher-pdf`, { responseType: 'blob' });
         return r.data; // Blob
     },
-    getVoucherPdfUrl: (id) => `${API_URL}/transactions/${id}/voucher-pdf`
+    getVoucherPdfUrl: (id) => `${API_URL}/transactions/${id}/voucher-pdf`,
+    downloadLedgerPdf: async (payload = {}) => {
+        const r = await api.post('/transactions/ledger-pdf', payload, { responseType: 'blob' });
+        return r.data; // Blob
+    }
 };
 
 // Clients API
