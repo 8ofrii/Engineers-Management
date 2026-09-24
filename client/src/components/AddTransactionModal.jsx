@@ -235,6 +235,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         description: '',
         transactionDate: getLocalDateTime(), // Format: YYYY-MM-DDTHH:mm (Local)
         category: '',
+        customCategoryText: '',
 
         // Stock/Expense
         materialId: '',
@@ -283,6 +284,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 description: '',
                 transactionDate: getLocalDateTime(),
                 category: '',
+                customCategoryText: '',
                 itemName: '',
                 unit: 'TON',
                 beneficiary: '',
@@ -332,7 +334,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             isOfficeExpense: isOffice,
             category: isOffice
                 ? (prev.category && (prev.category.startsWith('OFFICE_') || prev.category === 'OTHER') ? prev.category : '')
-                : (prev.category && !prev.category.startsWith('OFFICE_') && prev.category !== 'OTHER' ? prev.category : ''),
+                : (prev.category && (!prev.category.startsWith('OFFICE_') || prev.category === 'OTHER') ? prev.category : ''),
             costCenter: isOffice
                 ? (prev.costCenter || (isRTL ? 'المقر الرئيسي' : 'Headquarters'))
                 : (prev.costCenter === 'Headquarters' || prev.costCenter === 'المقر الرئيسي' ? '' : prev.costCenter),
@@ -489,11 +491,25 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 }
 
                 const isOffice = Boolean(initialData.isOfficeExpense);
+                let customCatText = '';
+                if (initialData.category === 'OTHER') {
+                    if (parsedDesc && parsedDesc.startsWith('Other - ')) {
+                        const afterPrefix = parsedDesc.substring(8);
+                        const colonIdx = afterPrefix.indexOf(':');
+                        customCatText = colonIdx !== -1 ? afterPrefix.substring(0, colonIdx).trim() : afterPrefix.trim();
+                    } else if (parsedDesc && parsedDesc.startsWith('أخرى - ')) {
+                        const afterPrefix = parsedDesc.substring(7);
+                        const colonIdx = afterPrefix.indexOf(':');
+                        customCatText = colonIdx !== -1 ? afterPrefix.substring(0, colonIdx).trim() : afterPrefix.trim();
+                    }
+                }
+
                 setFormData({
                     amount: initialData.amount || '',
                     description: parsedDesc,
                     transactionDate: initialData.transactionDate ? getLocalDateTime(new Date(initialData.transactionDate)) : getLocalDateTime(),
                     category: initialData.category || (isOffice ? 'OFFICE_EXPENSES' : ''),
+                    customCategoryText: customCatText,
                     itemName: parsedDesc, // Use description as itemName for stock mode too
                     unit: parsedUnit || (isOffice ? 'PIECE' : 'TON'),
                     clientId: initialData.clientId || initialData.client?.id || '',
@@ -913,6 +929,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             } else {
                 if (!formData.category) newErrors.category = t('common.required');
             }
+            if (formData.category === 'OTHER' && !formData.customCategoryText?.trim()) {
+                newErrors.customCategoryText = isRTL ? 'يرجى كتابة اسم البند المطلوب' : 'Please enter the custom category name';
+            }
         }
         else if (mode === 'INCOME') {
             if (!formData.amount || Number(formData.amount) <= 0) newErrors.amount = t('common.required');
@@ -949,7 +968,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 const isSupplierInv = isMaterial && inventoryDestination === 'SUPPLIER';
                 const chosenMaterial = isMaterial ? rawMaterials.find(m => m.id === formData.materialId) : null;
                 const resolvedCategory = isMaterial ? 'MATERIALS' : (formData.category || (isOffice ? 'OFFICE_EXPENSES' : 'MATERIALS'));
-                const resolvedItemName = isMaterial
+                let resolvedItemName = isMaterial
                     ? (formData.itemName || (chosenMaterial ? (isRTL ? (chosenMaterial.nameAr || chosenMaterial.name) : chosenMaterial.name) : 'خامة مخزنية'))
                     : undefined;
 
@@ -958,6 +977,27 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     : (chosenMaterial?.supplierId || formData.supplierId);
 
                 const resolvedBeneficiary = formData.beneficiary?.trim() || (!isOffice && formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (effectiveSupplierId ? suppliers.find(s => s.id === effectiveSupplierId)?.name : undefined));
+
+                let finalDescription = formData.description?.trim();
+
+                if (resolvedCategory === 'OTHER' && formData.customCategoryText?.trim()) {
+                    const customWritten = formData.customCategoryText.trim();
+                    const otherPrefix = `Other - ${customWritten}`;
+
+                    if (!resolvedItemName && !isOffice && costItemMode === 'NEW') {
+                        resolvedItemName = otherPrefix;
+                    }
+
+                    if (!finalDescription) {
+                        finalDescription = otherPrefix;
+                    } else if (finalDescription === otherPrefix || finalDescription.startsWith(`${otherPrefix}:`) || finalDescription.startsWith('Other - ') || finalDescription.startsWith('أخرى - ')) {
+                        // Already formatted
+                    } else {
+                        finalDescription = `${otherPrefix}: ${finalDescription}`;
+                    }
+                } else if (!finalDescription) {
+                    finalDescription = (isOffice ? (isRTL ? 'مصروف مقر ومكتب' : 'Office Expense') : (resolvedItemName || t(`finance.categories.${resolvedCategory?.toLowerCase()}`) || resolvedCategory || 'Site Expense'));
+                }
 
                 payload = {
                     type: 'EXPENSE',
@@ -975,7 +1015,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     beneficiary: resolvedBeneficiary || undefined,
                     createBatch: isMaterial,
                     materialId: (isMaterial && formData.materialId) ? formData.materialId : undefined,
-                    description: formData.description?.trim() || (isOffice ? (isRTL ? 'مصروف مقر ومكتب' : 'Office Expense') : (resolvedItemName || t(`finance.categories.${resolvedCategory?.toLowerCase()}`) || resolvedCategory || 'Site Expense')),
+                    description: finalDescription,
                     transactionDate: formData.transactionDate,
                     paymentMethod: formData.paymentMethod,
                     itemName: resolvedItemName,
@@ -1455,12 +1495,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 </div>
 
                 {/* Styled Tabs */}
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
+                <div style={{ display: 'flex', borderBottom: '1.5px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>
                     <button
                         className={`tab-btn ${mode === 'EXPENSE' ? 'active' : ''}`}
                         onClick={() => switchMode('EXPENSE')}
                         style={{
                             flex: 1, padding: '16px', background: 'transparent', border: 'none',
+                            borderInlineEnd: '1px solid var(--border-color)',
                             borderBottom: mode === 'EXPENSE' ? '3px solid var(--color-primary)' : '3px solid transparent',
                             color: mode === 'EXPENSE' ? 'var(--color-primary)' : 'var(--text-secondary)',
                             fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
@@ -1473,6 +1514,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         onClick={() => switchMode('INCOME')}
                         style={{
                             flex: 1, padding: '16px', background: 'transparent', border: 'none',
+                            borderInlineEnd: '1px solid var(--border-color)',
                             borderBottom: mode === 'INCOME' ? '3px solid var(--color-primary)' : '3px solid transparent',
                             color: mode === 'INCOME' ? 'var(--color-primary)' : 'var(--text-secondary)',
                             fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
@@ -1485,6 +1527,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         onClick={() => switchMode('USAGE')}
                         style={{
                             flex: 1, padding: '16px', background: 'transparent', border: 'none',
+                            borderInlineEnd: '1px solid var(--border-color)',
                             borderBottom: mode === 'USAGE' ? '3px solid var(--color-primary)' : '3px solid transparent',
                             color: mode === 'USAGE' ? 'var(--color-primary)' : 'var(--text-secondary)',
                             fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
@@ -1510,7 +1553,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 {mode === 'EXPENSE' && (
                     <div style={{
                         display: 'flex',
-                        background: 'var(--bg-tertiary, rgba(0,0,0,0.03))',
+                        background: 'var(--bg-secondary, rgba(0,0,0,0.03))',
+                        borderTop: '1px solid var(--border-color)',
                         borderBottom: '2px solid var(--border-color)',
                         marginBottom: 'var(--spacing-md)'
                     }}>
@@ -1519,11 +1563,12 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             onClick={() => handleExpenseTypeChange(false)}
                             style={{
                                 flex: 1,
-                                padding: '12px 16px',
+                                padding: '13px 16px',
                                 background: !formData.isOfficeExpense ? 'var(--bg-primary, #ffffff)' : 'transparent',
                                 border: 'none',
-                                borderBottom: !formData.isOfficeExpense ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                color: !formData.isOfficeExpense ? 'var(--color-primary)' : 'var(--text-secondary)',
+                                borderInlineEnd: '1px solid var(--border-color)',
+                                borderBottom: !formData.isOfficeExpense ? '3px solid var(--subtab-accent, #2563eb)' : '3px solid transparent',
+                                color: !formData.isOfficeExpense ? 'var(--subtab-accent, #2563eb)' : 'var(--text-secondary)',
                                 fontWeight: '700',
                                 fontSize: '0.92rem',
                                 cursor: 'pointer',
@@ -1534,7 +1579,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 gap: '8px'
                             }}
                         >
-                            <Building2 size={16} />
+                            <Building2 size={17} style={{ color: !formData.isOfficeExpense ? 'var(--subtab-accent, #2563eb)' : 'inherit' }} />
                             <span>{isRTL ? 'مصاريف المشاريع والمواقع' : 'Project / Site Expense'}</span>
                         </button>
                         <button
@@ -1542,11 +1587,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             onClick={() => handleExpenseTypeChange(true)}
                             style={{
                                 flex: 1,
-                                padding: '12px 16px',
+                                padding: '13px 16px',
                                 background: formData.isOfficeExpense ? 'var(--bg-primary, #ffffff)' : 'transparent',
                                 border: 'none',
-                                borderBottom: formData.isOfficeExpense ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                color: formData.isOfficeExpense ? 'var(--color-primary)' : 'var(--text-secondary)',
+                                borderBottom: formData.isOfficeExpense ? '3px solid var(--subtab-accent, #2563eb)' : '3px solid transparent',
+                                color: formData.isOfficeExpense ? 'var(--subtab-accent, #2563eb)' : 'var(--text-secondary)',
                                 fontWeight: '700',
                                 fontSize: '0.92rem',
                                 cursor: 'pointer',
@@ -1557,7 +1602,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 gap: '8px'
                             }}
                         >
-                            <Briefcase size={16} />
+                            <Briefcase size={17} style={{ color: formData.isOfficeExpense ? 'var(--subtab-accent, #2563eb)' : 'inherit' }} />
                             <span>{isRTL ? 'مصاريف المقر والمكتب الإداري' : 'Office & Headquarters Expense'}</span>
                         </button>
                     </div>
@@ -1989,6 +2034,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                                 {isRTL ? item.ar : (item.en || item.ar)}
                                                             </option>
                                                         ))}
+                                                        <option value="OTHER">
+                                                            {isRTL ? 'أخرى' : 'Other'}
+                                                        </option>
                                                     </select>
                                                 </div>
                                             </>
@@ -2004,7 +2052,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                             : t('finance.category')} <span className="required">*</span>
                                                     </label>
                                                     {formData.isOfficeExpense && (
-                                                        <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+                                                        <span style={{ fontSize: '0.75rem', color: 'var(--subtab-accent, #2563eb)', fontWeight: 600 }}>
                                                             🏢 {isRTL ? 'تصنيفات خاصة بالمقر والمكتب الإداري' : 'Dedicated HQ & Office Categories'}
                                                         </span>
                                                     )}
@@ -2023,15 +2071,79 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                     </option>
                                                     {displayCategories.map(group => (
                                                         <optgroup key={group.group} label={isRTL ? group.groupNameAr : (group.groupNameEn || group.groupNameAr)}>
-                                                            {group.items.map(item => (
+                                                            {group.items.filter(item => item.key !== 'OTHER').map(item => (
                                                                 <option key={item.key} value={item.key}>
                                                                     {isRTL ? item.ar : (item.en || item.ar)}
                                                                 </option>
                                                             ))}
                                                         </optgroup>
                                                     ))}
+                                                    <option value="OTHER" style={{ fontWeight: '700' }}>
+                                                        {isRTL ? '➕ أخرى (كتابة بند مخصص)...' : '➕ Other (Custom Category)...'}
+                                                    </option>
                                                 </select>
                                                 {errors.category && <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>{errors.category}</span>}
+
+                                                {/* Custom category input when OTHER is selected */}
+                                                {formData.category === 'OTHER' && (
+                                                    <div style={{
+                                                        marginTop: '10px',
+                                                        padding: '12px 14px',
+                                                        background: 'var(--bg-secondary, rgba(0,0,0,0.02))',
+                                                        borderRadius: '8px',
+                                                        border: '1.5px dashed var(--subtab-accent, #2563eb)'
+                                                    }}>
+                                                        <label style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            fontSize: '0.88rem',
+                                                            fontWeight: '700',
+                                                            marginBottom: '6px',
+                                                            color: 'var(--subtab-accent, #2563eb)'
+                                                        }}>
+                                                            <span>{isRTL ? 'اكتب اسم البند المخصص:' : 'Enter Custom Category Name:'}</span>
+                                                            <span style={{ color: '#ef4444' }}>*</span>
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            name="customCategoryText"
+                                                            value={formData.customCategoryText || ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setFormData(prev => ({ ...prev, customCategoryText: val }));
+                                                                if (errors.customCategoryText) setErrors(prev => ({ ...prev, customCategoryText: '' }));
+                                                            }}
+                                                            placeholder={isRTL
+                                                                ? (formData.isOfficeExpense ? 'اكتب اسم البند المطلوب (مثال: صيانة مصعد، ضيافة، استشارات...)' : 'اكتب اسم البند المطلوب (مثال: ونش هيدروليكي، سقالات خاصة، ...)')
+                                                                : 'Type whatever you want (e.g. Elevator maintenance, Special scaffolding...)'}
+                                                            className={errors.customCategoryText ? 'error' : ''}
+                                                            style={{
+                                                                width: '100%',
+                                                                padding: '10px 12px',
+                                                                borderRadius: '6px',
+                                                                border: errors.customCategoryText ? '1.5px solid var(--color-danger)' : '1px solid var(--border-color)',
+                                                                fontSize: '0.95rem',
+                                                                fontWeight: '600',
+                                                                background: 'var(--bg-primary)'
+                                                            }}
+                                                            autoFocus
+                                                        />
+                                                        {errors.customCategoryText && (
+                                                            <span className="error-message" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                                                                {errors.customCategoryText}
+                                                            </span>
+                                                        )}
+                                                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <span>💾</span>
+                                                            <span>
+                                                                {isRTL
+                                                                    ? `سيتم حفظ المعاملة كالتالي: "Other - ${formData.customCategoryText?.trim() || '...'}"`
+                                                                    : `Will be saved as: "Other - ${formData.customCategoryText?.trim() || '...'}"`}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 

@@ -25,6 +25,8 @@ html {
   /* Slate Grey */
   --color-accent: #38bdf8;
   /* Soft Sky Accent */
+  --subtab-accent: #2563eb;
+  --subtab-accent-bg: rgba(37, 99, 235, 0.08);
   --color-warning: #f59e0b;
   /* Warm Amber */
   --color-danger: #ef4444;

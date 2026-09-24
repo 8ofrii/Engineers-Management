@@ -1154,7 +1154,11 @@ export default function OfficeFinances() {
                                                         }}>
                                                             {isFee && <TrendingUp size={13} />}
                                                             <span>
-                                                                {isFee ? (isArabic ? 'أتعاب إدارة' : 'Management Fee') : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category)}
+                                                                {isFee
+                                                                    ? (isArabic ? 'أتعاب إدارة' : 'Management Fee')
+                                                                    : ((tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
+                                                                        ? tx.description.split(':')[0].trim()
+                                                                        : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category))}
                                                             </span>
                                                         </span>
                                                     </td>

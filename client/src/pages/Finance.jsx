@@ -383,9 +383,11 @@ export default function Finance() {
                         ? (isArabic ? 'شيك' : 'Check')
                         : (tx.paymentMethod === 'CUSTODY_WALLET' ? (isArabic ? 'عهدة مهندس' : 'Custody Wallet') : (tx.paymentMethod || ''))));
 
-            const catLabel = isArabic
-                ? (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '')
-                : (tx.category || '');
+            const catLabel = (tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
+                ? tx.description.split(':')[0].trim()
+                : (isArabic
+                    ? (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '')
+                    : (tx.category || ''));
 
             const beneficiaryVal = tx.type === 'INCOME'
                 ? (tx.client?.name || tx.project?.client?.name || '')
@@ -1693,7 +1695,11 @@ export default function Finance() {
                                                     <td style={{ textAlign: 'start' }}>
                                                         {tx.project?.name || (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر' : '🏢 Office & HQ') : '-')}
                                                     </td>
-                                                    <td style={{ textAlign: 'start', fontWeight: '600' }}>{t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category}</td>
+                                                    <td style={{ textAlign: 'start', fontWeight: '600' }}>
+                                                        {(tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
+                                                            ? tx.description.split(':')[0].trim()
+                                                            : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category)}
+                                                    </td>
                                                     <td style={{ textAlign: 'start', maxWidth: '220px' }} className="truncate" title={tx.description}>{tx.description}</td>
                                                     <td style={{ textAlign: 'start', maxWidth: '165px' }}>
                                                         {renderPayerOrClient(tx)}
@@ -1858,7 +1864,9 @@ export default function Finance() {
                                                         return displayTxs.map((tx) => {
                                                             const isCancelled = tx.status === 'CANCELLED';
                                                             const hasNestedFees = tx.nestedFees && tx.nestedFees.length > 0;
-                                                            const catLabel = t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '';
+                                                            const catLabel = (tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
+                                                                ? tx.description.split(':')[0].trim()
+                                                                : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '');
                                                             const isDescDuplicate = !tx.description || tx.description.trim().toLowerCase() === catLabel.trim().toLowerCase();
 
                                                             return (

@@ -23,6 +23,8 @@
   --color-primary: #ff5a1f;
   --color-primary-dark: #c2410c;
   --color-primary-light: #ff8a50;
+  --subtab-accent: #38bdf8;
+  --subtab-accent-bg: rgba(56, 189, 248, 0.1);
 
   --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 28px -8px rgba(0, 0, 0, 0.6);
@@ -55,6 +57,8 @@ body.light-mode .layout {
   --color-primary: #c2410c;
   --color-primary-dark: #9a3412;
   --color-primary-light: #ea580c;
+  --subtab-accent: #1d4ed8;
+  --subtab-accent-bg: rgba(29, 78, 216, 0.08);
 
   --shadow-sm: 0 2px 8px rgba(60, 45, 20, 0.1);
   --shadow-md: 0 10px 28px -12px rgba(60, 45, 20, 0.25);
