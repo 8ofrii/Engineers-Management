@@ -8,6 +8,7 @@ import { draftsAPI, aiExtractAPI } from '../services/api';
 import { useFormat } from '../utils/format';
 import VoiceRecorderModal from '../components/VoiceRecorderModal';
 import DraftReviewModal from '../components/DraftReviewModal';
+import AIProcessingModal, { useAIProcessing } from '../components/AIProcessingModal';
 
 const sourceIcon = (source) => source === 'VOICE' ? <Volume2 size={20} /> : <ImageIcon size={20} />;
 
@@ -44,7 +45,7 @@ export default function Drafts() {
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('PENDING_REVIEW');
     const [voiceOpen, setVoiceOpen] = useState(false);
-    const [uploading, setUploading] = useState(false);
+    const { processing, startProcessing, finishProcessing, stopProcessing } = useAIProcessing();
     // The review modal opens locally on row click. /drafts/:id deep-links
     // also work — we sync the URL param into the same state.
     const [reviewId, setReviewId] = useState(null);
@@ -78,42 +79,48 @@ export default function Drafts() {
 
     useEffect(() => { load(); }, [statusFilter]);
 
-    const handleVoiceCaptured = async (blob, transcript = '') => {
+    const handleVoiceCaptured = async (blob) => {
         setVoiceOpen(false);
+        startProcessing('voice');
         try {
-            setUploading(true);
             const r = await aiExtractAPI.voice(blob);
-            // Open review locally (no full-page navigation)
-            setReviewId(r.data.draft.id);
-            load();
+            finishProcessing();
+            setTimeout(() => {
+                stopProcessing();
+                setReviewId(r.data.draft.id);
+                load();
+            }, 500);
         } catch (err) {
+            stopProcessing();
             showAlert({
                 type: 'error',
                 title: t('common.error') || 'Error',
-                message: err.response?.data?.message || 'Voice extraction failed'
+                message: err.response?.data?.message || (isRTL ? 'فشل معالجة واستخراج الصوت' : 'Voice extraction failed')
             });
-        } finally {
-            setUploading(false);
         }
     };
 
     const handlePhotoSelected = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        startProcessing('receipt');
         try {
-            setUploading(true);
             const r = await aiExtractAPI.receipt(file);
-            setReviewId(r.data.draft.id);
-            load();
+            finishProcessing();
+            setTimeout(() => {
+                stopProcessing();
+                setReviewId(r.data.draft.id);
+                load();
+            }, 500);
         } catch (err) {
+            stopProcessing();
             showAlert({
                 type: 'error',
                 title: t('common.error') || 'Error',
-                message: err.response?.data?.message || 'Receipt extraction failed'
+                message: err.response?.data?.message || (isRTL ? 'فشل معالجة وقراءة الفاتورة' : 'Receipt extraction failed')
             });
         } finally {
-            setUploading(false);
-            e.target.value = ''; // allow re-pick of same file
+            if (e.target) e.target.value = ''; // allow re-pick of same file
         }
     };
 
@@ -148,12 +155,13 @@ export default function Drafts() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             minHeight: 120,
-                            cursor: uploading ? 'not-allowed' : 'pointer',
+                            cursor: processing.active ? 'not-allowed' : 'pointer',
                             borderRadius: 12,
                             textAlign: 'center',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            opacity: processing.active ? 0.6 : 1
                         }}
-                        disabled={uploading}
+                        disabled={processing.active}
                         onClick={() => setVoiceOpen(true)}
                     >
                         <div style={{
@@ -163,7 +171,7 @@ export default function Drafts() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             color: '#34d399'
                         }}>
-                            {uploading ? <Loader2 size={24} className="spin" /> : <Mic size={24} />}
+                            <Mic size={24} />
                         </div>
                         <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary, #fafafa)' }}>
                             {t('drafts.captureVoice', 'Voice Draft')}
@@ -186,10 +194,10 @@ export default function Drafts() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             minHeight: 120,
-                            cursor: uploading ? 'not-allowed' : 'pointer',
+                            cursor: processing.active ? 'not-allowed' : 'pointer',
                             borderRadius: 12,
                             textAlign: 'center',
-                            opacity: uploading ? 0.6 : 1,
+                            opacity: processing.active ? 0.6 : 1,
                             transition: 'all 0.2s ease'
                         }}
                     >
@@ -200,7 +208,7 @@ export default function Drafts() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             color: '#60a5fa'
                         }}>
-                            {uploading ? <Loader2 size={24} className="spin" /> : <Camera size={24} />}
+                            <Camera size={24} />
                         </div>
                         <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--text-primary, #fafafa)' }}>
                             {t('drafts.captureReceipt', 'Receipt Draft')}
@@ -212,7 +220,7 @@ export default function Drafts() {
                             type="file"
                             accept="image/*,application/pdf"
                             onChange={handlePhotoSelected}
-                            disabled={uploading}
+                            disabled={processing.active}
                             style={{ display: 'none' }}
                         />
                     </label>
@@ -338,6 +346,14 @@ export default function Drafts() {
                     </div>
                 )}
             </div>
+
+            {/* AI Progressive Processing Modal */}
+            <AIProcessingModal
+                active={processing.active}
+                type={processing.type}
+                progress={processing.progress}
+                stepIndex={processing.stepIndex}
+            />
 
             <VoiceRecorderModal
                 open={voiceOpen}

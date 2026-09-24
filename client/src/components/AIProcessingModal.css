@@ -1,0 +1,254 @@
+/* =========================================================
+   AI DRAFT SCANNING & EXTRACTION PROGRESS MODAL
+   ========================================================= */
+
+@keyframes aiProcessingFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes aiProcessingModalZoom {
+    from {
+        opacity: 0;
+        transform: scale(0.88) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes aiGradientSlide {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+@keyframes aiRadarSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes aiLaserScan {
+    0% { top: 15%; opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { top: 85%; opacity: 0.4; }
+}
+
+.ai-processing-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10005;
+    background: rgba(10, 15, 29, 0.78);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: aiProcessingFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ai-processing-modal-card {
+    width: 100%;
+    max-width: 460px;
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 24px;
+    padding: 32px 28px;
+    box-shadow: 0 30px 80px -15px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    text-align: center;
+    color: #ffffff;
+    animation: aiProcessingModalZoom 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+}
+
+/* Top Specular Gradient Rim */
+.ai-processing-modal-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #10b981);
+    background-size: 200% 200%;
+    animation: aiGradientSlide 3s linear infinite;
+}
+
+/* Scanner Central Hub Animation */
+.ai-scanner-hub {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px auto;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.hub-receipt {
+    background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.45);
+}
+
+.hub-voice {
+    background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+    box-shadow: 0 10px 30px rgba(236, 72, 153, 0.45);
+}
+
+/* Radar Pulse Rings */
+.ai-scanner-pulse-ring {
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    border: 2px dashed rgba(255, 255, 255, 0.4);
+    animation: aiRadarSpin 6s linear infinite;
+    pointer-events: none;
+}
+
+/* Scanning Laser Bar */
+.ai-scanner-laser {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 2px;
+    background: #ffffff;
+    box-shadow: 0 0 12px 2px #ffffff, 0 0 20px 4px rgba(255, 255, 255, 0.8);
+    border-radius: 2px;
+    animation: aiLaserScan 1.6s ease-in-out infinite alternate;
+}
+
+/* Modal Titles & Subtitles */
+.ai-processing-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0 0 6px 0;
+}
+
+.ai-processing-subtitle {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    line-height: 1.5;
+    margin: 0 0 24px 0;
+}
+
+/* Progress Track & Fill */
+.ai-progressbar-container {
+    margin-bottom: 24px;
+}
+
+.ai-progressbar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.ai-progressbar-status-text {
+    color: #38bdf8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ai-progressbar-percent {
+    color: #ffffff;
+    font-family: monospace;
+    font-size: 0.95rem;
+    font-weight: 900;
+}
+
+.ai-progressbar-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ai-progressbar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.fill-receipt {
+    background: linear-gradient(90deg, #10b981, #06b6d4, #38bdf8);
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
+}
+
+.fill-voice {
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6);
+    box-shadow: 0 0 14px rgba(236, 72, 153, 0.6);
+}
+
+/* Progress Steps Checklist */
+.ai-processing-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: start;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 14px;
+}
+
+.ai-step-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.84rem;
+    color: #64748b;
+    transition: all 0.25s ease;
+}
+
+.ai-step-row.is-done {
+    color: #34d399;
+    font-weight: 600;
+}
+
+.ai-step-row.is-current {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.ai-step-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ai-step-row.is-done .ai-step-icon {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.ai-step-row.is-current .ai-step-icon {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+}
+
+.ai-step-row.is-pending .ai-step-icon {
+    background: rgba(255, 255, 255, 0.05);
+    color: #475569;
+}

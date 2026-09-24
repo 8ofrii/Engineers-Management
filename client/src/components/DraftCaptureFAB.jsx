@@ -3,12 +3,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
     Sparkles, Bot, Mic, Camera, X, Loader2, 
-    ChevronRight, ChevronLeft, Check, FileText, CheckCircle2
+    ChevronRight, ChevronLeft, Check, FileText
 } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
 import { useCopilot } from '../context/CopilotContext';
 import { aiExtractAPI } from '../services/api';
 import VoiceRecorderModal from './VoiceRecorderModal';
+import AIProcessingModal, { useAIProcessing } from './AIProcessingModal';
 import './DraftCaptureFAB.css';
 
 // Master Unified AI Action Button
@@ -30,15 +31,9 @@ export default function DraftCaptureFAB() {
     const [voiceOpen, setVoiceOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const fileInputRef = useRef(null);
-    const progressTimerRef = useRef(null);
 
-    // Dynamic Progressive AI Scanning Modal State
-    const [processing, setProcessing] = useState({
-        active: false,
-        type: 'receipt', // 'receipt' or 'voice'
-        progress: 0,
-        stepIndex: 0
-    });
+    // Dynamic Progressive AI Scanning Modal State via unified hook
+    const { processing, startProcessing, finishProcessing, stopProcessing } = useAIProcessing();
 
     // Close on Escape key
     useEffect(() => {
@@ -63,51 +58,6 @@ export default function DraftCaptureFAB() {
         return null;
     }
 
-    const startProgressSimulation = (type) => {
-        setProcessing({
-            active: true,
-            type,
-            progress: 8,
-            stepIndex: 0
-        });
-
-        if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-
-        progressTimerRef.current = setInterval(() => {
-            setProcessing(prev => {
-                if (!prev.active) return prev;
-                let nextProg = prev.progress;
-                if (nextProg < 32) {
-                    nextProg += Math.floor(Math.random() * 5) + 4;
-                } else if (nextProg < 68) {
-                    nextProg += Math.floor(Math.random() * 4) + 2;
-                } else if (nextProg < 92) {
-                    nextProg += Math.floor(Math.random() * 2) + 1;
-                }
-
-                if (nextProg > 94) nextProg = 94;
-
-                let nextStep = 0;
-                if (nextProg >= 85) nextStep = 3;
-                else if (nextProg >= 55) nextStep = 2;
-                else if (nextProg >= 25) nextStep = 1;
-
-                return {
-                    ...prev,
-                    progress: nextProg,
-                    stepIndex: nextStep
-                };
-            });
-        }, 180);
-    };
-
-    const stopProgressSimulation = () => {
-        if (progressTimerRef.current) {
-            clearInterval(progressTimerRef.current);
-            progressTimerRef.current = null;
-        }
-    };
-
     const handleOpenAIChat = () => {
         setOpen(false);
         openChat();
@@ -125,26 +75,22 @@ export default function DraftCaptureFAB() {
         }
     };
 
-    const handleVoiceCaptured = async (blob, transcript = '') => {
+    const handleVoiceCaptured = async (blob) => {
         setVoiceOpen(false);
         setBusy(true);
-        startProgressSimulation('voice');
+        startProcessing('voice');
 
         try {
             const r = await aiExtractAPI.voice(blob);
-            stopProgressSimulation();
+            finishProcessing();
 
-            // Finish to 100%
-            setProcessing(prev => ({ ...prev, progress: 100, stepIndex: 3 }));
-            
             setTimeout(() => {
-                setProcessing({ active: false, type: 'voice', progress: 0, stepIndex: 0 });
+                stopProcessing();
                 setBusy(false);
                 navigate(`/drafts/${r.data.draft.id}`);
             }, 500);
         } catch (err) {
-            stopProgressSimulation();
-            setProcessing({ active: false, type: 'voice', progress: 0, stepIndex: 0 });
+            stopProcessing();
             setBusy(false);
             showAlert({
                 type: 'error',
@@ -158,23 +104,19 @@ export default function DraftCaptureFAB() {
         const file = e.target.files?.[0];
         if (!file) return;
         setBusy(true);
-        startProgressSimulation('receipt');
+        startProcessing('receipt');
 
         try {
             const r = await aiExtractAPI.receipt(file);
-            stopProgressSimulation();
-
-            // Finish to 100%
-            setProcessing(prev => ({ ...prev, progress: 100, stepIndex: 3 }));
+            finishProcessing();
 
             setTimeout(() => {
-                setProcessing({ active: false, type: 'receipt', progress: 0, stepIndex: 0 });
+                stopProcessing();
                 setBusy(false);
                 navigate(`/drafts/${r.data.draft.id}`);
             }, 500);
         } catch (err) {
-            stopProgressSimulation();
-            setProcessing({ active: false, type: 'receipt', progress: 0, stepIndex: 0 });
+            stopProcessing();
             setBusy(false);
             showAlert({
                 type: 'error',
@@ -185,23 +127,6 @@ export default function DraftCaptureFAB() {
             if (e.target) e.target.value = '';
         }
     };
-
-    // Checklist step definitions for Receipt and Voice
-    const receiptSteps = [
-        isRTL ? 'رفع المستند وتجهيز الصورة للفحص' : 'Uploading document & preprocessing image',
-        isRTL ? 'قراءة ومسح النصوص والأرقام ضوئياً (OCR)' : 'Running Optical Character Recognition (OCR)',
-        isRTL ? 'تحليل المبالغ الضريبية والمورد والبنود' : 'Structuring totals, VAT & vendor items',
-        isRTL ? 'توليد مسودة المصروف الجاهزة للمراجعة' : 'Generating reviewable expense draft'
-    ];
-
-    const voiceSteps = [
-        isRTL ? 'رفع المقطع الصوتي ومعالجة النبرة' : 'Uploading voice clip & analyzing audio',
-        isRTL ? 'تحويل الصوت إلى نص وفهم اللهجة والمصطلحات' : 'Transcribing speech & Egyptian/Arabic dialect',
-        isRTL ? 'استخراج مبالغ المعاملات وتصنيف المشروع' : 'Extracting transaction categories & amounts',
-        isRTL ? 'تجهيز مسودة المعاملة للتحقق والاعتماد' : 'Preparing draft for verification'
-    ];
-
-    const currentSteps = processing.type === 'voice' ? voiceSteps : receiptSteps;
 
     return (
         <>
@@ -366,83 +291,12 @@ export default function DraftCaptureFAB() {
             />
 
             {/* AI Scanning & Extraction Progress Modal */}
-            {processing.active && (
-                <div className="ai-processing-modal-overlay">
-                    <div className="ai-processing-modal-card" dir={isRTL ? 'rtl' : 'ltr'}>
-                        {/* Central Scanner Radar Hub */}
-                        <div className={`ai-scanner-hub ${processing.type === 'voice' ? 'hub-voice' : 'hub-receipt'}`}>
-                            <div className="ai-scanner-pulse-ring" />
-                            {processing.type === 'voice' ? <Mic size={36} color="#ffffff" /> : <Camera size={36} color="#ffffff" />}
-                            <div className="ai-scanner-laser" />
-                        </div>
-
-                        {/* Title & Subtitle */}
-                        <h3 className="ai-processing-title">
-                            {processing.type === 'voice'
-                                ? (isRTL ? 'جاري تحليل التسجيل الصوتي بالذكاء الاصطناعي...' : 'Analyzing Voice Recording...')
-                                : (isRTL ? 'جاري مسح واستخراج بيانات الفاتورة...' : 'Scanning & Extracting Receipt OCR...')
-                            }
-                        </h3>
-                        <p className="ai-processing-subtitle">
-                            {isRTL
-                                ? 'يقوم المحرك الذكي بهيكلة البيانات وتصنيف المبالغ بدقة عالية'
-                                : 'AI engine is structuring lines, tax totals, and vendor details'
-                            }
-                        </p>
-
-                        {/* Animated Progress Bar */}
-                        <div className="ai-progressbar-container">
-                            <div className="ai-progressbar-header">
-                                <div className="ai-progressbar-status-text">
-                                    <Loader2 size={15} className="spin" />
-                                    <span>
-                                        {processing.progress === 100 
-                                            ? (isRTL ? 'اكتملت المعالجة بنجاح!' : 'Processing Complete!') 
-                                            : currentSteps[processing.stepIndex]
-                                        }
-                                    </span>
-                                </div>
-                                <span className="ai-progressbar-percent">
-                                    {processing.progress}%
-                                </span>
-                            </div>
-                            <div className="ai-progressbar-track">
-                                <div 
-                                    className={`ai-progressbar-fill ${processing.type === 'voice' ? 'fill-voice' : 'fill-receipt'}`}
-                                    style={{ width: `${processing.progress}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Progressive Checklist */}
-                        <div className="ai-processing-steps">
-                            {currentSteps.map((stepText, idx) => {
-                                const isDone = processing.stepIndex > idx || processing.progress === 100;
-                                const isCurrent = processing.stepIndex === idx && processing.progress < 100;
-                                const isPending = processing.stepIndex < idx;
-
-                                return (
-                                    <div 
-                                        key={idx} 
-                                        className={`ai-step-row ${isDone ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''} ${isPending ? 'is-pending' : ''}`}
-                                    >
-                                        <div className="ai-step-icon">
-                                            {isDone ? (
-                                                <CheckCircle2 size={15} />
-                                            ) : isCurrent ? (
-                                                <Loader2 size={14} className="spin" />
-                                            ) : (
-                                                <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
-                                            )}
-                                        </div>
-                                        <span>{stepText}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AIProcessingModal
+                active={processing.active}
+                type={processing.type}
+                progress={processing.progress}
+                stepIndex={processing.stepIndex}
+            />
         </>
     );
 }
