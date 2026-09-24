@@ -309,37 +309,59 @@ export default function Finance() {
 
         const netCash = approvedIncomes - approvedExpenses - totalProfit;
 
-        const rows = [
-            [titleBanner],
-            [compMeta],
-            [scopeLine],
-            [],
-            [isArabic ? 'الملخص المالي والسيولة النقدية' : 'Executive Financial Summary', ''],
-            [isArabic ? 'إجمالي المقبوضات المحصلة' : 'Total Collected Income', Number(approvedIncomes.toFixed(2))],
-            [isArabic ? 'إجمالي مصروفات المواقع والمقر' : 'Total Expenses', Number(approvedExpenses.toFixed(2))],
-            [isArabic ? 'أرباح الشركة المحققة' : 'Recognized Office Profit', Number(totalProfit.toFixed(2))],
-            [isArabic ? 'صافي السيولة النقدية التشغيلية' : 'Net Operational Cash', Number(netCash.toFixed(2))],
-            [isArabic ? 'إجمالي عدد القيود المسجلة' : 'Total Registered Transactions', transactions.length],
-            [],
-            [
-                isArabic ? 'م' : '#',
-                isArabic ? 'التاريخ' : 'Date',
-                isArabic ? 'نوع المعاملة' : 'Type',
-                isArabic ? 'المشروع' : 'Project',
-                isArabic ? 'التصنيف' : 'Category',
-                isArabic ? 'البيان / الوصف' : 'Description',
-                isArabic ? 'البند المرتبط' : 'Cost Item / Band',
-                isArabic ? 'الجهة الدافعة / العميل' : 'Payer / Client',
-                isArabic ? 'المستفيد' : 'Beneficiary',
-                isArabic ? 'المستلم / باليد' : 'Recipient / Handed to',
-                isArabic ? 'طريقة الدفع' : 'Payment Method',
-                isArabic ? 'المبلغ (جنيه)' : 'Amount (EGP)',
-                isArabic ? 'الحالة' : 'Status',
-                isArabic ? 'الخزينة / الحساب' : 'Physical Account / Safe',
-                isArabic ? 'مركز التكلفة' : 'Cost Center',
-                isArabic ? 'المسجل بواسطة' : 'Created By'
-            ]
+        const makeRow = () => new Array(16).fill('');
+
+        const r0 = makeRow(); r0[0] = titleBanner;
+        const r1 = makeRow(); r1[0] = compMeta;
+        const r2 = makeRow(); r2[0] = scopeLine;
+        const r3 = makeRow(); // blank spacer
+
+        // KPI Summary Ribbon
+        const r4 = makeRow();
+        r4[0] = isArabic ? 'الملخص المالي والسيولة النقدية' : 'Executive Financial Summary & Cash Flow Overview';
+
+        // KPI Row 1: Income (cols 0-2 & 3) | Profit (cols 4-5 & 6)
+        const r5 = makeRow();
+        r5[0] = isArabic ? 'إجمالي المقبوضات المحصلة' : 'Total Collected Income';
+        r5[3] = Number(approvedIncomes.toFixed(2));
+        r5[4] = isArabic ? 'أرباح الشركة المحققة' : 'Recognized Office Profit';
+        r5[6] = Number(totalProfit.toFixed(2));
+
+        // KPI Row 2: Expenses (cols 0-2 & 3) | Net Cash (cols 4-5 & 6)
+        const r6 = makeRow();
+        r6[0] = isArabic ? 'إجمالي مصروفات المواقع والمقر' : 'Total Site & Office Expenses';
+        r6[3] = Number(approvedExpenses.toFixed(2));
+        r6[4] = isArabic ? 'صافي السيولة النقدية التشغيلية' : 'Net Operational Cash Flow';
+        r6[6] = Number(netCash.toFixed(2));
+
+        // KPI Row 3: Count
+        const r7 = makeRow();
+        r7[0] = isArabic ? 'إجمالي عدد القيود المسجلة' : 'Total Registered Transactions';
+        r7[3] = transactions.length;
+
+        const r8 = makeRow(); // blank spacer
+
+        // Table Header (row 9)
+        const r9 = [
+            isArabic ? 'م' : '#',
+            isArabic ? 'التاريخ' : 'Date',
+            isArabic ? 'نوع المعاملة' : 'Type',
+            isArabic ? 'المشروع' : 'Project',
+            isArabic ? 'التصنيف' : 'Category',
+            isArabic ? 'البيان / الوصف' : 'Description',
+            isArabic ? 'البند المرتبط' : 'Cost Item / Band',
+            isArabic ? 'الجهة الدافعة / العميل' : 'Payer / Client',
+            isArabic ? 'المستفيد' : 'Beneficiary',
+            isArabic ? 'المستلم / باليد' : 'Recipient / Handed to',
+            isArabic ? 'طريقة الدفع' : 'Payment Method',
+            isArabic ? 'المبلغ (جنيه)' : 'Amount (EGP)',
+            isArabic ? 'الحالة' : 'Status',
+            isArabic ? 'الخزينة / الحساب' : 'Physical Account / Safe',
+            isArabic ? 'مركز التكلفة' : 'Cost Center',
+            isArabic ? 'المسجل بواسطة' : 'Created By'
         ];
+
+        const rows = [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9];
 
         let totalAmountSum = 0;
         transactions.forEach((tx, idx) => {
@@ -392,31 +414,37 @@ export default function Finance() {
             ]);
         });
 
-        // Grand Total Summary Row
-        rows.push([
-            isArabic ? 'الإجمالي الكلي' : 'Grand Total',
-            '',
-            '',
-            '',
-            `${transactions.length} ${isArabic ? 'معاملة مسجلة' : 'transactions'}`,
-            '',
-            '',
-            '',
-            '',
-            '',
-            Number(totalAmountSum.toFixed(2)),
-            '',
-            '',
-            '',
-            ''
-        ]);
+        // Grand Total Summary Row with exact 16 columns and aligned Amount (col 11)
+        const grandTotalRow = makeRow();
+        grandTotalRow[0] = isArabic ? 'الإجمالي الكلي' : 'Grand Total';
+        grandTotalRow[4] = `${transactions.length} ${isArabic ? 'معاملة مسجلة' : 'transactions'}`;
+        grandTotalRow[11] = Number(totalAmountSum.toFixed(2));
+        rows.push(grandTotalRow);
+
+        const customMerges = [
+            // Top Banners across all 16 columns
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 15 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 15 } },
+            { s: { r: 2, c: 0 }, e: { r: 2, c: 15 } },
+            // Executive Summary Title Ribbon
+            { s: { r: 4, c: 0 }, e: { r: 4, c: 6 } },
+            // KPI Row 5: Income label (A-C) | Profit label (E-F)
+            { s: { r: 5, c: 0 }, e: { r: 5, c: 2 } },
+            { s: { r: 5, c: 4 }, e: { r: 5, c: 5 } },
+            // KPI Row 6: Expenses label (A-C) | Net Cash label (E-F)
+            { s: { r: 6, c: 0 }, e: { r: 6, c: 2 } },
+            { s: { r: 6, c: 4 }, e: { r: 6, c: 5 } },
+            // KPI Row 7: Count label (A-C)
+            { s: { r: 7, c: 0 }, e: { r: 7, c: 2 } }
+        ];
 
         exportToXLSX({
             filename: `hesaby-transactions-${new Date().toISOString().slice(0, 10)}.xlsx`,
             sheets: [
                 {
                     sheetName: isArabic ? 'سجل المعاملات' : 'Transactions',
-                    data: rows
+                    data: rows,
+                    customMerges
                 }
             ],
             isRTL: isArabic
