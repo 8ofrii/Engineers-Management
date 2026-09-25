@@ -1015,45 +1015,19 @@ export default function OfficeFinances() {
                                             </div>
 
                                             {/* Safe Name */}
-                                            <h3 style={{ margin: '0 0 6px', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                            <h3 style={{
+                                                margin: '0 0 10px',
+                                                fontSize: '1.18rem',
+                                                fontWeight: 800,
+                                                color: 'var(--text-primary)',
+                                                minHeight: '1.75rem',
+                                                lineHeight: 1.3
+                                            }}>
                                                 {safe.name}
                                             </h3>
 
-                                            {/* Assigned Custodian / Member Badge */}
-                                            {safe.assignedUser && (
-                                                <div style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    padding: '3px 9px',
-                                                    borderRadius: '6px',
-                                                    background: 'rgba(59, 130, 246, 0.08)',
-                                                    border: '1px solid rgba(59, 130, 246, 0.22)',
-                                                    fontSize: '0.78rem',
-                                                    color: 'var(--text-primary)',
-                                                    marginBottom: '10px'
-                                                }}>
-                                                    <User size={13} style={{ color: '#3b82f6' }} />
-                                                    <span>
-                                                        <span style={{ color: 'var(--text-tertiary)', fontWeight: 500 }}>
-                                                            {isArabic ? 'المسؤول:' : 'Custodian:'}
-                                                        </span>{' '}
-                                                        <strong>{safe.assignedUser.name}</strong>
-                                                    </span>
-                                                </div>
-                                            )}
-
-                                            {/* Bank Name / Account number */}
-                                            {(safe.bankName || safe.accountNumber) && (
-                                                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                                                    {safe.bankName && <span>🏦 {safe.bankName}</span>}
-                                                    {safe.bankName && safe.accountNumber && <span> • </span>}
-                                                    {safe.accountNumber && <span>رقم: {safe.accountNumber}</span>}
-                                                </div>
-                                            )}
-
-                                            {/* Live Balance */}
-                                            <div className="safe-card-balance-box">
+                                            {/* Live Balance Box - Positioned immediately under Safe Name for exact vertical alignment across all cards */}
+                                            <div className="safe-card-balance-box" style={{ marginBottom: '12px' }}>
                                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
                                                     {isArabic ? 'الرصيد المتاح الحالي' : 'Current Available Balance'}
                                                 </div>
@@ -1066,6 +1040,88 @@ export default function OfficeFinances() {
                                                 }}>
                                                     {fmtCurrency(safe.balance)}
                                                 </div>
+                                            </div>
+
+                                            {/* Safe Metadata Strip (Bank / Account / Custodian) - Consistent min-height slot for vertical parity */}
+                                            <div style={{
+                                                minHeight: '34px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                flexWrap: 'wrap',
+                                                marginBottom: '14px'
+                                            }}>
+                                                {safe.bankName && (
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '6px',
+                                                        background: 'var(--bg-tertiary)',
+                                                        border: '1px solid var(--border-color)',
+                                                        fontSize: '0.78rem',
+                                                        fontWeight: 600,
+                                                        color: 'var(--text-secondary)'
+                                                    }}>
+                                                        <Building2 size={12} style={{ color: 'var(--color-primary)' }} />
+                                                        <span dir="auto">{safe.bankName}</span>
+                                                    </span>
+                                                )}
+                                                {safe.accountNumber && (
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '6px',
+                                                        background: 'var(--bg-tertiary)',
+                                                        border: '1px solid var(--border-color)',
+                                                        fontSize: '0.75rem',
+                                                        fontFamily: 'monospace',
+                                                        color: 'var(--text-secondary)'
+                                                    }} dir="ltr">
+                                                        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem' }}>{isArabic ? 'رقم:' : 'Acc:'}</span>
+                                                        <span>{safe.accountNumber}</span>
+                                                    </span>
+                                                )}
+                                                {safe.assignedUser && (
+                                                    <div style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '6px',
+                                                        background: 'rgba(59, 130, 246, 0.08)',
+                                                        border: '1px solid rgba(59, 130, 246, 0.22)',
+                                                        fontSize: '0.76rem',
+                                                        color: 'var(--text-primary)'
+                                                    }}>
+                                                        <User size={12} style={{ color: '#3b82f6' }} />
+                                                        <span dir="auto">
+                                                            <span style={{ color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                                                                {isArabic ? 'المسؤول:' : 'Custodian:'}
+                                                            </span>{' '}
+                                                            <strong>{safe.assignedUser.name}</strong>
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {!safe.bankName && !safe.accountNumber && !safe.assignedUser && (
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '5px',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '6px',
+                                                        background: 'var(--bg-tertiary)',
+                                                        border: '1px solid var(--border-color)',
+                                                        fontSize: '0.75rem',
+                                                        color: 'var(--text-tertiary)'
+                                                    }}>
+                                                        <Wallet size={12} style={{ opacity: 0.7 }} />
+                                                        <span>{isArabic ? 'خزينة نقدية ورقية بالمقر' : 'HQ Operational Cash Vault'}</span>
+                                                    </span>
+                                                )}
                                             </div>
 
                                             {/* Mini In/Out flows */}
