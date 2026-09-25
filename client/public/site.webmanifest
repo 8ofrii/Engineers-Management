@@ -1,0 +1,19 @@
+{
+  "name": "Hesaby.ai",
+  "short_name": "Hesaby",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/hesaby_logo_icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#ff5a1f",
+  "background_color": "#08080a",
+  "display": "standalone"
+}
