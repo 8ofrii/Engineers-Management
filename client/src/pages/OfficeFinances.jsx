@@ -25,7 +25,9 @@ import {
     Eye,
     Folder,
     UploadCloud,
-    Paperclip
+    Paperclip,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { safesAPI, transactionsAPI, userAPI } from '../services/api';
@@ -82,6 +84,7 @@ export default function OfficeFinances() {
     const [safeTypeFilter, setSafeTypeFilter] = useState('ALL');
     const [txSearch, setTxSearch] = useState('');
     const [txCategoryFilter, setTxCategoryFilter] = useState('ALL');
+    const [isTxExpanded, setIsTxExpanded] = useState(false);
 
     // Modals
     const [isAddSafeModalOpen, setIsAddSafeModalOpen] = useState(false);
@@ -259,6 +262,8 @@ export default function OfficeFinances() {
         return true;
     });
 
+    const displayedTxs = isTxExpanded ? filteredTxs : filteredTxs.slice(0, 5);
+
     const getSafeTypeBadge = (type) => {
         switch (type) {
             case 'BANK_ACCOUNT':
@@ -382,177 +387,8 @@ export default function OfficeFinances() {
                     </div>
                 </div>
 
-                {/* ========================================================= */}
-                {/* SECTION 1 (TOP HALF): OFFICE FINANCIALS & PROFIT/LOSS     */}
-                {/* ========================================================= */}
-                <div style={{ marginBottom: '40px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                            {isArabic ? '📊 المركز المالي للمقر الرئيسي' : 'Office Profit & Loss Overview'}
-                        </h2>
-                    </div>
-
-                    {/* 3 Core Office P&L Stat Cards */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                        gap: '20px',
-                        marginBottom: '28px'
-                    }}>
-                        {/* 1. Total Office Profit */}
-                        <div className="card" style={{
-                            padding: '22px 24px',
-                            background: 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(16, 185, 129, 0.06))',
-                            border: '1px solid rgba(16, 185, 129, 0.25)',
-                            borderRadius: '14px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                                <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                    {isArabic ? 'إجمالي أرباح المقر' : 'Total Office Profits'}
-                                </span>
-                                <div style={{
-                                    width: '38px', height: '38px', borderRadius: '10px',
-                                    background: 'rgba(16, 185, 129, 0.15)', color: '#10b981',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                }}>
-                                    <TrendingUp size={20} />
-                                </div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#10b981', letterSpacing: '-0.5px' }}>
-                                    {fmtCurrency(summary?.totalOfficeProfit || 0)}
-                                </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                                    {isArabic ? `أتعاب إدارة: ${fmtCurrency(summary?.totalManagementFees || 0)}` : `Fees: ${fmtCurrency(summary?.totalManagementFees || 0)}`}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. Total Office Expenses */}
-                        <div className="card" style={{
-                            padding: '22px 24px',
-                            background: 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(239, 68, 68, 0.06))',
-                            border: '1px solid rgba(239, 68, 68, 0.25)',
-                            borderRadius: '14px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                                <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                    {isArabic ? 'إجمالي مصروفات المقر' : 'Total Office Expenses'}
-                                </span>
-                                <div style={{
-                                    width: '38px', height: '38px', borderRadius: '10px',
-                                    background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                }}>
-                                    <TrendingDown size={20} />
-                                </div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#ef4444', letterSpacing: '-0.5px' }}>
-                                    {fmtCurrency(summary?.totalOfficeExpenses || 0)}
-                                </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                                    {isArabic ? 'إيجار، فواتير، رواتب، مستلزمات المقر' : 'Rent, utilities, salaries, office supplies'}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 3. Net Office Profit */}
-                        <div className="card" style={{
-                            padding: '22px 24px',
-                            background: (summary?.netOfficeProfit || 0) >= 0
-                                ? 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(59, 130, 246, 0.06))'
-                                : 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(239, 68, 68, 0.06))',
-                            border: (summary?.netOfficeProfit || 0) >= 0
-                                ? '1px solid rgba(59, 130, 246, 0.3)'
-                                : '1px solid rgba(239, 68, 68, 0.3)',
-                            borderRadius: '14px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                                <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                    {isArabic ? 'صافي أرباح المقر' : 'Net Office Profit'}
-                                </span>
-                                <div style={{
-                                    width: '38px', height: '38px', borderRadius: '10px',
-                                    background: (summary?.netOfficeProfit || 0) >= 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                    color: (summary?.netOfficeProfit || 0) >= 0 ? '#3b82f6' : '#ef4444',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                }}>
-                                    <Building2 size={20} />
-                                </div>
-                            </div>
-                            <div>
-                                <div style={{
-                                    fontSize: '1.85rem',
-                                    fontWeight: 800,
-                                    color: (summary?.netOfficeProfit || 0) >= 0 ? '#3b82f6' : '#ef4444',
-                                    letterSpacing: '-0.5px'
-                                }}>
-                                    {fmtCurrency(summary?.netOfficeProfit || 0)}
-                                </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                                    {(summary?.netOfficeProfit || 0) >= 0
-                                        ? (isArabic ? 'فائض تشغيلي في أرباح المقر' : 'Operating surplus')
-                                        : (isArabic ? 'عجز تشغيلي في أرباح المقر' : 'Operating deficit')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Category Breakdown Tags */}
-                    {summary?.categoryBreakdown && summary.categoryBreakdown.length > 0 && (
-                        <div style={{
-                            background: 'var(--bg-secondary)',
-                            padding: '14px 18px',
-                            borderRadius: '10px',
-                            border: '1px solid var(--border-color)',
-                            marginBottom: '24px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            flexWrap: 'wrap'
-                        }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Filter size={15} />
-                                {isArabic ? 'تصنيفات مصروفات المقر:' : 'Expense Breakdown:'}
-                            </span>
-                            {summary.categoryBreakdown.map(item => (
-                                <span
-                                    key={item.category}
-                                    style={{
-                                        fontSize: '0.8rem',
-                                        padding: '4px 10px',
-                                        borderRadius: 'var(--radius-full)',
-                                        background: 'var(--bg-tertiary)',
-                                        border: '1px solid var(--border-color)',
-                                        color: 'var(--text-primary)',
-                                        fontWeight: 600,
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                >
-                                    <span>{t(`finance.categories.${item.category.toLowerCase()}`) || item.category}:</span>
-                                    <span style={{ color: '#ef4444' }}>{fmtCurrency(item.amount)}</span>
-                                </span>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Scoped CSS for Table, Safe Cards, Modals & Badges */}
-                    <style>{`
+                
+                <style>{`
                         .office-finances-page {
                             --bg-surface: var(--bg-elevated, var(--bg-secondary));
                         }
@@ -1029,221 +865,10 @@ export default function OfficeFinances() {
                         }
                     `}</style>
 
-                    {/* Recent Office Transactions Table */}
-                    <div className="card tx-table-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
-                                    {isArabic ? 'آخر معاملات المقر وأرباح الإدارة' : 'Recent Office Transactions & Fee Transfers'}
-                                </h3>
-                                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                                    {isArabic ? 'سجل الإيرادات وأتعاب الإدارة المحولة ومصروفات المقر التشغيلية' : 'Audit trail of recognized profits, fee transfers, and operational office expenses'}
-                                </p>
-                            </div>
-
-                            {/* Search & Filter */}
-                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <select
-                                    value={txCategoryFilter}
-                                    onChange={(e) => setTxCategoryFilter(e.target.value)}
-                                    style={{
-                                        padding: '7px 12px',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--border-color)',
-                                        background: 'var(--bg-tertiary)',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '0.84rem',
-                                        outline: 'none',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    <option value="ALL">{isArabic ? 'جميع المعاملات' : 'All Transactions'}</option>
-                                    <option value="MANAGEMENT_FEE_TRANSFER">{isArabic ? 'أرباح إدارة المشروعات' : 'Management Fees'}</option>
-                                    <option value="EXPENSES_ONLY">{isArabic ? 'مصروفات المقر فقط' : 'Office Expenses Only'}</option>
-                                </select>
-                                <div style={{ position: 'relative' }}>
-                                    <Search size={15} style={{ position: 'absolute', top: '10px', [isArabic ? 'right' : 'left']: '10px', color: 'var(--text-tertiary)' }} />
-                                    <input
-                                        type="text"
-                                        placeholder={isArabic ? 'بحث في معاملات المقر...' : 'Search office txs...'}
-                                        value={txSearch}
-                                        onChange={(e) => setTxSearch(e.target.value)}
-                                        style={{
-                                            padding: '7px 12px',
-                                            [isArabic ? 'paddingRight' : 'paddingLeft']: '32px',
-                                            borderRadius: '8px',
-                                            border: '1px solid var(--border-color)',
-                                            background: 'var(--bg-tertiary)',
-                                            color: 'var(--text-primary)',
-                                            fontSize: '0.84rem',
-                                            width: '210px',
-                                            outline: 'none'
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {filteredTxs.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px dashed var(--border-color)' }}>
-                                <AlertCircle size={28} style={{ margin: '0 auto 8px', opacity: 0.5, display: 'block' }} />
-                                <div>{isArabic ? 'لا توجد معاملات مسجلة للمقر حالياً' : 'No office transactions found'}</div>
-                            </div>
-                        ) : (
-                            <div className="tx-table-container">
-                                <table className="office-tx-table">
-                                    <thead>
-                                        <tr>
-                                            <th style={{ textAlign: 'start', width: '125px', minWidth: '125px' }}>{isArabic ? 'التاريخ' : 'Date'}</th>
-                                            <th style={{ textAlign: 'start', minWidth: '280px' }}>{isArabic ? 'البيان' : 'Description'}</th>
-                                            <th style={{ textAlign: 'start', width: '150px', minWidth: '150px' }}>{isArabic ? 'التصنيف' : 'Category'}</th>
-                                            <th style={{ textAlign: isArabic ? 'left' : 'right', width: '140px', minWidth: '140px' }}>{isArabic ? 'المبلغ' : 'Amount'}</th>
-                                            <th style={{ textAlign: 'start', width: '210px', minWidth: '210px' }}>{isArabic ? 'الخزينة المرتبطة' : 'Linked Safe'}</th>
-                                            <th style={{ textAlign: 'start', width: '150px', minWidth: '150px' }}>{isArabic ? 'المسجل' : 'Recorded By'}</th>
-                                            <th style={{ textAlign: 'center', width: '110px', minWidth: '110px' }}>{isArabic ? 'الحالة' : 'Status'}</th>
-                                            <th style={{ textAlign: 'center', width: '70px', minWidth: '70px' }}>{isArabic ? 'إجراء' : 'Action'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredTxs.map(tx => {
-                                            const isFee = tx.category === 'MANAGEMENT_FEE_TRANSFER';
-                                            const isIncome = tx.type === 'INCOME';
-                                            return (
-                                                <tr key={tx.id}>
-                                                    <td style={{ textAlign: 'start', whiteSpace: 'nowrap' }}>
-                                                        <span dir="ltr" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
-                                                            {displayDate(tx.transactionDate || tx.createdAt)}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ textAlign: 'start' }}>
-                                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem', lineHeight: '1.4' }}>
-                                                            {formatOfficeTxDescription(tx)}
-                                                        </div>
-                                                        {tx.project && (
-                                                            <div style={{
-                                                                display: 'inline-flex',
-                                                                alignItems: 'center',
-                                                                gap: '5px',
-                                                                fontSize: '0.74rem',
-                                                                fontWeight: 600,
-                                                                color: 'var(--color-primary)',
-                                                                background: 'rgba(59, 130, 246, 0.1)',
-                                                                border: '1px solid rgba(59, 130, 246, 0.25)',
-                                                                padding: '2px 8px',
-                                                                borderRadius: '6px',
-                                                                marginTop: '5px'
-                                                            }}>
-                                                                <Folder size={12} />
-                                                                <span>{tx.project.name}</span>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td style={{ textAlign: 'start' }}>
-                                                        <span style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '5px',
-                                                            fontSize: '0.78rem',
-                                                            padding: '4px 10px',
-                                                            borderRadius: '6px',
-                                                            background: isFee ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-tertiary)',
-                                                            color: isFee ? '#10b981' : 'var(--text-primary)',
-                                                            border: isFee ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)',
-                                                            fontWeight: 600,
-                                                            whiteSpace: 'nowrap'
-                                                        }}>
-                                                            {isFee && <TrendingUp size={13} />}
-                                                            <span>
-                                                                {isFee
-                                                                    ? (isArabic ? 'أتعاب إدارة' : 'Management Fee')
-                                                                    : ((tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
-                                                                        ? tx.description.split(':')[0].trim()
-                                                                        : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category))}
-                                                            </span>
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ textAlign: isArabic ? 'left' : 'right', whiteSpace: 'nowrap' }}>
-                                                        <span dir="ltr" style={{
-                                                            fontWeight: 800,
-                                                            fontSize: '0.94rem',
-                                                            fontVariantNumeric: 'tabular-nums',
-                                                            color: isFee || isIncome ? '#10b981' : '#ef4444'
-                                                        }}>
-                                                            {isFee || isIncome ? '+' : '-'}{fmtCurrency(tx.amount)}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ textAlign: 'start' }}>
-                                                        {tx.safe ? (
-                                                            <span className="safe-badge-pill">
-                                                                <Wallet size={14} style={{ flexShrink: 0 }} />
-                                                                <span dir="auto" style={{ unicodeBidi: 'plaintext', color: 'var(--text-primary)' }}>
-                                                                    {tx.safe.name}
-                                                                </span>
-                                                            </span>
-                                                        ) : (
-                                                            <span style={{ color: 'var(--text-tertiary)' }}>-</span>
-                                                        )}
-                                                    </td>
-                                                    <td style={{ textAlign: 'start' }}>
-                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                                                            <div style={{
-                                                                width: '24px',
-                                                                height: '24px',
-                                                                borderRadius: '50%',
-                                                                background: 'rgba(59, 130, 246, 0.15)',
-                                                                color: '#3b82f6',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                fontSize: '0.72rem',
-                                                                fontWeight: 700,
-                                                                flexShrink: 0
-                                                            }}>
-                                                                {(tx.user?.name || 'U').charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                                                                {tx.user?.name || '-'}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ textAlign: 'center' }}>
-                                                        <span className={`status-badge-pill ${tx.status?.toLowerCase() || 'pending'}`}>
-                                                            <span className="dot" />
-                                                            <span>
-                                                                {tx.status === 'APPROVED'
-                                                                    ? (isArabic ? 'معتمد' : 'APPROVED')
-                                                                    : tx.status === 'REJECTED'
-                                                                    ? (isArabic ? 'مرفوض' : 'REJECTED')
-                                                                    : (isArabic ? 'معلق' : 'PENDING')}
-                                                            </span>
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ textAlign: 'center' }}>
-                                                        <button
-                                                            className="tx-action-btn-circle"
-                                                            onClick={() => {
-                                                                setSelectedTxDetail(tx);
-                                                                setIsTxDetailOpen(true);
-                                                            }}
-                                                            title={isArabic ? 'تفاصيل المعاملة' : 'View details'}
-                                                        >
-                                                            <Eye size={15} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
                 {/* ========================================================= */}
-                {/* SECTION 2 (BOTTOM HALF): COMPANY SAFES & TREASURY ACCOUNTS */}
+                {/* SECTION 1: COMPANY SAFES & TREASURY ACCOUNTS */}
                 {/* ========================================================= */}
-                <div>
+                <div style={{ marginBottom: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                         <div>
                             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
@@ -1502,6 +1127,455 @@ export default function OfficeFinances() {
                         </div>
                     )}
                 </div>
+
+                {/* ========================================================= */}
+                {/* SECTION 1 (TOP HALF): OFFICE FINANCIALS & PROFIT/LOSS     */}
+                {/* ========================================================= */}
+                <div style={{ marginBottom: '36px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
+                            {isArabic ? '📊 المركز المالي للمقر الرئيسي' : 'Office Profit & Loss Overview'}
+                        </h2>
+                    </div>
+
+                    {/* 3 Core Office P&L Stat Cards */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                        gap: '20px',
+                        marginBottom: '28px'
+                    }}>
+                        {/* 1. Total Office Profit */}
+                        <div className="card" style={{
+                            padding: '22px 24px',
+                            background: 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(16, 185, 129, 0.06))',
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                            borderRadius: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                    {isArabic ? 'إجمالي أرباح المقر' : 'Total Office Profits'}
+                                </span>
+                                <div style={{
+                                    width: '38px', height: '38px', borderRadius: '10px',
+                                    background: 'rgba(16, 185, 129, 0.15)', color: '#10b981',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    <TrendingUp size={20} />
+                                </div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#10b981', letterSpacing: '-0.5px' }}>
+                                    {fmtCurrency(summary?.totalOfficeProfit || 0)}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                                    {isArabic ? `أتعاب إدارة: ${fmtCurrency(summary?.totalManagementFees || 0)}` : `Fees: ${fmtCurrency(summary?.totalManagementFees || 0)}`}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Total Office Expenses */}
+                        <div className="card" style={{
+                            padding: '22px 24px',
+                            background: 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(239, 68, 68, 0.06))',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            borderRadius: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                    {isArabic ? 'إجمالي مصروفات المقر' : 'Total Office Expenses'}
+                                </span>
+                                <div style={{
+                                    width: '38px', height: '38px', borderRadius: '10px',
+                                    background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    <TrendingDown size={20} />
+                                </div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#ef4444', letterSpacing: '-0.5px' }}>
+                                    {fmtCurrency(summary?.totalOfficeExpenses || 0)}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                                    {isArabic ? 'إيجار، فواتير، رواتب، مستلزمات المقر' : 'Rent, utilities, salaries, office supplies'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. Net Office Profit */}
+                        <div className="card" style={{
+                            padding: '22px 24px',
+                            background: (summary?.netOfficeProfit || 0) >= 0
+                                ? 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(59, 130, 246, 0.06))'
+                                : 'linear-gradient(145deg, var(--bg-elevated, var(--bg-secondary)), rgba(239, 68, 68, 0.06))',
+                            border: (summary?.netOfficeProfit || 0) >= 0
+                                ? '1px solid rgba(59, 130, 246, 0.3)'
+                                : '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                                <span style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                    {isArabic ? 'صافي أرباح المقر' : 'Net Office Profit'}
+                                </span>
+                                <div style={{
+                                    width: '38px', height: '38px', borderRadius: '10px',
+                                    background: (summary?.netOfficeProfit || 0) >= 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                    color: (summary?.netOfficeProfit || 0) >= 0 ? '#3b82f6' : '#ef4444',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    <Building2 size={20} />
+                                </div>
+                            </div>
+                            <div>
+                                <div style={{
+                                    fontSize: '1.85rem',
+                                    fontWeight: 800,
+                                    color: (summary?.netOfficeProfit || 0) >= 0 ? '#3b82f6' : '#ef4444',
+                                    letterSpacing: '-0.5px'
+                                }}>
+                                    {fmtCurrency(summary?.netOfficeProfit || 0)}
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                                    {(summary?.netOfficeProfit || 0) >= 0
+                                        ? (isArabic ? 'فائض تشغيلي في أرباح المقر' : 'Operating surplus')
+                                        : (isArabic ? 'عجز تشغيلي في أرباح المقر' : 'Operating deficit')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Category Breakdown Tags */}
+                    {summary?.categoryBreakdown && summary.categoryBreakdown.length > 0 && (
+                        <div style={{
+                            background: 'var(--bg-secondary)',
+                            padding: '14px 18px',
+                            borderRadius: '10px',
+                            border: '1px solid var(--border-color)',
+                            marginBottom: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            flexWrap: 'wrap'
+                        }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Filter size={15} />
+                                {isArabic ? 'تصنيفات مصروفات المقر:' : 'Expense Breakdown:'}
+                            </span>
+                            {summary.categoryBreakdown.map(item => (
+                                <span
+                                    key={item.category}
+                                    style={{
+                                        fontSize: '0.8rem',
+                                        padding: '4px 10px',
+                                        borderRadius: 'var(--radius-full)',
+                                        background: 'var(--bg-tertiary)',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        fontWeight: 600,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <span>{t(`finance.categories.${item.category.toLowerCase()}`) || item.category}:</span>
+                                    <span style={{ color: '#ef4444' }}>{fmtCurrency(item.amount)}</span>
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Scoped CSS for Table, Safe Cards, Modals & Badges */}
+                </div>
+
+                {/* Recent Office Transactions Table */}
+                    <div className="card tx-table-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+                                    {isArabic ? 'آخر معاملات المقر وأرباح الإدارة' : 'Recent Office Transactions & Fee Transfers'}
+                                </h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                    {isArabic ? 'سجل الإيرادات وأتعاب الإدارة المحولة ومصروفات المقر التشغيلية' : 'Audit trail of recognized profits, fee transfers, and operational office expenses'}
+                                    {filteredTxs.length > 5 && !isTxExpanded && (
+                                        <span style={{
+                                            display: 'inline-block',
+                                            marginRight: isArabic ? '8px' : 0,
+                                            marginLeft: isArabic ? 0 : '8px',
+                                            fontSize: '0.75rem',
+                                            padding: '2px 8px',
+                                            borderRadius: '6px',
+                                            background: 'var(--bg-tertiary)',
+                                            color: 'var(--color-primary)',
+                                            fontWeight: 700,
+                                            border: '1px solid var(--border-color)'
+                                        }}>
+                                            {isArabic ? `(معروض أول 5 من ${filteredTxs.length})` : `(Showing first 5 of ${filteredTxs.length})`}
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+
+                            {/* Search & Filter */}
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <select
+                                    value={txCategoryFilter}
+                                    onChange={(e) => setTxCategoryFilter(e.target.value)}
+                                    style={{
+                                        padding: '7px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-tertiary)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '0.84rem',
+                                        outline: 'none',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="ALL">{isArabic ? 'جميع المعاملات' : 'All Transactions'}</option>
+                                    <option value="MANAGEMENT_FEE_TRANSFER">{isArabic ? 'أرباح إدارة المشروعات' : 'Management Fees'}</option>
+                                    <option value="EXPENSES_ONLY">{isArabic ? 'مصروفات المقر فقط' : 'Office Expenses Only'}</option>
+                                </select>
+                                <div style={{ position: 'relative' }}>
+                                    <Search size={15} style={{ position: 'absolute', top: '10px', [isArabic ? 'right' : 'left']: '10px', color: 'var(--text-tertiary)' }} />
+                                    <input
+                                        type="text"
+                                        placeholder={isArabic ? 'بحث في معاملات المقر...' : 'Search office txs...'}
+                                        value={txSearch}
+                                        onChange={(e) => setTxSearch(e.target.value)}
+                                        style={{
+                                            padding: '7px 12px',
+                                            [isArabic ? 'paddingRight' : 'paddingLeft']: '32px',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-tertiary)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '0.84rem',
+                                            width: '210px',
+                                            outline: 'none'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {filteredTxs.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', borderRadius: '10px', border: '1px dashed var(--border-color)' }}>
+                                <AlertCircle size={28} style={{ margin: '0 auto 8px', opacity: 0.5, display: 'block' }} />
+                                <div>{isArabic ? 'لا توجد معاملات مسجلة للمقر حالياً' : 'No office transactions found'}</div>
+                            </div>
+                        ) : (
+                            <div className="tx-table-container">
+                                <table className="office-tx-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ textAlign: 'start', width: '125px', minWidth: '125px' }}>{isArabic ? 'التاريخ' : 'Date'}</th>
+                                            <th style={{ textAlign: 'start', minWidth: '280px' }}>{isArabic ? 'البيان' : 'Description'}</th>
+                                            <th style={{ textAlign: 'start', width: '150px', minWidth: '150px' }}>{isArabic ? 'التصنيف' : 'Category'}</th>
+                                            <th style={{ textAlign: isArabic ? 'left' : 'right', width: '140px', minWidth: '140px' }}>{isArabic ? 'المبلغ' : 'Amount'}</th>
+                                            <th style={{ textAlign: 'start', width: '210px', minWidth: '210px' }}>{isArabic ? 'الخزينة المرتبطة' : 'Linked Safe'}</th>
+                                            <th style={{ textAlign: 'start', width: '150px', minWidth: '150px' }}>{isArabic ? 'المسجل' : 'Recorded By'}</th>
+                                            <th style={{ textAlign: 'center', width: '110px', minWidth: '110px' }}>{isArabic ? 'الحالة' : 'Status'}</th>
+                                            <th style={{ textAlign: 'center', width: '70px', minWidth: '70px' }}>{isArabic ? 'إجراء' : 'Action'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {displayedTxs.map(tx => {
+                                            const isFee = tx.category === 'MANAGEMENT_FEE_TRANSFER';
+                                            const isIncome = tx.type === 'INCOME';
+                                            return (
+                                                <tr key={tx.id}>
+                                                    <td style={{ textAlign: 'start', whiteSpace: 'nowrap' }}>
+                                                        <span dir="ltr" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                                                            {displayDate(tx.transactionDate || tx.createdAt)}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'start' }}>
+                                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem', lineHeight: '1.4' }}>
+                                                            {formatOfficeTxDescription(tx)}
+                                                        </div>
+                                                        {tx.project && (
+                                                            <div style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '5px',
+                                                                fontSize: '0.74rem',
+                                                                fontWeight: 600,
+                                                                color: 'var(--color-primary)',
+                                                                background: 'rgba(59, 130, 246, 0.1)',
+                                                                border: '1px solid rgba(59, 130, 246, 0.25)',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '6px',
+                                                                marginTop: '5px'
+                                                            }}>
+                                                                <Folder size={12} />
+                                                                <span>{tx.project.name}</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'start' }}>
+                                                        <span style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '5px',
+                                                            fontSize: '0.78rem',
+                                                            padding: '4px 10px',
+                                                            borderRadius: '6px',
+                                                            background: isFee ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-tertiary)',
+                                                            color: isFee ? '#10b981' : 'var(--text-primary)',
+                                                            border: isFee ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-color)',
+                                                            fontWeight: 600,
+                                                            whiteSpace: 'nowrap'
+                                                        }}>
+                                                            {isFee && <TrendingUp size={13} />}
+                                                            <span>
+                                                                {isFee
+                                                                    ? (isArabic ? 'أتعاب إدارة' : 'Management Fee')
+                                                                    : ((tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
+                                                                        ? tx.description.split(':')[0].trim()
+                                                                        : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category))}
+                                                            </span>
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: isArabic ? 'left' : 'right', whiteSpace: 'nowrap' }}>
+                                                        <span dir="ltr" style={{
+                                                            fontWeight: 800,
+                                                            fontSize: '0.94rem',
+                                                            fontVariantNumeric: 'tabular-nums',
+                                                            color: isFee || isIncome ? '#10b981' : '#ef4444'
+                                                        }}>
+                                                            {isFee || isIncome ? '+' : '-'}{fmtCurrency(tx.amount)}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'start' }}>
+                                                        {tx.safe ? (
+                                                            <span className="safe-badge-pill">
+                                                                <Wallet size={14} style={{ flexShrink: 0 }} />
+                                                                <span dir="auto" style={{ unicodeBidi: 'plaintext', color: 'var(--text-primary)' }}>
+                                                                    {tx.safe.name}
+                                                                </span>
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{ color: 'var(--text-tertiary)' }}>-</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'start' }}>
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                                            <div style={{
+                                                                width: '24px',
+                                                                height: '24px',
+                                                                borderRadius: '50%',
+                                                                background: 'rgba(59, 130, 246, 0.15)',
+                                                                color: '#3b82f6',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 700,
+                                                                flexShrink: 0
+                                                            }}>
+                                                                {(tx.user?.name || 'U').charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                                                {tx.user?.name || '-'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span className={`status-badge-pill ${tx.status?.toLowerCase() || 'pending'}`}>
+                                                            <span className="dot" />
+                                                            <span>
+                                                                {tx.status === 'APPROVED'
+                                                                    ? (isArabic ? 'معتمد' : 'APPROVED')
+                                                                    : tx.status === 'REJECTED'
+                                                                    ? (isArabic ? 'مرفوض' : 'REJECTED')
+                                                                    : (isArabic ? 'معلق' : 'PENDING')}
+                                                            </span>
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <button
+                                                            className="tx-action-btn-circle"
+                                                            onClick={() => {
+                                                                setSelectedTxDetail(tx);
+                                                                setIsTxDetailOpen(true);
+                                                            }}
+                                                            title={isArabic ? 'تفاصيل المعاملة' : 'View details'}
+                                                        >
+                                                            <Eye size={15} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    
+                        {/* Expand / Collapse Button if more than 5 transactions */}
+                        {filteredTxs.length > 5 && (
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                paddingTop: '16px',
+                                marginTop: '16px',
+                                borderTop: '1px solid var(--border-color)'
+                            }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsTxExpanded(!isTxExpanded)}
+                                    className="btn btn-secondary"
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        fontSize: '0.88rem',
+                                        fontWeight: 600,
+                                        padding: '9px 24px',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        border: '1px solid var(--border-color)',
+                                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
+                                    }}
+                                >
+                                    {isTxExpanded ? (
+                                        <>
+                                            <ChevronUp size={16} />
+                                            <span>
+                                                {isArabic
+                                                    ? 'عرض أقل (أول 5 معاملات فقط)'
+                                                    : 'Show Less (First 5 Only)'}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ChevronDown size={16} />
+                                            <span>
+                                                {isArabic
+                                                    ? `عرض جميع المعاملات (${filteredTxs.length})`
+                                                    : `Show All Transactions (${filteredTxs.length})`}
+                                            </span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                 {/* ========================================================= */}
                 {/* MODAL 1: CREATE / EDIT SAFE                               */}
