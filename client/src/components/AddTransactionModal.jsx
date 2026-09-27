@@ -95,7 +95,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         // 1. Direct unit property on batch (if populated by API or model)
         if (batch.unit && typeof batch.unit === 'string') {
             const u = batch.unit.toUpperCase();
-            if (['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG'].includes(u)) {
+            if (['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG', 'OTHER'].includes(u)) {
                 return u;
             }
         }
@@ -103,7 +103,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         // 2. Direct material relation on batch
         if (batch.material?.unit) {
             const u = batch.material.unit.toUpperCase();
-            if (['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG'].includes(u)) {
+            if (['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG', 'OTHER'].includes(u)) {
                 return u;
             }
         }
@@ -240,7 +240,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         // Stock/Expense
         materialId: '',
         itemName: '',
-        unit: 'TON',
+        unit: 'OTHER',
+        customUnit: '',
         beneficiary: '',
         transactionFrom: '',
         transactionTo: '',
@@ -286,7 +287,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 category: '',
                 customCategoryText: '',
                 itemName: '',
-                unit: 'TON',
+                unit: 'OTHER',
+                customUnit: '',
                 beneficiary: '',
                 transactionFrom: '',
                 transactionTo: '',
@@ -338,7 +340,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             costCenter: isOffice
                 ? (prev.costCenter || (isRTL ? 'المقر الرئيسي' : 'Headquarters'))
                 : (prev.costCenter === 'Headquarters' || prev.costCenter === 'المقر الرئيسي' ? '' : prev.costCenter),
-            unit: isOffice ? 'PIECE' : (prev.unit === 'PIECE' ? 'TON' : prev.unit),
+            unit: isOffice ? 'PIECE' : (prev.unit === 'PIECE' ? 'OTHER' : (prev.unit || 'OTHER')),
             workmanId: isOffice ? '' : prev.workmanId
         }));
         if (isOffice) {
@@ -408,7 +410,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             transactionDate: getLocalDateTime(),
             category: '',
             itemName: '',
-            unit: 'TON',
+            unit: 'OTHER',
+            customUnit: '',
             invoiceNumber: '',
             beneficiary: '',
             transactionFrom: '',
@@ -463,7 +466,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 // Attempt to parse description for extended fields if they follow "Desc | Qty Unit @ Price" pattern
                 let parsedDesc = initialData.description || '';
                 let parsedQty = '';
-                let parsedUnit = 'TON';
+                let parsedUnit = initialData.projectCostItem?.unitOfMeasure || initialData.unit || '';
+                let parsedCustomUnit = '';
                 let parsedPrice = '';
 
                 if (initialData.description && initialData.description.includes('|')) {
@@ -474,23 +478,27 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
                         parsedDesc = descPart;
 
-                        // Regex to match "Qty Unit @ Price"
-                        // Examples: "50 BAG @ 100", "2.98 @ 0", "10 @ 50"
-                        // Since unit is optional (sometimes just digit + space + @), we need to be careful.
                         // Match: Start -> Number -> Optional Space -> Optional String -> Space -> @ -> Space -> Number
-                        const match = statsPart.match(/^([\d\.]+)\s*(\w*)\s*@\s*([\d\.]+)$/);
+                        const match = statsPart.match(/^([\d\.]+)\s*([A-Za-z0-9_\u0600-\u06FF]*)\s*@\s*([\d\.]+)$/);
 
                         if (match) {
                             parsedQty = match[1];
-                            parsedUnit = match[2] || 'TON'; // Default if missing
-                            // If unit matches a number or is empty, maybe fallback?
-                            // But \w* matches alphanumeric.
+                            if (!parsedUnit) {
+                                parsedUnit = match[2] || '';
+                            }
                             parsedPrice = match[3];
                         }
                     }
                 }
 
                 const isOffice = Boolean(initialData.isOfficeExpense);
+                const standardUnits = ['TON', 'KG', 'M3', 'M2', 'M', 'PIECE', 'LITER', 'BAG'];
+                if (parsedUnit && !standardUnits.includes(parsedUnit.toUpperCase())) {
+                    parsedCustomUnit = parsedUnit;
+                    parsedUnit = 'OTHER';
+                } else if (!parsedUnit) {
+                    parsedUnit = isOffice ? 'PIECE' : 'OTHER';
+                }
                 let customCatText = '';
                 if (initialData.category === 'OTHER') {
                     if (parsedDesc && parsedDesc.startsWith('Other - ')) {
@@ -511,7 +519,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     category: initialData.category || (isOffice ? 'OFFICE_EXPENSES' : ''),
                     customCategoryText: customCatText,
                     itemName: parsedDesc, // Use description as itemName for stock mode too
-                    unit: parsedUnit || (isOffice ? 'PIECE' : 'TON'),
+                    unit: parsedUnit,
+                    customUnit: parsedCustomUnit,
                     clientId: initialData.clientId || initialData.client?.id || '',
                     paidByClientContact: initialData.paidByClientContact || '',
                     beneficiary: initialData.beneficiary || initialData.supplier?.name || initialData.workman?.name || '',
@@ -526,7 +535,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     payerUserId: initialData.payerUserId || user?.id || '',
                     projectCostItemId: isOffice ? '' : (initialData.projectCostItemId || ''),
                     toEngineerId: '',
-                    safeId: initialData.safeId || formData.safeId || '',
+                    safeId: initialData.safeId || (
+                        initialData.paymentMethod === 'CUSTODY_WALLET' && (initialData.payerUserId || initialData.custodyWalletId || initialData.createdBy)
+                            ? `custody_${initialData.payerUserId || initialData.custodyWalletId || initialData.createdBy}`
+                            : (formData.safeId || '')
+                    ),
                     isOfficeExpense: isOffice
                 });
                 if (isOffice) {
@@ -564,7 +577,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         transactionDate: savedDraft.formData?.transactionDate || getLocalDateTime(),
                         category: savedDraft.formData?.category || '',
                         itemName: savedDraft.formData?.itemName || '',
-                        unit: savedDraft.formData?.unit || 'TON',
+                        unit: savedDraft.formData?.unit || 'OTHER',
+                        customUnit: savedDraft.formData?.customUnit || '',
                         invoiceNumber: savedDraft.formData?.invoiceNumber || '',
                         beneficiary: savedDraft.formData?.beneficiary || '',
                         transactionFrom: savedDraft.formData?.transactionFrom || '',
@@ -602,7 +616,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         transactionDate: getLocalDateTime(),
                         category: '',
                         itemName: '',
-                        unit: 'TON',
+                        unit: 'OTHER',
+                        customUnit: '',
                         invoiceNumber: '',
                         beneficiary: '',
                         transactionFrom: '',
@@ -845,7 +860,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 amount: prev.amount || (batch.remainingValue ? batch.remainingValue.toString() : ''),
                 category: prev.category || 'MATERIALS',
                 description: prev.description || (isRTL ? `استهلاك من دفعة: ${batch.description}` : `Usage from batch: ${batch.description}`),
-                unit: detectedUnit || prev.unit || 'TON',
+                unit: detectedUnit || prev.unit || 'OTHER',
                 unitPrice: prev.unitPrice || batchUnitPrice
             }));
             if (errors.batchId) setErrors(prev => ({ ...prev, batchId: '' }));
@@ -861,7 +876,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 const detectedUnit = detectBatchUnit(batch, rawMaterials);
                 if (detectedUnit) {
                     setFormData(prev => {
-                        if (!prev.unit || prev.unit === 'TON' || prev.unit !== detectedUnit) {
+                        if (!prev.unit || prev.unit === 'TON' || prev.unit === 'OTHER' || prev.unit !== detectedUnit) {
                             return { ...prev, unit: detectedUnit };
                         }
                         return prev;
@@ -978,6 +993,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
                 const resolvedBeneficiary = formData.beneficiary?.trim() || (!isOffice && formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (effectiveSupplierId ? suppliers.find(s => s.id === effectiveSupplierId)?.name : undefined));
 
+                const resolvedUnit = formData.unit === 'OTHER'
+                    ? (formData.customUnit?.trim() || undefined)
+                    : (formData.unit || undefined);
+
                 let finalDescription = formData.description?.trim();
 
                 if (resolvedCategory === 'OTHER' && formData.customCategoryText?.trim()) {
@@ -1004,7 +1023,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     category: resolvedCategory,
                     amount: Number(formData.amount),
                     projectId: (isOffice || isSupplierInv) ? undefined : (selectedProjectId || undefined),
-                    safeId: formData.safeId || undefined,
+                    safeId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? null : (formData.safeId || undefined),
+                    custodyWalletId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? formData.safeId.replace('custody_', '') : undefined,
                     isOfficeExpense: isOffice,
                     projectCostItemId: (!isOffice && costItemMode === 'EXISTING') ? formData.projectCostItemId : undefined,
                     payerUserId: formData.payerUserId || user?.id,
@@ -1017,9 +1037,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     materialId: (isMaterial && formData.materialId) ? formData.materialId : undefined,
                     description: finalDescription,
                     transactionDate: formData.transactionDate,
-                    paymentMethod: formData.paymentMethod,
+                    paymentMethod: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? 'CUSTODY_WALLET' : formData.paymentMethod,
                     itemName: resolvedItemName,
-                    unit: isOffice ? (formData.unit || undefined) : (isMaterial ? (formData.unit || chosenMaterial?.unit) : (costItemMode === 'NEW' ? formData.unit : undefined)),
+                    unit: isOffice ? (resolvedUnit || undefined) : (isMaterial ? (formData.unit || chosenMaterial?.unit) : (costItemMode === 'NEW' ? resolvedUnit : undefined)),
                     unitPrice: isOffice ? (formData.unitPrice ? Number(formData.unitPrice) : undefined) : (isMaterial ? (formData.unitPrice ? Number(formData.unitPrice) : (chosenMaterial?.unitPrice ? Number(chosenMaterial.unitPrice) : undefined)) : (costItemMode === 'NEW' && formData.unitPrice ? Number(formData.unitPrice) : undefined)),
                     quantity: formData.quantity ? Number(formData.quantity) : undefined,
                     costCenter: formData.costCenter || (isOffice ? (isRTL ? 'المقر الرئيسي' : 'Headquarters') : (isSupplierInv ? (isRTL ? 'مخزون مورد' : 'Supplier Inventory') : (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')))),
@@ -1037,7 +1057,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     category: 'PAYMENT',
                     amount: Number(formData.amount),
                     projectId: selectedProjectId || undefined,
-                    safeId: formData.safeId || undefined,
+                    safeId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? null : (formData.safeId || undefined),
+                    custodyWalletId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? formData.safeId.replace('custody_', '') : undefined,
                     isOfficeExpense: Boolean(formData.isOfficeExpense),
                     projectCostItemId: formData.projectCostItemId || undefined,
                     description: formData.description?.trim() || t('finance.categories.payment') || 'Client Payment',
@@ -1056,7 +1077,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     materialBatchId: selectedBatchId,
                     valueConsumed: Number(formData.amount),
                     quantityConsumed: formData.quantity ? Number(formData.quantity) : undefined,
-                    unit: formData.unit,
+                    unit: (formData.unit === 'OTHER' && formData.customUnit?.trim()) ? formData.customUnit.trim() : formData.unit,
                     projectId: selectedProjectId,
                     description: formData.description?.trim() || t('inventory.recordUsage') || 'Material Usage',
                     category: formData.category
@@ -1769,7 +1790,19 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 <select
                                     name="safeId"
                                     value={formData.safeId || ''}
-                                    onChange={handleChange}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const selectedSafe = safes.find(s => s.id === val);
+                                        const isCustody = selectedSafe?.isCustody || selectedSafe?.type === 'CUSTODY' || (typeof val === 'string' && val.startsWith('custody_'));
+                                        const custodyUserId = isCustody ? (selectedSafe?.userId || selectedSafe?.assignedUserId || val.replace('custody_', '')) : null;
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            safeId: val,
+                                            paymentMethod: isCustody ? 'CUSTODY_WALLET' : (prev.paymentMethod === 'CUSTODY_WALLET' ? 'CASH' : prev.paymentMethod),
+                                            payerUserId: isCustody ? custodyUserId : prev.payerUserId
+                                        }));
+                                        if (errors.safeId) setErrors(prev => ({ ...prev, safeId: null }));
+                                    }}
                                     className={errors.safeId ? 'error' : ''}
                                     style={{
                                         fontSize: '0.95rem',
@@ -1783,20 +1816,36 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                     }}
                                 >
                                     <option value="">
-                                        -- {isRTL ? 'اختر الخزينة أو الحساب المالي (إلزامي)' : 'Select Safe / Account (Mandatory)'} --
+                                        -- {isRTL ? 'اختر الخزينة أو العهدة (إلزامي)' : 'Select Safe or Custody (Mandatory)'} --
                                     </option>
-                                    {safes.map(s => {
-                                        const typeLabel = s.type === 'BANK_ACCOUNT' ? (isRTL ? `حساب بنكي - ${s.bankName || ''}` : `Bank - ${s.bankName || ''}`)
-                                            : s.type === 'MOBILE_WALLET' ? (isRTL ? 'محفظة إلكترونية' : 'Mobile Wallet')
-                                            : s.type === 'OWNER_ACCOUNT' ? (isRTL ? 'حساب شريك/مدير' : 'Owner/Manager Account')
-                                            : (isRTL ? 'خزينة نقدية (كاش)' : 'Cash Safe');
-                                        const custodianText = s.assignedUser ? ` • ${isRTL ? 'المسؤول' : 'Custodian'}: ${s.assignedUser.name}` : '';
-                                        return (
-                                            <option key={s.id} value={s.id}>
-                                                {s.name} ({typeLabel}{custodianText}) - {isRTL ? 'الرصيد' : 'Balance'}: {fmtCurrency(s.balance)}
-                                            </option>
-                                        );
-                                    })}
+
+                                    {/* Company Safes & Bank Accounts Group */}
+                                    {safes.filter(s => !s.isCustody && s.type !== 'CUSTODY').length > 0 && (
+                                        <optgroup label={isRTL ? '🏦 خزائن وحسابات الشركة' : '🏦 Company Safes & Bank Accounts'}>
+                                            {safes.filter(s => !s.isCustody && s.type !== 'CUSTODY').map(s => {
+                                                const bankLabel = s.type === 'BANK_ACCOUNT' && s.bankName ? ` (${s.bankName})` : '';
+                                                return (
+                                                    <option key={s.id} value={s.id}>
+                                                        {s.name}{bankLabel} — {fmtCurrency(s.balance)}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
+
+                                    {/* Custodies Group */}
+                                    {safes.filter(s => s.isCustody || s.type === 'CUSTODY').length > 0 && (
+                                        <optgroup label={isRTL ? '💼 عُهد المهندسين والموظفين' : '💼 Employee Custodies'}>
+                                            {safes.filter(s => s.isCustody || s.type === 'CUSTODY').map(s => {
+                                                const custodianName = s.assignedUser?.name || s.name.replace(/^عهدة:\s*/, '');
+                                                return (
+                                                    <option key={s.id} value={s.id}>
+                                                        {isRTL ? `عهدة: ${custodianName}` : `Custody: ${custodianName}`} — {fmtCurrency(s.balance)}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
                                 </select>
                                 {errors.safeId && (
                                     <span className="error-message" style={{ color: '#ef4444', fontSize: '0.8rem', display: 'block', marginTop: '3px' }}>
@@ -2297,8 +2346,27 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         <option value="PACKAGE">{isRTL ? 'علبة / باقة / كرتونة' : 'Package / Box'}</option>
                                                         <option value="KG">{t('finance.uom_options.kg')}</option>
                                                         <option value="LITER">{t('finance.uom_options.liter')}</option>
-                                                        <option value="OTHER">{isRTL ? 'أخرى' : 'Other'}</option>
+                                                        <option value="OTHER">{t('finance.uom_options.other', isRTL ? 'أخرى / غير محدد' : 'Other / Unspecified')}</option>
                                                     </select>
+                                                    {formData.unit === 'OTHER' && (
+                                                        <input
+                                                            type="text"
+                                                            name="customUnit"
+                                                            value={formData.customUnit || ''}
+                                                            onChange={handleChange}
+                                                            placeholder={t('finance.custom_unit_placeholder', isRTL ? 'اكتب وحدة القياس (اختياري)...' : 'Custom unit (optional)...')}
+                                                            style={{
+                                                                marginTop: '6px',
+                                                                fontSize: '0.85rem',
+                                                                padding: '6px 10px',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid var(--border-color, #cbd5e1)',
+                                                                backgroundColor: 'var(--bg-primary, #fff)',
+                                                                color: 'var(--text-primary, #1e293b)',
+                                                                width: '100%'
+                                                            }}
+                                                        />
+                                                    )}
                                                 </div>
                                             </>
                                         ) : (
@@ -2317,6 +2385,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 <div className="form-group">
                                                     <label>{t('finance.uom')}</label>
                                                     <select name="unit" value={formData.unit} onChange={handleChange}>
+                                                        <option value="OTHER">{t('finance.uom_options.other', isRTL ? 'أخرى / غير محدد' : 'Other / Unspecified')}</option>
                                                         <option value="TON">{t('finance.uom_options.ton')}</option>
                                                         <option value="KG">{t('finance.uom_options.kg')}</option>
                                                         <option value="M3">{t('finance.uom_options.m3')}</option>
@@ -2326,6 +2395,25 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         <option value="LITER">{t('finance.uom_options.liter')}</option>
                                                         <option value="BAG">{t('finance.uom_options.bag')}</option>
                                                     </select>
+                                                    {formData.unit === 'OTHER' && (
+                                                        <input
+                                                            type="text"
+                                                            name="customUnit"
+                                                            value={formData.customUnit || ''}
+                                                            onChange={handleChange}
+                                                            placeholder={t('finance.custom_unit_placeholder', isRTL ? 'اكتب وحدة القياس (اختياري، مثلاً: نقلة، ساعة، لفة...)' : 'Custom unit (optional, e.g. trip, hour, roll...)')}
+                                                            style={{
+                                                                marginTop: '6px',
+                                                                fontSize: '0.85rem',
+                                                                padding: '6px 10px',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid var(--border-color, #cbd5e1)',
+                                                                backgroundColor: 'var(--bg-primary, #fff)',
+                                                                color: 'var(--text-primary, #1e293b)',
+                                                                width: '100%'
+                                                            }}
+                                                        />
+                                                    )}
                                                 </div>
                                                 <div className="form-group">
                                                     <label>{t('finance.unitPrice')}</label>
@@ -2578,6 +2666,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 )}
                                             </label>
                                             <select name="unit" value={formData.unit} onChange={handleChange}>
+                                                <option value="OTHER">{t('finance.uom_options.other', isRTL ? 'أخرى / غير محدد' : 'Other / Unspecified')}</option>
                                                 <option value="TON">{t('finance.uom_options.ton')}</option>
                                                 <option value="KG">{t('finance.uom_options.kg')}</option>
                                                 <option value="M3">{t('finance.uom_options.m3')}</option>
@@ -2587,6 +2676,25 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 <option value="LITER">{t('finance.uom_options.liter')}</option>
                                                 <option value="BAG">{t('finance.uom_options.bag')}</option>
                                             </select>
+                                            {formData.unit === 'OTHER' && (
+                                                <input
+                                                    type="text"
+                                                    name="customUnit"
+                                                    value={formData.customUnit || ''}
+                                                    onChange={handleChange}
+                                                    placeholder={t('finance.custom_unit_placeholder', isRTL ? 'اكتب وحدة القياس (اختياري)...' : 'Custom unit (optional)...')}
+                                                    style={{
+                                                        marginTop: '6px',
+                                                        fontSize: '0.85rem',
+                                                        padding: '6px 10px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid var(--border-color, #cbd5e1)',
+                                                        backgroundColor: 'var(--bg-primary, #fff)',
+                                                        color: 'var(--text-primary, #1e293b)',
+                                                        width: '100%'
+                                                    }}
+                                                />
+                                            )}
                                         </div>
                                         <div className="form-group">
                                             <label>{t('finance.usedForCategory')} <span className="required">*</span></label>

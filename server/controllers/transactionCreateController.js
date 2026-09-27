@@ -83,6 +83,29 @@ export const createTransaction = async (req, res, next) => {
             actualPayer = payerUserId;
         }
 
+        // Resolve safe vs custody targets
+        let targetSafeId = safeId || null;
+        let targetPaymentMethod = paymentMethod || (type === 'INCOME' ? 'BANK_TRANSFER' : 'CASH');
+        let targetPayerUserId = payerUserId || null;
+        let targetCustodyWalletId = req.body.custodyWalletId || null;
+
+        if (typeof targetSafeId === 'string' && targetSafeId.startsWith('custody_')) {
+            const custodyUserId = targetSafeId.replace('custody_', '');
+            targetSafeId = null;
+            targetPaymentMethod = 'CUSTODY_WALLET';
+            if (!targetPayerUserId) targetPayerUserId = custodyUserId;
+            if (!targetCustodyWalletId) targetCustodyWalletId = custodyUserId;
+        }
+
+        if (targetPaymentMethod === 'CUSTODY_WALLET') {
+            targetSafeId = null;
+            if (!targetCustodyWalletId && targetPayerUserId) {
+                targetCustodyWalletId = targetPayerUserId;
+            }
+        } else if (targetSafeId) {
+            targetCustodyWalletId = null;
+        }
+
         const result = await prisma.$transaction(async (tx) => {
             let profitInfo = null;
 
@@ -99,10 +122,12 @@ export const createTransaction = async (req, res, next) => {
                         projectId: projectId || null,
                         projectCostItemId: projectCostItemId || null,
                         clientId: clientId || project?.clientId || null,
-                        safeId: safeId || null,
+                        safeId: targetSafeId,
+                        custodyWalletId: targetCustodyWalletId,
+                        payerUserId: targetPayerUserId,
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-                        paymentMethod: paymentMethod || 'BANK_TRANSFER',
+                        paymentMethod: targetPaymentMethod,
                         invoiceNumber: invoiceNumber || null,
                         transactionFrom: transactionFrom || null,
                         paidByClientContact: paidByClientContact || null,
@@ -130,14 +155,19 @@ export const createTransaction = async (req, res, next) => {
                     });
                 }
 
-                // Update Company Safe Balance if safe selected
-                if (safeId) {
+                // Update Company Safe or Custody Balance if selected
+                if (targetSafeId) {
                     await tx.companySafe.update({
-                        where: { id: safeId },
+                        where: { id: targetSafeId },
                         data: {
                             balance: { increment: Number(amount) }
                         }
                     });
+                } else if (targetPaymentMethod === 'CUSTODY_WALLET' && targetCustodyWalletId) {
+                    await tx.user.update({
+                        where: { id: targetCustodyWalletId },
+                        data: { currentCustodyBalance: { increment: Number(amount) } }
+                    }).catch(e => console.error('Error incrementing custody balance:', e));
                 }
 
                 profitInfo = {
@@ -182,13 +212,15 @@ export const createTransaction = async (req, res, next) => {
                         projectCostItemId: finalCostItemId || null,
                         supplierId: supplierId || null,
                         workmanId: workmanId || null,
-                        safeId: safeId || null,
+                        safeId: targetSafeId,
+                        custodyWalletId: targetCustodyWalletId,
+                        payerUserId: targetPayerUserId,
                         beneficiary: beneficiary || null,
                         transactionTo: transactionTo || null,
                         costCenter: costCenter || null,
                         createdBy: actualPayer,
                         transactionDate: transactionDate ? new Date(transactionDate) : new Date(),
-                        paymentMethod: paymentMethod || 'CASH',
+                        paymentMethod: targetPaymentMethod,
                         invoiceNumber: invoiceNumber || null,
                         isOfficeExpense: Boolean(isOfficeExpense),
                         voiceNoteUrl: voiceNoteUrl || null,
@@ -199,14 +231,20 @@ export const createTransaction = async (req, res, next) => {
                     }
                 });
 
-                // Update Company Safe balance if safe selected
-                if (safeId) {
+                // Update Company Safe or Custody balance if selected
+                if (targetSafeId) {
                     await tx.companySafe.update({
-                        where: { id: safeId },
+                        where: { id: targetSafeId },
                         data: {
                             balance: { decrement: Number(amount) }
                         }
                     });
+                } else if (targetPaymentMethod === 'CUSTODY_WALLET') {
+                    const custodyUserId = targetCustodyWalletId || targetPayerUserId || actualPayer;
+                    await tx.user.update({
+                        where: { id: custodyUserId },
+                        data: { currentCustodyBalance: { decrement: Number(amount) } }
+                    }).catch(e => console.error('Error deducting custody balance:', e));
                 }
 
                 // Deduct from Project Safe or Office Expenses if project exists

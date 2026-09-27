@@ -1,3 +1,14 @@
+
+// Helper to eliminate quantity/unit/price bloat from transaction descriptions
+export const cleanTransactionDescription = (desc) => {
+    if (!desc || typeof desc !== 'string') return '';
+    let cleaned = desc.replace(/\s*\|\s*[\d.]+\s*[A-Za-z\u0600-\u06FF]*\s*@\s*[\d.]+(?:\s*EGP)?\s*$/gi, '');
+    cleaned = cleaned.replace(/^[\d.]+\s*[A-Za-z\u0600-\u06FF]*\s*@\s*[\d.]+(?:\s*EGP)?\s*\|\s*/gi, '');
+    cleaned = cleaned.replace(/\(?\s*0\s+TON\s+@\s+0\s*\)?/gi, '');
+    cleaned = cleaned.replace(/\s*\|\s*$/, '').trim();
+    return cleaned;
+};
+
 import prisma from '../lib/prisma.js';
 import * as transactionV2 from './transactionControllerV2.js';
 import { auditFromReq } from '../lib/audit.js';
@@ -81,6 +92,13 @@ export const getTransactions = async (req, res, next) => {
             ];
         }
 
+        if (req.query.workmanId && req.query.workmanId !== 'ALL') {
+            whereClause.workmanId = req.query.workmanId;
+        }
+        if (req.query.supplierId && req.query.supplierId !== 'ALL') {
+            whereClause.supplierId = req.query.supplierId;
+        }
+
         // PROJECT_MANAGER, ADMIN, ACCOUNTANT, SUPER_ADMIN all see every
         // transaction in the tenant — managers need full visibility to
         // approve/reject submissions raised by any engineer.
@@ -88,12 +106,14 @@ export const getTransactions = async (req, res, next) => {
         const transactions = await prisma.transaction.findMany({
             where: whereClause,
             include: {
-                project: { select: { name: true } },
-                supplier: { select: { name: true } },
-                client: { select: { name: true } },
-                user: { select: { name: true, email: true } },
-                payer: { select: { name: true } },
-                workman: { select: { name: true } }
+                project: { select: { id: true, name: true } },
+                supplier: { select: { id: true, name: true } },
+                client: { select: { id: true, name: true } },
+                user: { select: { id: true, name: true, email: true } },
+                payer: { select: { id: true, name: true } },
+                toEngineer: { select: { id: true, name: true } },
+                workman: { select: { id: true, name: true } },
+                safe: { select: { id: true, name: true, type: true } }
             },
             orderBy: {
                 createdAt: 'desc'
@@ -518,6 +538,7 @@ export const getTransactionsLedgerPdf = async (req, res, next) => {
             filterProjectId,
             filterType,
             filterWorkmanId,
+            filterSupplierId,
             dateFrom,
             dateTo,
             lang
@@ -599,6 +620,10 @@ export const getTransactionsLedgerPdf = async (req, res, next) => {
 
             if (filterWorkmanId && filterWorkmanId !== 'ALL') {
                 where.workmanId = filterWorkmanId;
+            }
+
+            if (filterSupplierId && filterSupplierId !== 'ALL') {
+                where.supplierId = filterSupplierId;
             }
 
             if (dateFrom || dateTo) {
@@ -1167,7 +1192,10 @@ export const deleteTransaction = async (req, res, next) => {
 
             // Clean up any uploaded media evidence associated with this transaction
             if (transaction.receiptPhotoUrl) {
-                await deleteByUrl(transaction.receiptPhotoUrl).catch(() => {});
+                const urls = parseReceiptUrls(transaction.receiptPhotoUrl);
+                for (const u of urls) {
+                    await deleteByUrl(u).catch(() => {});
+                }
             }
             if (transaction.voiceNoteUrl) {
                 await deleteByUrl(transaction.voiceNoteUrl).catch(() => {});
@@ -1201,15 +1229,56 @@ export const deleteTransaction = async (req, res, next) => {
 // @desc    Update transaction
 // @route   PUT /api/transactions/:id
 // @access  Private (Owner/Admin)
-// @desc    Attach (or replace) a receipt photo on an existing transaction.
+export const parseReceiptAttachments = (val) => {
+    if (!val) return [];
+    let items = [];
+    if (Array.isArray(val)) {
+        items = val;
+    } else if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) items = parsed;
+            } catch (e) {
+                items = [trimmed];
+            }
+        } else {
+            items = [trimmed];
+        }
+    }
+
+    return items.map((item, index) => {
+        if (!item) return null;
+        if (typeof item === 'string') {
+            return {
+                url: item,
+                label: '',
+                name: item.split('/').pop() || item
+            };
+        }
+        if (typeof item === 'object' && item.url) {
+            return {
+                url: item.url,
+                label: typeof item.label === 'string' ? item.label : '',
+                name: item.name || item.url.split('/').pop() || item.url,
+                size: item.size || null
+            };
+        }
+        return null;
+    }).filter(Boolean);
+};
+
+export const parseReceiptUrls = (val) => {
+    return parseReceiptAttachments(val).map(a => a.url);
+};
+
+// @desc    Attach, append, or update receipt / invoice media (supports unlimited files restricted by space/storage and custom per-attachment labels).
 // @route   PATCH /api/transactions/:id/receipt
-// @access  Private (creator / manager / admin) — multipart with file=image
+// @access  Private (creator / manager / admin) — multipart
 export const uploadReceipt = async (req, res, next) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'No file uploaded' });
-        }
-
         const { id } = req.params;
         const tx = await prisma.transaction.findFirst({
             where: { id, tenantId: req.user.tenantId }
@@ -1225,30 +1294,152 @@ export const uploadReceipt = async (req, res, next) => {
             req.user.role === 'ADMIN' ||
             req.user.role === 'SUPER_ADMIN';
         if (!canEdit) {
-            return res.status(403).json({ success: false, message: 'Not authorized to attach a receipt to this transaction' });
+            return res.status(403).json({ success: false, message: 'Not authorized to attach media to this transaction' });
         }
 
-        const url = req.file.key
-            ? `/uploads/${req.file.key}`
-            : (req.file.location || `/uploads/receipts/${req.file.filename}`);
-
-        if (tx.receiptPhotoUrl && tx.receiptPhotoUrl !== url) {
-            await deleteByUrl(tx.receiptPhotoUrl).catch(() => {});
+        // Gather all uploaded files from req.files or req.file
+        let uploadedFiles = [];
+        if (req.files) {
+            if (Array.isArray(req.files)) {
+                uploadedFiles = req.files;
+            } else if (typeof req.files === 'object') {
+                uploadedFiles = [
+                    ...(req.files.files || []),
+                    ...(req.files.file || [])
+                ];
+            }
+        } else if (req.file) {
+            uploadedFiles = [req.file];
         }
+
+        // Parse existing attachments & URLs stored on this transaction
+        const existingTxAttachments = parseReceiptAttachments(tx.receiptPhotoUrl);
+        const existingTxUrls = existingTxAttachments.map(a => a.url);
+
+        // Check if client explicitly provided keptExistingAttachments or keptExistingUrls
+        let keptExistingAttachments = existingTxAttachments;
+        if (req.body.keptExistingAttachments !== undefined) {
+            try {
+                const parsedKept = typeof req.body.keptExistingAttachments === 'string'
+                    ? JSON.parse(req.body.keptExistingAttachments)
+                    : req.body.keptExistingAttachments;
+                if (Array.isArray(parsedKept)) {
+                    keptExistingAttachments = parsedKept.map(item => {
+                        if (typeof item === 'string') return { url: item, label: '', name: item.split('/').pop() };
+                        return {
+                            url: item.url,
+                            label: typeof item.label === 'string' ? item.label : '',
+                            name: item.name || item.url?.split('/').pop()
+                        };
+                    }).filter(item => item.url && item.url.trim().length > 0);
+                }
+            } catch (e) {
+                // If invalid JSON, retain current
+            }
+        } else if (req.body.keptExistingUrls !== undefined) {
+            try {
+                const parsedKept = typeof req.body.keptExistingUrls === 'string'
+                    ? JSON.parse(req.body.keptExistingUrls)
+                    : req.body.keptExistingUrls;
+                if (Array.isArray(parsedKept)) {
+                    const keptUrls = parsedKept.filter(u => typeof u === 'string' && u.trim().length > 0);
+                    keptExistingAttachments = existingTxAttachments.filter(a => keptUrls.includes(a.url));
+                }
+            } catch (e) {
+                // If invalid JSON, retain current existing
+            }
+        } else if (req.body.replace === 'true') {
+            keptExistingAttachments = [];
+        }
+
+        if (uploadedFiles.length === 0 && req.body.keptExistingAttachments === undefined && req.body.keptExistingUrls === undefined) {
+            return res.status(400).json({ success: false, message: 'No files uploaded or modified' });
+        }
+
+        // Delete any existing files that were removed by the user
+        const keptUrls = keptExistingAttachments.map(a => a.url);
+        const removedUrls = existingTxUrls.filter(url => !keptUrls.includes(url));
+        for (const remUrl of removedUrls) {
+            await deleteByUrl(remUrl).catch(() => {});
+        }
+
+        // Storage budget check (50 MB total for this transaction upload batch)
+        const MAX_TOTAL_STORAGE_BYTES = 50 * 1024 * 1024; // 50 MB
+        const totalNewBytes = uploadedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+
+        if (totalNewBytes > MAX_TOTAL_STORAGE_BYTES) {
+            // Delete newly uploaded files that exceeded the quota
+            for (const f of uploadedFiles) {
+                const u = f.key ? `/uploads/${f.key}` : (f.location || `/uploads/receipts/${f.filename}`);
+                await deleteByUrl(u).catch(() => {});
+            }
+            return res.status(400).json({
+                success: false,
+                message: `Uploaded files (${(totalNewBytes / (1024 * 1024)).toFixed(1)} MB) exceed the maximum allowed total storage limit of 50 MB.`
+            });
+        }
+
+        // Parse optional custom labels for new files
+        let fileLabels = [];
+        if (req.body.fileLabels !== undefined) {
+            try {
+                const parsedLabels = typeof req.body.fileLabels === 'string'
+                    ? JSON.parse(req.body.fileLabels)
+                    : req.body.fileLabels;
+                if (Array.isArray(parsedLabels)) {
+                    fileLabels = parsedLabels;
+                }
+            } catch (e) {}
+        }
+
+        // Generate public URLs and attachment objects for all newly uploaded files
+        const newAttachments = uploadedFiles.map((file, idx) => {
+            const url = file.key
+                ? `/uploads/${file.key}`
+                : (file.location || `/uploads/receipts/${file.filename}`);
+            const label = (fileLabels[idx] && typeof fileLabels[idx] === 'string') ? fileLabels[idx].trim() : '';
+            return {
+                url,
+                label,
+                name: file.originalname || file.filename || url.split('/').pop(),
+                size: file.size || null
+            };
+        });
+
+        // Combine kept existing attachments with new attachments
+        const combinedAttachments = [...keptExistingAttachments, ...newAttachments];
+        const finalReceiptValue = combinedAttachments.length === 0
+            ? null
+            : JSON.stringify(combinedAttachments);
 
         const updated = await prisma.transaction.update({
             where: { id },
-            data: { receiptPhotoUrl: url }
+            data: { receiptPhotoUrl: finalReceiptValue }
         });
 
         await auditFromReq(req, {
             action: 'UPDATE',
             entity: 'Transaction',
             entityId: id,
-            metadata: { field: 'receiptPhotoUrl', from: tx.receiptPhotoUrl || null, to: url }
+            metadata: {
+                field: 'receiptPhotoUrl',
+                from: tx.receiptPhotoUrl || null,
+                to: finalReceiptValue,
+                fileCount: combinedAttachments.length,
+                newFilesUploaded: newAttachments.length
+            }
         });
 
-        res.status(200).json({ success: true, data: { id: updated.id, receiptPhotoUrl: updated.receiptPhotoUrl } });
+        res.status(200).json({
+            success: true,
+            data: {
+                id: updated.id,
+                receiptPhotoUrl: updated.receiptPhotoUrl,
+                attachments: combinedAttachments,
+                receiptUrls: combinedAttachments.map(a => a.url),
+                totalFiles: combinedAttachments.length
+            }
+        });
     } catch (error) {
         next(error);
     }
@@ -1319,9 +1510,10 @@ export const updateTransaction = async (req, res, next) => {
             paymentMethod, projectId,
             // Extended fields
             itemName, unit, quantity, unitPrice,
-            beneficiary, transactionFrom, transactionTo, costCenter,
+            beneficiary, transactionTo, transactionFrom, costCenter,
             invoiceNumber, payerUserId, projectCostItemId,
-            clientId, supplierId, workmanId, physicalAccount, paidByClientContact
+            clientId, supplierId, workmanId, physicalAccount, paidByClientContact,
+            safeId, isOfficeExpense
         } = req.body;
 
         let transaction = await prisma.transaction.findFirst({
@@ -1335,32 +1527,46 @@ export const updateTransaction = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Transaction not found' });
         }
 
-        // Only allow editing if user is creator or admin, and status is usually DRAFT or PENDING
-        // specific business logic can be added here
-
-        // Append extended details to description if needed, similar to create
-        // Logic: specific fields > description text
-        // If we have extended fields, re-format the description.
-        // If we don't, just use the description as is (assuming it might already contain the format or is simple)
-        let finalDescription = description;
-        if (quantity !== undefined || unitPrice !== undefined || unit || itemName) {
-            // We are updating the "stats" part.
-            // We should reconstruct the full string: "Clean Description | Qty Unit @ Price"
-            const cleanDesc = description ? description.split('|')[0].trim() : (transaction.description.split('|')[0].trim());
-            const q = quantity !== undefined ? Number(quantity) : 0;
-            const up = unitPrice !== undefined ? Number(unitPrice) : 0;
-            const u = unit || (transaction.description.includes('|') ? '' : 'TON'); // Fallback logic is tricky without explicit previous values, default empty
-
-            // If the user didn't send unit, we might lose it if we just use ''. 
-            // Ideally frontend sends ALL fields on update.
-            // Assuming frontend sends the full state of the form.
-
-            finalDescription = `${cleanDesc} | ${q} ${u} @ ${up}`;
-        }
+        // Clean description without unit/quantity bloating
+        let finalDescription = cleanTransactionDescription(description !== undefined ? description : transaction.description);
 
         const oldAmount = Number(transaction.amount);
-        const newAmount = amount ? Number(amount) : oldAmount;
+        const newAmount = (amount !== undefined && amount !== null && amount !== '') ? Number(amount) : oldAmount;
         const diff = newAmount - oldAmount;
+
+        // Resolve safe vs custody targets
+        let targetSafeId = safeId !== undefined ? (safeId || null) : transaction.safeId;
+        let targetPaymentMethod = paymentMethod !== undefined ? paymentMethod : transaction.paymentMethod;
+        let targetPayerUserId = payerUserId !== undefined ? (payerUserId || null) : transaction.payerUserId;
+        let targetCustodyWalletId = req.body.custodyWalletId !== undefined ? (req.body.custodyWalletId || null) : transaction.custodyWalletId;
+
+        // If safeId was passed with custody_ prefix
+        if (typeof targetSafeId === 'string' && targetSafeId.startsWith('custody_')) {
+            const custodyUserId = targetSafeId.replace('custody_', '');
+            targetSafeId = null;
+            targetPaymentMethod = 'CUSTODY_WALLET';
+            if (!targetPayerUserId) targetPayerUserId = custodyUserId;
+            if (!targetCustodyWalletId) targetCustodyWalletId = custodyUserId;
+        }
+
+        // If target paymentMethod is CUSTODY_WALLET, ensure safeId is null
+        if (targetPaymentMethod === 'CUSTODY_WALLET') {
+            targetSafeId = null;
+            if (!targetCustodyWalletId && targetPayerUserId) {
+                targetCustodyWalletId = targetPayerUserId;
+            }
+        } else if (targetSafeId) {
+            targetCustodyWalletId = null;
+        }
+
+        // Determine old vs new source entity for balance adjustments
+        const oldIsCustody = transaction.paymentMethod === 'CUSTODY_WALLET';
+        const oldCustodianId = oldIsCustody ? (transaction.payerUserId || transaction.custodyWalletId || transaction.createdBy) : null;
+        const oldSafeId = !oldIsCustody ? transaction.safeId : null;
+
+        const newIsCustody = targetPaymentMethod === 'CUSTODY_WALLET';
+        const newCustodianId = newIsCustody ? (targetPayerUserId || targetCustodyWalletId || transaction.createdBy) : null;
+        const newSafeId = !newIsCustody ? targetSafeId : null;
 
         // Atomic update with financial recalculations
         const updated = await prisma.$transaction(async (tx) => {
@@ -1371,15 +1577,18 @@ export const updateTransaction = async (req, res, next) => {
                     tenantId: req.user.tenantId
                 },
                 data: {
-                    amount: amount ? Number(amount) : undefined,
+                    amount: (amount !== undefined && amount !== null && amount !== '') ? Number(amount) : undefined,
                     description: finalDescription,
                     category,
                     transactionDate: transactionDate ? new Date(transactionDate) : undefined,
-                    paymentMethod,
-                    projectId,
-                    invoiceNumber,
-                    payerUserId,
-                    projectCostItemId,
+                    paymentMethod: targetPaymentMethod,
+                    projectId: projectId !== undefined ? (projectId || null) : undefined,
+                    safeId: targetSafeId,
+                    custodyWalletId: targetCustodyWalletId,
+                    isOfficeExpense: isOfficeExpense !== undefined ? Boolean(isOfficeExpense) : undefined,
+                    invoiceNumber: invoiceNumber !== undefined ? (invoiceNumber || null) : undefined,
+                    payerUserId: targetPayerUserId,
+                    projectCostItemId: projectCostItemId !== undefined ? (projectCostItemId || null) : undefined,
                     beneficiary: beneficiary !== undefined ? (beneficiary || null) : undefined,
                     transactionTo: transactionTo !== undefined ? (transactionTo || null) : undefined,
                     transactionFrom: transactionFrom !== undefined ? (transactionFrom || null) : undefined,
@@ -1396,21 +1605,122 @@ export const updateTransaction = async (req, res, next) => {
                 }
             });
 
-            // 2. Handle Financial Impacts if Amount Changed
-            if (diff !== 0) {
-                // If APPROVED, we must update balances
-                if (transaction.status === 'APPROVED') {
-                    // Update User Custody (if paid from custody)
-                    if (transaction.paymentMethod === 'CUSTODY_WALLET') {
-                        await tx.user.update({
-                            where: { id: transaction.createdBy },
-                            data: {
-                                currentCustodyBalance: { decrement: diff }, // Spend more = Balance down
-                                // pendingClearance is already cleared for approved transactions, so no change there
-                            }
-                        });
+            // 2. Handle Safe and Custody Balance Adjustments if APPROVED
+            if (transaction.status === 'APPROVED') {
+                // Revert old funding source
+                if (oldIsCustody && oldCustodianId) {
+                    if (oldCustodianId !== newCustodianId || !newIsCustody) {
+                        if (transaction.type === 'INCOME') {
+                            await tx.user.update({
+                                where: { id: oldCustodianId },
+                                data: { currentCustodyBalance: { decrement: oldAmount } }
+                            }).catch(e => console.error('Error decrementing old custody balance:', e));
+                        } else if (transaction.type === 'EXPENSE') {
+                            await tx.user.update({
+                                where: { id: oldCustodianId },
+                                data: { currentCustodyBalance: { increment: oldAmount } }
+                            }).catch(e => console.error('Error incrementing old custody balance:', e));
+                        }
                     }
+                } else if (!oldIsCustody && oldSafeId) {
+                    if (oldSafeId !== newSafeId || newIsCustody) {
+                        if (transaction.type === 'INCOME') {
+                            await tx.companySafe.update({
+                                where: { id: oldSafeId },
+                                data: { balance: { decrement: oldAmount } }
+                            }).catch(e => console.error('Error decrementing old safe balance:', e));
+                        } else if (transaction.type === 'EXPENSE') {
+                            await tx.companySafe.update({
+                                where: { id: oldSafeId },
+                                data: { balance: { increment: oldAmount } }
+                            }).catch(e => console.error('Error incrementing old safe balance:', e));
+                        }
+                    }
+                }
 
+                // Apply new funding source
+                if (newIsCustody && newCustodianId) {
+                    if (oldCustodianId !== newCustodianId || !oldIsCustody) {
+                        if (transaction.type === 'INCOME') {
+                            await tx.user.update({
+                                where: { id: newCustodianId },
+                                data: { currentCustodyBalance: { increment: newAmount } }
+                            }).catch(e => console.error('Error incrementing new custody balance:', e));
+                        } else if (transaction.type === 'EXPENSE') {
+                            await tx.user.update({
+                                where: { id: newCustodianId },
+                                data: { currentCustodyBalance: { decrement: newAmount } }
+                            }).catch(e => console.error('Error decrementing new custody balance:', e));
+                        }
+                    } else if (oldCustodianId === newCustodianId && diff !== 0) {
+                        // Same custodian, amount changed
+                        if (transaction.type === 'INCOME') {
+                            await tx.user.update({
+                                where: { id: newCustodianId },
+                                data: { currentCustodyBalance: { increment: diff } }
+                            }).catch(e => console.error('Error adjusting custody income balance:', e));
+                        } else if (transaction.type === 'EXPENSE') {
+                            await tx.user.update({
+                                where: { id: newCustodianId },
+                                data: { currentCustodyBalance: { decrement: diff } }
+                            }).catch(e => console.error('Error adjusting custody expense balance:', e));
+                        }
+                    }
+                } else if (!newIsCustody && newSafeId) {
+                    if (oldSafeId !== newSafeId || oldIsCustody) {
+                        if (transaction.type === 'INCOME') {
+                            await tx.companySafe.update({
+                                where: { id: newSafeId },
+                                data: { balance: { increment: newAmount } }
+                            }).catch(e => console.error('Error incrementing new safe balance:', e));
+                        } else if (transaction.type === 'EXPENSE') {
+                            await tx.companySafe.update({
+                                where: { id: newSafeId },
+                                data: { balance: { decrement: newAmount } }
+                            }).catch(e => console.error('Error decrementing new safe balance:', e));
+                        }
+                    } else if (oldSafeId === newSafeId && diff !== 0) {
+                        // Same safe, amount changed
+                        if (transaction.type === 'INCOME') {
+                            await tx.companySafe.update({
+                                where: { id: newSafeId },
+                                data: { balance: { increment: diff } }
+                            }).catch(e => console.error('Error adjusting safe income balance:', e));
+                        } else if (transaction.type === 'EXPENSE') {
+                            await tx.companySafe.update({
+                                where: { id: newSafeId },
+                                data: { balance: { decrement: diff } }
+                            }).catch(e => console.error('Error adjusting safe expense balance:', e));
+                        }
+                    }
+                }
+            } else if (transaction.status === 'PENDING_APPROVAL' || transaction.status === 'DRAFT') {
+                // Adjust pendingClearance reservations for expenses
+                if (transaction.type === 'EXPENSE') {
+                    if (oldIsCustody && oldCustodianId && (oldCustodianId !== newCustodianId || !newIsCustody)) {
+                        await tx.user.update({
+                            where: { id: oldCustodianId },
+                            data: { pendingClearance: { decrement: oldAmount } }
+                        }).catch(e => console.error('Error decrementing old pending clearance:', e));
+                    }
+                    if (newIsCustody && newCustodianId && (oldCustodianId !== newCustodianId || !oldIsCustody)) {
+                        await tx.user.update({
+                            where: { id: newCustodianId },
+                            data: { pendingClearance: { increment: newAmount } }
+                        }).catch(e => console.error('Error incrementing new pending clearance:', e));
+                    } else if (newIsCustody && newCustodianId && oldCustodianId === newCustodianId && diff !== 0) {
+                        await tx.user.update({
+                            where: { id: newCustodianId },
+                            data: { pendingClearance: { increment: diff } }
+                        }).catch(e => console.error('Error adjusting pending clearance:', e));
+                    }
+                }
+            }
+
+            // 3. Handle Project / Cost Impacts if Amount Changed
+            if (diff !== 0) {
+                // If APPROVED, we must update project balances
+                if (transaction.status === 'APPROVED') {
                     // Update Project Costs or Office Profit
                     if (transaction.projectId && transaction.category === 'MANAGEMENT_FEE_TRANSFER') {
                         await tx.project.update({
@@ -1453,22 +1763,27 @@ export const updateTransaction = async (req, res, next) => {
                                         where: { id: feeTx.id },
                                         data: {
                                             amount: newFeeAmount,
-                                            description: `Cost-Plus Management Fee (${feePercent}%) on ${newAmount} EGP expense`,
-                                            notes: `PARENT_TX:${transaction.id}`
+                                            description: `Cost-Plus Management Fee (${feePercent}%) on ${newAmount} EGP expense (${finalDescription})`
+                                        }
+                                    });
+
+                                    await tx.project.update({
+                                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
+                                        data: {
+                                            officeRevenue: { increment: feeDiff },
+                                            projectSafeBalance: { decrement: feeDiff }
                                         }
                                     });
                                 } else {
                                     await tx.transaction.delete({
                                         where: { id: feeTx.id }
                                     });
-                                }
 
-                                if (feeDiff !== 0) {
                                     await tx.project.update({
-                                        where: { id: proj.id },
+                                        where: { id: transaction.projectId, tenantId: req.user.tenantId },
                                         data: {
-                                            officeRevenue: { increment: feeDiff },
-                                            projectSafeBalance: { decrement: feeDiff }
+                                            officeRevenue: { decrement: oldFeeAmount },
+                                            projectSafeBalance: { increment: oldFeeAmount }
                                         }
                                     });
                                 }
@@ -1478,11 +1793,11 @@ export const updateTransaction = async (req, res, next) => {
                                         type: 'EXPENSE',
                                         category: 'MANAGEMENT_FEE_TRANSFER',
                                         amount: newFeeAmount,
-                                        description: `Cost-Plus Management Fee (${feePercent}%) on ${newAmount} EGP expense`,
+                                        description: `Cost-Plus Management Fee (${feePercent}%) on ${newAmount} EGP expense (${finalDescription})`,
                                         status: 'APPROVED',
-                                        projectId: proj.id,
+                                        projectId: transaction.projectId,
                                         createdBy: req.user.id,
-                                        transactionDate: transaction.transactionDate || new Date(),
+                                        transactionDate: new Date(),
                                         paymentMethod: 'OTHER',
                                         tenantId: req.user.tenantId,
                                         isOfficeExpense: false,
@@ -1491,7 +1806,7 @@ export const updateTransaction = async (req, res, next) => {
                                 });
 
                                 await tx.project.update({
-                                    where: { id: proj.id },
+                                    where: { id: transaction.projectId, tenantId: req.user.tenantId },
                                     data: {
                                         officeRevenue: { increment: newFeeAmount },
                                         projectSafeBalance: { decrement: newFeeAmount }
@@ -1500,15 +1815,6 @@ export const updateTransaction = async (req, res, next) => {
                             }
                         }
                     }
-                }
-                // If PENDING or DRAFT and CUSTODY_WALLET, update pendingClearance
-                else if ((transaction.status === 'PENDING_APPROVAL' || transaction.status === 'DRAFT') && transaction.paymentMethod === 'CUSTODY_WALLET') {
-                    await tx.user.update({
-                        where: { id: transaction.createdBy },
-                        data: {
-                            pendingClearance: { increment: diff } // Reserved amount changes
-                        }
-                    });
                 }
             }
 
