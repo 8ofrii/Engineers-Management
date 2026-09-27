@@ -6,6 +6,73 @@ import { auditFromReq } from '../lib/audit.js';
  * @route   GET /api/safes
  * @access  Private
  */
+
+/**
+ * Helper to compute custody inflows, outflows, and transaction counts
+ */
+async function getCustodyFlows(userId, tenantId) {
+    const [expenses, returns, fundings, incomes, txCount] = await Promise.all([
+        prisma.transaction.aggregate({
+            where: {
+                tenantId,
+                status: 'APPROVED',
+                type: 'EXPENSE',
+                OR: [
+                    { custodyWalletId: userId },
+                    { payerUserId: userId, paymentMethod: 'CUSTODY_WALLET' },
+                    { createdBy: userId, paymentMethod: 'CUSTODY_WALLET', custodyWalletId: null, payerUserId: null }
+                ]
+            },
+            _sum: { amount: true }
+        }),
+        prisma.custodyTransfer.aggregate({
+            where: {
+                tenantId,
+                engineerId: userId,
+                type: { in: ['RETURN', 'SETTLEMENT'] },
+                relatedTransactionId: null
+            },
+            _sum: { amount: true }
+        }),
+        prisma.custodyTransfer.aggregate({
+            where: {
+                tenantId,
+                engineerId: userId,
+                type: 'FUNDING'
+            },
+            _sum: { amount: true }
+        }),
+        prisma.transaction.aggregate({
+            where: {
+                tenantId,
+                status: 'APPROVED',
+                type: 'INCOME',
+                OR: [
+                    { custodyWalletId: userId },
+                    { payerUserId: userId, paymentMethod: 'CUSTODY_WALLET' }
+                ]
+            },
+            _sum: { amount: true }
+        }),
+        prisma.transaction.count({
+            where: {
+                tenantId,
+                status: 'APPROVED',
+                OR: [
+                    { custodyWalletId: userId },
+                    { payerUserId: userId, paymentMethod: 'CUSTODY_WALLET' },
+                    { createdBy: userId, paymentMethod: 'CUSTODY_WALLET', custodyWalletId: null, payerUserId: null }
+                ]
+            }
+        })
+    ]);
+
+    const totalExpense = Number(expenses._sum.amount || 0) + Number(returns._sum.amount || 0);
+    const totalIncome = Number(fundings._sum.amount || 0) + Number(incomes._sum.amount || 0);
+
+    return { totalIncome, totalExpense, transactionCount: txCount };
+}
+
 export const getSafes = async (req, res, next) => {
     try {
         const tenantId = req.user.tenantId;
@@ -42,9 +109,9 @@ export const getSafes = async (req, res, next) => {
             }
         });
 
-        // Compute inflow and outflow for each safe from approved transactions
+        // Compute inflow, outflow, and transfers for each safe to determine reconciled real-time balance
         const enrichedSafes = await Promise.all(safes.map(async (safe) => {
-            const [inflows, outflows] = await Promise.all([
+            const [inflows, outflows, transfersIn, transfersOut] = await Promise.all([
                 prisma.transaction.aggregate({
                     where: {
                         safeId: safe.id,
@@ -62,22 +129,106 @@ export const getSafes = async (req, res, next) => {
                         tenantId
                     },
                     _sum: { amount: true }
+                }),
+                prisma.safeTransfer.aggregate({
+                    where: {
+                        toSafeId: safe.id,
+                        tenantId
+                    },
+                    _sum: { amount: true }
+                }),
+                prisma.safeTransfer.aggregate({
+                    where: {
+                        fromSafeId: safe.id,
+                        tenantId
+                    },
+                    _sum: { amount: true }
                 })
             ]);
 
+            const totalIn = Number(inflows._sum.amount || 0);
+            const totalOut = Number(outflows._sum.amount || 0);
+            const totalTrIn = Number(transfersIn._sum.amount || 0);
+            const totalTrOut = Number(transfersOut._sum.amount || 0);
+            const initial = Number(safe.initialBalance || 0);
+
+            // Reconciled real-time balance: Initial + Inflows - Outflows + Transfers In - Transfers Out
+            const reconciledBalance = initial + totalIn - totalOut + totalTrIn - totalTrOut;
+
+            // Automatically keep safe.balance in sync in database if drift occurred
+            if (Number(safe.balance) !== reconciledBalance) {
+                await prisma.companySafe.update({
+                    where: { id: safe.id },
+                    data: { balance: reconciledBalance }
+                }).catch(err => console.error(`Error auto-syncing safe ${safe.id} balance:`, err));
+            }
+
             return {
                 ...safe,
-                totalIncome: Number(inflows._sum.amount || 0),
-                totalExpense: Number(outflows._sum.amount || 0),
-                balance: Number(safe.balance),
-                initialBalance: Number(safe.initialBalance)
+                totalIncome: totalIn,
+                totalExpense: totalOut,
+                balance: reconciledBalance,
+                initialBalance: initial
             };
         }));
 
+        // Fetch active tenant members to present custodies on the same plane as safes
+        const usersWithCustody = await prisma.user.findMany({
+            where: {
+                tenantId,
+                isActive: true
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                profilePicture: true,
+                currentCustodyBalance: true
+            },
+            orderBy: { name: 'asc' }
+        });
+
+        const custodyEntities = await Promise.all(usersWithCustody.map(async (u) => {
+            const flows = await getCustodyFlows(u.id, tenantId);
+            return {
+                id: `custody_${u.id}`,
+                userId: u.id,
+                name: `عهدة: ${u.name || u.email}`,
+                nameAr: `عهدة: ${u.name || u.email}`,
+                type: 'CUSTODY',
+                accountNumber: null,
+                bankName: null,
+                balance: Number(u.currentCustodyBalance || 0),
+                totalIncome: flows.totalIncome,
+                totalExpense: flows.totalExpense,
+                initialBalance: 0,
+                currency: 'EGP',
+                isDefault: false,
+                isActive: true,
+                isCustody: true,
+                assignedUserId: u.id,
+                assignedUser: {
+                    id: u.id,
+                    name: u.name,
+                    email: u.email,
+                    role: u.role,
+                    profilePicture: u.profilePicture
+                },
+                _count: {
+                    transactions: flows.transactionCount,
+                    transfersFrom: 0,
+                    transfersTo: 0
+                }
+            };
+        }));
+
+        const allSafesAndCustodies = [...enrichedSafes, ...custodyEntities];
+
         res.status(200).json({
             success: true,
-            count: enrichedSafes.length,
-            data: enrichedSafes
+            count: allSafesAndCustodies.length,
+            data: allSafesAndCustodies
         });
     } catch (error) {
         next(error);
@@ -93,6 +244,42 @@ export const getSafeById = async (req, res, next) => {
     try {
         const { id } = req.params;
         const tenantId = req.user.tenantId;
+
+        if (id && id.startsWith('custody_')) {
+            const userId = id.replace('custody_', '');
+            const user = await prisma.user.findFirst({
+                where: { id: userId, tenantId },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true,
+                    profilePicture: true,
+                    currentCustodyBalance: true
+                }
+            });
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'Custody account user not found' });
+            }
+            const flows = await getCustodyFlows(user.id, tenantId);
+            return res.status(200).json({
+                success: true,
+                data: {
+                    id: `custody_${user.id}`,
+                    userId: user.id,
+                    name: `عهدة: ${user.name || user.email}`,
+                    nameAr: `عهدة: ${user.name || user.email}`,
+                    type: 'CUSTODY',
+                    balance: Number(user.currentCustodyBalance || 0),
+                    totalIncome: flows.totalIncome,
+                    totalExpense: flows.totalExpense,
+                    currency: 'EGP',
+                    isCustody: true,
+                    isActive: true,
+                    assignedUser: user
+                }
+            });
+        }
 
         const safe = await prisma.companySafe.findFirst({
             where: { id, tenantId },
@@ -124,9 +311,41 @@ export const getSafeById = async (req, res, next) => {
             });
         }
 
+        const [inflows, outflows, transfersIn, transfersOut] = await Promise.all([
+            prisma.transaction.aggregate({
+                where: { safeId: safe.id, status: 'APPROVED', type: 'INCOME', tenantId },
+                _sum: { amount: true }
+            }),
+            prisma.transaction.aggregate({
+                where: { safeId: safe.id, status: 'APPROVED', type: 'EXPENSE', tenantId },
+                _sum: { amount: true }
+            }),
+            prisma.safeTransfer.aggregate({
+                where: { toSafeId: safe.id, tenantId },
+                _sum: { amount: true }
+            }),
+            prisma.safeTransfer.aggregate({
+                where: { fromSafeId: safe.id, tenantId },
+                _sum: { amount: true }
+            })
+        ]);
+
+        const totalIn = Number(inflows._sum.amount || 0);
+        const totalOut = Number(outflows._sum.amount || 0);
+        const totalTrIn = Number(transfersIn._sum.amount || 0);
+        const totalTrOut = Number(transfersOut._sum.amount || 0);
+        const initial = Number(safe.initialBalance || 0);
+        const reconciledBalance = initial + totalIn - totalOut + totalTrIn - totalTrOut;
+
         res.status(200).json({
             success: true,
-            data: safe
+            data: {
+                ...safe,
+                totalIncome: totalIn,
+                totalExpense: totalOut,
+                balance: reconciledBalance,
+                initialBalance: initial
+            }
         });
     } catch (error) {
         next(error);
@@ -435,17 +654,232 @@ export const transferBetweenSafes = async (req, res, next) => {
         if (!fromSafeId || !toSafeId) {
             return res.status(400).json({
                 success: false,
-                message: 'Source and destination safes are required'
+                message: 'Source and destination safes/custodies are required'
             });
         }
 
         if (fromSafeId === toSafeId) {
             return res.status(400).json({
                 success: false,
-                message: 'Source and destination safes cannot be the same'
+                message: 'Source and destination cannot be the same'
             });
         }
 
+        const fromIsCustody = String(fromSafeId).startsWith('custody_');
+        const toIsCustody = String(toSafeId).startsWith('custody_');
+        const fromUserId = fromIsCustody ? String(fromSafeId).replace('custody_', '') : null;
+        const toUserId = toIsCustody ? String(toSafeId).replace('custody_', '') : null;
+
+        const receiptUrl = req.file
+            ? (req.file.key ? `/uploads/${req.file.key}` : (req.file.location || `/uploads/receipts/${req.file.filename}`))
+            : (req.body.receiptUrl ? String(req.body.receiptUrl).trim() : null);
+
+        // Case 1: Custody to Custody Handover
+        if (fromIsCustody && toIsCustody) {
+            const [fromUser, toUser] = await Promise.all([
+                prisma.user.findFirst({ where: { id: fromUserId, tenantId, isActive: true } }),
+                prisma.user.findFirst({ where: { id: toUserId, tenantId, isActive: true } })
+            ]);
+
+            if (!fromUser) return res.status(404).json({ success: false, message: 'Source custody member not found' });
+            if (!toUser) return res.status(404).json({ success: false, message: 'Destination custody member not found' });
+
+            const result = await prisma.$transaction(async (tx) => {
+                const updatedFrom = await tx.user.update({
+                    where: { id: fromUserId },
+                    data: { currentCustodyBalance: { decrement: transferAmount } }
+                });
+
+                const updatedTo = await tx.user.update({
+                    where: { id: toUserId },
+                    data: { currentCustodyBalance: { increment: transferAmount } }
+                });
+
+                await tx.custodyTransfer.create({
+                    data: {
+                        type: 'CLEARANCE',
+                        amount: transferAmount,
+                        description: notes ? `تحويل عهدة إلى ${toUser.name}: ${notes}` : `تحويل عهدة إلى ${toUser.name}`,
+                        engineerId: fromUserId,
+                        balanceBefore: fromUser.currentCustodyBalance,
+                        balanceAfter: updatedFrom.currentCustodyBalance,
+                        tenantId
+                    }
+                });
+
+                await tx.custodyTransfer.create({
+                    data: {
+                        type: 'FUNDING',
+                        amount: transferAmount,
+                        description: notes ? `استلام عهدة من ${fromUser.name}: ${notes}` : `استلام عهدة من ${fromUser.name}`,
+                        engineerId: toUserId,
+                        balanceBefore: toUser.currentCustodyBalance,
+                        balanceAfter: updatedTo.currentCustodyBalance,
+                        tenantId
+                    }
+                });
+
+                return { fromBalance: updatedFrom.currentCustodyBalance, toBalance: updatedTo.currentCustodyBalance };
+            });
+
+            await auditFromReq(req, {
+                action: 'TRANSFER_CUSTODY',
+                entity: 'CustodyTransfer',
+                after: { from: fromUser.name, to: toUser.name, amount: transferAmount }
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Custody transfer completed successfully',
+                data: result
+            });
+        }
+
+        // Case 2: Safe to Custody (Funding Custody from Safe)
+        if (!fromIsCustody && toIsCustody) {
+            const [fromSafe, toUser] = await Promise.all([
+                prisma.companySafe.findFirst({ where: { id: fromSafeId, tenantId, isActive: true } }),
+                prisma.user.findFirst({ where: { id: toUserId, tenantId, isActive: true } })
+            ]);
+
+            if (!fromSafe) return res.status(404).json({ success: false, message: 'Source safe not found or inactive' });
+            if (!toUser) return res.status(404).json({ success: false, message: 'Destination custody member not found' });
+
+            const result = await prisma.$transaction(async (tx) => {
+                const updatedFrom = await tx.companySafe.update({
+                    where: { id: fromSafeId },
+                    data: { balance: { decrement: transferAmount } }
+                });
+
+                const updatedTo = await tx.user.update({
+                    where: { id: toUserId },
+                    data: { currentCustodyBalance: { increment: transferAmount } }
+                });
+
+                const custodyTransferRecord = await tx.custodyTransfer.create({
+                    data: {
+                        type: 'FUNDING',
+                        amount: transferAmount,
+                        description: notes ? `تغذية عهدة من ${fromSafe.name}: ${notes}` : `تغذية عهدة من ${fromSafe.name}`,
+                        engineerId: toUserId,
+                        balanceBefore: toUser.currentCustodyBalance,
+                        balanceAfter: updatedTo.currentCustodyBalance,
+                        tenantId
+                    }
+                });
+
+                const txOut = await tx.transaction.create({
+                    data: {
+                        type: 'EXPENSE',
+                        category: 'CUSTODY_TRANSFER',
+                        amount: transferAmount,
+                        description: notes ? `تغذية عهدة (${toUser.name}): ${notes}` : `تغذية عهدة: ${toUser.name} من ${fromSafe.name}`,
+                        status: 'APPROVED',
+                        createdBy: req.user.id,
+                        transactionDate: transferDate ? new Date(transferDate) : new Date(),
+                        paymentMethod: 'CASH',
+                        safeId: fromSafeId,
+                        transactionTo: toUser.name,
+                        toEngineerId: toUserId,
+                        receiptPhotoUrl: receiptUrl,
+                        tenantId
+                    }
+                });
+
+                await tx.notification.create({
+                    data: {
+                        userId: toUserId,
+                        type: 'INFO',
+                        title: 'Custody Funded / تغذية عهدة',
+                        message: `تم تحويل ${transferAmount} ج.م إلى عهدتك من [${fromSafe.name}]. الرصيد الجديد: ${updatedTo.currentCustodyBalance} ج.م`,
+                        resourceType: 'custody',
+                        tenantId
+                    }
+                }).catch(() => {});
+
+                return { transferRecord: txOut, custodyTransferRecord, fromBalance: updatedFrom.balance, toBalance: updatedTo.currentCustodyBalance };
+            });
+
+            await auditFromReq(req, {
+                action: 'SAFE_TO_CUSTODY_TRANSFER',
+                entity: 'CustodyTransfer',
+                after: { fromSafe: fromSafe.name, toMember: toUser.name, amount: transferAmount }
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Custody funded successfully from safe',
+                data: result
+            });
+        }
+
+        // Case 3: Custody to Safe (Returning Custody to Safe)
+        if (fromIsCustody && !toIsCustody) {
+            const [fromUser, toSafe] = await Promise.all([
+                prisma.user.findFirst({ where: { id: fromUserId, tenantId, isActive: true } }),
+                prisma.companySafe.findFirst({ where: { id: toSafeId, tenantId, isActive: true } })
+            ]);
+
+            if (!fromUser) return res.status(404).json({ success: false, message: 'Source custody member not found' });
+            if (!toSafe) return res.status(404).json({ success: false, message: 'Destination safe not found or inactive' });
+
+            const result = await prisma.$transaction(async (tx) => {
+                const updatedFrom = await tx.user.update({
+                    where: { id: fromUserId },
+                    data: { currentCustodyBalance: { decrement: transferAmount } }
+                });
+
+                const updatedTo = await tx.companySafe.update({
+                    where: { id: toSafeId },
+                    data: { balance: { increment: transferAmount } }
+                });
+
+                const custodyTransferRecord = await tx.custodyTransfer.create({
+                    data: {
+                        type: 'RETURN',
+                        amount: transferAmount,
+                        description: notes ? `توريد عهدة إلى ${toSafe.name}: ${notes}` : `توريد عهدة إلى ${toSafe.name}`,
+                        engineerId: fromUserId,
+                        balanceBefore: fromUser.currentCustodyBalance,
+                        balanceAfter: updatedFrom.currentCustodyBalance,
+                        tenantId
+                    }
+                });
+
+                const txIn = await tx.transaction.create({
+                    data: {
+                        type: 'INCOME',
+                        category: 'CUSTODY_TRANSFER',
+                        amount: transferAmount,
+                        description: notes ? `توريد عهدة من (${fromUser.name}): ${notes}` : `توريد عهدة من: ${fromUser.name} إلى ${toSafe.name}`,
+                        status: 'APPROVED',
+                        createdBy: req.user.id,
+                        transactionDate: transferDate ? new Date(transferDate) : new Date(),
+                        paymentMethod: 'CASH',
+                        safeId: toSafeId,
+                        transactionFrom: fromUser.name,
+                        receiptPhotoUrl: receiptUrl,
+                        tenantId
+                    }
+                });
+
+                return { transferRecord: txIn, custodyTransferRecord, fromBalance: updatedFrom.currentCustodyBalance, toBalance: updatedTo.balance };
+            });
+
+            await auditFromReq(req, {
+                action: 'CUSTODY_TO_SAFE_TRANSFER',
+                entity: 'CustodyTransfer',
+                after: { fromMember: fromUser.name, toSafe: toSafe.name, amount: transferAmount }
+            });
+
+            return res.status(201).json({
+                success: true,
+                message: 'Custody returned successfully to safe',
+                data: result
+            });
+        }
+
+        // Case 4: Safe to Safe (Original behavior)
         const [fromSafe, toSafe] = await Promise.all([
             prisma.companySafe.findFirst({ where: { id: fromSafeId, tenantId, isActive: true } }),
             prisma.companySafe.findFirst({ where: { id: toSafeId, tenantId, isActive: true } })
@@ -458,24 +892,17 @@ export const transferBetweenSafes = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Destination safe not found or inactive' });
         }
 
-        const receiptUrl = req.file
-            ? (req.file.key ? `/uploads/${req.file.key}` : (req.file.location || `/uploads/receipts/${req.file.filename}`))
-            : (req.body.receiptUrl ? String(req.body.receiptUrl).trim() : null);
-
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Decrement source safe balance
             const updatedFrom = await tx.companySafe.update({
                 where: { id: fromSafeId },
                 data: { balance: { decrement: transferAmount } }
             });
 
-            // 2. Increment destination safe balance
             const updatedTo = await tx.companySafe.update({
                 where: { id: toSafeId },
                 data: { balance: { increment: transferAmount } }
             });
 
-            // 3. Create SafeTransfer record
             const transferRecord = await tx.safeTransfer.create({
                 data: {
                     amount: transferAmount,
@@ -519,11 +946,6 @@ export const transferBetweenSafes = async (req, res, next) => {
     }
 };
 
-/**
- * @desc    Get safe transfers history
- * @route   GET /api/safes/transfers
- * @access  Private
- */
 export const getSafeTransfers = async (req, res, next) => {
     try {
         const tenantId = req.user.tenantId;
@@ -560,6 +982,139 @@ export const getSafeStatement = async (req, res, next) => {
         const { id } = req.params;
         const tenantId = req.user.tenantId;
         const { dateFrom, dateTo } = req.query;
+
+        // Support Member Custody Statement
+        if (id && id.startsWith('custody_')) {
+            const userId = id.replace('custody_', '');
+            const user = await prisma.user.findFirst({
+                where: { id: userId, tenantId },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true,
+                    currentCustodyBalance: true
+                }
+            });
+
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'Custody account user not found' });
+            }
+
+            const ctWhere = { engineerId: userId, tenantId };
+            if (dateFrom) ctWhere.createdAt = { gte: new Date(dateFrom) };
+            if (dateTo) ctWhere.createdAt = { ...(ctWhere.createdAt || {}), lte: new Date(`${dateTo}T23:59:59.999Z`) };
+
+            const custodyTransfers = await prisma.custodyTransfer.findMany({
+                where: ctWhere,
+                orderBy: { createdAt: 'asc' }
+            });
+
+            const txWhere = {
+                tenantId,
+                status: 'APPROVED',
+                OR: [
+                    { payerUserId: userId, paymentMethod: 'CUSTODY_WALLET' },
+                    { custodyWalletId: userId },
+                    { createdBy: userId, paymentMethod: 'CUSTODY_WALLET', custodyWalletId: null, payerUserId: null },
+                    { toEngineerId: userId, category: 'CUSTODY_TRANSFER' },
+                    { transactionFrom: user.name, category: 'CUSTODY_TRANSFER' }
+                ]
+            };
+            if (dateFrom) txWhere.transactionDate = { gte: new Date(dateFrom) };
+            if (dateTo) txWhere.transactionDate = { ...(txWhere.transactionDate || {}), lte: new Date(`${dateTo}T23:59:59.999Z`) };
+
+            const txs = await prisma.transaction.findMany({
+                where: txWhere,
+                orderBy: { transactionDate: 'asc' },
+                include: {
+                    project: { select: { id: true, name: true } },
+                    user: { select: { id: true, name: true } },
+                    workman: { select: { id: true, name: true } },
+                    supplier: { select: { id: true, name: true } },
+                    client: { select: { id: true, name: true } }
+                }
+            });
+
+            const ledger = [];
+
+            custodyTransfers.forEach(ct => {
+                const isFunding = ct.type === 'FUNDING';
+                ledger.push({
+                    id: ct.id,
+                    date: ct.createdAt,
+                    type: isFunding ? 'TRANSFER_IN' : 'TRANSFER_OUT',
+                    inflow: isFunding ? Number(ct.amount) : 0,
+                    outflow: !isFunding ? Number(ct.amount) : 0,
+                    description: ct.description || (isFunding ? 'تغذية عهدة' : 'تسوية عهدة'),
+                    reference: `CT-${ct.id.slice(0, 6)}`,
+                    category: ct.type,
+                    projectName: 'العهدة المالية',
+                    partyName: user.name,
+                    userName: user.name,
+                    receiptUrl: null
+                });
+            });
+
+            txs.forEach(t => {
+                const isCustodyExpense = t.type === 'EXPENSE' && (
+                    t.paymentMethod === 'CUSTODY_WALLET' ||
+                    t.custodyWalletId === userId ||
+                    (t.payerUserId === userId && t.paymentMethod === 'CUSTODY_WALLET')
+                );
+                if (isCustodyExpense) {
+                    ledger.push({
+                        id: t.id,
+                        date: t.transactionDate,
+                        type: 'EXPENSE',
+                        inflow: 0,
+                        outflow: Number(t.amount),
+                        description: t.description || 'مصروف موقع من العهدة',
+                        reference: t.invoiceNumber || t.id.slice(0, 8),
+                        category: t.category,
+                        projectName: t.project?.name || null,
+                        partyName: t.client?.name || t.supplier?.name || t.workman?.name || null,
+                        userName: user.name,
+                        receiptUrl: t.receiptPhotoUrl || null
+                    });
+                }
+            });
+
+            ledger.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            let runningBalance = 0;
+            const entriesWithBalance = ledger.map(entry => {
+                runningBalance += (entry.inflow - entry.outflow);
+                return {
+                    ...entry,
+                    balanceAfter: runningBalance
+                };
+            });
+
+            const totalInflow = ledger.reduce((sum, item) => sum + item.inflow, 0);
+            const totalOutflow = ledger.reduce((sum, item) => sum + item.outflow, 0);
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    safe: {
+                        id: `custody_${user.id}`,
+                        name: `عهدة: ${user.name || user.email}`,
+                        nameAr: `عهدة: ${user.name || user.email}`,
+                        type: 'CUSTODY',
+                        currency: 'EGP',
+                        balance: Number(user.currentCustodyBalance || 0),
+                        assignedUser: user
+                    },
+                    openingBalance: 0,
+                    closingBalance: Number(user.currentCustodyBalance || 0),
+                    totalInflow,
+                    totalOutflow,
+                    netChange: totalInflow - totalOutflow,
+                    transactions: entriesWithBalance
+                }
+            });
+        }
 
         const safe = await prisma.companySafe.findFirst({
             where: { id, tenantId },
@@ -720,7 +1275,7 @@ export const getSafeStatement = async (req, res, next) => {
                     type: safe.type,
                     bankName: safe.bankName,
                     accountNumber: safe.accountNumber,
-                    currentBalance: Number(safe.balance),
+                    currentBalance: runningBalance,
                     initialBalance: Number(safe.initialBalance),
                     currency: safe.currency
                 },
