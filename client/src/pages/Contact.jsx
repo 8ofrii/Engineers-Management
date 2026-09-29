@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
-  ArrowLeft, ArrowRight, Globe, Mail, Phone, 
-  MapPin, Clock, Send, CheckCircle2, MessageSquare, 
-  Sparkles, HelpCircle, FileText
+  ArrowLeft, ArrowRight, Globe, Mail, 
+  Clock, Send, CheckCircle2, Copy, Check,
+  Sparkles, HelpCircle
 } from 'lucide-react';
 import SkyToggle from '../components/ui/sky-toggle';
 import { BeamsBackground } from '@/components/ui/beams-background';
 import './Legal.css';
+
+const SUPPORT_EMAIL = 'hesabyaisupport@gmail.com';
 
 export default function Contact() {
   const { i18n } = useTranslation();
@@ -45,6 +47,7 @@ export default function Contact() {
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const quickPills = [
     { id: 'demo', label: T('Schedule Demo', 'طلب عرض توضيحي') },
@@ -57,11 +60,17 @@ export default function Contact() {
     setTopic(pill.id);
     if (!message) {
       if (pill.id === 'demo') {
-        setMessage(T('Hello, I would like to schedule a quick demo of Hesaby for our engineering team.', 'مرحباً، أود حجز موعد لعرض توضيحي لمنصة حسابي لفريق شركتنا.'));
+        setMessage(T('Hello, I would like to schedule a quick demo of Hesaby for our team.', 'مرحباً، أود حجز موعد لعرض توضيحي لمنصة حسابي لفريقنا.'));
       } else if (pill.id === 'pricing') {
         setMessage(T('Hello, I would like more details about your enterprise multi-company plans.', 'مرحباً، أود الاستفسار عن باقات الشركات الكبرى والمشاريع غير المحدودة.'));
       }
     }
+  };
+
+  const copyEmailToClipboard = () => {
+    navigator.clipboard?.writeText(SUPPORT_EMAIL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleSubmit = (e) => {
@@ -69,7 +78,6 @@ export default function Contact() {
     if (!name.trim() || !email.trim() || !message.trim()) return;
 
     setLoading(true);
-    // Compose mailto as fallback and direct conduit
     const subject = encodeURIComponent(`[Hesaby Contact - ${topic.toUpperCase()}] from ${name}`);
     const body = encodeURIComponent(
       `Name: ${name}\nEmail: ${email}\nPhone: ${phone || 'N/A'}\nTopic: ${topic}\n\nMessage:\n${message}`
@@ -78,13 +86,12 @@ export default function Contact() {
     setTimeout(() => {
       setLoading(false);
       setSubmitted(true);
-      // Attempt opening user's native email client
       try {
-        window.location.href = `mailto:support@hesaby.app?subject=${subject}&body=${body}`;
+        window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
       } catch (err) {
         console.log('Mail client invocation fallback', err);
       }
-    }, 600);
+    }, 500);
   };
 
   return (
@@ -117,33 +124,36 @@ export default function Contact() {
           </div>
 
           <div className="contact-grid">
-            {/* Left Column: Direct Info */}
+            {/* Left Column: Direct Info (Location Card Removed) */}
             <div className="contact-info-col">
               <div className="contact-card">
                 <div className="contact-card-icon"><Mail size={20} /></div>
-                <h4>{T('Customer Support', 'الدعم الفني')}</h4>
-                <p>{T('For technical questions, bugs, or account help.', 'للمساعدة الفنية، المشكلات، أو إدارة الحساب.')}</p>
-                <a href="mailto:support@hesaby.app" className="contact-link">
-                  support@hesaby.app
-                </a>
+                <h4>{T('Direct Email Support', 'البريد الإلكتروني المباشر')}</h4>
+                <p>{T('For technical questions, billing inquiries, or account help.', 'للمساعدة الفنية، المشكلات، الاشتراكات، أو إدارة الحساب.')}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                  <a href="mailto:hesabyaisupport@gmail.com" className="contact-link" style={{ fontSize: '0.92rem' }}>
+                    hesabyaisupport@gmail.com
+                  </a>
+                  <button 
+                    type="button" 
+                    onClick={copyEmailToClipboard}
+                    className="contact-pill-btn"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px' }}
+                    title={T('Copy to clipboard', 'نسخ إلى الحافظة')}
+                  >
+                    {copied ? <Check size={12} color="#22c55e" /> : <Copy size={12} />}
+                    <span>{copied ? T('Copied!', 'تم النسخ!') : T('Copy', 'نسخ')}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="contact-card">
-                <div className="contact-card-icon"><Sparkles size={20} /></div>
-                <h4>{T('Sales & Enterprise', 'المبيعات والشركات')}</h4>
-                <p>{T('Custom plans, invoice volume discounts, and onboarding.', 'للباقات المخصصة، الشركات الكبرى، وحلول الدفع المجمعة.')}</p>
-                <a href="mailto:sales@hesaby.app" className="contact-link">
-                  sales@hesaby.app
-                </a>
-              </div>
-
-              <div className="contact-card">
-                <div className="contact-card-icon"><MapPin size={20} /></div>
-                <h4>{T('Location', 'المقر')}</h4>
-                <p>{T('Cairo, Egypt · Middle East Operations', 'القاهرة، جمهورية مصر العربية')}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--text-tertiary, #78716c)' }}>
-                  <Clock size={14} />
-                  <span>{T('Sun – Thu: 9:00 AM – 6:00 PM (GMT+2)', 'الأحد – الخميس: ٩:٠٠ ص – ٦:٠٠ م')}</span>
+                <div className="contact-card-icon"><Clock size={20} /></div>
+                <h4>{T('Response Commitment', 'سرعة الاستجابة')}</h4>
+                <p>{T('We review incoming messages regularly and typically respond within a few hours.', 'نراجع الرسائل بانتظام ونقوم بالرد في أسرع وقت ممكن.')}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.84rem', color: '#ff8a50', fontWeight: 600 }}>
+                  <CheckCircle2 size={15} />
+                  <span>{T('Direct Support from the Core Team', 'دعم مباشر وسريع من فريق العمل')}</span>
                 </div>
               </div>
             </div>
@@ -153,11 +163,11 @@ export default function Contact() {
               {submitted ? (
                 <div className="contact-success-box">
                   <CheckCircle2 size={44} style={{ margin: '0 auto 12px' }} />
-                  <h4>{T('Message Sent Successfully!', 'تم إرسال رسالتك بنجاح!')}</h4>
+                  <h4>{T('Message Ready & Sent!', 'تم تجهيز رسالتك بنجاح!')}</h4>
                   <p>
                     {T(
-                      'Thank you for reaching out. We have opened your email client with the pre-filled inquiry. Our team will review and reply within 2-4 business hours.',
-                      'شكراً لتواصلك معنا. تم تجهيز رسالتك وسيقوم فريقنا بمراجعتها والرد عليك في أقرب وقت خلال ساعات العمل.'
+                      'Your email client has been prompted to send your message to hesabyaisupport@gmail.com. We will review and reply promptly.',
+                      'تم تجهيز الرسالة لإرسالها عبر بريدك إلى hesabyaisupport@gmail.com. سنقوم بالمراجعة والرد عليك في أسرع وقت.'
                     )}
                   </p>
                   <button 

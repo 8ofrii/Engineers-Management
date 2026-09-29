@@ -138,7 +138,7 @@ export default function PrivacyPolicy() {
                         <section className="legal-section">
                             <h2>{T('9. Contact', '\u0669. \u0627\u0644\u062a\u0648\u0627\u0635\u0644')}</h2>
                             <p>{T('For privacy inquiries, contact us at:', '\u0644\u0627\u0633\u062a\u0641\u0633\u0627\u0631\u0627\u062a \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629\u060c \u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627:')}</p>
-                            <p className="legal-contact"><FileText size={14} /><a href="mailto:privacy@hesaby.app">privacy@hesaby.app</a></p>
+                            <p className="legal-contact"><FileText size={14} /><a href="mailto:hesabyaisupport@gmail.com">hesabyaisupport@gmail.com</a></p>
                         </section>
                     </div>
 

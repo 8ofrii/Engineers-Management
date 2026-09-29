@@ -128,7 +128,7 @@ export default function About() {
             <div className="legal-icon-wrap"><Building2 size={26} /></div>
             <h1>{T('About Hesaby', 'عن منصة حسابي')}</h1>
             <p className="legal-updated">
-              {T('Engineered in Cairo for construction firms across Egypt & MENA', 'صُمم في القاهرة لخدمة شركات المقاولات والهندسة في مصر والشرق الأوسط')}
+              {T('Engineered for construction & engineering firms', 'صُممت لخدمة شركات المقاولات والهندسة وإدارة المشروعات')}
             </p>
           </div>
 
@@ -185,16 +185,16 @@ export default function About() {
             </section>
 
             <section className="legal-section">
-              <h2>{T('Headquarters & Support', 'المقر والدعم الفني')}</h2>
+              <h2>{T('Support & Inquiries', 'الدعم الفني والاستفسارات')}</h2>
               <p>
                 {T(
-                  'Hesaby is headquartered in Cairo, Egypt. Our dedicated engineering and customer success teams are always available to help you configure your company safes, migrate your historical project data, and train your site engineers.',
-                  'يقع المقر الرئيسي لمنصة حسابي في القاهرة، مصر. فريق الدعم الفني والهندسي متواجد دائماً لمساعدتك في إعداد خزائن شركتك، ونقل بيانات مشروعاتك السابقة، وتدريب مهندسي الموقع.'
+                  'Our support team is always available to help you configure your company accounts, manage your projects, and answer any technical questions.',
+                  'فريق الدعم الفني متواجد لمساعدتك في إعداد حسابات شركتك، وإدارة مشروعاتك، والإجابة على أي استفسارات تقنية.'
                 )}
               </p>
               <p className="legal-contact" style={{ marginTop: 12 }}>
                 <Mail size={16} />
-                <a href="mailto:support@hesaby.app">support@hesaby.app</a>
+                <a href="mailto:hesabyaisupport@gmail.com">hesabyaisupport@gmail.com</a>
               </p>
             </section>
           </div>

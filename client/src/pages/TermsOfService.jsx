@@ -144,7 +144,7 @@ export default function TermsOfService() {
                         <section className="legal-section">
                             <h2>{T('11. Contact', '\u0661\u0661. \u0627\u0644\u062a\u0648\u0627\u0635\u0644')}</h2>
                             <p>{T('Questions about these Terms? Contact us at:', '\u0623\u0633\u0626\u0644\u0629 \u062d\u0648\u0644 \u0627\u0644\u0634\u0631\u0648\u0637\u061f \u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0646\u0627:')}</p>
-                            <p className="legal-contact"><FileText size={14} /><a href="mailto:support@hesaby.app">support@hesaby.app</a></p>
+                            <p className="legal-contact"><FileText size={14} /><a href="mailto:hesabyaisupport@gmail.com">hesabyaisupport@gmail.com</a></p>
                         </section>
                     </div>
 
