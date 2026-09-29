@@ -239,9 +239,11 @@ export default function Landing() {
           <span className="hx-foot-tagline">{T('Your site, properly recorded.','موقعك، مسجّل صح.')}</span>
         </div>
         <div className="hx-foot-links">
+          <Link to="/about">{T('About Us','عن حسابي')}</Link>
+          <Link to="/faq">{T('FAQ','الأسئلة الشائعة')}</Link>
+          <Link to="/contact">{T('Contact','تواصل معنا')}</Link>
           <Link to="/terms">{T('Terms of Service','شروط الخدمة')}</Link>
           <Link to="/privacy">{T('Privacy Policy','سياسة الخصوصية')}</Link>
-          <a href="mailto:support@hesaby.app">{T('Contact','تواصل معنا')}</a>
         </div>
         <div className="hx-foot-copy">
           <span>© {new Date().getFullYear()} Hesaby</span>
