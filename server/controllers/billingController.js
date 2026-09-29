@@ -9,8 +9,9 @@ import {
     verifyWebhookHmac,
     paymobEnabled
 } from '../lib/paymob.js';
-import { getPlan, listSelfServicePlans, listAddOnPacks, ADD_ONS } from '../lib/plans.js';
+import { getPlan, listSelfServicePlans, listAddOnPacks, ADD_ONS, isPlanEligibleForAddOns } from '../lib/plans.js';
 import { getTenantAiUsage } from '../lib/aiUsage.js';
+import { getTenantStorageUsage } from '../lib/storageUsage.js';
 import { getInstaPayConfig, generateReferenceCode } from '../lib/instapay.js';
 import { uploadBuffer } from '../lib/storage.js';
 
@@ -31,7 +32,7 @@ export const listPlans = async (req, res) => {
  */
 export const getCurrentSubscription = async (req, res) => {
     const tenantId = req.user.tenantId;
-    const [sub, tenant, projectCount, userCount, aiUsage] = await Promise.all([
+    const [sub, tenant, projectCount, userCount, aiUsage, storageUsage] = await Promise.all([
         prisma.subscription.findFirst({
             where: { tenantId, status: 'ACTIVE' },
             orderBy: { currentPeriodEnd: 'desc' }
@@ -42,11 +43,13 @@ export const getCurrentSubscription = async (req, res) => {
         }),
         prisma.project.count({ where: { tenantId, deletedAt: null } }),
         prisma.user.count({ where: { tenantId, isActive: true } }),
-        getTenantAiUsage(tenantId)
+        getTenantAiUsage(tenantId),
+        getTenantStorageUsage(tenantId)
     ]);
 
-    const activePlanKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
-    const planConfig = getPlan(activePlanKey);
+    const rawPlanKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
+    const planConfig = getPlan(rawPlanKey);
+    const activePlanKey = planConfig.key; // Always canonical: 'FREE', 'PREMIUM', or 'ENTERPRISE'
 
     const usageStats = {
         projects: {
@@ -64,6 +67,14 @@ export const getCurrentSubscription = async (req, res) => {
             max: aiUsage.cap,
             remaining: aiUsage.remaining,
             periodStart: aiUsage.periodStart
+        },
+        storage: {
+            currentMb: storageUsage.usedMb,
+            maxMb: storageUsage.maxMb,
+            remainingMb: storageUsage.remainingMb,
+            usedPercent: storageUsage.usedPercent,
+            isUnlimited: storageUsage.isUnlimited,
+            maxUploadFileMb: storageUsage.maxUploadFileMb
         }
     };
 
@@ -73,6 +84,7 @@ export const getCurrentSubscription = async (req, res) => {
             data: {
                 ...sub,
                 plan: activePlanKey,
+                rawPlan: rawPlanKey,
                 planConfig,
                 usage: usageStats
             }
@@ -359,7 +371,7 @@ export const cancelSubscription = async (req, res) => {
  * via Paymob checkout (/checkout) or verified InstaPay transfer, unless executed by a SUPER_ADMIN.
  */
 export const selectPlan = async (req, res) => {
-    const { plan: planKey } = req.body || {};
+    const { plan: planKey, confirmDowngrade, confirmationCode, reason, feedback } = req.body || {};
     const plan = getPlan(planKey);
     if (!plan) {
         return res.status(400).json({ success: false, message: 'Unknown plan key.' });
@@ -375,6 +387,34 @@ export const selectPlan = async (req, res) => {
     }
 
     const tenantId = req.user.tenantId;
+
+    // Check if currently on a paid subscription or paid tenant plan
+    const [currentSub, tenant] = await Promise.all([
+        prisma.subscription.findFirst({
+            where: { tenantId, status: 'ACTIVE' },
+            orderBy: { currentPeriodEnd: 'desc' }
+        }),
+        prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { subscriptionPlan: true }
+        })
+    ]);
+
+    const activePlanKey = currentSub?.plan || tenant?.subscriptionPlan || 'FREE';
+    const activePlanConfig = getPlan(activePlanKey);
+    const isDowngradingFromPaid = (activePlanConfig?.priceEgp > 0 || (activePlanKey !== 'FREE' && planKey === 'FREE'));
+
+    if (isDowngradingFromPaid && planKey === 'FREE') {
+        if (!confirmDowngrade) {
+            return res.status(400).json({
+                success: false,
+                code: 'DOWNGRADE_CONFIRMATION_REQUIRED',
+                message: 'Explicit downgrade confirmation is required to switch from a paid plan to Free.',
+                messageAr: 'يتطلب الانتقال من باقة مدفوعة إلى الباقة المجانية تأكيداً صريحاً لتجنب التخفيض غير المقصود.'
+            });
+        }
+    }
+
     const start = new Date();
     const end = new Date(start.getTime() + plan.billingPeriodDays * 24 * 60 * 60 * 1000);
 
@@ -400,13 +440,27 @@ export const selectPlan = async (req, res) => {
     });
 
     auditFromReq(req, {
-        action: 'PLAN_CHANGED',
+        action: isDowngradingFromPaid ? 'PLAN_DOWNGRADE' : 'PLAN_CHANGED',
         entity: 'Subscription',
         entityId: tenantId,
-        metadata: { plan: plan.key }
+        metadata: {
+            fromPlan: activePlanKey,
+            toPlan: plan.key,
+            downgradeReason: reason || null,
+            downgradeFeedback: feedback || null
+        }
     });
 
-    res.json({ success: true, message: `Successfully updated plan to ${plan.name}`, plan: plan.key });
+    res.json({
+        success: true,
+        message: isDowngradingFromPaid
+            ? `Your plan has been downgraded to ${plan.name}. Limits have been updated.`
+            : `Successfully updated plan to ${plan.name}`,
+        messageAr: isDowngradingFromPaid
+            ? `تم تخفيض باقتك بنجاح إلى ${plan.nameAr}. تم تطبيق الحدود المجانية الجديدة.`
+            : `تم تحديث الباقة بنجاح إلى ${plan.nameAr}`,
+        plan: plan.key
+    });
 };
 
 /**
@@ -430,6 +484,25 @@ export const buyAddOn = async (req, res) => {
     }
 
     const tenantId = req.user.tenantId;
+
+    const [sub, tenant] = await Promise.all([
+        prisma.subscription.findFirst({
+            where: { tenantId, status: 'ACTIVE' },
+            orderBy: { currentPeriodEnd: 'desc' }
+        }),
+        prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { subscriptionPlan: true }
+        })
+    ]);
+    const activePlanKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
+    if (!isPlanEligibleForAddOns(activePlanKey)) {
+        return res.status(400).json({
+            success: false,
+            code: 'ADDON_TIER_RESTRICTED',
+            message: 'Add-on packages can only be assigned to tenants on Premium or Enterprise plans.'
+        });
+    }
 
     await auditFromReq(req, {
         action: 'ADDON_PURCHASED',
@@ -490,6 +563,27 @@ export const initiateInstaPay = async (req, res) => {
         priceEgp = plan.priceEgp;
         itemName = `${plan.name} Subscription`;
     } else if (itemType === 'ADDON') {
+        // Enforce: Add-ons only available to Premium and Enterprise members
+        const [sub, tenant] = await Promise.all([
+            prisma.subscription.findFirst({
+                where: { tenantId, status: 'ACTIVE' },
+                orderBy: { currentPeriodEnd: 'desc' }
+            }),
+            prisma.tenant.findUnique({
+                where: { id: tenantId },
+                select: { subscriptionPlan: true }
+            })
+        ]);
+        const activePlanKey = sub?.plan || tenant?.subscriptionPlan || 'FREE';
+        if (!isPlanEligibleForAddOns(activePlanKey)) {
+            return res.status(403).json({
+                success: false,
+                code: 'ADDON_TIER_RESTRICTED',
+                message: 'AI Token Add-On packs are exclusively available to Premium and Enterprise members. Please upgrade your plan first.',
+                messageAr: 'باقات شحن الذكاء الاصطناعي الإضافية متاحة حصرياً لمشتركي الباقة المميزة (Premium) وباقة الشركات (Enterprise). يرجى ترقية باقتك أولاً.'
+            });
+        }
+
         const addOn = ADD_ONS[itemKey];
         if (!addOn) {
             return res.status(400).json({ success: false, message: 'Invalid add-on package.' });

@@ -51,6 +51,25 @@ export const formatDate = (dateString, lang = 'en') => {
     return `${year}/${month}/${day}`;
 };
 
+// Clean bloated quantity/unit tags (e.g. " | 0 TON @ 0" or " | 35 TON @ 1000") so descriptions reflect user text
+export const cleanTransactionDescription = (desc) => {
+    if (!desc || typeof desc !== 'string') return '';
+    
+    // 1. Strip trailing "| Qty Unit @ Price" e.g. " | 0 TON @ 0", " | 35 TON @ 1000"
+    let cleaned = desc.replace(/\s*\|\s*[\d.]+\s*[A-Za-z\u0600-\u06FF]*\s*@\s*[\d.]+(?:\s*EGP)?\s*$/gi, '');
+    
+    // 2. Strip leading "Qty Unit @ Price | " e.g. "0 TON @ 0 | "
+    cleaned = cleaned.replace(/^[\d.]+\s*[A-Za-z\u0600-\u06FF]*\s*@\s*[\d.]+(?:\s*EGP)?\s*\|\s*/gi, '');
+    
+    // 3. Strip any standalone "0 TON @ 0" or "(+0 TON @ 0)"
+    cleaned = cleaned.replace(/\(?\s*0\s+TON\s+@\s+0\s*\)?/gi, '');
+    
+    // 4. Clean any residual dangling pipes or extra whitespace
+    cleaned = cleaned.replace(/\s*\|\s*$/, '').trim();
+    
+    return cleaned;
+};
+
 // Convenience hook so components don't have to thread `i18n.language` through every callsite.
 export const useFormat = () => {
     const { i18n } = useTranslation();

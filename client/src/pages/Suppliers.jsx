@@ -1,14 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { suppliersAPI } from '../services/api';
-import { Package, Plus, Mail, Phone, Edit2, Trash2, Search, Tag } from 'lucide-react';
+import { Package, Plus, Mail, Phone, Pencil, Trash2, Search, Tag, Building2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddSupplierModal from '../components/AddSupplierModal';
 import { apiErrorMessage } from '../utils/apiError';
 
 export default function Suppliers() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -100,10 +101,224 @@ export default function Suppliers() {
 
     return (
         <Layout>
+            <style>{`
+                .suppliers-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: var(--spacing-lg);
+                }
+                @media (max-width: 1100px) {
+                    .suppliers-grid {
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                    }
+                }
+                @media (max-width: 650px) {
+                    .suppliers-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                .supplier-card {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    padding: 20px;
+                    min-height: 220px;
+                    border-radius: 12px;
+                    background: var(--bg-card, #141416);
+                    border: 1px solid var(--border-color);
+                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                }
+                .supplier-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+                }
+
+                .supplier-card-header {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 12px;
+                    margin-bottom: 14px;
+                }
+                .supplier-card-name {
+                    font-size: 1.15rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    line-height: 1.35;
+                    margin: 0;
+                    word-break: break-word;
+                }
+                .supplier-card-company {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                    margin-top: 4px;
+                }
+
+                .supplier-card-stats {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-bottom: 16px;
+                    flex: 1;
+                }
+
+                .supplier-stat-row {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 10px;
+                }
+
+                .supplier-category-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    padding: 4px 10px;
+                    border-radius: 9999px;
+                    font-size: 0.72rem;
+                    font-weight: 600;
+                    letter-spacing: 0.3px;
+                    line-height: 1;
+                    background: rgba(255, 90, 31, 0.12);
+                    border: 1px solid rgba(255, 90, 31, 0.28);
+                    color: var(--color-primary, #ff5a1f);
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                }
+                body.light-mode .supplier-category-badge {
+                    background: rgba(194, 65, 12, 0.1);
+                    border-color: rgba(194, 65, 12, 0.25);
+                    color: #c2410c;
+                }
+
+                .supplier-category-chip {
+                    display: inline-flex;
+                    align-items: center;
+                    padding: 2px 8px;
+                    border-radius: 9999px;
+                    font-size: 0.72rem;
+                    font-weight: 600;
+                    background: var(--bg-tertiary);
+                    border: 1px solid var(--border-color);
+                    color: var(--text-secondary);
+                }
+
+                .supplier-item-tag {
+                    display: inline-flex;
+                    align-items: center;
+                    background: var(--bg-tertiary);
+                    border: 1px solid var(--border-color);
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 0.75rem;
+                    color: var(--text-secondary);
+                }
+
+                .supplier-phone-pill {
+                    display: inline-block;
+                    direction: ltr;
+                    unicode-bidi: isolate;
+                    color: var(--text-primary);
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    padding: 3px 10px;
+                    border-radius: 6px;
+                    font-size: 0.82rem;
+                    font-weight: 600;
+                    text-decoration: none;
+                    transition: all 0.15s ease;
+                }
+                .supplier-phone-pill:hover {
+                    background: rgba(255, 255, 255, 0.12);
+                    border-color: rgba(255, 255, 255, 0.22);
+                }
+                body.light-mode .supplier-phone-pill {
+                    background: var(--bg-tertiary);
+                    border-color: var(--border-color);
+                    color: var(--text-primary);
+                }
+                body.light-mode .supplier-phone-pill:hover {
+                    background: var(--bg-primary);
+                    border-color: var(--border-color-light);
+                }
+
+                .supplier-email-link {
+                    font-size: 0.82rem;
+                    color: var(--text-secondary);
+                    text-decoration: none;
+                    word-break: break-all;
+                    transition: color 0.15s ease;
+                }
+                .supplier-email-link:hover {
+                    color: var(--text-primary);
+                    text-decoration: underline;
+                }
+
+                .supplier-card-footer {
+                    margin-top: auto;
+                    padding-top: 14px;
+                    border-top: 1px solid var(--border-color);
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: 8px;
+                }
+                .supplier-action-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 14px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    border-radius: 6px;
+                    border: 1px solid var(--border-color);
+                    background: rgba(255, 255, 255, 0.03);
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+                .supplier-action-btn:hover {
+                    color: var(--text-primary);
+                    background: rgba(255, 255, 255, 0.08);
+                    border-color: rgba(255, 255, 255, 0.2);
+                }
+                .supplier-action-btn.delete {
+                    color: #f87171;
+                    border-color: rgba(239, 68, 68, 0.25);
+                    background: rgba(239, 68, 68, 0.05);
+                }
+                .supplier-action-btn.delete:hover {
+                    background: rgba(239, 68, 68, 0.15);
+                    border-color: rgba(239, 68, 68, 0.45);
+                    color: #ef4444;
+                }
+                body.light-mode .supplier-action-btn {
+                    border-color: var(--border-color);
+                    background: var(--bg-tertiary);
+                    color: var(--text-secondary);
+                }
+                body.light-mode .supplier-action-btn:hover {
+                    background: var(--bg-primary);
+                    color: var(--text-primary);
+                    border-color: var(--border-color-light);
+                }
+                body.light-mode .supplier-action-btn.delete {
+                    color: #dc2626;
+                    border-color: rgba(220, 38, 38, 0.28);
+                    background: rgba(220, 38, 38, 0.06);
+                }
+                body.light-mode .supplier-action-btn.delete:hover {
+                    background: rgba(220, 38, 38, 0.12);
+                    border-color: rgba(220, 38, 38, 0.5);
+                }
+            `}</style>
+
             <div>
-                <div className="flex-between mb-xl">
+                <div className="flex-between mb-xl flex-wrap gap-md">
                     <div>
-                        <h1 className="flex gap-md">
+                        <h1 className="flex gap-md items-center">
                             <Package size={32} />
                             {t('suppliers.title')}
                         </h1>
@@ -118,15 +333,25 @@ export default function Suppliers() {
                 {/* Search Bar */}
                 {suppliers.length > 0 && (
                     <div style={{ position: 'relative', marginBottom: '20px', maxWidth: '500px' }}>
-                        <Search size={18} style={{ position: 'absolute', top: '12px', right: '14px', color: 'var(--text-tertiary)', pointerEvents: 'none' }} />
+                        <Search
+                            size={18}
+                            style={{
+                                position: 'absolute',
+                                top: '50%',
+                                [isArabic ? 'right' : 'left']: '14px',
+                                transform: 'translateY(-50%)',
+                                color: 'var(--text-tertiary)',
+                                pointerEvents: 'none'
+                            }}
+                        />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={t('suppliers.placeholders.search', 'بحث باسم المورد أو مجالات التوريد أو الأصناف المحددة...')}
+                            placeholder={t('suppliers.placeholders.search', isArabic ? 'بحث باسم المورد أو مجالات التوريد أو الأصناف المحددة...' : 'Search by supplier name, categories, or items...')}
                             style={{
                                 width: '100%',
-                                padding: '10px 40px 10px 14px',
+                                padding: isArabic ? '10px 42px 10px 14px' : '10px 14px 10px 42px',
                                 borderRadius: '10px',
                                 border: '1px solid var(--border-color)',
                                 background: 'var(--bg-secondary)',
@@ -149,113 +374,126 @@ export default function Suppliers() {
                     </div>
                 ) : filteredSuppliers.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-xl)' }}>
-                        <p className="text-secondary">لا توجد نتائج مطابقة لبحثك: "{searchQuery}"</p>
+                        <p className="text-secondary">{isArabic ? `لا توجد نتائج مطابقة لبحثك: "${searchQuery}"` : `No results matching: "${searchQuery}"`}</p>
                     </div>
                 ) : (
-                    <div className="grid grid-3">
-                        {filteredSuppliers.map((supplier) => (
-                            <div key={supplier.id} className="card">
-                                <div className="flex-between mb-md">
-                                    <h3 style={{ margin: 0 }}>{supplier.name}</h3>
-                                    <div className="flex gap-sm">
-                                        <button
-                                            onClick={() => handleOpenModal(supplier)}
-                                            className="btn-icon"
-                                            style={{ padding: '4px', color: 'var(--text-secondary)' }}
-                                            title={t('common.edit')}
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteClick(supplier)}
-                                            className="btn btn-secondary"
-                                            style={{ padding: '4px 8px', color: '#ef4444', borderColor: '#ef4444', background: 'transparent' }}
-                                            title={t('common.delete')}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
+                    <div className="suppliers-grid">
+                        {filteredSuppliers.map((supplier) => {
+                            const cats = Array.isArray(supplier.categories) && supplier.categories.length > 0
+                                ? supplier.categories
+                                : (supplier.category ? [supplier.category] : []);
 
-                                {/* Multi-Categories Badges */}
-                                {(() => {
-                                    const cats = Array.isArray(supplier.categories) && supplier.categories.length > 0
-                                        ? supplier.categories
-                                        : (supplier.category ? [supplier.category] : []);
-                                    if (cats.length === 0) return null;
-                                    return (
-                                        <div className="flex gap-xs mb-sm" style={{ flexWrap: 'wrap' }}>
-                                            {cats.map((c, i) => (
-                                                <span key={i} className="badge badge-primary" style={{ display: 'inline-block', fontSize: '0.78rem' }}>
-                                                    {t(`suppliers.categories.${c}`, c)}
-                                                </span>
-                                            ))}
+                            const supplierPhones = Array.isArray(supplier.phones) && supplier.phones.length > 0
+                                ? supplier.phones.filter(Boolean)
+                                : (supplier.phone ? [supplier.phone] : []);
+
+                            return (
+                                <div key={supplier.id} className="card supplier-card">
+                                    {/* 1. Header: Name, Company, Primary Category Badge */}
+                                    <div className="supplier-card-header">
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <h3 className="supplier-card-name" title={supplier.name}>
+                                                {supplier.name}
+                                            </h3>
+                                            {supplier.company && (
+                                                <div className="supplier-card-company">
+                                                    <Building2 size={13} style={{ flexShrink: 0 }} />
+                                                    <span className="truncate">{supplier.company}</span>
+                                                </div>
+                                            )}
                                         </div>
-                                    );
-                                })()}
-
-                                {/* Supplied Items Tags */}
-                                {Array.isArray(supplier.suppliedItems) && supplier.suppliedItems.length > 0 && (
-                                    <div className="flex gap-xs mb-md" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                                        <Tag size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
-                                        {supplier.suppliedItems.map((item, idx) => (
+                                        {cats.length > 0 && (
                                             <span
-                                                key={idx}
-                                                style={{
-                                                    background: 'var(--bg-tertiary, rgba(0,0,0,0.04))',
-                                                    border: '1px solid var(--border-color)',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '4px',
-                                                    fontSize: '0.75rem',
-                                                    color: 'var(--text-secondary)'
-                                                }}
+                                                className="supplier-category-badge"
+                                                title={cats.map(c => t(`suppliers.categories.${c}`, c)).join(', ')}
                                             >
-                                                {item}
+                                                {t(`suppliers.categories.${cats[0]}`, cats[0])}
+                                                {cats.length > 1 && ` +${cats.length - 1}`}
                                             </span>
-                                        ))}
+                                        )}
                                     </div>
-                                )}
 
-                                <div className="flex gap-sm mb-sm text-secondary">
-                                    <Mail size={16} />
-                                    <span>{supplier.email || '-'}</span>
-                                </div>
-                                {(() => {
-                                    const supplierPhones = Array.isArray(supplier.phones) && supplier.phones.length > 0
-                                        ? supplier.phones.filter(Boolean)
-                                        : (supplier.phone ? [supplier.phone] : []);
-                                    if (supplierPhones.length === 0) return null;
-                                    return (
-                                        <div className="flex gap-sm text-secondary" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                                            <Phone size={16} style={{ marginTop: '3px', flexShrink: 0 }} />
-                                            <div className="flex gap-xs" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
-                                                {supplierPhones.map((p, idx) => (
-                                                    <a
-                                                        key={idx}
-                                                        href={`tel:${p}`}
-                                                        style={{
-                                                            direction: 'ltr',
-                                                            display: 'inline-block',
-                                                            color: 'inherit',
-                                                            textDecoration: 'none',
-                                                            background: 'var(--bg-secondary)',
-                                                            padding: '2px 8px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '12px',
-                                                            fontWeight: 500
-                                                        }}
-                                                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                                                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
-                                                    >
-                                                        {p}
-                                                    </a>
+                                    {/* 2. Body Details: Additional Category Chips, Supplied Items, Phone, Email */}
+                                    <div className="supplier-card-stats">
+                                        {/* Multi-Categories chips if more than 1 */}
+                                        {cats.length > 1 && (
+                                            <div className="flex gap-xs flex-wrap items-center">
+                                                {cats.slice(1).map((c, i) => (
+                                                    <span key={i} className="supplier-category-chip">
+                                                        {t(`suppliers.categories.${c}`, c)}
+                                                    </span>
                                                 ))}
                                             </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        ))}
+                                        )}
+
+                                        {/* Supplied Items Tags */}
+                                        {Array.isArray(supplier.suppliedItems) && supplier.suppliedItems.length > 0 && (
+                                            <div className="flex gap-xs items-center flex-wrap" style={{ fontSize: '0.78rem' }}>
+                                                <Tag size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+                                                {supplier.suppliedItems.map((item, idx) => (
+                                                    <span key={idx} className="supplier-item-tag">
+                                                        {item}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Phone Numbers */}
+                                        {supplierPhones.length > 0 && (
+                                            <div className="supplier-stat-row">
+                                                <Phone size={15} style={{ color: 'var(--text-tertiary)', marginTop: '3px', flexShrink: 0 }} />
+                                                <div className="flex gap-xs flex-wrap items-center">
+                                                    {supplierPhones.map((p, idx) => (
+                                                        <a
+                                                            key={idx}
+                                                            href={`tel:${p}`}
+                                                            className="supplier-phone-pill"
+                                                            title={isArabic ? 'اتصال بالهاتف' : 'Call phone'}
+                                                        >
+                                                            {p}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Email (only if present, no empty '-') */}
+                                        {supplier.email && supplier.email.trim() && (
+                                            <div className="supplier-stat-row">
+                                                <Mail size={15} style={{ color: 'var(--text-tertiary)', marginTop: '3px', flexShrink: 0 }} />
+                                                <a
+                                                    href={`mailto:${supplier.email}`}
+                                                    className="supplier-email-link"
+                                                    title={supplier.email}
+                                                >
+                                                    {supplier.email}
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 3. Card Footer: Bottom Action Buttons */}
+                                    <div className="supplier-card-footer">
+                                        <button
+                                            className="supplier-action-btn edit"
+                                            onClick={() => handleOpenModal(supplier)}
+                                            title={t('common.edit')}
+                                        >
+                                            <Pencil size={13} />
+                                            <span>{t('common.edit', 'Edit')}</span>
+                                        </button>
+                                        <button
+                                            className="supplier-action-btn delete"
+                                            onClick={() => handleDeleteClick(supplier)}
+                                            title={t('common.delete')}
+                                        >
+                                            <Trash2 size={13} />
+                                            <span>{t('common.delete', 'Delete')}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 

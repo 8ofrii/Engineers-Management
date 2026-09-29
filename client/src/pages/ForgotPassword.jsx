@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Mail, AlertCircle, CheckCircle, Globe, ArrowRight, ArrowLeft } from 'lucide-react';
 import { authAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
+import { BeamsBackground } from '@/components/ui/beams-background';
 import './Auth.css';
 
 export default function ForgotPassword() {
@@ -45,6 +46,13 @@ export default function ForgotPassword() {
 
     return (
         <div className="auth-container">
+            {typeof document !== 'undefined' && !document.body.classList.contains('light-mode') && (
+                <BeamsBackground
+                    colorScheme="ember"
+                    intensity="medium"
+                    className="fixed inset-0 pointer-events-none z-0"
+                />
+            )}
             <div className="auth-background"></div>
 
             {/* Top Bar with Language Switcher */}
@@ -136,6 +144,11 @@ export default function ForgotPassword() {
                                 <Link to="/login" className="auth-link" style={{ fontWeight: 700 }}>
                                     {t('auth.backToLogin', 'Back to Sign In')}
                                 </Link>
+                            </p>
+                            <p style={{ marginTop: 10, fontSize: '11.5px', color: 'var(--text-tertiary, #78716c)' }}>
+                                <Link to="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>Terms</Link>
+                                {' · '}
+                                <Link to="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy</Link>
                             </p>
                         </div>
                     )}

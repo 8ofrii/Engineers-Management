@@ -130,7 +130,7 @@ const InstaPayModal = ({
 
             await billingAPI.submitInstaPayProof(formData);
             if (onSuccess) onSuccess(orderData);
-            onClose();
+            setIsSubmitted(true);
         } catch (err) {
             setError(err.response?.data?.message || (isAr ? 'فشل إرسال إيصال التحويل. يرجى المحاولة مجدداً.' : 'Failed to submit receipt. Please try again.'));
         } finally {
@@ -237,20 +237,72 @@ const InstaPayModal = ({
                                 {isAr ? 'جاري تجهيز بيانات الطلب وحساب إنستاباي...' : 'Preparing payment details...'}
                             </p>
                         </div>
-                    ) : error ? (
-                        <div style={{
-                            padding: '16px',
-                            borderRadius: '12px',
-                            background: 'rgba(239, 68, 68, 0.1)',
-                            border: '1px solid rgba(239, 68, 68, 0.2)',
-                            color: '#ef4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                            marginBottom: '16px'
-                        }}>
-                            <AlertCircle size={20} style={{ flexShrink: 0 }} />
-                            <span style={{ fontSize: '13.5px' }}>{error}</span>
+                    ) : (!orderData && error) ? (
+                        <div style={{ padding: '36px 20px', textAlign: 'center' }}>
+                            <div style={{
+                                width: '56px',
+                                height: '56px',
+                                borderRadius: '50%',
+                                background: 'rgba(239, 68, 68, 0.12)',
+                                color: '#ef4444',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 16px'
+                            }}>
+                                <AlertCircle size={32} />
+                            </div>
+                            <h4 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {isAr ? 'تعذر تجهيز بيانات الدفع' : 'Payment Initialization Failed'}
+                            </h4>
+                            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+                                {error}
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    style={{
+                                        background: 'var(--bg-tertiary)',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        padding: '10px 20px',
+                                        borderRadius: '10px',
+                                        fontSize: '13.5px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {isAr ? 'إغلاق' : 'Close'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setError(null);
+                                        setLoading(true);
+                                        billingAPI.initiateInstaPay(itemType, itemKey)
+                                            .then(res => {
+                                                if (res.data?.success) setOrderData(res.data.data);
+                                            })
+                                            .catch(err => {
+                                                setError(err.response?.data?.message || t('billing.initiateError', 'Failed to initialize payment.'));
+                                            })
+                                            .finally(() => setLoading(false));
+                                    }}
+                                    style={{
+                                        background: 'var(--color-primary)',
+                                        border: 'none',
+                                        color: 'white',
+                                        padding: '10px 20px',
+                                        borderRadius: '10px',
+                                        fontSize: '13.5px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {isAr ? 'إعادة المحاولة' : 'Retry'}
+                                </button>
+                            </div>
                         </div>
                     ) : isSubmitted ? (
                         /* Success View */
@@ -335,6 +387,44 @@ const InstaPayModal = ({
                     ) : (
                         /* Step 1: Order Details & Payment Target Cards */
                         <form onSubmit={handleSubmitProof}>
+                            {/* Inline Error Banner */}
+                            {error && (
+                                <div style={{
+                                    padding: '12px 16px',
+                                    borderRadius: '10px',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    color: '#ef4444',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '12px',
+                                    marginBottom: '18px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                                        <span style={{ fontSize: '13.5px', fontWeight: 600 }}>{error}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setError(null)}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#ef4444',
+                                            cursor: 'pointer',
+                                            padding: '4px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            borderRadius: '4px'
+                                        }}
+                                        title={isAr ? 'إغلاق التنبيه' : 'Dismiss'}
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Order Banner */}
                             <div style={{
                                 background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(124, 58, 237, 0.08) 100%)',
@@ -502,7 +592,7 @@ const InstaPayModal = ({
                                         <input
                                             type="text"
                                             value={senderName}
-                                            onChange={(e) => setSenderName(e.target.value)}
+                                            onChange={(e) => { setSenderName(e.target.value); setError(null); }}
                                             placeholder={isAr ? 'مثال: محمد أحمد' : 'e.g. Mohamed Ahmed'}
                                             style={{
                                                 width: '100%',
@@ -517,12 +607,12 @@ const InstaPayModal = ({
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                                            {isAr ? 'رقم هاتف المحول أو رقم العملية' : 'Sender Phone / Reference #'}
+                                            {isAr ? 'رقم هاتف المحول' : 'Sender Phone'}
                                         </label>
                                         <input
                                             type="text"
                                             value={senderPhone}
-                                            onChange={(e) => setSenderPhone(e.target.value)}
+                                            onChange={(e) => { setSenderPhone(e.target.value); setError(null); }}
                                             placeholder={isAr ? 'مثال: 010xxxxxxx' : 'e.g. 010xxxxxxx'}
                                             style={{
                                                 width: '100%',
@@ -537,10 +627,49 @@ const InstaPayModal = ({
                                     </div>
                                 </div>
 
+                                {/* Transfer Reference / Transaction ID */}
+                                <div style={{ marginBottom: '14px' }}>
+                                    <label style={{
+                                        display: 'block',
+                                        fontSize: '12px',
+                                        color: (error && !receiptFile && !transferRef) ? '#ef4444' : 'var(--text-secondary)',
+                                        marginBottom: '4px',
+                                        fontWeight: (error && !receiptFile && !transferRef) ? 600 : 400
+                                    }}>
+                                        {isAr ? 'رقم العملية أو المرجع في إنستاباي (اختياري إذا أرفقت صورة الإيصال)' : 'InstaPay Reference / Transaction ID (Optional if screenshot is attached)'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={transferRef}
+                                        onChange={(e) => { setTransferRef(e.target.value); setError(null); }}
+                                        placeholder={isAr ? 'مثال: IPN123456789 أو رقم التحويل من إنستاباي' : 'e.g. IPN reference number from InstaPay app'}
+                                        style={{
+                                            width: '100%',
+                                            padding: '9px 12px',
+                                            borderRadius: '8px',
+                                            background: 'var(--bg-secondary)',
+                                            border: (error && !receiptFile && !transferRef) ? '1.5px solid #ef4444' : '1px solid var(--border-color)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '13px'
+                                        }}
+                                    />
+                                </div>
+
                                 {/* Receipt Upload Dropzone */}
                                 <div>
-                                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                    <label style={{
+                                        display: 'block',
+                                        fontSize: '12px',
+                                        color: (error && !receiptFile && !transferRef) ? '#ef4444' : 'var(--text-secondary)',
+                                        marginBottom: '4px',
+                                        fontWeight: (error && !receiptFile && !transferRef) ? 600 : 400
+                                    }}>
                                         {isAr ? 'صورة إيصال التحويل (لقطة شاشة من إنستاباي)' : 'Receipt Screenshot (From InstaPay App)'}
+                                        {(error && !receiptFile && !transferRef) && (
+                                            <span style={{ color: '#ef4444', fontSize: '11px', marginInlineStart: '6px' }}>
+                                                ({isAr ? 'يرجى إرفاق صورة الإيصال أو إدخال رقم العملية أعلاه' : 'Required: attach screenshot or enter reference above'})
+                                            </span>
+                                        )}
                                     </label>
                                     <label style={{
                                         display: 'flex',
@@ -549,8 +678,8 @@ const InstaPayModal = ({
                                         justifyContent: 'center',
                                         padding: '20px 16px',
                                         borderRadius: '10px',
-                                        border: '2px dashed var(--border-color)',
-                                        background: 'var(--bg-secondary)',
+                                        border: (error && !receiptFile && !transferRef) ? '2px dashed #ef4444' : '2px dashed var(--border-color)',
+                                        background: (error && !receiptFile && !transferRef) ? 'rgba(239, 68, 68, 0.04)' : 'var(--bg-secondary)',
                                         cursor: 'pointer',
                                         transition: 'all 0.15s'
                                     }}>

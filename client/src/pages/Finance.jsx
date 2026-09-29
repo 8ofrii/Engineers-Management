@@ -1,8 +1,8 @@
 import { useState, useEffect, Fragment } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { transactionsAPI, workmenAPI, projectsAPI } from '../services/api';
-import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight, Eye, Mic, Image as ImageIcon, Sparkles, Building2, Printer } from 'lucide-react';
+import { transactionsAPI, workmenAPI, projectsAPI, suppliersAPI, userAPI, clientsAPI } from '../services/api';
+import { Plus, Wallet, FileText, Filter, Pencil, Trash2, X, CheckCircle, XCircle, Clock, Paperclip, Download, RotateCcw, CornerDownRight, Eye, Mic, Image as ImageIcon, Sparkles, Building2, Printer, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddTransactionModal from '../components/AddTransactionModal';
@@ -10,9 +10,11 @@ import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import RefundConfirmationModal from '../components/RefundConfirmationModal';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionActionsMenu from '../components/TransactionActionsMenu';
-import { useFormat } from '../utils/format';
+import { useFormat, cleanTransactionDescription } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 import { apiErrorMessage } from '../utils/apiError';
+import { parseReceiptUrls } from '../utils/media';
+import { sortTransactionList as sortTxList } from '../utils/transactionSort';
 
 export default function Finance() {
     const { t, i18n } = useTranslation();
@@ -31,6 +33,20 @@ export default function Finance() {
     const [filterType, setFilterType] = useState('ALL'); // ALL, INCOME, EXPENSE, PENDING, MY_LEDGER
     const [filterProjectId, setFilterProjectId] = useState(null);
     const [filterProjectName, setFilterProjectName] = useState(null);
+
+    // Sorting state (default: date desc - newest first upon app load)
+    const [sortField, setSortField] = useState('date');
+    const [sortOrder, setSortOrder] = useState('desc');
+
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            // Default newest first for date, highest first for amount; A-Z ascending for text
+            setSortOrder(field === 'date' || field === 'amount' ? 'desc' : 'asc');
+        }
+    };
 
     // Delete state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -55,8 +71,12 @@ export default function Finance() {
     };
 
     const [workmen, setWorkmen] = useState([]);
+    const [suppliers, setSuppliers] = useState([]);
     const [projects, setProjects] = useState([]);
-    const [filterWorkmanId, setFilterWorkmanId] = useState('ALL');
+    const [users, setUsers] = useState([]);
+    const [clients, setClients] = useState([]);
+    const [filterPaidById, setFilterPaidById] = useState('ALL'); // 'ALL', 'ALL_MEMBERS', 'ALL_CLIENTS', 'MEMBER:<id>', 'CLIENT:<id>'
+    const [filterPaidToId, setFilterPaidToId] = useState('ALL'); // 'ALL', 'ALL_MEMBERS', 'ALL_WORKMEN', 'ALL_SUPPLIERS', 'MEMBER:<id>', 'WORKMAN:<id>', 'SUPPLIER:<id>'
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
 
@@ -71,10 +91,251 @@ export default function Finance() {
     }, [searchParams]);
 
     useEffect(() => {
-        loadTransactions();
         loadWorkmen();
+        loadSuppliers();
         loadProjects();
-    }, [filterType, filterProjectId, filterWorkmanId, dateFrom, dateTo]);
+        loadUsers();
+        loadClients();
+    }, []);
+
+    useEffect(() => {
+        loadTransactions();
+    }, [filterType, filterProjectId, filterPaidById, filterPaidToId, dateFrom, dateTo]);
+
+    const getPaidByBadgeLabel = () => {
+        if (!filterPaidById || filterPaidById === 'ALL') return '';
+        if (filterPaidById === 'ALL_MEMBERS') return isArabic ? 'كل أعضاء الشركة' : 'All Company Members';
+        if (filterPaidById === 'ALL_CLIENTS') return isArabic ? 'كل العملاء' : 'All Clients';
+        if (filterPaidById.startsWith('MEMBER:')) {
+            const uid = filterPaidById.replace('MEMBER:', '');
+            const u = users.find(x => x.id === uid);
+            if (!u) return uid;
+            const roleKey = (u.role || '').toUpperCase();
+            const role = isArabic 
+                ? (t('teamManagement.roles.' + roleKey) || u.role) 
+                : (t('teamManagement.roles.' + roleKey, { lng: 'en' }) || u.role);
+            return u.name + (role ? ' (' + role + ')' : '');
+        }
+        if (filterPaidById.startsWith('CLIENT:')) {
+            const cid = filterPaidById.replace('CLIENT:', '');
+            const c = clients.find(x => x.id === cid);
+            return c ? c.name : cid;
+        }
+        const u = users.find(x => x.id === filterPaidById);
+        if (u) return u.name;
+        const c = clients.find(x => x.id === filterPaidById);
+        if (c) return c.name;
+        return filterPaidById;
+    };
+
+    const getPaidToBadgeLabel = () => {
+        if (!filterPaidToId || filterPaidToId === 'ALL') return '';
+        if (filterPaidToId === 'ALL_MEMBERS') return isArabic ? 'كل أعضاء الشركة' : 'All Company Members';
+        if (filterPaidToId === 'ALL_WORKMEN') return isArabic ? 'كل العمال ومقاولو الباطن' : 'All Labor & Subcontractors';
+        if (filterPaidToId === 'ALL_SUPPLIERS') return isArabic ? 'كل الموردين والشركات' : 'All Suppliers & Vendors';
+        if (filterPaidToId.startsWith('MEMBER:')) {
+            const uid = filterPaidToId.replace('MEMBER:', '');
+            const u = users.find(x => x.id === uid);
+            if (!u) return uid;
+            const roleKey = (u.role || '').toUpperCase();
+            const role = isArabic 
+                ? (t('teamManagement.roles.' + roleKey) || u.role) 
+                : (t('teamManagement.roles.' + roleKey, { lng: 'en' }) || u.role);
+            return u.name + (role ? ' (' + role + ')' : '');
+        }
+        if (filterPaidToId.startsWith('WORKMAN:')) {
+            const wid = filterPaidToId.replace('WORKMAN:', '');
+            const w = workmen.find(x => x.id === wid);
+            if (!w) return wid;
+            const tradeKey = (w.trade || '').toUpperCase();
+            const trade = isArabic 
+                ? (t('labor.trades.' + tradeKey) || w.trade) 
+                : (t('labor.trades.' + tradeKey, { lng: 'en' }) || w.trade);
+            return w.name + (trade ? ' (' + trade + ')' : '');
+        }
+        if (filterPaidToId.startsWith('SUPPLIER:')) {
+            const sid = filterPaidToId.replace('SUPPLIER:', '');
+            const s = suppliers.find(x => x.id === sid);
+            return s ? s.name : sid;
+        }
+        const u = users.find(x => x.id === filterPaidToId);
+        if (u) return u.name;
+        const w = workmen.find(x => x.id === filterPaidToId);
+        if (w) return w.name;
+        const s = suppliers.find(x => x.id === filterPaidToId);
+        if (s) return s.name;
+        return filterPaidToId;
+    };
+
+    const isClientIncomeTransaction = (tx) => {
+        if (tx.type !== 'INCOME') return false;
+        return Boolean(
+            tx.clientId ||
+            tx.client ||
+            tx.paidByClientContact ||
+            tx.project?.clientId ||
+            (tx.category && ['CLIENT_PAYMENT', 'PAYMENT', 'PROJECT_FUNDING', 'INVOICE_PAYMENT'].includes(tx.category)) ||
+            (tx.description && (
+                tx.description.includes('دفعة عميل') ||
+                tx.description.toLowerCase().includes('client payment') ||
+                tx.description.toLowerCase().includes('customer payment')
+            ))
+        );
+    };
+
+    const matchesPaidBy = (tx, paidByFilter) => {
+        if (!paidByFilter || paidByFilter === 'ALL') return true;
+
+        const isClientIncome = isClientIncomeTransaction(tx);
+
+        if (paidByFilter === 'ALL_MEMBERS') {
+            if (isClientIncome) return false;
+            if (tx.type === 'EXPENSE') return true;
+            return Boolean(tx.payerUserId || tx.payer);
+        }
+
+        if (paidByFilter === 'ALL_CLIENTS') {
+            if (isClientIncome) return true;
+            return Boolean(tx.clientId || tx.client || tx.paidByClientContact || tx.project?.clientId);
+        }
+
+        if (paidByFilter.startsWith('MEMBER:')) {
+            const targetId = paidByFilter.replace('MEMBER:', '');
+
+            // CRITICAL: Client income payments are paid by clients, NOT company members!
+            if (isClientIncome) return false;
+
+            if (tx.payerUserId === targetId || tx.payer?.id === targetId) return true;
+
+            // For EXPENSES only: if no explicit payerUserId, fall back to creator
+            if (tx.type === 'EXPENSE' && (tx.createdBy === targetId || tx.user?.id === targetId)) {
+                return true;
+            }
+
+            if (tx.type === 'EXPENSE') {
+                const u = users.find(x => x.id === targetId);
+                if (u) {
+                    const uName = (u.name || '').trim().toLowerCase();
+                    const from = (tx.transactionFrom || '').trim().toLowerCase();
+                    if (uName && from && from.includes(uName)) return true;
+                }
+            }
+            return false;
+        }
+
+        if (paidByFilter.startsWith('CLIENT:')) {
+            const targetId = paidByFilter.replace('CLIENT:', '');
+            if (tx.clientId === targetId || tx.client?.id === targetId) return true;
+            if (tx.project?.clientId === targetId) return true;
+            const c = clients.find(x => x.id === targetId);
+            if (c) {
+                const cName = (c.name || '').trim().toLowerCase();
+                const from = (tx.transactionFrom || '').trim().toLowerCase();
+                const contact = (tx.paidByClientContact || '').trim().toLowerCase();
+                const b = (tx.beneficiary || '').trim().toLowerCase();
+                const desc = (tx.description || '').trim().toLowerCase();
+                if (cName && (
+                    (from && from.includes(cName)) ||
+                    (contact && contact.includes(cName)) ||
+                    (tx.type === 'INCOME' && ((b && b.includes(cName)) || (desc && desc.includes(cName))))
+                )) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        if (paidByFilter === tx.payerUserId) return true;
+        if (tx.type === 'EXPENSE' && paidByFilter === tx.createdBy) return true;
+        if (paidByFilter === tx.clientId) return true;
+        return false;
+    };
+
+    const matchesPaidTo = (tx, paidToFilter) => {
+        if (!paidToFilter || paidToFilter === 'ALL') return true;
+
+        if (tx.type === 'INCOME') {
+            if (paidToFilter === 'ALL_WORKMEN' || paidToFilter.startsWith('WORKMAN:') ||
+                paidToFilter === 'ALL_SUPPLIERS' || paidToFilter.startsWith('SUPPLIER:')) {
+                return false;
+            }
+        }
+
+        if (paidToFilter === 'ALL_MEMBERS') {
+            if (tx.toEngineerId || tx.toEngineer) return true;
+            if (tx.category === 'CUSTODY_TRANSFER' || tx.category === 'MANAGEMENT_FEE_TRANSFER') return true;
+            const b = (tx.beneficiary || '').trim().toLowerCase();
+            const to = (tx.transactionTo || '').trim().toLowerCase();
+            return users.some(u => {
+                const n = (u.name || '').trim().toLowerCase();
+                return n && (b.includes(n) || to.includes(n));
+            });
+        }
+
+        if (paidToFilter === 'ALL_WORKMEN') {
+            return Boolean(
+                tx.workmanId || 
+                tx.workman || 
+                (tx.category && ['LABOR', 'WORKMANSHIP', 'LABOR_WAGES', 'MASONRY_LABOR', 'GENERAL_LABOR', 'CONTRACTING'].includes(tx.category))
+            );
+        }
+
+        if (paidToFilter === 'ALL_SUPPLIERS') {
+            return Boolean(
+                tx.supplierId || 
+                tx.supplier || 
+                (tx.category && ['MATERIALS', 'SUPPLIERS', 'MATERIALS_PURCHASE', 'EQUIPMENT', 'BRICKS', 'STEEL', 'CEMENT', 'STOCKING'].includes(tx.category))
+            );
+        }
+
+        if (paidToFilter.startsWith('MEMBER:')) {
+            const targetId = paidToFilter.replace('MEMBER:', '');
+            if (tx.toEngineerId === targetId || tx.toEngineer?.id === targetId) return true;
+            const u = users.find(x => x.id === targetId);
+            if (u) {
+                const uName = (u.name || '').trim().toLowerCase();
+                const b = (tx.beneficiary || '').trim().toLowerCase();
+                const to = (tx.transactionTo || '').trim().toLowerCase();
+                if (uName && (b.includes(uName) || to.includes(uName))) return true;
+            }
+            return false;
+        }
+
+        if (paidToFilter.startsWith('WORKMAN:')) {
+            const targetId = paidToFilter.replace('WORKMAN:', '');
+            if (tx.workmanId === targetId || tx.workman?.id === targetId) return true;
+            const w = workmen.find(x => x.id === targetId);
+            if (w) {
+                const wName = (w.name || '').trim().toLowerCase();
+                const wNameAr = (w.nameAr || '').trim().toLowerCase();
+                const b = (tx.beneficiary || '').trim().toLowerCase();
+                const to = (tx.transactionTo || '').trim().toLowerCase();
+                const wkName = (tx.workman?.name || '').trim().toLowerCase();
+                if (wName && (b.includes(wName) || to.includes(wName) || wkName.includes(wName))) return true;
+                if (wNameAr && (b.includes(wNameAr) || to.includes(wNameAr))) return true;
+            }
+            return false;
+        }
+
+        if (paidToFilter.startsWith('SUPPLIER:')) {
+            const targetId = paidToFilter.replace('SUPPLIER:', '');
+            if (tx.supplierId === targetId || tx.supplier?.id === targetId) return true;
+            const s = suppliers.find(x => x.id === targetId);
+            if (s) {
+                const sName = (s.name || '').trim().toLowerCase();
+                const sCompany = (s.company || '').trim().toLowerCase();
+                const b = (tx.beneficiary || '').trim().toLowerCase();
+                const to = (tx.transactionTo || '').trim().toLowerCase();
+                const spName = (tx.supplier?.name || '').trim().toLowerCase();
+                if (sName && (b.includes(sName) || to.includes(sName) || spName.includes(sName))) return true;
+                if (sCompany && (b.includes(sCompany) || to.includes(sCompany))) return true;
+            }
+            return false;
+        }
+
+        if (tx.toEngineerId === paidToFilter || tx.workmanId === paidToFilter || tx.supplierId === paidToFilter) return true;
+        return false;
+    };
 
     const loadTransactions = async () => {
         try {
@@ -117,9 +378,14 @@ export default function Finance() {
                 }
             }
 
-            // Filter by workman
-            if (filterWorkmanId !== 'ALL') {
-                allTx = allTx.filter(tx => tx.workmanId === filterWorkmanId);
+            // Filter by Paid by (Company member / Client)
+            if (filterPaidById && filterPaidById !== 'ALL') {
+                allTx = allTx.filter(tx => matchesPaidBy(tx, filterPaidById));
+            }
+
+            // Filter by Paid to (Company member / Workman / Supplier)
+            if (filterPaidToId && filterPaidToId !== 'ALL') {
+                allTx = allTx.filter(tx => matchesPaidTo(tx, filterPaidToId));
             }
 
             // Filter by date range
@@ -151,12 +417,39 @@ export default function Finance() {
         }
     };
 
+    const loadSuppliers = async () => {
+        try {
+            const res = await suppliersAPI.getAll();
+            setSuppliers(res.data?.data || []);
+        } catch (error) {
+            console.error('Failed to load suppliers:', error);
+        }
+    };
+
     const loadProjects = async () => {
         try {
             const res = await projectsAPI.getAll();
             setProjects(res.data.data || []);
         } catch (error) {
             console.error('Failed to load projects:', error);
+        }
+    };
+
+    const loadUsers = async () => {
+        try {
+            const res = await userAPI.getAll();
+            setUsers(res.data?.data || res.data || []);
+        } catch (error) {
+            console.error('Failed to load users:', error);
+        }
+    };
+
+    const loadClients = async () => {
+        try {
+            const res = await clientsAPI.getAll();
+            setClients(res.data?.data || res.data || []);
+        } catch (error) {
+            console.error('Failed to load clients:', error);
         }
     };
 
@@ -292,7 +585,12 @@ export default function Finance() {
             ? `${dateFrom} ${isArabic ? 'إلى' : 'to'} ${dateTo}`
             : (dateFrom ? `${isArabic ? 'من' : 'From'} ${dateFrom}` : (dateTo ? `${isArabic ? 'حتى' : 'Until'} ${dateTo}` : (isArabic ? 'كل الفترات' : 'All Time')));
 
-        const scopeLine = `${isArabic ? 'نطاق التقرير:' : 'Scope:'} ${projectName} | ${isArabic ? 'الفترة:' : 'Period:'} ${dateRange} | ${isArabic ? 'تاريخ التصدير:' : 'Exported:'} ${new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')} | ${isArabic ? 'المسؤول:' : 'By:'} ${user?.name || ''}`;
+        const paidByBadge = getPaidByBadgeLabel();
+        const paidByText = paidByBadge ? ` | ${isArabic ? 'الدافع:' : 'Paid by:'} ${paidByBadge}` : '';
+        const paidToBadge = getPaidToBadgeLabel();
+        const paidToText = paidToBadge ? ` | ${isArabic ? 'المدفوع له:' : 'Paid to:'} ${paidToBadge}` : '';
+
+        const scopeLine = `${isArabic ? 'نطاق التقرير:' : 'Scope:'} ${projectName}${paidByText}${paidToText} | ${isArabic ? 'الفترة:' : 'Period:'} ${dateRange} | ${isArabic ? 'تاريخ التصدير:' : 'Exported:'} ${new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')} | ${isArabic ? 'المسؤول:' : 'By:'} ${user?.name || ''}`;
 
         // Compute KPIs for sheet summary
         const approvedIncomes = transactions
@@ -467,11 +765,26 @@ export default function Finance() {
         else setExportingPdf(true);
 
         try {
+            let filterWorkmanIdToSend = null;
+            let filterSupplierIdToSend = null;
+            if (filterPaidToId.startsWith('WORKMAN:')) {
+                filterWorkmanIdToSend = filterPaidToId.replace('WORKMAN:', '');
+            } else if (filterPaidToId.startsWith('SUPPLIER:')) {
+                filterSupplierIdToSend = filterPaidToId.replace('SUPPLIER:', '');
+            } else if (filterPaidToId !== 'ALL' && filterPaidToId !== 'ALL_WORKMEN' && filterPaidToId !== 'ALL_SUPPLIERS') {
+                if (workmen.some(w => w.id === filterPaidToId)) filterWorkmanIdToSend = filterPaidToId;
+                else if (suppliers.some(s => s.id === filterPaidToId)) filterSupplierIdToSend = filterPaidToId;
+            }
+
             const payload = {
                 transactionIds: transactions.map(t => t.id),
                 filterProjectId,
                 filterType,
-                filterWorkmanId,
+                filterPaidById,
+                filterPaidToId,
+                filterWorkmanId: filterWorkmanIdToSend,
+                filterSupplierId: filterSupplierIdToSend,
+                filterPayeeId: filterPaidToId,
                 dateFrom,
                 dateTo,
                 lang: i18n.language
@@ -570,8 +883,9 @@ export default function Finance() {
 
         const txObj = typeof txOrUrl === 'object' && txOrUrl !== null ? txOrUrl : null;
         const legacyUrl = typeof txOrUrl === 'string' ? txOrUrl : (txObj?.receiptPhotoUrl || null);
+        const receiptUrls = parseReceiptUrls(legacyUrl);
         const hasVoice = Boolean(txObj?.voiceNoteUrl);
-        const hasReceipt = Boolean(legacyUrl);
+        const hasReceipt = receiptUrls.length > 0;
         const hasAi = Boolean(txObj?.aiRawText || txObj?.aiExtractedData);
 
         return (
@@ -597,7 +911,7 @@ export default function Finance() {
                     </button>
                 )}
 
-                {/* Receipt Photo Pill */}
+                {/* Receipt Media Pill (Supports single & multiple attachments) */}
                 {hasReceipt && (
                     <button
                         type="button"
@@ -605,15 +919,19 @@ export default function Finance() {
                             e.stopPropagation();
                             if (txObj) {
                                 handleOpenDetail(txObj);
-                            } else {
-                                window.open(legacyUrl.startsWith('http') ? legacyUrl : `/uploads/${legacyUrl.replace(/^(\/?uploads\/|\/+)/, '')}`, '_blank');
+                            } else if (receiptUrls[0]) {
+                                window.open(receiptUrls[0], '_blank');
                             }
                         }}
                         className="badge-media-btn receipt"
-                        title={isArabic ? 'معاينة الإيصال وتفاصيله' : 'View Receipt & Details'}
+                        title={isArabic ? (receiptUrls.length > 1 ? `معاينة المرفقات (${receiptUrls.length}) وتفاصيلها` : 'معاينة الإيصال وتفاصيله') : (receiptUrls.length > 1 ? `View Attachments (${receiptUrls.length}) & Details` : 'View Receipt & Details')}
                     >
                         <ImageIcon size={12} />
-                        <span>{isArabic ? 'إيصال' : 'Receipt'}</span>
+                        <span>
+                            {receiptUrls.length > 1
+                                ? `${receiptUrls.length} ${isArabic ? 'مرفقات' : 'files'}`
+                                : (isArabic ? 'إيصال' : 'Receipt')}
+                        </span>
                     </button>
                 )}
 
@@ -677,9 +995,63 @@ export default function Finance() {
         }
     };
 
+    const sortTransactionList = (list, field = 'date', order = 'desc') =>
+        sortTxList(list, field, order, { isArabic, t });
+
+
+    const renderSortableHeader = (field, label, { align = 'start', width } = {}) => {
+        const isActive = sortField === field;
+        return (
+            <th
+                key={field}
+                onClick={() => handleSort(field)}
+                style={{
+                    textAlign: align,
+                    width: width || 'auto',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    position: 'relative'
+                }}
+                className={`sortable-th ${isActive ? 'active-sort' : ''}`}
+                title={isArabic 
+                    ? `ترتيب حسب ${label} (${isActive ? (sortOrder === 'asc' ? 'تصاعدي' : 'تنازلي') : 'انقر للترتيب'})` 
+                    : `Sort by ${label} (${isActive ? (sortOrder === 'asc' ? 'Ascending' : 'Descending') : 'Click to sort'})`}
+            >
+                <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    justifyContent: align === 'center' ? 'center' : align === 'end' ? 'flex-end' : 'flex-start',
+                    width: '100%'
+                }}>
+                    <span style={{ fontWeight: isActive ? '800' : '700' }}>{label}</span>
+                    <span
+                        className={`sort-icon-indicator ${isActive ? 'active' : 'muted'}`}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            color: isActive ? 'var(--color-primary)' : 'currentColor',
+                            opacity: isActive ? 1 : 0.35,
+                            transition: 'opacity 0.15s ease'
+                        }}
+                    >
+                        {isActive ? (
+                            sortOrder === 'asc' ? <ArrowUp size={13} strokeWidth={2.5} /> : <ArrowDown size={13} strokeWidth={2.5} />
+                        ) : (
+                            <ArrowUpDown size={12} strokeWidth={1.8} />
+                        )}
+                    </span>
+                </div>
+            </th>
+        );
+    };
+
     const organizeTransactionsWithFees = (rawTxs, isAllTab) => {
         if (!isAllTab) {
-            return rawTxs.map(tx => ({ ...tx, nestedFees: [] }));
+            const unnested = rawTxs.map(tx => ({ ...tx, nestedFees: [] }));
+            return sortTransactionList(unnested, sortField, sortOrder);
         }
 
         // Separate management fees from other transactions
@@ -739,9 +1111,7 @@ export default function Finance() {
             .filter(feeTx => !matchedFeeIds.has(feeTx.id))
             .map(feeTx => ({ ...feeTx, nestedFees: [] }));
 
-        return [...structured, ...orphanFees].sort((a, b) => 
-            new Date(b.transactionDate || b.createdAt) - new Date(a.transactionDate || a.createdAt)
-        );
+        return sortTransactionList([...structured, ...orphanFees], sortField, sortOrder);
     };
 
     return (
@@ -852,6 +1222,86 @@ export default function Finance() {
                                 </button>
                             </div>
                         )}
+
+                        {/* Paid By Filter Badge */}
+                        {filterPaidById && filterPaidById !== 'ALL' && (
+                            <div style={{
+                                marginTop: 'var(--spacing-md)',
+                                marginInlineStart: 'var(--spacing-sm)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 'var(--spacing-sm)',
+                                padding: '8px 16px',
+                                background: 'rgba(37, 99, 235, 0.12)',
+                                color: '#2563eb',
+                                borderRadius: 'var(--radius-full)',
+                                fontSize: 'var(--font-size-sm)',
+                                fontWeight: '600',
+                                border: '1px solid rgba(37, 99, 235, 0.28)'
+                            }}>
+                                <Filter size={16} />
+                                <span>{isArabic ? 'الدافع:' : 'Paid by:'} {getPaidByBadgeLabel()}</span>
+                                <button
+                                    onClick={() => setFilterPaidById('ALL')}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#2563eb',
+                                        cursor: 'pointer',
+                                        padding: '2px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        borderRadius: 'var(--radius-sm)',
+                                        transition: 'all var(--transition-fast)'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.background = 'rgba(37, 99, 235, 0.2)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                    title={t('common.clear')}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Paid To Filter Badge */}
+                        {filterPaidToId && filterPaidToId !== 'ALL' && (
+                            <div style={{
+                                marginTop: 'var(--spacing-md)',
+                                marginInlineStart: 'var(--spacing-sm)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 'var(--spacing-sm)',
+                                padding: '8px 16px',
+                                background: 'rgba(245, 158, 11, 0.12)',
+                                color: '#d97706',
+                                borderRadius: 'var(--radius-full)',
+                                fontSize: 'var(--font-size-sm)',
+                                fontWeight: '600',
+                                border: '1px solid rgba(245, 158, 11, 0.28)'
+                            }}>
+                                <Filter size={16} />
+                                <span>{isArabic ? 'المدفوع له:' : 'Paid to:'} {getPaidToBadgeLabel()}</span>
+                                <button
+                                    onClick={() => setFilterPaidToId('ALL')}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: '#d97706',
+                                        cursor: 'pointer',
+                                        padding: '2px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        borderRadius: 'var(--radius-sm)',
+                                        transition: 'all var(--transition-fast)'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.background = 'rgba(245, 158, 11, 0.2)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                    title={t('common.clear')}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                     <div className="flex gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
                         <button
@@ -934,25 +1384,179 @@ export default function Finance() {
                                 ))}
                             </select>
 
-                            <select
-                                value={filterWorkmanId}
-                                onChange={(e) => setFilterWorkmanId(e.target.value)}
-                                className="select"
-                                style={{
-                                    padding: '6px 12px',
-                                    borderRadius: 'var(--radius-md)',
-                                    fontSize: 'var(--font-size-sm)',
-                                    width: '180px',
-                                    background: 'var(--bg-tertiary)',
-                                    border: '1px solid var(--border-color)',
-                                    color: 'var(--text-primary)'
-                                }}
-                            >
-                                <option value="ALL">{t('labor.title') || 'العمال والصنايعية'}</option>
-                                {workmen.map(w => (
-                                    <option key={w.id} value={w.id}>{w.name}</option>
-                                ))}
-                            </select>
+                            {/* 1. Paid By Filter Dropdown */}
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <select
+                                    value={filterPaidById}
+                                    onChange={(e) => setFilterPaidById(e.target.value)}
+                                    className="select"
+                                    style={{
+                                        padding: '6px 12px',
+                                        borderRadius: 'var(--radius-md)',
+                                        fontSize: 'var(--font-size-sm)',
+                                        minWidth: '185px',
+                                        maxWidth: '240px',
+                                        background: 'var(--bg-tertiary)',
+                                        border: filterPaidById !== 'ALL' ? '1px solid #2563eb' : '1px solid var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        cursor: 'pointer'
+                                    }}
+                                    title={isArabic ? 'تصفية حسب الدافع (أعضاء الشركة أو العملاء)' : 'Filter by Payer (Company Members or Clients)'}
+                                >
+                                    <option value="ALL">
+                                        {isArabic ? 'الدافع: الكل' : 'Paid by: All'}
+                                    </option>
+
+                                    <optgroup label={isArabic ? '⚡ تصفية سريعة' : '⚡ Quick Filter'}>
+                                        <option value="ALL_MEMBERS">
+                                            {isArabic ? '👥 كل أعضاء الشركة' : '👥 All Company Members'}
+                                        </option>
+                                        <option value="ALL_CLIENTS">
+                                            {isArabic ? '🏢 كل العملاء' : '🏢 All Clients'}
+                                        </option>
+                                    </optgroup>
+
+                                    {users.length > 0 && (
+                                        <optgroup label={(isArabic ? '👥 أعضاء الشركة' : '👥 Company Members') + ' (' + users.length + ')'}>
+                                            {users.map(u => {
+                                                const roleKey = (u.role || '').toUpperCase();
+                                                const roleName = isArabic 
+                                                    ? (t('teamManagement.roles.' + roleKey) || u.role) 
+                                                    : (t('teamManagement.roles.' + roleKey, { lng: 'en' }) || u.role);
+                                                return (
+                                                    <option key={'paid-by-member-' + u.id} value={'MEMBER:' + u.id}>
+                                                        {u.name}{roleName ? ' (' + roleName + ')' : ''}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
+
+                                    {clients.length > 0 && (
+                                        <optgroup label={(isArabic ? '🏢 العملاء' : '🏢 Clients') + ' (' + clients.length + ')'}>
+                                            {clients.map(c => {
+                                                const extra = c.company || c.phone || '';
+                                                return (
+                                                    <option key={'paid-by-client-' + c.id} value={'CLIENT:' + c.id}>
+                                                        {c.name}{extra ? ' (' + extra + ')' : ''}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
+                                </select>
+                                {filterPaidById !== 'ALL' && (
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={() => setFilterPaidById('ALL')}
+                                        style={{ padding: '4px 6px', fontSize: '0.75rem', height: '28px' }}
+                                        title={isArabic ? 'إلغاء تصفية الدافع' : 'Clear payer filter'}
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* 2. Paid To Filter Dropdown */}
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <select
+                                    value={filterPaidToId}
+                                    onChange={(e) => setFilterPaidToId(e.target.value)}
+                                    className="select"
+                                    style={{
+                                        padding: '6px 12px',
+                                        borderRadius: 'var(--radius-md)',
+                                        fontSize: 'var(--font-size-sm)',
+                                        minWidth: '185px',
+                                        maxWidth: '240px',
+                                        background: 'var(--bg-tertiary)',
+                                        border: filterPaidToId !== 'ALL' ? '1px solid #d97706' : '1px solid var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        cursor: 'pointer'
+                                    }}
+                                    title={isArabic ? 'تصفية حسب المدفوع له (أعضاء الشركة، العمال، أو الموردين)' : 'Filter by Payee (Company Members, Laborers, or Suppliers)'}
+                                >
+                                    <option value="ALL">
+                                        {isArabic ? 'المدفوع له: الكل' : 'Paid to: All'}
+                                    </option>
+
+                                    <optgroup label={isArabic ? '⚡ تصفية سريعة' : '⚡ Quick Filter'}>
+                                        <option value="ALL_MEMBERS">
+                                            {isArabic ? '👥 كل أعضاء الشركة' : '👥 All Company Members'}
+                                        </option>
+                                        <option value="ALL_WORKMEN">
+                                            {isArabic ? '👷 كل العمال ومقاولو الباطن' : '👷 All Labor & Subcontractors'}
+                                        </option>
+                                        <option value="ALL_SUPPLIERS">
+                                            {isArabic ? '🏢 كل الموردين والشركات' : '🏢 All Suppliers & Vendors'}
+                                        </option>
+                                    </optgroup>
+
+                                    {users.length > 0 && (
+                                        <optgroup label={(isArabic ? '👥 أعضاء الشركة' : '👥 Company Members') + ' (' + users.length + ')'}>
+                                            {users.map(u => {
+                                                const roleKey = (u.role || '').toUpperCase();
+                                                const roleName = isArabic 
+                                                    ? (t('teamManagement.roles.' + roleKey) || u.role) 
+                                                    : (t('teamManagement.roles.' + roleKey, { lng: 'en' }) || u.role);
+                                                return (
+                                                    <option key={'paid-to-member-' + u.id} value={'MEMBER:' + u.id}>
+                                                        {u.name}{roleName ? ' (' + roleName + ')' : ''}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
+
+                                    {workmen.length > 0 && (
+                                        <optgroup label={(isArabic ? '👷 العمال ومقاولو الباطن' : '👷 Labor & Subcontractors') + ' (' + workmen.length + ')'}>
+                                            {workmen.map(w => {
+                                                const tradeKey = (w.trade || '').toUpperCase();
+                                                const tradeName = isArabic 
+                                                    ? (t('labor.trades.' + tradeKey) || w.trade) 
+                                                    : (t('labor.trades.' + tradeKey, { lng: 'en' }) || w.trade);
+                                                return (
+                                                    <option key={'paid-to-workman-' + w.id} value={'WORKMAN:' + w.id}>
+                                                        {w.name}{tradeName ? ' (' + tradeName + ')' : ''}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
+
+                                    {suppliers.length > 0 && (
+                                        <optgroup label={(isArabic ? '🏢 الموردون والشركات' : '🏢 Suppliers & Vendors') + ' (' + suppliers.length + ')'}>
+                                            {suppliers.map(s => {
+                                                let catDisplay = '';
+                                                if (s.categories && s.categories.length > 0) {
+                                                    catDisplay = s.categories.slice(0, 2).map(c => {
+                                                        const cKey = (c || '').toUpperCase();
+                                                        return isArabic ? (t('suppliers.categories.' + cKey) || c) : (t('suppliers.categories.' + cKey, { lng: 'en' }) || c);
+                                                    }).join(', ');
+                                                } else if (s.category) {
+                                                    const cKey = (s.category || '').toUpperCase();
+                                                    catDisplay = isArabic ? (t('suppliers.categories.' + cKey) || s.category) : (t('suppliers.categories.' + cKey, { lng: 'en' }) || s.category);
+                                                }
+                                                return (
+                                                    <option key={'paid-to-supplier-' + s.id} value={'SUPPLIER:' + s.id}>
+                                                        {s.name}{catDisplay ? ' (' + catDisplay + ')' : ''}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
+                                </select>
+                                {filterPaidToId !== 'ALL' && (
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={() => setFilterPaidToId('ALL')}
+                                        style={{ padding: '4px 6px', fontSize: '0.75rem', height: '28px' }}
+                                        title={isArabic ? 'إلغاء تصفية المدفوع له' : 'Clear payee filter'}
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                )}
+                            </div>
 
                             {/* Date range picker (#11) */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1660,6 +2264,46 @@ export default function Finance() {
                                     overflow: hidden;
                                     text-overflow: ellipsis;
                                 }
+
+                                /* Sortable Table Headers */
+                                .sortable-th {
+                                    cursor: pointer;
+                                    user-select: none;
+                                    transition: background-color 0.15s ease, color 0.15s ease;
+                                }
+                                .sortable-th:hover {
+                                    background: rgba(37, 99, 235, 0.1) !important;
+                                    color: var(--color-primary) !important;
+                                }
+                                .sortable-th:hover .sort-icon-indicator {
+                                    opacity: 0.9 !important;
+                                    color: var(--color-primary) !important;
+                                }
+                                .sortable-th.active-sort {
+                                    background: rgba(37, 99, 235, 0.08) !important;
+                                    color: var(--color-primary) !important;
+                                }
+                                .sortable-th.active-sort .sort-icon-indicator {
+                                    color: var(--color-primary) !important;
+                                    opacity: 1 !important;
+                                }
+
+                                body.light-mode .sortable-th:hover {
+                                    background: #e2d5bd !important;
+                                    color: #9a3412 !important;
+                                }
+                                body.light-mode .sortable-th:hover .sort-icon-indicator {
+                                    color: #9a3412 !important;
+                                    opacity: 0.95 !important;
+                                }
+                                body.light-mode .sortable-th.active-sort {
+                                    background: #dfcfb2 !important;
+                                    color: #9a3412 !important;
+                                }
+                                body.light-mode .sortable-th.active-sort .sort-icon-indicator {
+                                    color: #9a3412 !important;
+                                    opacity: 1 !important;
+                                }
                             `}
                         </style>
 
@@ -1677,19 +2321,19 @@ export default function Finance() {
                                     <table className="transaction-table">
                                         <thead>
                                             <tr>
-                                                <th style={{ textAlign: 'start', width: '105px' }}>{t('common.date')}</th>
-                                                <th style={{ textAlign: 'start', width: '130px' }}>{t('finance.project')}</th>
-                                                <th style={{ textAlign: 'start', width: '135px' }}>{t('finance.category')}</th>
-                                                <th style={{ textAlign: 'start' }}>{t('finance.description')}</th>
-                                                <th style={{ textAlign: 'start', width: '165px' }}>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Contact')}</th>
-                                                <th style={{ textAlign: 'start', width: '145px' }}>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
-                                                <th style={{ textAlign: 'end', width: '130px' }}>{t('finance.amount')}</th>
-                                                <th style={{ textAlign: 'start', width: '110px' }}>{t('finance.createdBy') || (isArabic ? 'بواسطة' : 'Created By')}</th>
+                                                {renderSortableHeader('date', t('common.date'), { align: 'start', width: '105px' })}
+                                                {renderSortableHeader('project', t('finance.project'), { align: 'start', width: '130px' })}
+                                                {renderSortableHeader('category', t('finance.category'), { align: 'start', width: '135px' })}
+                                                {renderSortableHeader('description', t('finance.description'), { align: 'start' })}
+                                                {renderSortableHeader('payer', t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Contact'), { align: 'start', width: '165px' })}
+                                                {renderSortableHeader('paymentMethod', t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method'), { align: 'start', width: '145px' })}
+                                                {renderSortableHeader('amount', t('finance.amount'), { align: 'end', width: '130px' })}
+                                                {renderSortableHeader('createdBy', t('finance.createdBy') || (isArabic ? 'بواسطة' : 'Created By'), { align: 'start', width: '110px' })}
                                                 <th style={{ textAlign: 'center', width: '115px' }}>{t('common.actions')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {pendingTransactions.map((tx) => (
+                                            {sortTransactionList(pendingTransactions, sortField, sortOrder).map((tx) => (
                                                 <tr key={tx.id} className="tx-row" style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
                                                     <td style={{ textAlign: 'start', fontWeight: '500', fontSize: '0.82rem' }}>{formatDate(tx.transactionDate)}</td>
                                                     <td style={{ textAlign: 'start' }}>
@@ -1700,7 +2344,7 @@ export default function Finance() {
                                                             ? tx.description.split(':')[0].trim()
                                                             : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category)}
                                                     </td>
-                                                    <td style={{ textAlign: 'start', maxWidth: '220px' }} className="truncate" title={tx.description}>{tx.description}</td>
+                                                    <td style={{ textAlign: 'start', maxWidth: '220px' }} className="truncate" title={cleanTransactionDescription(tx.description)}>{cleanTransactionDescription(tx.description)}</td>
                                                     <td style={{ textAlign: 'start', maxWidth: '165px' }}>
                                                         {renderPayerOrClient(tx)}
                                                     </td>
@@ -1749,8 +2393,9 @@ export default function Finance() {
                             // If filterProjectId is set, we don't need to group (or we group by Category/Band)
                             // If NOT set, group by Project
                             const groupMap = new Map();
+                            const sortedTransactions = sortTransactionList(transactions, sortField, sortOrder);
 
-                            transactions.forEach((tx) => {
+                            sortedTransactions.forEach((tx) => {
                                 const isOffice = Boolean(tx.isOfficeExpense || !tx.projectId || !tx.project);
                                 const groupKey = isOffice ? '__OFFICE__' : (tx.project?.id || tx.project?.name || '__UNASSIGNED__');
 
@@ -1847,14 +2492,14 @@ export default function Finance() {
                                             <table className="transaction-table">
                                                 <thead>
                                                     <tr>
-                                                        <th style={{ textAlign: 'start', width: '105px' }}>{t('common.date')}</th>
-                                                        <th style={{ textAlign: 'center', width: '92px' }}>{t('common.type')}</th>
-                                                        <th style={{ textAlign: 'start', width: '135px' }}>{t('finance.category')}</th>
-                                                        <th style={{ textAlign: 'start' }}>{t('finance.description')}</th>
-                                                        <th style={{ textAlign: 'start', width: '165px' }}>{t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Contact')}</th>
-                                                        <th style={{ textAlign: 'start', width: '145px' }}>{t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method')}</th>
-                                                        <th style={{ textAlign: 'end', width: '130px' }}>{t('finance.amount')}</th>
-                                                        <th style={{ textAlign: 'center', width: '95px' }}>{t('common.status')}</th>
+                                                        {renderSortableHeader('date', t('common.date'), { align: 'start', width: '105px' })}
+                                                        {renderSortableHeader('type', t('common.type'), { align: 'center', width: '92px' })}
+                                                        {renderSortableHeader('category', t('finance.category'), { align: 'start', width: '135px' })}
+                                                        {renderSortableHeader('description', t('finance.description'), { align: 'start' })}
+                                                        {renderSortableHeader('payer', t('finance.payerContact') || (isArabic ? 'الدافع / جهة الاتصال' : 'Payer / Contact'), { align: 'start', width: '165px' })}
+                                                        {renderSortableHeader('paymentMethod', t('finance.paymentMethod') || (isArabic ? 'طريقة الدفع' : 'Payment Method'), { align: 'start', width: '145px' })}
+                                                        {renderSortableHeader('amount', t('finance.amount'), { align: 'end', width: '130px' })}
+                                                        {renderSortableHeader('status', t('common.status'), { align: 'center', width: '95px' })}
                                                         <th style={{ textAlign: 'center', width: '80px' }}>{t('common.actions')}</th>
                                                     </tr>
                                                 </thead>
@@ -1867,7 +2512,8 @@ export default function Finance() {
                                                             const catLabel = (tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
                                                                 ? tx.description.split(':')[0].trim()
                                                                 : (t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '');
-                                                            const isDescDuplicate = !tx.description || tx.description.trim().toLowerCase() === catLabel.trim().toLowerCase();
+                                                            const cleanDesc = cleanTransactionDescription(tx.description);
+                                                    const isDescDuplicate = !cleanDesc || cleanDesc.trim().toLowerCase() === catLabel.trim().toLowerCase();
 
                                                             return (
                                                                 <Fragment key={tx.id}>

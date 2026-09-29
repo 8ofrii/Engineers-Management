@@ -213,12 +213,13 @@ export default function Clients() {
                     border-color: rgba(255, 255, 255, 0.22);
                 }
                 body.light-mode .client-phone-pill {
-                    background: #f1f5f9;
-                    border-color: #cbd5e1;
-                    color: #0f172a;
+                    background: var(--bg-tertiary);
+                    border-color: var(--border-color);
+                    color: var(--text-primary);
                 }
                 body.light-mode .client-phone-pill:hover {
-                    background: #e2e8f0;
+                    background: var(--bg-primary);
+                    border-color: var(--border-color-light);
                 }
                 .client-project-pill {
                     display: inline-flex;
@@ -286,21 +287,23 @@ export default function Clients() {
                     color: #ef4444;
                 }
                 body.light-mode .client-action-btn {
-                    border-color: #cbd5e1;
-                    background: #f8fafc;
-                    color: #475569;
+                    border-color: var(--border-color);
+                    background: var(--bg-tertiary);
+                    color: var(--text-secondary);
                 }
                 body.light-mode .client-action-btn:hover {
-                    background: #e2e8f0;
-                    color: #0f172a;
+                    background: var(--bg-primary);
+                    color: var(--text-primary);
+                    border-color: var(--border-color-light);
                 }
                 body.light-mode .client-action-btn.delete {
                     color: #dc2626;
-                    border-color: #fca5a5;
-                    background: #fef2f2;
+                    border-color: rgba(220, 38, 38, 0.28);
+                    background: rgba(220, 38, 38, 0.06);
                 }
                 body.light-mode .client-action-btn.delete:hover {
-                    background: #fee2e2;
+                    background: rgba(220, 38, 38, 0.12);
+                    border-color: rgba(220, 38, 38, 0.5);
                 }
 
                 .status-indicator-dot {
@@ -347,9 +350,9 @@ export default function Clients() {
                     color: #065f46;
                 }
                 body.light-mode .client-static-badge.inactive {
-                    background: #f1f5f9;
-                    border-color: #cbd5e1;
-                    color: #475569;
+                    background: var(--bg-tertiary);
+                    border-color: var(--border-color);
+                    color: var(--text-secondary);
                 }
 
                 /* Filter Bar */
@@ -371,8 +374,8 @@ export default function Clients() {
                     border: 1px solid var(--border-color);
                 }
                 body.light-mode .client-filter-tabs {
-                    background: #f8fafc;
-                    border-color: #e2e8f0;
+                    background: var(--bg-tertiary);
+                    border-color: var(--border-color);
                 }
                 .filter-tab {
                     display: inline-flex;
@@ -397,9 +400,9 @@ export default function Clients() {
                     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
                 }
                 body.light-mode .filter-tab.active {
-                    background: #ffffff;
-                    color: #0f172a;
-                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+                    background: var(--bg-secondary);
+                    color: var(--text-primary);
+                    box-shadow: 0 1px 4px rgba(60, 45, 20, 0.12);
                 }
                 .filter-count {
                     display: inline-block;
@@ -409,7 +412,8 @@ export default function Clients() {
                     background: rgba(255, 255, 255, 0.08);
                 }
                 body.light-mode .filter-count {
-                    background: #e2e8f0;
+                    background: rgba(0, 0, 0, 0.06);
+                    color: var(--text-secondary);
                 }
 
                 .client-project-pill.completed {
@@ -418,9 +422,9 @@ export default function Clients() {
                     color: #94a3b8;
                 }
                 body.light-mode .client-project-pill.completed {
-                    background: #f1f5f9;
-                    border-color: #cbd5e1;
-                    color: #64748b;
+                    background: var(--bg-tertiary);
+                    border-color: var(--border-color);
+                    color: var(--text-secondary);
                 }
 
             `}</style>

@@ -26,6 +26,7 @@ export const getUsers = async (req, res) => {
                 profilePicture: true,
                 company: true,
                 permissions: true,
+                currentCustodyBalance: true,
                 isActive: true,
                 isVerified: true,
                 verificationCode: true,

@@ -20,7 +20,7 @@ async function getCustodyFlows(userId, tenantId) {
                 OR: [
                     { custodyWalletId: userId },
                     { payerUserId: userId, paymentMethod: 'CUSTODY_WALLET' },
-                    { createdBy: userId, paymentMethod: 'CUSTODY_WALLET', custodyWalletId: null, payerUserId: null }
+                    { createdBy: userId, paymentMethod: 'CUSTODY_WALLET' }
                 ]
             },
             _sum: { amount: true }
@@ -29,7 +29,7 @@ async function getCustodyFlows(userId, tenantId) {
             where: {
                 tenantId,
                 engineerId: userId,
-                type: { in: ['RETURN', 'SETTLEMENT'] },
+                type: 'RETURN',
                 relatedTransactionId: null
             },
             _sum: { amount: true }
@@ -61,7 +61,7 @@ async function getCustodyFlows(userId, tenantId) {
                 OR: [
                     { custodyWalletId: userId },
                     { payerUserId: userId, paymentMethod: 'CUSTODY_WALLET' },
-                    { createdBy: userId, paymentMethod: 'CUSTODY_WALLET', custodyWalletId: null, payerUserId: null }
+                    { createdBy: userId, paymentMethod: 'CUSTODY_WALLET' }
                 ]
             }
         })

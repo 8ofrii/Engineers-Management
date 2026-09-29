@@ -6,22 +6,15 @@ import {
     FileText, CheckCircle2, Clock, AlertCircle, Copy, Check,
     Image as ImageIcon, TrendingUp, TrendingDown, Building, User,
     Wallet, Calendar, Tag, Maximize2, Printer, Edit3, ArrowUpRight,
-    ArrowDownLeft, CornerDownRight, RotateCcw, Briefcase, Loader2
+    ArrowDownLeft, CornerDownRight, RotateCcw, Briefcase, Loader2,
+    FileSpreadsheet, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
+import { resolveMediaUrl, parseReceiptUrls, getFileCategory, formatBytes } from '../utils/media';
+import { cleanTransactionDescription } from '../utils/format';
 import './TransactionDetailModal.css';
 
-/**
- * Resolves media URLs (whether absolute S3, relative /uploads/, or data/blob URLs).
- */
-export const resolveMediaUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
-        return url;
-    }
-    const clean = url.replace(/^(\/?uploads\/|\/+)/, '');
-    return `/uploads/${clean}`;
-};
+export { resolveMediaUrl, parseReceiptUrls };
 
 export default function TransactionDetailModal({
     isOpen,
@@ -43,8 +36,8 @@ export default function TransactionDetailModal({
     const [playbackRate, setPlaybackRate] = useState(1);
     const [copiedTranscript, setCopiedTranscript] = useState(false);
 
-    // Image Zoom Modal State
-    const [isImageZoomed, setIsImageZoomed] = useState(false);
+    // Image Zoom Modal State (index of active image in imageAttachments)
+    const [zoomedImageIndex, setZoomedImageIndex] = useState(null);
     // Voucher Printing & Export State
     const [isPrintingSlip, setIsPrintingSlip] = useState(false);
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -54,7 +47,7 @@ export default function TransactionDetailModal({
         setIsPlaying(false);
         setCurrentTime(0);
         setDuration(0);
-        setIsImageZoomed(false);
+        setZoomedImageIndex(null);
         setIsPrintingSlip(false);
         setIsDownloadingPdf(false);
     }, [transaction?.id]);
@@ -70,8 +63,9 @@ export default function TransactionDetailModal({
     const isPending = tx.status === 'PENDING_APPROVAL';
 
     const voiceUrl = resolveMediaUrl(tx.voiceNoteUrl);
-    const receiptUrl = resolveMediaUrl(tx.receiptPhotoUrl);
-    const isPdf = receiptUrl && (receiptUrl.toLowerCase().endsWith('.pdf') || receiptUrl.includes('application/pdf'));
+    const receiptUrls = parseReceiptUrls(tx.receiptPhotoUrl);
+    const receiptUrl = receiptUrls[0] || null;
+    const imageAttachments = receiptUrls.filter(u => getFileCategory(u).isImg);
 
     // Audio Player Controls
     const togglePlay = () => {
@@ -128,6 +122,41 @@ export default function TransactionDetailModal({
             setCopiedTranscript(true);
             setTimeout(() => setCopiedTranscript(false), 2000);
         }
+    };
+
+    const getPaymentMethodLabel = (method) => {
+        if (!method) return '-';
+        switch (method) {
+            case 'BANK_TRANSFER':
+                return t('finance.methods.bankTransfer') || (isArabic ? 'تحويل بنكي' : 'Bank Transfer');
+            case 'CASH':
+                return t('finance.methods.cash') || (isArabic ? 'نقداً (كاش)' : 'Cash');
+            case 'CHECK':
+                return t('finance.methods.check') || (isArabic ? 'شيك' : 'Check');
+            case 'CREDIT_CARD':
+                return t('finance.methods.creditCard') || (isArabic ? 'بطاقة ائتمان' : 'Credit Card');
+            case 'CUSTODY_WALLET':
+                return t('finance.methods.custodyWallet') || (isArabic ? 'عهدة مهندس' : 'Custody Wallet');
+            case 'OTHER':
+                return t('finance.methods.other') || (isArabic ? 'أخرى' : 'Other');
+            default: {
+                const key = `finance.methods.${method.toLowerCase()}`;
+                const val = t(key);
+                if (val && val !== key) return val;
+                return method;
+            }
+        }
+    };
+
+    const getCategoryLabel = (category, description) => {
+        if (!category) return '-';
+        if (category === 'OTHER' && description && (description.startsWith('Other - ') || description.startsWith('أخرى - '))) {
+            return description.split(' - ')[1] || (isArabic ? 'أخرى' : 'Other');
+        }
+        const key = `finance.categories.${category.toLowerCase()}`;
+        const val = t(key);
+        if (val && val !== key) return val;
+        return category;
     };
 
     // Clean browser print fallback
@@ -260,10 +289,27 @@ export default function TransactionDetailModal({
                     <div className="voucher-print-title-box">
                         <div className="voucher-print-title">
                             {isIncome
-                                ? (isArabic ? 'سند قبض معتمد' : 'OFFICIAL RECEIPT VOUCHER')
+                                ? (isArabic ? 'سند قبض مالي معتمد (إيراد)' : 'OFFICIAL RECEIPT VOUCHER (INCOME)')
                                 : isProfit
                                     ? (isArabic ? 'إذن تحويل أرباح إدارة' : 'PROFIT TRANSFER VOUCHER')
-                                    : (isArabic ? 'سند صرف معتمد' : 'PAYMENT VOUCHER')}
+                                    : (isArabic ? 'سند صرف معتمد (مصروفات)' : 'OFFICIAL PAYMENT VOUCHER (EXPENSE)')}
+                        </div>
+                        <div className="voucher-print-badge" style={{
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            marginTop: '4px',
+                            backgroundColor: isIncome ? '#ecfdf5' : isProfit ? '#ecfeff' : '#fef2f2',
+                            color: isIncome ? '#047857' : isProfit ? '#0e7490' : '#b91c1c',
+                            border: `1px solid ${isIncome ? '#10b981' : isProfit ? '#06b6d4' : '#ef4444'}`
+                        }}>
+                            {isIncome
+                                ? (isArabic ? 'سند قبض • إيراد معتمد' : 'RECEIPT • INCOME')
+                                : isProfit
+                                    ? (isArabic ? 'تحويل أرباح' : 'PROFIT TRANSFER')
+                                    : (isArabic ? 'سند صرف • مصروفات' : 'PAYMENT • EXPENSE')}
                         </div>
                         <div className="voucher-print-ref">
                             REF #{tx.id ? tx.id.slice(0, 8).toUpperCase() : 'TX-001'}
@@ -303,7 +349,7 @@ export default function TransactionDetailModal({
                                 )}
                             </div>
                             <div className="tx-detail-subtitle">
-                                {tx.project?.name || (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر والشركة' : '🏢 Office & HQ Expenses') : (isArabic ? 'غير مسند لمشروع' : 'Unassigned Project'))} · {formatDate(tx.transactionDate || tx.createdAt)}
+                                {tx.project?.name || (isIncome ? (isArabic ? '🏢 إيرادات المقر والشركة' : '🏢 Company & HQ Revenue') : (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر والشركة' : '🏢 Office & HQ Expenses') : (isArabic ? 'غير مسند لمشروع' : 'Unassigned Project')))} · {formatDate(tx.transactionDate || tx.createdAt)}
                             </div>
                         </div>
                     </div>
@@ -328,7 +374,7 @@ export default function TransactionDetailModal({
                         </div>
                         {tx.description && (
                             <div className="tx-hero-desc">
-                                {tx.description}
+                                {cleanTransactionDescription(tx.description)}
                             </div>
                         )}
                     </div>
@@ -446,8 +492,8 @@ export default function TransactionDetailModal({
                                     </div>
                                 )}
 
-                                {/* RECEIPT / DOCUMENT PREVIEW CARD */}
-                                {receiptUrl && (
+                                {/* RECEIPT & ATTACHMENT MEDIA SECTION */}
+                                {receiptUrls.length > 0 && (
                                     <div className="media-card receipt-card">
                                         <div className="media-card-header">
                                             <div className="flex items-center gap-xs">
@@ -455,64 +501,165 @@ export default function TransactionDetailModal({
                                                     <ImageIcon size={15} />
                                                 </div>
                                                 <span className="media-card-title">
-                                                    {isPdf
-                                                        ? (isArabic ? 'مستند الإيصال / الفاتورة (PDF)' : 'Receipt Document (PDF)')
-                                                        : (isArabic ? 'صورة الإيصال / الفاتورة' : 'Receipt / Invoice Photo')}
+                                                    {receiptUrls.length > 1
+                                                        ? (isArabic ? `المرفقات والمستندات (${receiptUrls.length})` : `Attachments & Documents (${receiptUrls.length})`)
+                                                        : (isArabic ? 'صورة الإيصال / الفاتورة' : 'Receipt / Invoice Attachment')}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-xs">
-                                                <a
-                                                    href={receiptUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="btn-icon-sm"
-                                                    title={isArabic ? 'فتح في نافذة جديدة' : 'Open in New Tab'}
-                                                >
-                                                    <ExternalLink size={14} />
-                                                </a>
-                                                {!isPdf && (
-                                                    <button
-                                                        type="button"
-                                                        className="btn-icon-sm"
-                                                        onClick={() => setIsImageZoomed(true)}
-                                                        title={isArabic ? 'تكبير الصورة' : 'Zoom Image'}
-                                                    >
-                                                        <Maximize2 size={14} />
-                                                    </button>
-                                                )}
-                                            </div>
+                                            {receiptUrls.length > 1 && (
+                                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                                    {receiptUrls.length} {isArabic ? 'ملفات مرفقة' : 'files attached'}
+                                                </span>
+                                            )}
                                         </div>
 
-                                        {isPdf ? (
-                                            <div className="pdf-preview-box">
-                                                <FileText size={48} className="text-danger" />
-                                                <div className="pdf-file-title">
-                                                    {isArabic ? 'مستند PDF مرفق' : 'Attached PDF Document'}
-                                                </div>
-                                                <a
-                                                    href={receiptUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="btn btn-secondary btn-sm"
-                                                >
-                                                    <ExternalLink size={14} />
-                                                    {isArabic ? 'عرض المستند بالكامل' : 'View Full Document'}
-                                                </a>
-                                            </div>
+                                        {receiptUrls.length === 1 ? (
+                                            (() => {
+                                                const u = receiptUrls[0];
+                                                const meta = getFileCategory(u);
+                                                if (meta.isImg) {
+                                                    return (
+                                                        <div
+                                                            className="receipt-image-wrapper"
+                                                            onClick={() => setZoomedImageIndex(0)}
+                                                        >
+                                                            <img
+                                                                src={u}
+                                                                alt="Receipt Evidence"
+                                                                className="receipt-thumbnail"
+                                                            />
+                                                            <div className="receipt-zoom-hint">
+                                                                <Maximize2 size={16} />
+                                                                <span>{isArabic ? 'انقر للتكبير' : 'Click to zoom'}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                if (meta.isPdf) {
+                                                    return (
+                                                        <div className="pdf-preview-box">
+                                                            <FileText size={44} className="text-danger" />
+                                                            <div className="pdf-file-title" title={meta.name}>
+                                                                {meta.name || (isArabic ? 'مستند PDF مرفق' : 'Attached PDF Document')}
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                                <a
+                                                                    href={u}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="btn btn-secondary btn-sm"
+                                                                >
+                                                                    <ExternalLink size={14} />
+                                                                    {isArabic ? 'عرض المستند' : 'View Document'}
+                                                                </a>
+                                                                <a
+                                                                    href={u}
+                                                                    download
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="btn btn-secondary btn-sm"
+                                                                >
+                                                                    <Download size={14} />
+                                                                    {isArabic ? 'تحميل' : 'Download'}
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="pdf-preview-box" style={{ borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+                                                        {meta.isSpreadsheet ? <FileSpreadsheet size={44} style={{ color: '#10b981' }} /> : <FileText size={44} style={{ color: '#3b82f6' }} />}
+                                                        <div className="pdf-file-title" title={meta.name}>
+                                                            {meta.name || (isArabic ? 'مستند مرفق' : 'Attached Document')}
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                                            <a
+                                                                href={u}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="btn btn-secondary btn-sm"
+                                                            >
+                                                                <ExternalLink size={14} />
+                                                                {isArabic ? 'فتح الملف' : 'Open File'}
+                                                            </a>
+                                                            <a
+                                                                href={u}
+                                                                download
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="btn btn-secondary btn-sm"
+                                                            >
+                                                                <Download size={14} />
+                                                                {isArabic ? 'تحميل' : 'Download'}
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()
                                         ) : (
-                                            <div
-                                                className="receipt-image-wrapper"
-                                                onClick={() => setIsImageZoomed(true)}
-                                            >
-                                                <img
-                                                    src={receiptUrl}
-                                                    alt="Receipt Evidence"
-                                                    className="receipt-thumbnail"
-                                                />
-                                                <div className="receipt-zoom-hint">
-                                                    <Maximize2 size={16} />
-                                                    <span>{isArabic ? 'انقر للتكبير' : 'Click to zoom'}</span>
-                                                </div>
+                                            <div className="receipt-gallery-grid">
+                                                {receiptUrls.map((u, idx) => {
+                                                    const meta = getFileCategory(u);
+                                                    const imgIndex = imageAttachments.indexOf(u);
+                                                    return (
+                                                        <div key={idx} className="receipt-gallery-item">
+                                                            {meta.isImg ? (
+                                                                <div
+                                                                    className="gallery-thumb-container"
+                                                                    onClick={() => setZoomedImageIndex(imgIndex)}
+                                                                >
+                                                                    <img src={u} alt={meta.name} className="gallery-thumb-img" />
+                                                                    <div className="gallery-thumb-overlay">
+                                                                        <Maximize2 size={16} />
+                                                                    </div>
+                                                                    <span className="gallery-type-badge img">IMG</span>
+                                                                </div>
+                                                            ) : meta.isPdf ? (
+                                                                <div className="gallery-doc-container pdf">
+                                                                    <FileText size={32} className="text-danger" />
+                                                                    <span className="gallery-type-badge pdf">PDF</span>
+                                                                </div>
+                                                            ) : meta.isSpreadsheet ? (
+                                                                <div className="gallery-doc-container sheet">
+                                                                    <FileSpreadsheet size={32} style={{ color: '#10b981' }} />
+                                                                    <span className="gallery-type-badge sheet">{meta.ext}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="gallery-doc-container doc">
+                                                                    <FileText size={32} style={{ color: '#3b82f6' }} />
+                                                                    <span className="gallery-type-badge doc">{meta.ext}</span>
+                                                                </div>
+                                                            )}
+
+                                                            <div className="gallery-item-info">
+                                                                <span className="gallery-item-name" title={meta.name}>
+                                                                    {meta.name}
+                                                                </span>
+                                                                <div className="gallery-item-actions">
+                                                                    <a
+                                                                        href={u}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="btn-icon-xs"
+                                                                        title={isArabic ? 'معاينة' : 'View'}
+                                                                    >
+                                                                        <ExternalLink size={13} />
+                                                                    </a>
+                                                                    <a
+                                                                        href={u}
+                                                                        download
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="btn-icon-xs"
+                                                                        title={isArabic ? 'تحميل' : 'Download'}
+                                                                    >
+                                                                        <Download size={13} />
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -582,7 +729,7 @@ export default function TransactionDetailModal({
                                     {isArabic ? 'التصنيف' : 'Category'}
                                 </div>
                                 <div className="tx-item-value">
-                                    {t(`finance.categories.${tx.category?.toLowerCase()}`) || tx.category || '-'}
+                                    {getCategoryLabel(tx.category, tx.description)}
                                 </div>
                             </div>
 
@@ -593,7 +740,7 @@ export default function TransactionDetailModal({
                                     {isArabic ? 'طريقة الدفع' : 'Payment Method'}
                                 </div>
                                 <div className="tx-item-value">
-                                    {t(`finance.methods.${tx.paymentMethod}`) || tx.paymentMethod || '-'}
+                                    {getPaymentMethodLabel(tx.paymentMethod)}
                                 </div>
                             </div>
 
@@ -688,21 +835,40 @@ export default function TransactionDetailModal({
 
                     {/* PRINTABLE OFFICIAL SIGNATURES (Visible only during print) */}
                     <div className="voucher-print-signatures">
-                        <div className="voucher-sign-col">
-                            <div className="voucher-sign-title">{isArabic ? 'المحاسب المسؤول / الصراف' : 'Accountant / Cashier'}</div>
-                            <div className="voucher-sign-line">{tx.user?.name || user?.name || 'Authorized'}</div>
-                        </div>
-                        <div className="voucher-sign-col">
-                            <div className="voucher-sign-title">{isArabic ? 'المستلم / المستفيد' : 'Beneficiary / Recipient'}</div>
-                            <div className="voucher-sign-line">____________________</div>
-                        </div>
-                        <div className="voucher-sign-col">
-                            <div className="voucher-sign-title">{isArabic ? 'اعتماد الإدارة المالية' : 'Financial Approval'}</div>
-                            <div className="voucher-sign-line">{tx.approver?.name || '____________________'}</div>
-                        </div>
+                        {isIncome ? (
+                            <>
+                                <div className="voucher-sign-col">
+                                    <div className="voucher-sign-title">{isArabic ? 'المسلِّم / القائم بالسداد' : 'Depositor / Payer'}</div>
+                                    <div className="voucher-sign-line">{tx.client?.name || tx.transactionFrom || tx.beneficiary || '____________________'}</div>
+                                </div>
+                                <div className="voucher-sign-col">
+                                    <div className="voucher-sign-title">{isArabic ? 'المستلم / أمين الخزينة' : 'Received By / Cashier'}</div>
+                                    <div className="voucher-sign-line">{tx.user?.name || user?.name || 'Authorized'}</div>
+                                </div>
+                                <div className="voucher-sign-col">
+                                    <div className="voucher-sign-title">{isArabic ? 'اعتماد الإدارة المالية' : 'Financial Approval'}</div>
+                                    <div className="voucher-sign-line">{tx.approver?.name || (isApproved ? (isArabic ? 'الإدارة المالية' : 'Financial Dept') : '____________________')}</div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="voucher-sign-col">
+                                    <div className="voucher-sign-title">{isArabic ? 'المحاسب المسؤول / الصراف' : 'Accountant / Cashier'}</div>
+                                    <div className="voucher-sign-line">{tx.payer?.name || tx.user?.name || user?.name || 'Authorized'}</div>
+                                </div>
+                                <div className="voucher-sign-col">
+                                    <div className="voucher-sign-title">{isArabic ? 'المستلم / المستفيد' : 'Beneficiary / Recipient'}</div>
+                                    <div className="voucher-sign-line">{tx.beneficiary || tx.supplier?.name || tx.workman?.name || '____________________'}</div>
+                                </div>
+                                <div className="voucher-sign-col">
+                                    <div className="voucher-sign-title">{isArabic ? 'اعتماد الإدارة المالية' : 'Financial Approval'}</div>
+                                    <div className="voucher-sign-line">{tx.approver?.name || (isApproved ? (isArabic ? 'الإدارة المالية' : 'Financial Dept') : '____________________')}</div>
+                                </div>
+                            </>
+                        )}
                     </div>
                     <div className="voucher-print-footer">
-                        <span>{user?.company || 'Hesaby ERP'} &mdash; {isArabic ? 'إشعار مالي معتمد صالح للقيد والمراجعة' : 'Official Verified Financial Slip'}</span>
+                        <span>{user?.company || 'Hesaby ERP'} &mdash; {isIncome ? (isArabic ? 'إشعار تحصيل مالي معتمد صالح للقيد والمراجعة' : 'Official Verified Income Receipt Slip') : (isArabic ? 'إشعار مالي معتمد صالح للقيد والمراجعة' : 'Official Verified Financial Slip')}</span>
                         <span>{isArabic ? 'نسخة أصلية' : 'Original Copy'}</span>
                     </div>
                 </div>
@@ -772,16 +938,43 @@ export default function TransactionDetailModal({
             </div>
 
             {/* FULLSCREEN IMAGE ZOOM MODAL */}
-            {isImageZoomed && receiptUrl && (
-                <div className="image-zoom-overlay" onClick={() => setIsImageZoomed(false)}>
+            {zoomedImageIndex !== null && imageAttachments[zoomedImageIndex] && (
+                <div className="image-zoom-overlay" onClick={() => setZoomedImageIndex(null)}>
                     <div className="image-zoom-content" onClick={(e) => e.stopPropagation()}>
-                        <button className="image-zoom-close" onClick={() => setIsImageZoomed(false)}>
+                        <button className="image-zoom-close" onClick={() => setZoomedImageIndex(null)}>
                             <X size={24} />
                         </button>
-                        <img src={receiptUrl} alt="Zoomed Receipt" className="image-zoom-full" />
+
+                        {imageAttachments.length > 1 && (
+                            <>
+                                <button
+                                    type="button"
+                                    className="zoom-nav-btn zoom-nav-prev"
+                                    onClick={() => setZoomedImageIndex((prev) => (prev > 0 ? prev - 1 : imageAttachments.length - 1))}
+                                    title={isArabic ? 'السابق' : 'Previous'}
+                                >
+                                    <ChevronLeft size={22} />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="zoom-nav-btn zoom-nav-next"
+                                    onClick={() => setZoomedImageIndex((prev) => (prev < imageAttachments.length - 1 ? prev + 1 : 0))}
+                                    title={isArabic ? 'التالي' : 'Next'}
+                                >
+                                    <ChevronRight size={22} />
+                                </button>
+                                <div className="zoom-counter-badge">
+                                    {isArabic
+                                        ? `صورة ${zoomedImageIndex + 1} من ${imageAttachments.length}`
+                                        : `Photo ${zoomedImageIndex + 1} of ${imageAttachments.length}`}
+                                </div>
+                            </>
+                        )}
+
+                        <img src={imageAttachments[zoomedImageIndex]} alt="Zoomed Receipt" className="image-zoom-full" />
                         <div className="image-zoom-toolbar">
                             <a
-                                href={receiptUrl}
+                                href={imageAttachments[zoomedImageIndex]}
                                 download
                                 target="_blank"
                                 rel="noreferrer"

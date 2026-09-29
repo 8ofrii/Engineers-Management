@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { CheckCircle, XCircle, Loader, Building2 } from 'lucide-react';
+import { BeamsBackground } from '@/components/ui/beams-background';
 import './Auth.css';
 
 export default function VerifyInvite() {
@@ -42,6 +43,13 @@ export default function VerifyInvite() {
 
     return (
         <div className="auth-container">
+            {typeof document !== 'undefined' && !document.body.classList.contains('light-mode') && (
+                <BeamsBackground
+                    colorScheme="ember"
+                    intensity="medium"
+                    className="fixed inset-0 pointer-events-none z-0"
+                />
+            )}
             <div className="auth-background"></div>
             <div className="auth-content">
                 <div className="auth-card glass" style={{ textAlign: 'center', maxWidth: '450px' }}>

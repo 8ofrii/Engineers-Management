@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatNumber } from './format';
+import { formatCurrency, formatNumber, cleanTransactionDescription } from './format';
 
 // These tests pin the locale-aware money/number formatting.
 // Currency display strings come from ICU/CLDR via Intl.NumberFormat,
@@ -72,5 +72,33 @@ describe('formatNumber', () => {
     it('treats null/undefined as zero', () => {
         expect(formatNumber(null, 'en')).toMatch(/0/);
         expect(formatNumber(undefined, 'en')).toMatch(/0/);
+    });
+});
+
+describe('cleanTransactionDescription', () => {
+    it('strips " | 0 TON @ 0" bloat', () => {
+        expect(cleanTransactionDescription('Sand | 0 TON @ 0')).toBe('Sand');
+        expect(cleanTransactionDescription('مصنعيه كهربائى | 0 TON @ 0')).toBe('مصنعيه كهربائى');
+        expect(cleanTransactionDescription('فاتوره اسمنت وحديد | 0 TON @ 0')).toBe('فاتوره اسمنت وحديد');
+    });
+
+    it('strips quantity at price bloat', () => {
+        expect(cleanTransactionDescription('Ready-Mix Concrete | 35 TON @ 1000')).toBe('Ready-Mix Concrete');
+        expect(cleanTransactionDescription('Plumbing Materials | 30 TON @ 1000')).toBe('Plumbing Materials');
+    });
+
+    it('strips leading "0 TON @ 0 | " bloat', () => {
+        expect(cleanTransactionDescription('0 TON @ 0 | cement purchase')).toBe('cement purchase');
+    });
+
+    it('preserves clean descriptions and user notes with pipes', () => {
+        expect(cleanTransactionDescription('دفعة عميل - حسين بيومى الجزار | اتفاق على 150الف')).toBe('دفعة عميل - حسين بيومى الجزار | اتفاق على 150الف');
+        expect(cleanTransactionDescription('دفعة عميل - حسين بيومى الجزار | تحويل')).toBe('دفعة عميل - حسين بيومى الجزار | تحويل');
+    });
+
+    it('handles null, empty or undefined gracefully', () => {
+        expect(cleanTransactionDescription('')).toBe('');
+        expect(cleanTransactionDescription(null)).toBe('');
+        expect(cleanTransactionDescription(undefined)).toBe('');
     });
 });

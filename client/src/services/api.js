@@ -107,10 +107,10 @@ export const categoriesAPI = {
 export const billingAPI = {
     listPlans: () => api.get('/billing/plans'),
     getSubscription: () => api.get('/billing/subscription'),
-    selectPlan: (plan) => api.post('/billing/select-plan', { plan }),
+    selectPlan: (plan, extra = {}) => api.post('/billing/select-plan', { plan, ...extra }),
     buyAddOn: (addOnKey) => api.post('/billing/buy-addon', { addOnKey }),
     startCheckout: (plan) => api.post('/billing/checkout', { plan }),
-    cancel: () => api.post('/billing/cancel'),
+    cancel: (extra = {}) => api.post('/billing/cancel', extra),
     listAttempts: () => api.get('/billing/payment-attempts'),
 
     // InstaPay Egypt Integration

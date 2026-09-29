@@ -13,6 +13,7 @@ import prisma from '../lib/prisma.js';
 import * as transactionV2 from './transactionControllerV2.js';
 import { auditFromReq } from '../lib/audit.js';
 import { deleteByUrl } from '../lib/storage.js';
+import { checkStorageQuota } from '../lib/storageUsage.js';
 import { generateVoucherPdf } from '../lib/voucherPdf.js';
 import { generateTransactionsLedgerPdf } from '../lib/transactionsLedgerPdf.js';
 
@@ -1361,6 +1362,21 @@ export const uploadReceipt = async (req, res, next) => {
         const removedUrls = existingTxUrls.filter(url => !keptUrls.includes(url));
         for (const remUrl of removedUrls) {
             await deleteByUrl(remUrl).catch(() => {});
+        }
+
+        // Plan-based file size and tenant storage quota check
+        const quotaCheck = await checkStorageQuota(req.user.tenantId, uploadedFiles);
+        if (!quotaCheck.allowed) {
+            for (const f of uploadedFiles) {
+                const u = f.key ? `/uploads/${f.key}` : (f.location || `/uploads/receipts/${f.filename}`);
+                await deleteByUrl(u).catch(() => {});
+            }
+            return res.status(400).json({
+                success: false,
+                code: quotaCheck.code,
+                message: quotaCheck.message,
+                messageAr: quotaCheck.messageAr
+            });
         }
 
         // Storage budget check (50 MB total for this transaction upload batch)

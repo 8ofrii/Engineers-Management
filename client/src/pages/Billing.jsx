@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-    CreditCard, Check, Loader2, ExternalLink, Calendar, 
-    AlertCircle, AlertTriangle, X, Zap, Layers, Users, Sparkles, ShieldCheck, 
+    CreditCard, HardDrive, Check, Loader2, ExternalLink, Calendar, 
+    AlertCircle, AlertTriangle, X, Zap, Layers, Users, Sparkles, ShieldCheck, ShieldAlert, 
     ArrowRight, CheckCircle2, RefreshCw, MessageCircle, Mail,
-    Smartphone, Clock
+    Smartphone, Clock, Lock, Crown
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
@@ -13,6 +13,7 @@ import { billingAPI } from '../services/api';
 import { useFormat } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
 import InstaPayModal from '../components/billing/InstaPayModal';
+import DowngradeSafeguardModal from '../components/billing/DowngradeSafeguardModal';
 
 const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-GB') : '-';
 
@@ -38,6 +39,7 @@ export default function Billing() {
     const [paymentTarget, setPaymentTarget] = useState({ type: 'PLAN', key: 'PREMIUM' });
     const [adminApprovalsOpen, setAdminApprovalsOpen] = useState(false);
     const [pendingPayment, setPendingPayment] = useState(null);
+    const [downgradeModalOpen, setDowngradeModalOpen] = useState(false);
 
     // Custom UI Confirmation Modal State
     const [confirmDialog, setConfirmDialog] = useState({
@@ -80,7 +82,43 @@ export default function Billing() {
 
     useEffect(() => { load(); }, []);
 
+    const handleConfirmDowngrade = async ({ reason, feedback }) => {
+        try {
+            setActionInProgress('FREE');
+            const r = await billingAPI.selectPlan('FREE', {
+                confirmDowngrade: true,
+                reason,
+                feedback
+            });
+            setDowngradeModalOpen(false);
+            showAlert({
+                type: 'success',
+                title: t('common.success', 'Success'),
+                message: isAr
+                    ? (r.data.messageAr || 'تم تخفيض الباقة إلى الباقة المجانية بنجاح.')
+                    : (r.data.message || 'Plan downgraded to Free plan successfully.')
+            });
+            await load();
+        } catch (err) {
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: apiErrorMessage(err, 'Failed to downgrade plan.')
+            });
+        } finally {
+            setActionInProgress(null);
+        }
+    };
+
     const handleSelectPlan = async (planKey) => {
+        if (planKey === currentPlanKey) {
+            return; // Already active on this plan
+        }
+        const isCurrentlyPaid = (currentPlanConfig?.priceEgp > 0 || currentPlanKey !== 'FREE');
+        if (planKey === 'FREE' && isCurrentlyPaid) {
+            setDowngradeModalOpen(true);
+            return;
+        }
         if (pendingPayment) {
             showAlert({
                 type: 'warning',
@@ -120,6 +158,16 @@ export default function Billing() {
     };
 
     const handleBuyAddOn = async (addOnKey) => {
+        if (!isAddonEligible) {
+            showAlert({
+                type: 'warning',
+                title: isAr ? 'الباقات الإضافية حصرية' : 'Exclusive Add-Ons',
+                message: isAr
+                    ? 'باقات شحن رصيد الذكاء الاصطناعي متاحة فقط لمشتركي الباقة المميزة والشركات. يرجى ترقية باقتك للاستفادة منها.'
+                    : 'AI Token Add-On packs are exclusively available to Premium and Enterprise members. Please upgrade your plan first.'
+            });
+            return;
+        }
         if (pendingPayment) {
             showAlert({
                 type: 'warning',
@@ -136,36 +184,7 @@ export default function Billing() {
     };
 
     const handleCancel = () => {
-        setConfirmDialog({
-            isOpen: true,
-            title: isAr ? 'إلغاء اشتراك الباقة' : 'Cancel Subscription',
-            message: isAr
-                ? 'هل أنت متأكد من رغبتك في إلغاء اشتراكك الحالي؟'
-                : 'Are you sure you want to cancel your current subscription?',
-            warning: isAr
-                ? 'سيتم تحويل حسابك إلى الباقة المجانية فوراً وستفقد مميزات الباقة المدفوعة وصلاحيات الفريق الموسعة.'
-                : 'Your account will be downgraded to the Free plan immediately and premium limits will be revoked.',
-            confirmText: isAr ? 'نعم، إلغاء الاشتراك' : 'Yes, Cancel Subscription',
-            cancelText: isAr ? 'تراجع والاحتفاظ بالباقة' : 'Keep My Subscription',
-            confirmVariant: 'danger',
-            onConfirm: async () => {
-                try {
-                    await billingAPI.cancel();
-                    showAlert({
-                        type: 'success',
-                        title: t('common.success', 'Done'),
-                        message: isAr ? 'تم إلغاء الاشتراك بنجاح وتحويل الحساب إلى الباقة المجانية.' : 'Subscription cancelled successfully.'
-                    });
-                    await load();
-                } catch (err) {
-                    showAlert({
-                        type: 'error',
-                        title: t('common.error', 'Error'),
-                        message: apiErrorMessage(err, 'Cancel failed.')
-                    });
-                }
-            }
-        });
+        setDowngradeModalOpen(true);
     };
 
     const handleCancelPendingRequest = (paymentAttemptId) => {
@@ -212,8 +231,17 @@ export default function Billing() {
         );
     }
 
-    const currentPlanKey = subscription.plan;
-    const currentPlanConfig = subscription.planConfig;
+    const normalizePlanKey = (k) => {
+        if (!k) return 'FREE';
+        const u = String(k).toUpperCase();
+        if (u === 'BUSINESS' || u === 'PRO' || u === 'BASIC' || u === 'PREMIUM') return 'PREMIUM';
+        if (u === 'ENTERPRISE') return 'ENTERPRISE';
+        return 'FREE';
+    };
+
+    const currentPlanKey = normalizePlanKey(subscription.planConfig?.key || subscription.plan);
+    const currentPlanConfig = subscription.planConfig || getPlan(currentPlanKey);
+    const isAddonEligible = currentPlanKey === 'PREMIUM' || currentPlanKey === 'ENTERPRISE' || (currentPlanConfig && currentPlanConfig.priceEgp > 0);
     const usage = subscription.usage || {};
 
     // Progress calculations
@@ -226,6 +254,9 @@ export default function Billing() {
         : Math.min(100, Math.round(((usage.users?.current || 0) / (usage.users?.max || 1)) * 100));
 
     const aiUsagePct = Math.min(100, Math.round(((usage.aiActions?.current || 0) / (usage.aiActions?.max || 1)) * 100));
+    const storageUsagePct = usage.storage?.isUnlimited
+        ? 0
+        : (usage.storage?.usedPercent ?? Math.min(100, Math.round(((usage.storage?.currentMb || 0) / (usage.storage?.maxMb || 50)) * 100)));
 
     return (
         <Layout>
@@ -441,7 +472,7 @@ export default function Billing() {
                         <Zap size={18} className="text-primary" />
                         {t('billing.usageOverview', 'Company Capacity & Quota Usage')}
                     </h3>
-                    <div className="grid grid-3" style={{ gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
                         {/* Projects Meter */}
                         <div className="card" style={{ padding: '18px 20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
                             <div className="flex-between" style={{ marginBottom: 8 }}>
@@ -523,6 +554,38 @@ export default function Billing() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Storage Meter */}
+                        <div className="card" style={{ padding: '18px 20px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                            <div className="flex-between" style={{ marginBottom: 8 }}>
+                                <span className="flex gap-sm text-secondary" style={{ alignItems: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
+                                    <HardDrive size={15} className="text-primary" />
+                                    {t('billing.storageUsed', 'Media Storage')}
+                                </span>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: storageUsagePct >= 90 ? '#ef4444' : 'var(--text-primary)' }}>
+                                    {usage.storage?.isUnlimited ? `${usage.storage?.currentMb || 0} MB` : `${usage.storage?.currentMb || 0} / ${usage.storage?.maxMb || 50} MB`}
+                                </span>
+                            </div>
+                            <div style={{ height: 8, background: 'var(--border-color)', borderRadius: 4, overflow: 'hidden' }}>
+                                <div style={{ 
+                                    height: '100%', 
+                                    width: usage.storage?.isUnlimited ? '15%' : `${storageUsagePct}%`, 
+                                    background: storageUsagePct >= 90 ? '#ef4444' : storageUsagePct >= 70 ? '#f59e0b' : '#8b5cf6',
+                                    borderRadius: 4,
+                                    transition: 'width 0.4s ease'
+                                }} />
+                            </div>
+                            <div className="text-secondary flex-between" style={{ fontSize: '0.75rem', marginTop: 8 }}>
+                                <span>
+                                    {usage.storage?.isUnlimited 
+                                        ? t('billing.unlimitedStorage', 'Uncapped on Enterprise')
+                                        : `${usage.storage?.remainingMb || 0} MB ${t('billing.remaining', 'remaining')}`}
+                                </span>
+                                <span>
+                                    {isAr ? `حد الملف: ${usage.storage?.maxUploadFileMb || 3} م.ب/ملف` : `Max: ${usage.storage?.maxUploadFileMb || 3} MB/file`}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -531,7 +594,7 @@ export default function Billing() {
                     <div>
                         <h2 style={{ margin: '0 0 4px 0', fontSize: '1.4rem' }}>{t('billing.choosePlan', 'Subscription Plans')}</h2>
                         <p className="text-secondary" style={{ margin: 0, fontSize: '0.9rem', maxWidth: 650 }}>
-                            {t('billing.plansSubtitle', '100% of all ERP features are unlocked across all paid tiers. Plans scale purely by projects, user seats, and AI agent quota.')}
+                            {t('billing.plansSubtitle', '100% of all ERP features are unlocked across all plans. Plans scale purely by projects, user seats, and AI agent quota.')}
                         </p>
                     </div>
 
@@ -596,12 +659,13 @@ export default function Billing() {
                     </div>
                 </div>
 
-                {/* 4-Tier Plans Grid */}
+                {/* 3-Tier Plans Grid - Perfectly Aligned Horizontal Rows */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                    gap: 16,
-                    marginTop: 20
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: 20,
+                    marginTop: 24,
+                    alignItems: 'stretch'
                 }}>
                     {plans.map(plan => {
                         const isCurrent = plan.key === currentPlanKey;
@@ -644,11 +708,12 @@ export default function Billing() {
                                     display: 'flex',
                                     flexDirection: 'column',
                                     justifyContent: 'space-between',
+                                    height: '100%',
                                     boxShadow: isPendingUpgrade ? '0 0 20px rgba(245, 158, 11, 0.2)' : undefined
                                 }}
                             >
-                                {/* Top Badges */}
-                                <div style={{ position: 'absolute', top: -11, insetInlineEnd: 16, display: 'flex', gap: 6 }}>
+                                {/* Top Badges (Aligned across all cards) */}
+                                <div style={{ position: 'absolute', top: -11, insetInlineEnd: 16, display: 'flex', gap: 6, height: 22 }}>
                                     {isPendingUpgrade && (
                                         <div style={{
                                             background: '#f59e0b',
@@ -660,18 +725,6 @@ export default function Billing() {
                                             boxShadow: '0 2px 8px rgba(245, 158, 11, 0.4)'
                                         }}>
                                             {isAr ? '⏳ قيد المراجعة والتفعيل' : '⏳ VERIFYING PROOF'}
-                                        </div>
-                                    )}
-                                    {isPopular && !isPendingUpgrade && (
-                                        <div style={{
-                                            background: '#10b981',
-                                            color: '#ffffff',
-                                            padding: '2px 10px',
-                                            borderRadius: 12,
-                                            fontSize: '0.7rem',
-                                            fontWeight: 800
-                                        }}>
-                                            {t('billing.popular', 'MOST POPULAR')}
                                         </div>
                                     )}
                                     {isCurrent && !isPendingUpgrade && (
@@ -686,49 +739,103 @@ export default function Billing() {
                                             {t('billing.current', 'CURRENT PLAN')}
                                         </div>
                                     )}
+                                    {isPopular && !isPendingUpgrade && !isCurrent && (
+                                        <div style={{
+                                            background: '#10b981',
+                                            color: '#ffffff',
+                                            padding: '2px 10px',
+                                            borderRadius: 12,
+                                            fontSize: '0.7rem',
+                                            fontWeight: 800
+                                        }}>
+                                            {t('billing.popular', 'MOST POPULAR')}
+                                        </div>
+                                    )}
+                                    {isEnterprise && !isPendingUpgrade && !isCurrent && (
+                                        <div style={{
+                                            background: '#0284c7',
+                                            color: '#ffffff',
+                                            padding: '2px 10px',
+                                            borderRadius: 12,
+                                            fontSize: '0.7rem',
+                                            fontWeight: 800
+                                        }}>
+                                            {isAr ? 'مخصص للشركات' : 'ENTERPRISE SCALE'}
+                                        </div>
+                                    )}
+                                    {plan.key === 'FREE' && !isCurrent && !isPendingUpgrade && (
+                                        <div style={{
+                                            background: '#64748b',
+                                            color: '#ffffff',
+                                            padding: '2px 10px',
+                                            borderRadius: 12,
+                                            fontSize: '0.7rem',
+                                            fontWeight: 800
+                                        }}>
+                                            {isAr ? 'الباقة الأساسية' : 'FREE FOREVER'}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div>
-                                    <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 700 }}>
+                                    {/* Plan Title & Description (Fixed height to keep price line identical) */}
+                                    <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 700, minHeight: 28, display: 'flex', alignItems: 'center' }}>
                                         {planName}
                                     </h3>
-                                    <p className="text-secondary" style={{ fontSize: '0.82rem', margin: '0 0 16px 0', minHeight: 36, lineHeight: 1.4 }}>
+                                    <p className="text-secondary" style={{ fontSize: '0.82rem', margin: '0 0 16px 0', minHeight: 40, lineHeight: 1.4, display: 'flex', alignItems: 'center' }}>
                                         {planDesc}
                                     </p>
 
-                                    {/* Pricing Block */}
-                                    {isEnterprise ? (
-                                        <div style={{ marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 16 }}>
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                                                <span style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                                                    {t('billing.customPrice', 'Custom Pricing')}
-                                                </span>
-                                            </div>
-                                            <div className="text-secondary" style={{ fontSize: '0.78rem', marginTop: 4 }}>
-                                                {t('billing.enterpriseTailored', 'Tailored for large firms & custom SLA')}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div style={{ marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 16 }}>
-                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                                                <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                                                    {displayPriceEgp > 0 ? currency(displayPriceEgp) : t('billing.free', 'Free')}
-                                                </span>
-                                                {displayPriceEgp > 0 && (
+                                    {/* Pricing Block (Exact same height and divider line across all 3 cards) */}
+                                    <div style={{
+                                        marginBottom: 16,
+                                        borderBottom: '1px solid var(--border-color)',
+                                        paddingBottom: 16,
+                                        minHeight: 76,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'center'
+                                    }}>
+                                        {isEnterprise ? (
+                                            <>
+                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                                    <span style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                                        {t('billing.customPrice', 'Custom Pricing')}
+                                                    </span>
+                                                </div>
+                                                <div className="text-secondary" style={{ fontSize: '0.78rem', marginTop: 4 }}>
+                                                    {t('billing.enterpriseTailored', 'Tailored for large firms & custom SLA')}
+                                                </div>
+                                            </>
+                                        ) : displayPriceEgp === 0 ? (
+                                            <>
+                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                                        {t('billing.free', 'Free')}
+                                                    </span>
+                                                </div>
+                                                <div className="text-secondary" style={{ fontSize: '0.78rem', marginTop: 4 }}>
+                                                    {isAr ? 'مجاناً مدى الحياة · بدون بطاقة بنكية' : 'Free forever · No credit card required'}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                                    <span style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                                        {currency(displayPriceEgp)}
+                                                    </span>
                                                     <span className="text-secondary" style={{ fontSize: '0.85rem' }}>
                                                         {billingCycle === 'annual' ? t('billing.perYear', '/ year') : t('billing.perMonth', '/ month')}
                                                     </span>
-                                                )}
-                                            </div>
-                                            {displayPriceEgp > 0 && (
+                                                </div>
                                                 <div className="text-secondary" style={{ fontSize: '0.78rem', marginTop: 4 }}>
                                                     ≈ ${displayPriceUsd} USD · {billingCycle === 'annual' ? t('billing.billedAnnually', 'Billed annually (2 mos free)') : t('billing.billedMonthly', 'Billed monthly')}
                                                 </div>
-                                            )}
-                                        </div>
-                                    )}
+                                            </>
+                                        )}
+                                    </div>
 
-                                    {/* Capacity Quota Specs (Clean & Punchy) */}
+                                    {/* Capacity Quota Specs (Exact same 4 rows & height across all cards) */}
                                     <div style={{
                                         background: 'var(--bg-primary, rgba(0,0,0,0.02))',
                                         border: '1px solid var(--border-color)',
@@ -737,7 +844,8 @@ export default function Billing() {
                                         display: 'flex',
                                         flexDirection: 'column',
                                         gap: 10,
-                                        marginBottom: 14
+                                        marginBottom: 14,
+                                        minHeight: 146
                                     }}>
                                         {/* Projects */}
                                         <div className="flex-between" style={{ fontSize: '0.83rem' }}>
@@ -771,38 +879,53 @@ export default function Billing() {
                                                 {plan.limits.aiExtractionsPerMonth === -1 || isEnterprise ? t('billing.unlimited', 'Unlimited / Custom') : `${plan.limits.aiExtractionsPerMonth.toLocaleString()} ${t('billing.perMonthShort', '/ mo')}`}
                                             </span>
                                         </div>
+
+                                        {/* Media Storage Capacity */}
+                                        <div className="flex-between" style={{ fontSize: '0.83rem' }}>
+                                            <span className="flex gap-sm text-secondary" style={{ alignItems: 'center' }}>
+                                                <HardDrive size={14} />
+                                                {t('billing.storageUsed', 'Media Storage')}
+                                            </span>
+                                            <span style={{ fontWeight: 700 }}>
+                                                {plan.limits.maxStorageMb === -1 || isEnterprise ? t('billing.unlimited', 'Unlimited') : plan.limits.maxStorageMb >= 1024 ? `${Math.round(plan.limits.maxStorageMb / 1024)} GB` : `${plan.limits.maxStorageMb} MB`}
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    {/* All Features Unlocked Callout */}
-                                    {plan.limits.allFeaturesUnlocked && (
-                                        <div style={{
-                                            background: 'rgba(16, 185, 129, 0.08)',
-                                            color: '#10b981',
-                                            padding: '7px 10px',
-                                            borderRadius: 8,
-                                            fontSize: '0.78rem',
-                                            fontWeight: 700,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 6
-                                        }}>
-                                            <ShieldCheck size={14} style={{ flexShrink: 0 }} />
-                                            {t('billing.allFeaturesUnlocked', '100% Full ERP Features Unlocked')}
-                                        </div>
-                                    )}
+                                    {/* Feature Callout Badge (Exact same height and position across all cards) */}
+                                    <div style={{
+                                        background: isEnterprise ? 'rgba(2, 132, 199, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                                        color: isEnterprise ? '#38bdf8' : '#10b981',
+                                        border: `1px solid ${isEnterprise ? 'rgba(2, 132, 199, 0.25)' : 'rgba(16, 185, 129, 0.25)'}`,
+                                        padding: '7px 10px',
+                                        borderRadius: 8,
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        minHeight: 34
+                                    }}>
+                                        <ShieldCheck size={14} style={{ flexShrink: 0 }} />
+                                        <span>
+                                            {isEnterprise
+                                                ? (isAr ? 'جميع الميزات + أولوية الدعم الفني SLA' : 'Full Suite + Dedicated Priority SLA')
+                                                : t('billing.allFeaturesUnlocked', '100% Full ERP Features Unlocked')}
+                                        </span>
+                                    </div>
                                 </div>
 
-                                {/* Plan Action Button */}
-                                <div style={{ marginTop: 24 }}>
+                                {/* Plan Action Button (Exact same 44px height & pinned to bottom baseline across all cards) */}
+                                <div style={{ marginTop: 'auto', paddingTop: 20 }}>
                                     {isEnterprise ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, height: 44 }}>
                                             <a
                                                 href={`https://wa.me/201092041908?text=${encodeURIComponent(isAr ? 'مرحباً، أود الاستفسار عن باقة الشركات (Enterprise) لنظام حسابي ERP' : "Hello, I'm interested in Hesaby ERP Enterprise Plan")}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="btn"
                                                 style={{
-                                                    width: '100%',
+                                                    height: 44,
                                                     background: '#25D366',
                                                     borderColor: '#25D366',
                                                     color: '#ffffff',
@@ -810,16 +933,16 @@ export default function Billing() {
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    gap: 8,
+                                                    gap: 6,
                                                     textDecoration: 'none',
-                                                    padding: '9px 12px',
+                                                    padding: '0 8px',
                                                     borderRadius: 8,
-                                                    fontSize: '0.88rem',
+                                                    fontSize: '0.84rem',
                                                     boxShadow: '0 2px 8px rgba(37, 211, 102, 0.25)'
                                                 }}
                                             >
-                                                <MessageCircle size={16} />
-                                                {t('billing.contactWhatsapp', 'WhatsApp (+20 109 204 1908)')}
+                                                <MessageCircle size={15} />
+                                                <span>{isAr ? 'واتساب' : 'WhatsApp'}</span>
                                             </a>
                                             <a
                                                 href={`https://mail.google.com/mail/?view=cm&fs=1&to=nooraldeenahmed04@gmail.com&su=${encodeURIComponent(isAr ? 'استفسار عن باقة الشركات Enterprise - نظام حسابي ERP' : 'Hesaby ERP Enterprise Plan Inquiry')}&body=${encodeURIComponent(isAr ? 'مرحباً فريق مبيعات حسابي، نود الاستفسار عن باقة الشركات وتفاصيل الاشتراك المخصص لشركتنا.' : 'Hello Hesaby Sales Team, We would like to inquire about the Enterprise Plan and custom quotation.')}`}
@@ -827,7 +950,7 @@ export default function Billing() {
                                                 rel="noopener noreferrer"
                                                 className="btn"
                                                 style={{
-                                                    width: '100%',
+                                                    height: 44,
                                                     background: '#0284c7',
                                                     borderColor: '#0284c7',
                                                     color: '#ffffff',
@@ -835,34 +958,34 @@ export default function Billing() {
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    gap: 8,
+                                                    gap: 6,
                                                     textDecoration: 'none',
-                                                    padding: '9px 12px',
+                                                    padding: '0 8px',
                                                     borderRadius: 8,
-                                                    fontSize: '0.88rem',
+                                                    fontSize: '0.84rem',
                                                     boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
                                                 }}
                                             >
-                                                <Mail size={16} />
-                                                {t('billing.contactEmail', 'Email Sales')}
+                                                <Mail size={15} />
+                                                <span>{isAr ? 'إيميل المبيعات' : 'Email Sales'}</span>
                                             </a>
                                         </div>
                                     ) : isPendingUpgrade ? (
                                         <button
-                                            className="btn btn-warning btn-sm"
+                                            className="btn btn-secondary"
                                             disabled
                                             style={{
                                                 width: '100%',
-                                                background: 'rgba(245, 158, 11, 0.15)',
-                                                border: '1.5px solid #f59e0b',
+                                                height: 44,
+                                                borderColor: '#f59e0b',
                                                 color: '#f59e0b',
-                                                fontWeight: 800,
+                                                background: 'rgba(245, 158, 11, 0.1)',
+                                                fontWeight: 700,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: 8,
                                                 cursor: 'default',
-                                                padding: '9px 12px',
                                                 borderRadius: 8
                                             }}
                                         >
@@ -870,32 +993,84 @@ export default function Billing() {
                                             {isAr ? 'جاري التحقق من الإيصال والتفعيل ⏳' : 'Verifying Receipt ⏳'}
                                         </button>
                                     ) : isCurrent ? (
-                                        <button className="btn btn-secondary btn-sm" disabled style={{ width: '100%', opacity: 0.8, cursor: 'default' }}>
-                                            <Check size={14} />
-                                            {t('billing.currentPlanLabel', 'Your current plan')}
+                                        <button 
+                                            className="btn" 
+                                            disabled 
+                                            style={{ 
+                                                width: '100%', 
+                                                height: 44, 
+                                                opacity: 0.92, 
+                                                cursor: 'default', 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                gap: 8,
+                                                background: 'var(--bg-secondary)',
+                                                border: '1.5px solid var(--border-color)',
+                                                color: 'var(--text-primary)',
+                                                fontWeight: 700,
+                                                borderRadius: 10
+                                            }}
+                                        >
+                                            <Check size={16} style={{ color: '#10b981', strokeWidth: 2.5 }} />
+                                            <span>{t('billing.currentPlanLabel', 'Your current plan')}</span>
                                         </button>
                                     ) : (
-                                        <button
-                                            className={`btn ${isPopular ? 'btn-primary' : 'btn-secondary'}`}
-                                            style={{ 
-                                                width: '100%',
-                                                background: isPopular ? '#10b981' : undefined,
-                                                borderColor: isPopular ? '#10b981' : undefined,
-                                                color: isPopular ? '#ffffff' : undefined,
-                                                opacity: pendingPayment ? 0.45 : 1,
-                                                cursor: pendingPayment ? 'not-allowed' : 'pointer'
-                                            }}
-                                            onClick={() => handleSelectPlan(plan.key)}
-                                            disabled={actionInProgress === plan.key || !!pendingPayment}
-                                            title={pendingPayment ? (isAr ? 'لديك طلب ترقية قيد المراجعة بالفعل' : 'You have a pending upgrade under verification') : ''}
-                                        >
-                                            {actionInProgress === plan.key ? (
-                                                <Loader2 size={14} className="spin" />
-                                            ) : (
-                                                <ArrowRight size={14} />
-                                            )}
-                                            {pendingPayment ? (isAr ? 'طلب معلق قيد المراجعة' : 'Upgrade Pending') : t('billing.switchPlan', 'Switch to this Plan')}
-                                        </button>
+                                        (() => {
+                                            const isDowngradeToFree = plan.key === 'FREE' && currentPlanKey !== 'FREE';
+                                            return (
+                                                <button
+                                                    className="btn"
+                                                    style={{ 
+                                                        width: '100%',
+                                                        height: 44,
+                                                        background: isDowngradeToFree 
+                                                            ? '#dc2626' 
+                                                            : isPopular 
+                                                                ? '#10b981' 
+                                                                : 'var(--bg-secondary)',
+                                                        borderColor: isDowngradeToFree 
+                                                            ? '#dc2626' 
+                                                            : isPopular 
+                                                                ? '#10b981' 
+                                                                : 'var(--border-color)',
+                                                        color: (isDowngradeToFree || isPopular) ? '#ffffff' : 'var(--text-primary)',
+                                                        boxShadow: isDowngradeToFree 
+                                                            ? '0 2px 10px rgba(220, 38, 38, 0.25)' 
+                                                            : isPopular 
+                                                                ? '0 2px 10px rgba(16, 185, 129, 0.25)' 
+                                                                : 'none',
+                                                        opacity: pendingPayment ? 0.45 : 1,
+                                                        cursor: pendingPayment ? 'not-allowed' : 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: 8,
+                                                        fontWeight: 700,
+                                                        borderRadius: 10,
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    onClick={() => handleSelectPlan(plan.key)}
+                                                    disabled={actionInProgress === plan.key || !!pendingPayment}
+                                                    title={pendingPayment ? (isAr ? 'لديك طلب ترقية قيد المراجعة الفورية' : 'You have a pending upgrade under verification') : ''}
+                                                >
+                                                    {actionInProgress === plan.key ? (
+                                                        <Loader2 size={15} className="spin" color="#ffffff" />
+                                                    ) : isDowngradeToFree ? (
+                                                        <ShieldAlert size={16} color="#ffffff" style={{ flexShrink: 0 }} />
+                                                    ) : (
+                                                        <ArrowRight size={15} color={isPopular ? '#ffffff' : undefined} />
+                                                    )}
+                                                    <span style={{ color: (isDowngradeToFree || isPopular) ? '#ffffff' : undefined }}>
+                                                        {pendingPayment 
+                                                            ? (isAr ? 'طلب معلق قيد المراجعة' : 'Upgrade Pending') 
+                                                            : isDowngradeToFree
+                                                                ? (isAr ? 'تخفيض للباقة المجانية' : 'Downgrade to Free')
+                                                                : t('billing.switchPlan', 'Switch to this Plan')}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })()
                                     )}
                                 </div>
                             </div>
@@ -910,8 +1085,12 @@ export default function Billing() {
                             className="card card-hover"
                             style={{
                                 padding: '20px 24px',
-                                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.06) 100%)',
-                                border: '1.5px dashed rgba(16, 185, 129, 0.45)',
+                                background: isAddonEligible
+                                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.06) 100%)'
+                                    : 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                                border: isAddonEligible
+                                    ? '1.5px dashed rgba(16, 185, 129, 0.45)'
+                                    : '1.5px dashed rgba(168, 85, 247, 0.4)',
                                 borderRadius: 14,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -928,32 +1107,41 @@ export default function Billing() {
                                     width: 46,
                                     height: 46,
                                     borderRadius: 12,
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    background: isAddonEligible
+                                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                        : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
                                     color: '#ffffff',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     flexShrink: 0,
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.35)'
+                                    boxShadow: isAddonEligible
+                                        ? '0 4px 12px rgba(16, 185, 129, 0.35)'
+                                        : '0 4px 12px rgba(139, 92, 246, 0.35)'
                                 }}>
-                                    <Sparkles size={24} />
+                                    {isAddonEligible ? <Sparkles size={24} /> : <Crown size={24} />}
                                 </div>
                                 <div>
-                                    <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                         {t('billing.addOnsBannerTitle', 'AI Token Add-On Packs')}
                                         <span style={{
                                             fontSize: '0.68rem',
                                             fontWeight: 800,
-                                            background: '#10b981',
+                                            background: isAddonEligible ? '#10b981' : 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
                                             color: '#ffffff',
                                             padding: '2px 8px',
-                                            borderRadius: 10
+                                            borderRadius: 10,
+                                            letterSpacing: '0.04em'
                                         }}>
-                                            {t('billing.topUp', 'TOP-UP')}
+                                            {isAddonEligible
+                                                ? t('billing.topUp', 'TOP-UP')
+                                                : t('billing.exclusiveBadge', 'PREMIUM & ENTERPRISE EXCLUSIVE')}
                                         </span>
                                     </h3>
                                     <p className="text-secondary" style={{ margin: 0, fontSize: '0.85rem' }}>
-                                        {t('billing.addOnsBannerDesc', 'Need more voice note transcripts or receipt scans? Recharge instant AI actions without upgrading your plan.')}
+                                        {isAddonEligible
+                                            ? t('billing.addOnsBannerDesc', 'Exclusively for Premium and Enterprise members: recharge instant AI actions on top of your plan monthly quota.')
+                                            : t('billing.addOnsBannerDescLocked', 'AI Token Add-On packs are exclusively available to Premium and Enterprise members. Upgrade your plan to unlock instant quota top-ups.')}
                                     </p>
                                 </div>
                             </div>
@@ -961,15 +1149,15 @@ export default function Billing() {
                             <button
                                 type="button"
                                 style={{
-                                    background: '#10b981',
-                                    borderColor: '#10b981',
-                                    color: '#ffffff',
+                                    background: isAddonEligible ? '#10b981' : 'var(--bg-secondary)',
+                                    borderColor: isAddonEligible ? '#10b981' : 'var(--border-color)',
+                                    color: isAddonEligible ? '#ffffff' : 'var(--text-primary)',
                                     padding: '10px 22px',
                                     fontSize: '0.9rem',
                                     fontWeight: 700,
                                     borderRadius: 10,
-                                    border: '1px solid #10b981',
-                                    boxShadow: '0 2px 10px rgba(16, 185, 129, 0.35)',
+                                    border: '1px solid',
+                                    boxShadow: isAddonEligible ? '0 2px 10px rgba(16, 185, 129, 0.35)' : 'none',
                                     pointerEvents: 'none',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -977,10 +1165,21 @@ export default function Billing() {
                                     whiteSpace: 'nowrap'
                                 }}
                             >
-                                <Zap size={15} color="#ffffff" style={{ stroke: '#ffffff', color: '#ffffff' }} />
-                                <span style={{ color: '#ffffff' }}>
-                                    {t('billing.browseAddOns', 'Browse Add-On Packs')}
-                                </span>
+                                {isAddonEligible ? (
+                                    <>
+                                        <Zap size={15} color="#ffffff" style={{ stroke: '#ffffff', color: '#ffffff' }} />
+                                        <span style={{ color: '#ffffff' }}>
+                                            {t('billing.browseAddOns', 'Browse Add-On Packs')}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Lock size={15} style={{ color: '#8b5cf6' }} />
+                                        <span style={{ color: 'var(--text-primary)' }}>
+                                            {t('billing.upgradeToAccessAddons', 'View Add-Ons (Requires Upgrade)')}
+                                        </span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
@@ -1046,6 +1245,68 @@ export default function Billing() {
                         </div>
 
                         <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {/* Exclusivity Notice for Free Plan Members */}
+                        {!isAddonEligible && (
+                            <div style={{
+                                padding: '14px 18px',
+                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%)',
+                                border: '1.5px solid rgba(139, 92, 246, 0.3)',
+                                borderRadius: 12,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 16,
+                                flexWrap: 'wrap',
+                                marginBottom: 4
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 240 }}>
+                                    <div style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 10,
+                                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                                        color: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <Lock size={18} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                                            {isAr ? 'الباقات الإضافية متاحة حصرياً للباقة المميزة وباقة الشركات' : 'Add-Ons are Exclusive to Premium & Enterprise Plans'}
+                                        </div>
+                                        <div className="text-secondary" style={{ fontSize: '0.8rem', marginTop: 2 }}>
+                                            {t('billing.addonsLockedNotice', 'Add-on recharge packs are exclusively available for Premium and Enterprise members. Upgrade to Premium to recharge extra AI tokens.')}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    className="btn btn-sm"
+                                    onClick={() => {
+                                        setShowAddOnsModal(false);
+                                        handleSelectPlan('PREMIUM');
+                                    }}
+                                    style={{
+                                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        padding: '9px 18px',
+                                        borderRadius: 9,
+                                        boxShadow: '0 2px 8px rgba(139, 92, 246, 0.35)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}
+                                >
+                                    <Crown size={14} />
+                                    <span>{isAr ? 'ترقية إلى Premium' : 'Upgrade to Premium'}</span>
+                                </button>
+                            </div>
+                        )}
                             {addOns.map(addon => {
                                 const addonName = isAr && addon.nameAr ? addon.nameAr : addon.name;
                                 const isAction = actionInProgress === `addon_${addon.key}`;
@@ -1116,33 +1377,58 @@ export default function Billing() {
                                                 </div>
                                             </div>
 
-                                            <button
-                                                className={`btn ${addon.popular ? '' : 'btn-secondary'} btn-sm`}
-                                                style={{
-                                                    background: addon.popular ? '#10b981' : undefined,
-                                                    borderColor: addon.popular ? '#10b981' : undefined,
-                                                    color: addon.popular ? '#ffffff' : undefined,
-                                                    minWidth: 100,
-                                                    padding: '8px 14px',
-                                                    fontWeight: 700,
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: 6
-                                                }}
-                                                onClick={async () => {
-                                                    await handleBuyAddOn(addon.key);
-                                                }}
-                                                disabled={isAction}
-                                            >
-                                                {isAction ? (
-                                                    <Loader2 size={14} className="spin" color={addon.popular ? '#ffffff' : undefined} />
-                                                ) : (
-                                                    <Zap size={14} color={addon.popular ? '#ffffff' : undefined} />
-                                                )}
-                                                <span style={{ color: addon.popular ? '#ffffff' : undefined }}>
-                                                    {t('billing.buyNow', 'Buy Now')}
-                                                </span>
-                                            </button>
+                                            {!isAddonEligible ? (
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    style={{
+                                                        minWidth: 120,
+                                                        padding: '8px 14px',
+                                                        fontWeight: 700,
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: 6,
+                                                        background: 'rgba(139, 92, 246, 0.08)',
+                                                        borderColor: 'rgba(139, 92, 246, 0.3)',
+                                                        color: '#a855f7'
+                                                    }}
+                                                    onClick={() => {
+                                                        setShowAddOnsModal(false);
+                                                        handleSelectPlan('PREMIUM');
+                                                    }}
+                                                >
+                                                    <Lock size={13} />
+                                                    <span>{t('billing.upgradeToBuy', 'Upgrade to Buy')}</span>
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    className={`btn ${addon.popular ? '' : 'btn-secondary'} btn-sm`}
+                                                    style={{
+                                                        background: addon.popular ? '#10b981' : undefined,
+                                                        borderColor: addon.popular ? '#10b981' : undefined,
+                                                        color: addon.popular ? '#ffffff' : undefined,
+                                                        minWidth: 100,
+                                                        padding: '8px 14px',
+                                                        fontWeight: 700,
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 6
+                                                    }}
+                                                    onClick={async () => {
+                                                        await handleBuyAddOn(addon.key);
+                                                    }}
+                                                    disabled={isAction}
+                                                >
+                                                    {isAction ? (
+                                                        <Loader2 size={14} className="spin" color={addon.popular ? '#ffffff' : undefined} />
+                                                    ) : (
+                                                        <Zap size={14} color={addon.popular ? '#ffffff' : undefined} />
+                                                    )}
+                                                    <span style={{ color: addon.popular ? '#ffffff' : undefined }}>
+                                                        {t('billing.buyNow', 'Buy Now')}
+                                                    </span>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -1201,6 +1487,18 @@ export default function Billing() {
                         message: isAr ? 'تم إرسال إيصال التحويل بنجاح وجاري المراجعة والتفعيل.' : 'Receipt submitted successfully and is being verified.'
                     });
                 }}
+            />
+
+            {/* Multi-Step Downgrade Safeguard Modal */}
+            <DowngradeSafeguardModal
+                isOpen={downgradeModalOpen}
+                onClose={() => setDowngradeModalOpen(false)}
+                currentPlan={currentPlanConfig}
+                targetPlan={plans.find(p => p.key === 'FREE')}
+                subscription={subscription}
+                onConfirmDowngrade={handleConfirmDowngrade}
+                isAr={isAr}
+                currency={currency}
             />
 
             {/* Custom UI Confirmation Dialog */}

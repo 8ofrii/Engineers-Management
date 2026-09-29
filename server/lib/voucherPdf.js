@@ -83,12 +83,13 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
             doc.on('end', () => resolve(Buffer.concat(chunks)));
             doc.on('error', reject);
 
-            // Hesaby Webpage Light Mode Palette (Warm Cafe & Ember)
+            // Hesaby Webpage Light Mode Palette (Warm Cafe & Ember & Emerald)
             const BRAND_EMBER = '#c2410c';     // Primary Brand Accent (Warm Terracotta / Ember)
             const BRAND_EMBER_DARK = '#9a3412';// Deep Terracotta
             const BRAND_EMBER_LIGHT = '#ea580c';// Vibrant Ember
             const BRAND_GOLD = '#d97706';      // Warm Gold / Amber
             const SUCCESS = '#065f46';         // Deep Forest Emerald
+            const SUCCESS_VIBRANT = '#047857'; // Vibrant Emerald for Amount
             const DANGER = '#991b1b';          // Deep Crimson
             const TEXT_PRIMARY = '#1c1710';    // Deep Espresso
             const TEXT_SECONDARY = '#6b5f4d';  // Warm Coffee
@@ -110,17 +111,17 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
             const isCustody = tx.category === 'CUSTODY_TRANSFER';
             const isApproved = tx.status === 'APPROVED';
 
-            // Resolve Voucher Title
-            let voucherTitleAr = 'سند صرف معتمد';
-            let voucherTitleEn = 'OFFICIAL PAYMENT VOUCHER';
+            // Resolve Voucher Title, Top Accent & Prominent Badges
+            let voucherTitleAr = 'سند صرف معتمد (مصروفات)';
+            let voucherTitleEn = 'OFFICIAL PAYMENT VOUCHER (EXPENSE)';
             let topColor = BRAND_EMBER;
-            let amountColor = TEXT_PRIMARY;
+            let amountColor = DANGER;
 
             if (isIncome) {
-                voucherTitleAr = 'سند قبض مالي معتمد';
-                voucherTitleEn = 'OFFICIAL RECEIPT VOUCHER';
+                voucherTitleAr = 'سند قبض مالي معتمد (إيراد)';
+                voucherTitleEn = 'OFFICIAL RECEIPT VOUCHER (INCOME)';
                 topColor = SUCCESS;
-                amountColor = SUCCESS;
+                amountColor = SUCCESS_VIBRANT;
             } else if (isProfit) {
                 voucherTitleAr = 'إذن تحويل أرباح إدارة';
                 voucherTitleEn = 'PROFIT TRANSFER VOUCHER';
@@ -166,7 +167,7 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
 
             if (!logoRendered) {
                 const emblemSize = 40;
-                doc.roundedRect(45, compY, emblemSize, emblemSize, 6).fillColor(BRAND_EMBER).fill();
+                doc.roundedRect(45, compY, emblemSize, emblemSize, 6).fillColor(topColor).fill();
                 useFont(true);
                 const initial = (tenant?.name || user?.company || 'H').trim().charAt(0).toUpperCase();
                 doc.fillColor('#ffffff').fontSize(18).text(initial, 45, compY + 11, { width: emblemSize, align: 'center', lineBreak: false });
@@ -195,35 +196,57 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
             }
 
             // 3. Document Meta (Top-Right)
-            const metaX = 330;
-            const metaW = 220;
+            const metaX = 320;
+            const metaW = 230;
             useFont(true);
-            doc.fillColor(TEXT_PRIMARY).fontSize(16);
-            drawPdfText(doc, voucherTitleAr, metaX, 40, { align: 'right', width: metaW, lineBreak: false });
-            doc.fontSize(9.5).fillColor(TEXT_SECONDARY);
-            doc.text(voucherTitleEn, metaX, 58, { align: 'right', width: metaW, lineBreak: false });
+            doc.fillColor(TEXT_PRIMARY).fontSize(15);
+            drawPdfText(doc, voucherTitleAr, metaX, 35, { align: 'right', width: metaW, lineBreak: false });
+            doc.fontSize(8).fillColor(TEXT_SECONDARY);
+            doc.text(voucherTitleEn, metaX, 54, { align: 'right', width: metaW, lineBreak: false });
 
             const refId = tx.id ? tx.id.slice(0, 8).toUpperCase() : 'TX-001';
-            doc.fontSize(11).fillColor(topColor);
-            doc.text(`REF #${refId}`, metaX, 74, { align: 'right', width: metaW, lineBreak: false });
+            doc.fontSize(10.5).fillColor(topColor);
+            doc.text(`REF #${refId}`, metaX, 70, { align: 'right', width: metaW, lineBreak: false });
 
             useFont(false);
-            doc.fontSize(8.5).fillColor(TEXT_MUTED);
-            doc.text(fmtDateTime(tx.transactionDate || tx.createdAt), metaX, 90, { align: 'right', width: metaW, lineBreak: false });
+            doc.fontSize(8).fillColor(TEXT_MUTED);
+            doc.text(fmtDateTime(tx.transactionDate || tx.createdAt), metaX, 86, { align: 'right', width: metaW, lineBreak: false });
 
-            // Status Badge (Webpage Pill Style)
-            const bW = 68, bH = 18, bX = 482, bY = 106;
+            // Dual Badges Row: Transaction Type Pill + Approval Status Badge
+            const badgesY = 104;
+            const bH = 18;
+
+            // 1. Approval Status Badge (Far Right)
+            const bW_Status = 62;
+            const bX_Status = 488;
             const badgeConfig = isApproved
                 ? { bg: '#d1fae5', border: '#6ee7b7', text: '#065f46', label: 'معتمد' }
                 : (tx.status === 'REJECTED'
                     ? { bg: '#fee2e2', border: '#fca5a5', text: '#991b1b', label: 'مرفوض' }
                     : { bg: '#fef3c7', border: '#fcd34d', text: '#92400e', label: 'قيد المراجعة' });
 
-            doc.roundedRect(bX, bY, bW, bH, 4).fillColor(badgeConfig.bg).fill();
-            doc.roundedRect(bX, bY, bW, bH, 4).lineWidth(0.75).strokeColor(badgeConfig.border).stroke();
+            doc.roundedRect(bX_Status, badgesY, bW_Status, bH, 4).fillColor(badgeConfig.bg).fill();
+            doc.roundedRect(bX_Status, badgesY, bW_Status, bH, 4).lineWidth(0.75).strokeColor(badgeConfig.border).stroke();
             useFont(true);
             doc.fillColor(badgeConfig.text).fontSize(7.5);
-            drawPdfText(doc, badgeConfig.label, bX, bY + 4, { width: bW, align: 'center', lineBreak: false });
+            drawPdfText(doc, badgeConfig.label, bX_Status, badgesY + 4, { width: bW_Status, align: 'center', lineBreak: false });
+
+            // 2. High-Visibility Transaction Type Pill Badge (Beside Status)
+            const typeBadgeConfig = isIncome
+                ? { bg: '#ecfdf5', border: '#10b981', text: '#047857', label: 'سند قبض • إيراد معتمد' }
+                : (isProfit
+                    ? { bg: '#ecfeff', border: '#06b6d4', text: '#0e7490', label: 'إذن تحويل أرباح' }
+                    : (isCustody
+                        ? { bg: '#fffbeb', border: '#f59e0b', text: '#b45309', label: 'تسليم / إخلاء عهدة' }
+                        : { bg: '#fef2f2', border: '#ef4444', text: '#b91c1c', label: 'سند صرف • مصروفات' }));
+
+            const bW_Type = 126;
+            const bX_Type = bX_Status - bW_Type - 6; // 488 - 126 - 6 = 356
+            doc.roundedRect(bX_Type, badgesY, bW_Type, bH, 4).fillColor(typeBadgeConfig.bg).fill();
+            doc.roundedRect(bX_Type, badgesY, bW_Type, bH, 4).lineWidth(0.75).strokeColor(typeBadgeConfig.border).stroke();
+            useFont(true);
+            doc.fillColor(typeBadgeConfig.text).fontSize(7.5);
+            drawPdfText(doc, typeBadgeConfig.label, bX_Type, badgesY + 4, { width: bW_Type, align: 'center', lineBreak: false });
 
             // Divider
             doc.moveTo(45, 132).lineTo(550, 132).lineWidth(1).strokeColor(BORDER).stroke();
@@ -238,11 +261,18 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
             doc.rect(45, heroY, 4, heroH).fillColor(topColor).fill();
 
             useFont(true);
-            doc.fontSize(9).fillColor(TEXT_SECONDARY);
-            drawPdfText(doc, isIncome ? 'المبلغ المستلم / المحصل:' : (isProfit ? 'مبلغ الأرباح المحولة:' : 'المبلغ المصروف / المسدد:'), 60, heroY + 12, { lineBreak: false });
+            doc.fontSize(9.5).fillColor(topColor);
+            const amountHeader = isIncome
+                ? 'المبلغ المقبوض / المحصل (إيراد وارد معتمد):'
+                : (isProfit ? 'مبلغ الأرباح المحولة:' : (isCustody ? 'مبلغ العهدة النقدية المنصرفة:' : 'المبلغ المصروف / المسدد:'));
+            drawPdfText(doc, amountHeader, 60, heroY + 11, { lineBreak: false });
+
             useFont(false);
             doc.fontSize(8).fillColor(TEXT_MUTED);
-            doc.text('Amount in Egyptian Pounds', 60, heroY + 28, { lineBreak: false });
+            const amountSub = isIncome
+                ? 'Total Received Revenue in Egyptian Pounds (EGP)'
+                : (isProfit ? 'Profit Distribution Amount in Egyptian Pounds (EGP)' : 'Amount Disbursed in Egyptian Pounds (EGP)');
+            doc.text(amountSub, 60, heroY + 28, { lineBreak: false });
 
             useFont(true);
             doc.fillColor(amountColor).fontSize(20);
@@ -269,22 +299,99 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
             };
 
             // Row 1: Project & Category
-            const projName = tx.project?.name || (tx.isOfficeExpense ? 'المقر الرئيسي / المكتب الإداري' : 'مصروف عام');
+            const projName = tx.project?.name || (isIncome
+                ? (tx.isOfficeExpense ? 'إيرادات عامة / المقر الرئيسي' : 'إيراد عام / غير مقيد بمشروع')
+                : (isProfit
+                    ? 'أرباح إدارة المشروعات'
+                    : (tx.isOfficeExpense ? 'المقر الرئيسي / مصاريف إدارية' : 'مصروف عام')));
             drawFieldCard(col1, currentY, 'المشروع / الموقع', 'Project', projName);
-            drawFieldCard(col2, currentY, 'بند التكلفة / التصنيف', 'Category', tx.category || 'عام');
+
+            const getCategoryLabel = () => {
+                const cat = (tx.category || '').toUpperCase();
+                const categoryMap = {
+                    PAYMENT: isIncome ? 'دفعة عميل / تحصيل إيراد' : 'سداد دفعة / صرف مالي',
+                    MATERIAL: 'توريد خامات ومواد',
+                    EQUIPMENT: 'معدات وإيجارات',
+                    LABOR: 'مصنعيات وأجور عمال',
+                    SUBCONTRACTOR: 'مقاولو باطن',
+                    SALARY: 'رواتب وبدلات',
+                    RENT: 'إيجارات',
+                    UTILITIES: 'فواتير ومرافق',
+                    OFFICE: 'مصاريف إدارية ومكتبية',
+                    GOVERNMENT: 'رسوم حكومية وتراخيص',
+                    TRANSPORTATION: 'نقل ومشاوير',
+                    MARKETING: 'تسويق وإعلانات',
+                    MAINTENANCE: 'صيانة وتشغيل',
+                    CONSULTING: 'استشارات هندسية',
+                    FINANCIAL: 'رسوم بنكية ومصرفية',
+                    PETTY_CASH: 'نثريات وبوفيه',
+                    CUSTODY_TRANSFER: 'حركة تسليم عهدة',
+                    MANAGEMENT_FEE_TRANSFER: 'تحويل أرباح إدارة',
+                    OTHER: isIncome ? 'إيرادات متنوعة' : 'مصروفات أخرى'
+                };
+                return categoryMap[cat] || tx.category || (isIncome ? 'إيراد عام' : 'عام');
+            };
+            const catLabelAr = isIncome ? 'نوع الإيراد / التصنيف' : 'بند التكلفة / التصنيف';
+            const catLabelEn = isIncome ? 'Revenue Category' : 'Cost Item / Category';
+            drawFieldCard(col2, currentY, catLabelAr, catLabelEn, getCategoryLabel());
             currentY += cardH + 10;
 
-            // Row 2: Beneficiary & Safe / Payment Method
-            const beneficiaryText = tx.beneficiary || tx.supplier?.name || tx.workman?.name || tx.client?.name || '-';
-            const safeText = tx.safe?.name ? `${tx.safe.name} (${tx.paymentMethod || 'CASH'})` : (tx.paymentMethod || 'CASH');
-            drawFieldCard(col1, currentY, 'المستلم / المستفيد', 'Beneficiary', beneficiaryText);
-            drawFieldCard(col2, currentY, 'الخزينة / طريقة السداد', 'Safe / Payment', safeText);
+            // Row 2: Party (Sender / Client for Income vs Beneficiary for Expense) & Safe / Account
+            let partyLabelAr, partyLabelEn, partyVal;
+            if (isIncome) {
+                partyLabelAr = 'المسلِّم / العميل (القائم بالسداد)';
+                partyLabelEn = 'Paid By / Client (Sender)';
+                if (tx.client) {
+                    const clientComp = tx.client.company ? ` — ${tx.client.company}` : '';
+                    partyVal = `${tx.client.name}${clientComp}`;
+                } else {
+                    partyVal = tx.transactionFrom || tx.paidByClientContact || tx.beneficiary || 'عميل نقدي / غير مسجل';
+                }
+            } else if (isProfit) {
+                partyLabelAr = 'المستفيد / جهة التحويل';
+                partyLabelEn = 'Beneficiary / Transferred To';
+                partyVal = tx.beneficiary || 'حساب أرباح الإدارة';
+            } else if (isCustody) {
+                partyLabelAr = 'المستلم للعهدة';
+                partyLabelEn = 'Custodian / Recipient';
+                partyVal = tx.beneficiary || tx.workman?.name || tx.toEngineer?.name || tx.payer?.name || '-';
+            } else {
+                partyLabelAr = 'المستلم / المستفيد (يصرف إلى)';
+                partyLabelEn = 'Beneficiary / Payee';
+                partyVal = tx.beneficiary || tx.supplier?.name || tx.workman?.name || tx.transactionTo || '-';
+            }
+            drawFieldCard(col1, currentY, partyLabelAr, partyLabelEn, partyVal);
+
+            // Safe / Account and Payment Method
+            const methodMap = {
+                CASH: 'نقدي',
+                BANK_TRANSFER: 'تحويل بنكي',
+                CHECK: 'شيك بنكي',
+                CREDIT_CARD: 'بطاقة ائتمان',
+                WALLET: 'محفظة إلكترونية',
+                INSTAPAY: 'انستاباي',
+                VODAFONE_CASH: 'فودافون كاش',
+                ETISALAT_CASH: 'اتصالات كاش',
+                ORANGE_CASH: 'أورنج كاش'
+            };
+            const methodStr = methodMap[tx.paymentMethod] || tx.paymentMethod || 'نقدي';
+            const safeText = tx.safe?.name ? `${tx.safe.name} — ${methodStr}` : methodStr;
+            const safeLabelAr = isIncome ? 'أودع في / طريقة التحصيل' : 'الخزينة / طريقة السداد';
+            const safeLabelEn = isIncome ? 'Deposited To / Method' : 'Paid From / Method';
+            drawFieldCard(col2, currentY, safeLabelAr, safeLabelEn, safeText);
             currentY += cardH + 10;
 
-            // Row 3: Paid By & Approved By
-            const payerText = tx.payer?.name || tx.user?.name || '-';
-            const approverText = tx.approver?.name ? `${tx.approver.name} (${fmtDateTime(tx.approvedAt)})` : (isApproved ? 'إدارة الشركة' : 'قيد الاعتماد');
-            drawFieldCard(col1, currentY, 'مسؤول الصرف / القيد', 'Recorded By', payerText);
+            // Row 3: Staff Officer & Financial Approval
+            const recorderLabelAr = isIncome ? 'المستلم / محرر السند' : 'مسؤول الصرف / القيد';
+            const recorderLabelEn = isIncome ? 'Received By / Cashier' : 'Disbursed By / Recorder';
+            const recorderVal = isIncome
+                ? (tx.user?.name || user?.name || '-')
+                : (tx.payer?.name || tx.user?.name || user?.name || '-');
+            drawFieldCard(col1, currentY, recorderLabelAr, recorderLabelEn, recorderVal);
+
+            const approverText = tx.approver?.name
+                ? `${tx.approver.name} (${fmtDateTime(tx.approvedAt)})`
+                : (isApproved ? 'الإدارة المالية (معتمد رسمي)' : 'قيد المراجعة والاعتماد');
             drawFieldCard(col2, currentY, 'الاعتماد المالي', 'Financial Approval', approverText);
             currentY += cardH + 14;
 
@@ -295,12 +402,19 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
             doc.roundedRect(45, descBoxY, 505, descBoxH, 4).lineWidth(0.75).strokeColor(BORDER).stroke();
 
             useFont(true);
-            doc.fontSize(8.5).fillColor(BRAND_EMBER);
-            drawPdfText(doc, 'البيان والغرض من المعاملة • Description & Details:', 57, descBoxY + 8, { lineBreak: false });
+            doc.fontSize(8.5).fillColor(topColor);
+            const descHeader = isIncome
+                ? 'البيان والغرض من التحصيل • Receipt Purpose & Notes:'
+                : 'البيان والغرض من المعاملة • Description & Details:';
+            drawPdfText(doc, descHeader, 57, descBoxY + 8, { lineBreak: false });
             useFont(false);
 
             doc.fontSize(9).fillColor(TEXT_PRIMARY);
-            const fullDesc = tx.description || tx.descriptionAr || tx.notes || 'لا توجد ملاحظات إضافية';
+            let fullDesc = tx.description || tx.descriptionAr || '';
+            if (tx.notes && tx.notes !== fullDesc) {
+                fullDesc = fullDesc ? `${fullDesc} — ملاحظات: ${tx.notes}` : tx.notes;
+            }
+            if (!fullDesc) fullDesc = 'لا توجد ملاحظات إضافية';
             drawPdfText(doc, fullDesc, 57, descBoxY + 24, { width: 480 });
 
             if (tx.costCenter) {
@@ -329,9 +443,30 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
                 drawPdfText(doc, name || '____________________', x, signY + 44, { width: signColW, align: 'center', lineBreak: false });
             };
 
-            drawSignBlock(45, 'المحاسب المسؤول / الصراف', 'Accountant / Cashier', tx.user?.name || user?.name || 'Authorized');
-            drawSignBlock(45 + signColW + signGap, 'المستلم / المستفيد', 'Beneficiary / Recipient', beneficiaryText !== '-' ? beneficiaryText : '____________________');
-            drawSignBlock(45 + (signColW + signGap) * 2, 'اعتماد الإدارة المالية', 'Financial Management', tx.approver?.name || (isApproved ? 'الإدارة المالية' : '____________________'));
+            if (isIncome) {
+                // Col 1: Depositor / Payer (Client)
+                const depositorName = tx.client?.name || tx.transactionFrom || tx.beneficiary || '____________________';
+                drawSignBlock(45, 'المسلِّم / القائم بالسداد', 'Depositor / Payer (Client)', depositorName);
+
+                // Col 2: Received By / Cashier (Company Staff)
+                drawSignBlock(45 + signColW + signGap, 'المستلم / أمين الخزينة', 'Received By / Cashier', tx.user?.name || user?.name || 'Authorized');
+
+                // Col 3: Financial Management Approval
+                drawSignBlock(45 + (signColW + signGap) * 2, 'اعتماد الإدارة المالية', 'Financial Management', tx.approver?.name || (isApproved ? 'الإدارة المالية' : '____________________'));
+            } else if (isProfit) {
+                drawSignBlock(45, 'مسؤول التحويل', 'Transferred By', tx.user?.name || user?.name || 'Authorized');
+                drawSignBlock(45 + signColW + signGap, 'المستلم / الشريك أو الإدارة', 'Received By / Partner', tx.beneficiary || '____________________');
+                drawSignBlock(45 + (signColW + signGap) * 2, 'اعتماد الإدارة المالية', 'Financial Management', tx.approver?.name || (isApproved ? 'الإدارة المالية' : '____________________'));
+            } else if (isCustody) {
+                drawSignBlock(45, 'المسلِّم / أمين الخزينة', 'Issued By / Cashier', tx.user?.name || user?.name || 'Authorized');
+                drawSignBlock(45 + signColW + signGap, 'المستلم للعهدة', 'Custodian / Recipient', tx.beneficiary || tx.workman?.name || '____________________');
+                drawSignBlock(45 + (signColW + signGap) * 2, 'اعتماد الإدارة المالية', 'Financial Management', tx.approver?.name || (isApproved ? 'الإدارة المالية' : '____________________'));
+            } else {
+                // Expense
+                drawSignBlock(45, 'المحاسب المسؤول / الصراف', 'Accountant / Cashier', tx.payer?.name || tx.user?.name || user?.name || 'Authorized');
+                drawSignBlock(45 + signColW + signGap, 'المستلم / المستفيد', 'Beneficiary / Recipient', partyVal !== '-' ? partyVal : '____________________');
+                drawSignBlock(45 + (signColW + signGap) * 2, 'اعتماد الإدارة المالية', 'Financial Management', tx.approver?.name || (isApproved ? 'الإدارة المالية' : '____________________'));
+            }
 
             // 8. Official Footer on buffered pages
             const range = doc.bufferedPageRange();
@@ -341,7 +476,10 @@ export const generateVoucherPdf = ({ transaction, tenant, user }) => {
                 doc.moveTo(45, footerY).lineTo(550, footerY).lineWidth(0.75).strokeColor(BORDER).stroke();
                 useFont(true);
                 doc.fontSize(8).fillColor(TEXT_PRIMARY);
-                drawPdfText(doc, 'إشعار مالي معتمد صادر من نظام حسابي لإدارة المشروعات • Official Verified Financial Slip', 45, footerY + 5, { width: 505, align: 'center', lineBreak: false });
+                const footerSlipText = isIncome
+                    ? 'إشعار تحصيل مالي معتمد صادر من نظام حسابي لإدارة المشروعات • Official Verified Income Receipt Slip'
+                    : 'إشعار مالي معتمد صادر من نظام حسابي لإدارة المشروعات • Official Verified Financial Slip';
+                drawPdfText(doc, footerSlipText, 45, footerY + 5, { width: 505, align: 'center', lineBreak: false });
                 useFont(false);
                 doc.fontSize(7.5).fillColor(TEXT_SECONDARY).text(
                     `${tenant?.name || user?.company || 'Hesaby ERP'} • Ref #${refId} • Page ${i + 1} of ${range.count}`,

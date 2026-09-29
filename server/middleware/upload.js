@@ -203,7 +203,7 @@ const receiptUpload = multer({
             cb(new Error('Invalid file type. Allowed formats: images (JPG, PNG, WebP, HEIC), PDF, CSV, Excel, Word, Text'), false);
         }
     },
-    limits: { fileSize: 25 * 1024 * 1024 }
+    limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 // Document storage (Contracts, legal documentation, permits, drawings, etc.)

@@ -82,3 +82,14 @@ hesaby_style_reference.png
 hesaby_brand_briefing.html
 hesaby_brand_briefing.pdf
 client/src/pages/backup-landing-2026-09-09/
+
+# Bundles and scratch
+*.bundle
+/scratch/
+/client/src/backups/
+/exports/
+inner_space_master_data.json
+
+scripts/*.mjs
+client/src/components/ui/beams-background-demo.tsx
+

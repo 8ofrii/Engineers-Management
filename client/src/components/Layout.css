@@ -480,3 +480,20 @@
         margin-right: 0;
     }
 }
+/* Hesaby Ambient Beams Glassmorphic Integration in Dark Mode */
+body:not(.light-mode) .layout {
+    position: relative;
+    background: transparent;
+}
+
+body:not(.light-mode) .content {
+    background: rgba(20, 20, 20, 0.85);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+body:not(.light-mode) .topbar {
+    background: rgba(28, 28, 28, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}

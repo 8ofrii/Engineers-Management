@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { 
     Users, UserPlus, Trash2, Edit2, Search, X, Eye, EyeOff, 
     Mail, Phone, Copy, Check, Send, Link as LinkIcon, Sparkles, 
-    Clock, CheckCircle2, RefreshCw, AlertTriangle
+    Clock, CheckCircle2, RefreshCw, AlertTriangle, Wallet
 } from 'lucide-react';
 import { userAPI, rolesAPI } from '../services/api';
+import { useFormat } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import CustomAlert from '../components/CustomAlert';
@@ -15,6 +16,7 @@ import '../components/Modal.css';
 export default function TeamManagement() {
     const { t, i18n } = useTranslation();
     const { user: currentUser } = useAuth();
+    const { currency: fmtCurrency } = useFormat();
     const isRTL = i18n.language === 'ar';
 
     const [users, setUsers] = useState([]);
@@ -460,7 +462,7 @@ export default function TeamManagement() {
                                 onChange={handleSearch}
                             />
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '0.9rem', flexWrap: 'wrap' }}>
                             <span style={{ color: 'var(--text-secondary)' }}>
                                 {isRTL ? 'إجمالي الفريق:' : 'Total Members:'} <strong style={{ color: 'var(--text-primary)', fontWeight: 800 }}>{filteredUsers.length}</strong>
                             </span>
@@ -468,6 +470,14 @@ export default function TeamManagement() {
                             <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
                                 <Clock size={15} />
                                 <span>{isRTL ? 'في انتظار الانضمام:' : 'Pending Invites:'} {filteredUsers.filter(u => !u.isVerified).length}</span>
+                            </span>
+                            <span style={{ color: 'var(--text-secondary)' }}>•</span>
+                            <span style={{ color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                                <Wallet size={15} />
+                                <span>
+                                    {isRTL ? 'إجمالي عهد الفريق:' : 'Total Custodies:'}{' '}
+                                    <strong style={{ color: '#8b5cf6' }}>{fmtCurrency(filteredUsers.reduce((sum, u) => sum + (Number(u.currentCustodyBalance) || 0), 0))}</strong>
+                                </span>
                             </span>
                         </div>
                     </div>
@@ -479,6 +489,7 @@ export default function TeamManagement() {
                                 <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
                                     <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'العضو' : 'Member'}</th>
                                     <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'الدور الوظيفي' : 'Role'}</th>
+                                    <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'رصيد العهدة' : 'Custody Balance'}</th>
                                     <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'حالة الانضمام' : 'Status'}</th>
                                     <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'start' }}>{isRTL ? 'بيانات التواصل' : 'Contact'}</th>
                                     <th style={{ padding: '16px 20px', fontWeight: '700', color: 'var(--text-secondary)', textAlign: 'end' }}>{isRTL ? 'الإجراءات' : 'Actions'}</th>
@@ -487,7 +498,7 @@ export default function TeamManagement() {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="5" style={{ padding: '50px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                        <td colSpan="6" style={{ padding: '50px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
                                             <RefreshCw size={24} className="spin-slow" style={{ margin: '0 auto 10px auto', display: 'block' }} />
                                             <span>{isRTL ? 'جاري تحميل بيانات الفريق...' : 'Loading team members...'}</span>
                                         </td>
@@ -544,6 +555,31 @@ export default function TeamManagement() {
                                                     }}>
                                                         {getRoleDisplayName(user)}
                                                     </span>
+                                                </td>
+
+                                                {/* Custody Balance */}
+                                                <td style={{ padding: '16px 20px', textAlign: 'start' }}>
+                                                    {Number(user.currentCustodyBalance || 0) !== 0 ? (
+                                                        <div style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            padding: '4px 12px',
+                                                            borderRadius: '20px',
+                                                            background: Number(user.currentCustodyBalance || 0) > 0 ? 'rgba(139, 92, 246, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                                                            border: `1px solid ${Number(user.currentCustodyBalance || 0) > 0 ? 'rgba(139, 92, 246, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                                                            color: Number(user.currentCustodyBalance || 0) > 0 ? '#8b5cf6' : '#ef4444',
+                                                            fontSize: '13px',
+                                                            fontWeight: '800'
+                                                        }}>
+                                                            <Wallet size={14} />
+                                                            <span>{fmtCurrency(user.currentCustodyBalance || 0)}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontWeight: '600' }}>
+                                                            0 {isRTL ? 'ج.م' : 'EGP'}
+                                                        </span>
+                                                    )}
                                                 </td>
 
                                                 {/* Status: Active vs Pending Invite */}

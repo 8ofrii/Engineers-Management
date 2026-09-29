@@ -6,29 +6,35 @@ export const PLANS = {
         key: 'FREE',
         name: 'Free Plan',
         nameAr: 'الباقة المجانية',
-        description: 'Ideal for testing workflows on up to 2 active projects.',
-        descriptionAr: 'مثالية لتجربة النظام على مشروعين نشطين.',
+        description: 'Ideal for small site teams on up to 3 active projects.',
+        descriptionAr: 'مثالية لتجربة النظام وإدارة فرق المواقع حتى 3 مشاريع نشطة.',
         priceUsd: 0,
         priceEgp: 0,
         billingPeriodDays: 30,
         limits: {
-            maxProjects: 2,
-            maxUsers: 2,
-            aiExtractionsPerMonth: 15,
-            allFeaturesUnlocked: false
+            maxProjects: 3,
+            maxUsers: 5,
+            aiExtractionsPerMonth: 20,
+            maxStorageMb: 50,
+            maxUploadFileMb: 3,
+            allFeaturesUnlocked: true
         },
         features: [
-            'Up to 2 Active Projects',
-            '2 Team Members',
-            '15 AI Agent Actions / month',
-            'Core Expenses & Safe Balance',
+            'Up to 3 Active Projects',
+            'Up to 5 Team Members',
+            '20 AI Agent Actions / month',
+            '50 MB Media & Document Storage',
+            'Max 3 MB per Upload',
+            '100% Full ERP Features Included',
             'Mobile Companion App'
         ],
         featuresAr: [
-            'حتى مشروعين نشطين',
-            'عضوان في فريق العمل',
-            '15 عملية ذكاء اصطناعي شهرياً',
-            'تسجيل المصروفات وحسابات العهدة',
+            'حتى 3 مشاريع نشطة',
+            'حتى 5 أعضاء في فريق العمل',
+            '20 عملية ذكاء اصطناعي شهرياً',
+            '50 ميجابايت مساحة تخزين المستندات والإيصالات',
+            'الحد الأقصى للملف الواحد 3 ميجابايت',
+            'جميع ميزات النظام مفعلة بالكامل',
             'تطبيق الموبايل الميداني'
         ]
     },
@@ -36,22 +42,26 @@ export const PLANS = {
         key: 'PREMIUM',
         name: 'Premium Plan',
         nameAr: 'الباقة المميزة (Premium)',
-        description: 'For small contracting firms and active site teams.',
-        descriptionAr: 'لمكاتب وشركات المقاولات الصغيرة وفرق المواقع.',
+        description: 'For growing contracting firms and active site teams.',
+        descriptionAr: 'لمكاتب وشركات المقاولات وفرق المواقع المتنامية.',
         priceUsd: 49,
         priceEgp: 2450,
         billingPeriodDays: 30,
         popular: true,
         limits: {
             maxProjects: 10,
-            maxUsers: 6,
+            maxUsers: 15,
             aiExtractionsPerMonth: 2500,
+            maxStorageMb: 2048,
+            maxUploadFileMb: 25,
             allFeaturesUnlocked: true
         },
         features: [
             'Up to 10 Active Projects',
-            'Up to 6 Team Members',
+            'Up to 15 Team Members',
             '2,500 AI Agent Actions / month',
+            '2 GB Cloud Media & Document Storage',
+            'Max 25 MB per Upload',
             'ALL ERP Features Unlocked',
             'Workforce Wages & DSR Reports',
             'Inventory & Supplier Batches',
@@ -60,48 +70,14 @@ export const PLANS = {
         ],
         featuresAr: [
             'حتى 10 مشاريع نشطة',
-            'حتى 6 مستخدمين في الفريق',
+            'حتى 15 مستخدماً في الفريق',
             '2,500 عملية ذكاء اصطناعي شهرياً',
+            '2 جيجابايت مساحة تخزين المستندات والإيصالات',
+            'الحد الأقصى للملف الواحد 25 ميجابايت',
             'جميع ميزات النظام متاحة بالكامل',
             'يوميات العمالة والتقارير اليومية DSR',
             'المخازن وتوريدات الموردين',
             'اعتمادات الصرف والعهدة المالية',
-            'تطبيق الموبايل الميداني'
-        ]
-    },
-    BUSINESS: {
-        key: 'BUSINESS',
-        name: 'Business Plan',
-        nameAr: 'باقة الأعمال (Business)',
-        description: 'For mid-sized general contractors and multi-project teams.',
-        descriptionAr: 'لشركات المقاولات المتوسطة وإدارة عدة مواقع متزامنة.',
-        priceUsd: 89,
-        priceEgp: 4450,
-        billingPeriodDays: 30,
-        limits: {
-            maxProjects: 20,
-            maxUsers: 12,
-            aiExtractionsPerMonth: 6000,
-            allFeaturesUnlocked: true
-        },
-        features: [
-            'Up to 20 Active Projects',
-            'Up to 12 Team Members',
-            '6,000 AI Agent Actions / month',
-            'ALL ERP Features Unlocked',
-            'Multi-Site Safe Wallets',
-            'Cost Center Analytics',
-            'Custom PDF Branding',
-            'Mobile Companion App'
-        ],
-        featuresAr: [
-            'حتى 20 مشروعاً نشطاً',
-            'حتى 12 مستخدماً في الفريق',
-            '6,000 عملية ذكاء اصطناعي شهرياً',
-            'جميع ميزات النظام متاحة بالكامل',
-            'خزائن وحسابات عهدة متعددة',
-            'مراكز التكلفة والتحليلات المالية',
-            'تخصيص شعار وهوية تقارير PDF',
             'تطبيق الموبايل الميداني'
         ]
     },
@@ -121,12 +97,16 @@ export const PLANS = {
             maxProjects: -1, // Unlimited
             maxUsers: -1,    // Unlimited
             aiExtractionsPerMonth: 10000,
+            maxStorageMb: -1, // Unlimited
+            maxUploadFileMb: 50,
             allFeaturesUnlocked: true
         },
         features: [
             'Unlimited Active Projects',
             'Unlimited Team Members',
             'Custom / Dedicated AI Quota',
+            'Unlimited Cloud Media Storage',
+            'Max 50 MB per Upload',
             'ALL ERP Features Unlocked',
             'Bank Statement Reconciliation',
             'Audit Logging & Security',
@@ -137,6 +117,8 @@ export const PLANS = {
             'عدد غير محدود من المشاريع',
             'عدد غير محدود من المستخدمين',
             'رصيد ذكاء اصطناعي مخصص',
+            'سعة تخزين وسائط ومستندات غير محدودة',
+            'الحد الأقصى للملف الواحد 50 ميجابايت',
             'جميع ميزات النظام متاحة بالكامل',
             'المطابقة والتسوية البنكية الآلية',
             'سجل التدقيق والأمان الكامل',
@@ -146,7 +128,7 @@ export const PLANS = {
     }
 };
 
-// AI Token Add-On Packs (Available for Paid Subscribers with Volume Discounting)
+// AI Token Add-On Packs (Available exclusively for Premium & Enterprise members)
 export const ADD_ONS = {
     ADDON_100: {
         key: 'ADDON_100',
@@ -154,7 +136,8 @@ export const ADD_ONS = {
         nameAr: '100 عملية ذكاء اصطناعي إضافية',
         uses: 100,
         priceUsd: 3,
-        priceEgp: 150
+        priceEgp: 150,
+        availablePlans: ['PREMIUM', 'ENTERPRISE']
     },
     ADDON_250: {
         key: 'ADDON_250',
@@ -162,7 +145,8 @@ export const ADD_ONS = {
         nameAr: '250 عملية ذكاء اصطناعي إضافية',
         uses: 250,
         priceUsd: 6,
-        priceEgp: 300
+        priceEgp: 300,
+        availablePlans: ['PREMIUM', 'ENTERPRISE']
     },
     ADDON_500: {
         key: 'ADDON_500',
@@ -170,7 +154,8 @@ export const ADD_ONS = {
         nameAr: '500 عملية ذكاء اصطناعي إضافية',
         uses: 500,
         priceUsd: 10,
-        priceEgp: 500
+        priceEgp: 500,
+        availablePlans: ['PREMIUM', 'ENTERPRISE']
     },
     ADDON_1000: {
         key: 'ADDON_1000',
@@ -179,7 +164,8 @@ export const ADD_ONS = {
         uses: 1000,
         priceUsd: 17,
         priceEgp: 850,
-        popular: true
+        popular: true,
+        availablePlans: ['PREMIUM', 'ENTERPRISE']
     },
     ADDON_2500: {
         key: 'ADDON_2500',
@@ -187,7 +173,8 @@ export const ADD_ONS = {
         nameAr: '2,500 عملية ذكاء اصطناعي إضافية',
         uses: 2500,
         priceUsd: 35,
-        priceEgp: 1750
+        priceEgp: 1750,
+        availablePlans: ['PREMIUM', 'ENTERPRISE']
     }
 };
 
@@ -195,7 +182,14 @@ export const ADD_ONS = {
 const ALIASES = {
     FREE_PILOT: 'FREE',
     BASIC: 'PREMIUM',
-    PRO: 'BUSINESS'
+    PRO: 'PREMIUM',
+    BUSINESS: 'PREMIUM'
+};
+
+/** Returns whether a plan is eligible to purchase or activate add-on packs. */
+export const isPlanEligibleForAddOns = (planKey) => {
+    const plan = getPlan(planKey);
+    return Boolean(plan && plan.key !== 'FREE');
 };
 
 /** Returns normalized plan config or default FREE if unknown. */

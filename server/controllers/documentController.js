@@ -1,5 +1,7 @@
 import path from 'path';
+import fs from 'fs';
 import prisma from '../lib/prisma.js';
+import { checkStorageQuota } from '../lib/storageUsage.js';
 import { auditFromReq } from '../lib/audit.js';
 
 // Map an uploaded multer file → its public URL. Mirrors the pattern used
@@ -78,6 +80,20 @@ export const uploadDocument = async (req, res, next) => {
 
         const url = fileToUrl(req.file);
         if (!url) return res.status(500).json({ success: false, message: 'Upload failed: no file URL' });
+
+        // Plan-based file size and tenant storage quota check
+        const quotaCheck = await checkStorageQuota(req.user.tenantId, [req.file]);
+        if (!quotaCheck.allowed) {
+            if (req.file?.path && fs.existsSync(req.file.path)) {
+                try { fs.unlinkSync(req.file.path); } catch {}
+            }
+            return res.status(400).json({
+                success: false,
+                code: quotaCheck.code,
+                message: quotaCheck.message,
+                messageAr: quotaCheck.messageAr
+            });
+        }
 
         const { name, category, description, latitude, longitude, takenAt } = req.body;
 

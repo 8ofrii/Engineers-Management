@@ -101,8 +101,8 @@ router.get('/:id', transactionController.getTransaction);
 // Update transaction
 router.put('/:id', transactionController.updateTransaction);
 
-// Phase 3 — attach a receipt photo / document (multipart, field=file)
-router.patch('/:id/receipt', receiptUpload.single('file'), transactionController.uploadReceipt);
+// Phase 3 — attach receipt photos / documents (multipart, supports unlimited files up to storage limit)
+router.patch('/:id/receipt', receiptUpload.any(), transactionController.uploadReceipt);
 
 // Attach a voice note (multipart, field=file)
 router.patch('/:id/voice', audioUpload.single('file'), transactionController.uploadVoiceNote);

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import SkyToggle from '../components/ui/sky-toggle';
 import { authAPI } from '../services/api';
+import { BeamsBackground } from '@/components/ui/beams-background';
 import './Auth.css';
 
 export default function SignUp() {
@@ -47,6 +48,7 @@ export default function SignUp() {
         localStorage.setItem('theme_preset', theme);
         localStorage.setItem('theme_preset_v3', theme);
     }, [theme, light]);
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [loading, setLoading] = useState(false);
     const [validatingInvite, setValidatingInvite] = useState(false);
     const [invitePreview, setInvitePreview] = useState(null);
@@ -175,6 +177,18 @@ export default function SignUp() {
             return;
         }
 
+
+        // Terms of Service agreement
+        if (!agreedToTerms) {
+            showAlert({
+                type: 'error',
+                title: t('common.error', 'Error'),
+                message: isAr
+                    ? 'يجب الموافقة على شروط الخدمة وسياسة الخصوصية للمتابعة.'
+                    : 'You must agree to the Terms of Service and Privacy Policy to continue.'
+            });
+            return;
+        }
         setStep(2);
     };
 
@@ -311,6 +325,13 @@ export default function SignUp() {
 
     return (
         <div className="auth-container">
+            {!light && (
+                <BeamsBackground
+                    colorScheme="ember"
+                    intensity="medium"
+                    className="fixed inset-0 pointer-events-none z-0"
+                />
+            )}
             <div className="auth-background"></div>
 
             {/* Top Bar with brand + theme + language */}
@@ -528,6 +549,33 @@ export default function SignUp() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Terms of Service Agreement */}
+                                <label style={{
+                                    display: 'flex', alignItems: 'flex-start', gap: 8,
+                                    marginTop: 14, cursor: 'pointer', fontSize: '0.8rem',
+                                    lineHeight: 1.45, color: 'var(--text-secondary, #a8a29e)'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={agreedToTerms}
+                                        onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                        style={{
+                                            marginTop: 2, accentColor: '#ff5a1f',
+                                            width: 16, height: 16, flexShrink: 0, cursor: 'pointer'
+                                        }}
+                                    />
+                                    <span>
+                                        {isAr ? 'أوافق على ' : 'I agree to the '}
+                                        <Link to="/terms" target="_blank" style={{ color: '#ff5a1f', textDecoration: 'none', fontWeight: 600 }}>
+                                            {isAr ? 'شروط الخدمة' : 'Terms of Service'}
+                                        </Link>
+                                        {isAr ? ' و' : ' and '}
+                                        <Link to="/privacy" target="_blank" style={{ color: '#ff5a1f', textDecoration: 'none', fontWeight: 600 }}>
+                                            {isAr ? 'سياسة الخصوصية' : 'Privacy Policy'}
+                                        </Link>
+                                    </span>
+                                </label>
 
                                 <button 
                                     type="submit" 
@@ -750,6 +798,15 @@ export default function SignUp() {
                             {isAr ? 'لديك حساب بالفعل؟' : 'Already have an account?'}{' '}
                             <Link to="/login" className="auth-link">
                                 {isAr ? 'تسجيل الدخول' : 'Sign in'}
+                            </Link>
+                        </p>
+                        <p style={{ marginTop: 10, fontSize: '11.5px', color: 'var(--text-tertiary, #78716c)' }}>
+                            <Link to="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                {isAr ? 'شروط الخدمة' : 'Terms'}
+                            </Link>
+                            {' · '}
+                            <Link to="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                {isAr ? 'سياسة الخصوصية' : 'Privacy'}
                             </Link>
                         </p>
                     </div>

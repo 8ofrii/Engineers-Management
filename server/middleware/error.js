@@ -52,6 +52,14 @@ export const errorHandler = (err, req, res, next) => {
         statusCode = 403;
     }
 
+    // Multer upload errors (file size, file type limits)
+    else if (err.name === 'MulterError' || err.code === 'LIMIT_FILE_SIZE') {
+        statusCode = 400;
+        message = err.code === 'LIMIT_FILE_SIZE'
+            ? 'One or more files exceed the maximum file size limit (50 MB).'
+            : `Upload error: ${err.message}`;
+    }
+
     if (statusCode >= 500) {
         // Use pino-http's per-request logger if available so the log line
         // carries the same request ID as the access log.

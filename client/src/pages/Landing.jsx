@@ -7,6 +7,7 @@ import { useFormat } from '../utils/format';
 import { Camera, Check, Globe, ShieldCheck, HardHat, Scale, DollarSign, Receipt, FileSpreadsheet, TrendingUp, Smartphone, Zap, Play, CheckCircle2 } from 'lucide-react';
 import SkyToggle from '@/components/ui/sky-toggle';
 import HandwritingText from '@/components/ui/handwriting-text';
+import { BeamsBackground } from '@/components/ui/beams-background';
 import { AuroraBackground } from '@/components/ui/aurora-background';
 import DisplayCards from '@/components/ui/display-cards';
 import { LampContainer } from '@/components/ui/lamp';
@@ -21,9 +22,9 @@ const SCEN = [
   { id:'fuel', tAr:'إيصال وقود', tEn:'Fuel receipt', vAr:'وطنية', vEn:'Watanya', pAr:'العاصمة الإدارية', pEn:'New Capital', amt:'8,500 EGP', amtAr:'8,500 ج.م', vat:'1,190 EGP', vatAr:'1,190 ج.م', itemsAr:'سولار للحفار والمولد', itemsEn:'Diesel — excavator', conf:'99.1%' },
 ];
 const PLANS = [
-  { key:'FREE', n:'Free Plan', nAr:'الباقة المجانية', d:'Test Hesaby on one real site. No credit card, no time limit.', dAr:'جرّب حسابي في موقع حقيقي. من غير كارت فيزا ولا مدة صلاحية.', price:0, f:['Up to 2 active projects','2 engineer seats','150 AI receipt scans / mo','Full DSR site diaries','Site custody & mobile app'], fAr:['مشروعين هندسيين نشطين','حسابين للمهندسين','١٥٠ مسحة فاتورة بالذكاء الاصطناعي شهرياً','يوميات الموقع كاملة (DSR)','محفظة العهدة وتطبيق الموبايل'] },
-  { key:'PREMIUM', n:'Premium Plan', nAr:'الباقة المميزة (Premium)', d:'For growing contractors needing live safe tracking and real-time site control.', dAr:'لشركات المقاولات اللي شغّالة في كذا موقع ومحتاجة تتابع الخزاين أول بأول.', price:2450, pop:true, f:['Up to 10 active projects','15 multi-role team seats','2,500 AI receipt scans & voice notes','Multi-tier financial approvals','Daily wages, draws & stock'], fAr:['١٠ مشاريع هندسية نشطة','١٥ مستخدم بصلاحيات متعددة','٢,٥٠٠ مسحة فاتورة وملاحظة صوتية بالذكاء الاصطناعي','اعتمادات صرف متعددة المستويات','يوميات عمالة ومستخلصات ومخازن'] },
-  { key:'BUSINESS', n:'Business Plan', nAr:'باقة الأعمال (Business)', d:'For established contractors running multi-site operations with Egyptian VAT & isolated safes.', dAr:'للشركات الكبيرة اللي بتدير مواقع متزامنة ومحتاجة عزل تام للخزائن وقيد ضريبي ١٤٪.', price:4450, f:['Up to 30 active projects','40 team seats & custom roles','6,000 AI extractions & actions','Site-fenced safes & 14% Egyptian VAT','Bank reconciliation & sealed audit log'], fAr:['٣٠ مشروع نشط','٤٠ مستخدم مع سجل صلاحيات كامل','٦,٠٠٠ عملية ذكاء اصطناعي','خزائن مسيّجة لكل موقع وضريبة القيمة المضافة ١٤٪','مطابقة بنكية وسجل تدقيق مقفول'] },
+  { key:'FREE', n:'Free Plan', nAr:'الباقة المجانية', d:'Test Hesaby on real sites. No credit card, no time limit.', dAr:'جرّب حسابي في مواقع حقيقية. من غير كارت فيزا ولا مدة صلاحية.', price:0, f:['Up to 3 active projects','5 engineer seats','20 AI actions / month','50 MB cloud media storage (3 MB / file)','100% Full ERP features included'], fAr:['٣ مشاريع هندسية نشطة','٥ حسابات للمهندسين وفريق العمل','٢٠ عملية ذكاء اصطناعي شهرياً','٥٠ ميجابايت مساحة تخزين (٣ م.ب للملف)','جميع ميزات النظام مفعلة بالكامل'] },
+  { key:'PREMIUM', n:'Premium Plan', nAr:'الباقة المميزة (Premium)', d:'For growing contractors needing live safe tracking and real-time site control.', dAr:'لشركات المقاولات اللي شغّالة في كذا موقع ومحتاجة تتابع الخزاين أول بأول.', price:2450, pop:true, f:['Up to 10 active projects','15 team seats','2,500 AI actions / month','2 GB cloud media storage (25 MB / file)','Multi-tier financial approvals'], fAr:['١٠ مشاريع هندسية نشطة','١٥ مستخدم في الفريق','٢,٥٠٠ عملية ذكاء اصطناعي شهرياً','٢ جيجابايت مساحة تخزين (٢٥ م.ب للملف)','اعتمادات صرف متعددة المستويات'] },
+  
   { key:'ENTERPRISE', n:'Enterprise Plan', nAr:'باقة الشركات (Enterprise)', d:'Dedicated infrastructure, custom SLAs, and unlimited capacity for large developers.', dAr:'خادم وقاعدة بيانات معزولة بالكامل، ودعم مباشر على مدار الساعة، وربط مخصص.', price:null, f:['Unlimited projects & subcontracts','Unlimited team seats & custom RBAC','Dedicated isolated database instance','Unlimited AI volume & custom SLA','Direct ERP API & dedicated support engineer'], fAr:['مشاريع ومقاولين باطن غير محدودين','مستخدمين وصلاحيات غير محدودة','قاعدة بيانات مخصصة ومعزولة تمامًا','استهلاك ذكاء اصطناعي غير محدود مع SLA','ربط أنظمة ERP ومهندس دعم مخصص'] },
 ];
 
@@ -121,7 +122,11 @@ export default function Landing() {
   return (
     <MotionConfig reducedMotion="user">
     <div ref={rootRef} className={cn('hx', light && 'hx-light')} dir={isRTL ? 'rtl' : 'ltr'}>
-      <AuroraBackground />
+      {!light ? (
+        <BeamsBackground colorScheme="ember" intensity="medium" className="fixed inset-0 pointer-events-none z-0" />
+      ) : (
+        <AuroraBackground />
+      )}
       <header className="hx-nav"><div className="hx-inner hx-nav-row">
         <Link to="/" className="hx-brand"><img src="/hesaby_logo_lockup.svg" alt="Hesaby.ai" className="hx-logo-lockup logo-for-dark" /><img src="/hesaby_logo_lockup_light.svg" alt="Hesaby.ai" className="hx-logo-lockup logo-for-light" /></Link>
         <div className="tube-top"><TubeNav id="tube-top" items={navItems} active={active} onSelect={pick} /></div>
@@ -206,7 +211,7 @@ export default function Landing() {
         <div className="hx-head rv"><div className="hx-eyebrow">{T('Pricing','الأسعار')}</div><h2 className="hx-h2">{T('Transparent, flexible pricing that grows with your business.','خطط أسعار مرنة وشفافة تواكب نمو أعمالك.')}</h2><p className="hx-lead">{T('Run your first project free — no time limit, no credit card. Choose the plan and capacity that best fit your team\'s operational needs, with 20% savings on annual billing.','شغّل أول مشروع مجانًا — بدون حد زمني وبلا بطاقة بنكية. اختر الباقة والسعة الأنسب لاحتياجات فريقك ومشاريعك، مع توفير ٢٠٪ عند الفوترة السنوية.')}</p>
         <div className="hx-bill"><button onClick={()=>setCycle('monthly')} className={cn(cycle==='monthly'&&'on')}>{T('Monthly','شهري')}</button><button onClick={()=>setCycle('annual')} className={cn(cycle==='annual'&&'on')}>{T('Annual −20%','سنوي −٢٠٪')}</button></div></div>
         <div className="hx-plans">{plans.map(p=>{const ent=p.price==null;const price=!ent?((cycle==='annual')?Math.round(p.price*12*.8):p.price):null;const feats=(isRTL?p.fAr:p.f)||[];return(
-          <div key={p.key} className={cn('hx-plan rv',p.pop&&'pop')} style={{'--rv-d':`${(({FREE:0,PREMIUM:.08,BUSINESS:.16,ENTERPRISE:.24})[p.key] ?? 0).toFixed(2)}s`}}><h3>{isRTL?p.nAr:p.n}{p.pop&&<span className="hx-pop">{T('POPULAR','الأكثر')}</span>}</h3><p className="hx-pdesc">{isRTL?p.dAr:p.d}</p>
+          <div key={p.key} className={cn('hx-plan rv',p.pop&&'pop')} style={{'--rv-d':`${(({FREE:0,PREMIUM:.08,ENTERPRISE:.16})[p.key] ?? 0).toFixed(2)}s`}}><h3>{isRTL?p.nAr:p.n}{p.pop&&<span className="hx-pop">{T('POPULAR','الأكثر')}</span>}</h3><p className="hx-pdesc">{isRTL?p.dAr:p.d}</p>
           <div>{ent?<span className="hx-price" style={{fontSize:22}}>{T('Custom','مخصص')}</span>:p.price===0?<span className="hx-price" style={{fontSize:22}}>{T('Free','مجاني')}</span>:<><span className="hx-price">{currency(price)}</span> <span className="hx-per">/ {cycle==='annual'?T('yr','سنة'):T('mo','شهر')}</span></>}</div>
           <ul className="hx-feats">{feats.slice(0,5).map(f=><li key={f}><Check size={14}/>{f}</li>)}</ul>
           <Link to={user?'/billing':'/signup'} className={cn('hx-btn',p.pop?'hx-btn-fire':'hx-btn-ghost')} style={{width:'100%'}}>{ent?T('Talk to us','كلمنا'):p.price===0?T('Start free','ابدأ مجانًا'):T('Choose plan','اختر الباقة')}</Link></div>);})}</div>
@@ -225,7 +230,23 @@ export default function Landing() {
           <p className="hx-micro2">{T('No credit card required · Instant setup · Zero commitment','بدون بطاقة بنكية · تشغيل فوري · بدون أي التزام')}</p>
         </motion.div>
       </LampContainer></section>
-      <footer className="hx-footer"><div className="hx-inner hx-foot"><span style={{display:'inline-flex',alignItems:'center',gap:10}}><span className="hx-logo-chip" style={{width:28,height:28,borderRadius:8}}><img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{width:20,height:20}} /></span><b style={{color:'var(--text)'}}>Hesaby</b> — {T('Your site, properly recorded.','موقعك، مسجّل صح.')}</span><span>© {new Date().getFullYear()} · EN / عربي</span></div></footer>
+      <footer className="hx-footer"><div className="hx-inner hx-foot-v2">
+        <div className="hx-foot-brand">
+          <span style={{display:'inline-flex',alignItems:'center',gap:10}}>
+            <span className="hx-logo-chip" style={{width:28,height:28,borderRadius:8}}><img src="/hesaby_logo_icon.svg" alt="Hesaby" style={{width:20,height:20}} /></span>
+            <b style={{color:'var(--text)'}}>Hesaby</b>
+          </span>
+          <span className="hx-foot-tagline">{T('Your site, properly recorded.','موقعك، مسجّل صح.')}</span>
+        </div>
+        <div className="hx-foot-links">
+          <Link to="/terms">{T('Terms of Service','شروط الخدمة')}</Link>
+          <Link to="/privacy">{T('Privacy Policy','سياسة الخصوصية')}</Link>
+          <a href="mailto:support@hesaby.app">{T('Contact','تواصل معنا')}</a>
+        </div>
+        <div className="hx-foot-copy">
+          <span>© {new Date().getFullYear()} Hesaby</span>
+        </div>
+      </div></footer>
       {isMobile && (<div className="tube-dock"><TubeNav id="tube-dock" items={navItems} active={active} onSelect={pick} /></div>)}
     </div>
     </MotionConfig>

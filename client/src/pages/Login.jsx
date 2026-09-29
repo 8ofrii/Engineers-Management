@@ -6,6 +6,7 @@ import { useAlert } from '../context/AlertContext';
 import { authAPI } from '../services/api';
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, Loader2, Globe, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import SkyToggle from '../components/ui/sky-toggle';
+import { BeamsBackground } from '@/components/ui/beams-background';
 import './Auth.css';
 
 export default function Login() {
@@ -199,6 +200,13 @@ export default function Login() {
     if (twoFactor) {
         return (
             <div className="auth-container">
+                {!light && (
+                    <BeamsBackground
+                        colorScheme="ember"
+                        intensity="medium"
+                        className="fixed inset-0 pointer-events-none z-0"
+                    />
+                )}
                 <div className="auth-background"></div>
                 <div className="auth-content">
                     <div className="auth-card">
@@ -251,6 +259,13 @@ export default function Login() {
 
     return (
         <div className="auth-container">
+            {!light && (
+                <BeamsBackground
+                    colorScheme="ember"
+                    intensity="medium"
+                    className="fixed inset-0 pointer-events-none z-0"
+                />
+            )}
             <div className="auth-background"></div>
 
             {/* Top Bar with brand + theme + language */}
@@ -484,6 +499,15 @@ export default function Login() {
                             {isAr ? 'ليس لديك حساب؟' : "Don't have an account?"}{' '}
                             <Link to="/signup" className="auth-link">
                                 {isAr ? 'إنشاء حساب جديد' : 'Create Account'}
+                            </Link>
+                        </p>
+                        <p style={{ marginTop: 10, fontSize: '11.5px', color: 'var(--text-tertiary, #78716c)' }}>
+                            <Link to="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                {isAr ? 'شروط الخدمة' : 'Terms'}
+                            </Link>
+                            {' · '}
+                            <Link to="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>
+                                {isAr ? 'سياسة الخصوصية' : 'Privacy'}
                             </Link>
                         </p>
                     </div>

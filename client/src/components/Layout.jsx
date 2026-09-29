@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import SkyToggle from './ui/sky-toggle';
+import { BeamsBackground } from './ui/beams-background';
 import ProfileModal from './ProfileModal';
 import TwoFactorModal from './TwoFactorModal';
 import DraftCaptureFAB from './DraftCaptureFAB';
@@ -261,6 +262,13 @@ export default function Layout({ children }) {
 
     return (
         <div className={`layout ${sidebarCollapsed ? 'layout-collapsed' : ''}`}>
+            {activeTheme !== 'light' && (
+                <BeamsBackground
+                    colorScheme="ember"
+                    intensity="medium"
+                    className="fixed inset-0 pointer-events-none z-0"
+                />
+            )}
             {/* Sidebar */}
             <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
                 <div className="sidebar-header" style={{ position: 'relative' }}>

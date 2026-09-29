@@ -32,7 +32,7 @@ import {
 import Layout from '../components/Layout';
 import { safesAPI, transactionsAPI, userAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
-import { useFormat } from '../utils/format';
+import { useFormat, cleanTransactionDescription } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 import AddTransactionModal from '../components/AddTransactionModal';
 import TransactionDetailModal from '../components/TransactionDetailModal';
@@ -91,6 +91,7 @@ export default function OfficeFinances() {
     const [editingSafe, setEditingSafe] = useState(null);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [transferSourceSafeId, setTransferSourceSafeId] = useState('');
+    const [transferTargetSafeId, setTransferTargetSafeId] = useState('');
     const [isStatementModalOpen, setIsStatementModalOpen] = useState(false);
     const [selectedSafeForStatement, setSelectedSafeForStatement] = useState(null);
     const [statementData, setStatementData] = useState(null);
@@ -266,6 +267,8 @@ export default function OfficeFinances() {
 
     const getSafeTypeBadge = (type) => {
         switch (type) {
+            case 'CUSTODY':
+                return { label: isArabic ? 'عهدة موظف' : 'Member Custody', color: '#8b5cf6', icon: UserCheck };
             case 'BANK_ACCOUNT':
                 return { label: isArabic ? 'حساب بنكي' : 'Bank Account', color: '#2563eb', icon: CreditCard };
             case 'MOBILE_WALLET':
@@ -918,6 +921,14 @@ export default function OfficeFinances() {
                             >
                                 {isArabic ? 'شركاء/مديرين' : 'Partners'}
                             </button>
+                            <button
+                                className={`btn btn-sm ${safeTypeFilter === 'CUSTODY' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setSafeTypeFilter('CUSTODY')}
+                                style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                                <UserCheck size={13} />
+                                <span>{isArabic ? 'عهد الموظفين' : 'Custodies'}</span>
+                            </button>
                         </div>
                     </div>
 
@@ -1001,16 +1012,29 @@ export default function OfficeFinances() {
                                                             {isArabic ? 'الخزينة الافتراضية' : 'Default'}
                                                         </span>
                                                     )}
-                                                    <button
-                                                        className="safe-edit-btn"
-                                                        onClick={() => {
-                                                            setEditingSafe(safe);
-                                                            setIsAddSafeModalOpen(true);
-                                                        }}
-                                                        title={isArabic ? 'تعديل بيانات الخزينة' : 'Edit Safe'}
-                                                    >
-                                                        <Pencil size={14} />
-                                                    </button>
+                                                    {safe.isCustody ? (
+                                                        <span style={{
+                                                            fontSize: '0.72rem',
+                                                            padding: '2px 8px',
+                                                            borderRadius: 'var(--radius-full)',
+                                                            background: 'rgba(139, 92, 246, 0.15)',
+                                                            color: '#8b5cf6',
+                                                            fontWeight: 700
+                                                        }}>
+                                                            {isArabic ? 'عهدة شخصية' : 'Personal Custody'}
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            className="safe-edit-btn"
+                                                            onClick={() => {
+                                                                setEditingSafe(safe);
+                                                                setIsAddSafeModalOpen(true);
+                                                            }}
+                                                            title={isArabic ? 'تعديل بيانات الخزينة' : 'Edit Safe'}
+                                                        >
+                                                            <Pencil size={14} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -1029,7 +1053,9 @@ export default function OfficeFinances() {
                                             {/* Live Balance Box - Positioned immediately under Safe Name for exact vertical alignment across all cards */}
                                             <div className="safe-card-balance-box" style={{ marginBottom: '12px' }}>
                                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
-                                                    {isArabic ? 'الرصيد المتاح الحالي' : 'Current Available Balance'}
+                                                    {safe.isCustody 
+                                                        ? (isArabic ? 'رصيد العهدة في ذمة الموظف' : 'Active Custody Balance') 
+                                                        : (isArabic ? 'الرصيد المتاح الحالي' : 'Current Available Balance')}
                                                 </div>
                                                 <div style={{
                                                     fontSize: '1.75rem',
@@ -1152,31 +1178,76 @@ export default function OfficeFinances() {
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div style={{
-                                            display: 'flex',
-                                            gap: '8px',
-                                            borderTop: '1px solid var(--border-color)',
-                                            paddingTop: '14px'
-                                        }}>
-                                            <button
-                                                className="safe-action-btn statement"
-                                                onClick={() => handleOpenStatement(safe)}
-                                            >
-                                                <FileText size={15} />
-                                                <span>{isArabic ? 'كشف حساب' : 'Statement'}</span>
-                                            </button>
-                                            <button
-                                                className="safe-action-btn transfer"
-                                                onClick={() => {
-                                                    setTransferSourceSafeId(safe.id);
-                                                    setIsTransferModalOpen(true);
-                                                }}
-                                                title={isArabic ? 'تحويل من/إلى هذه الخزينة' : 'Transfer'}
-                                            >
-                                                <ArrowRightLeft size={15} />
-                                                <span>{isArabic ? 'تحويل' : 'Transfer'}</span>
-                                            </button>
-                                        </div>
+                                        {safe.isCustody ? (
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '1fr 1fr',
+                                                gap: '8px',
+                                                borderTop: '1px solid var(--border-color)',
+                                                paddingTop: '14px'
+                                            }}>
+                                                <button
+                                                    className="safe-action-btn transfer"
+                                                    style={{ background: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6', borderColor: 'rgba(139, 92, 246, 0.3)' }}
+                                                    onClick={() => {
+                                                        setTransferSourceSafeId('');
+                                                        setTransferTargetSafeId(safe.id);
+                                                        setIsTransferModalOpen(true);
+                                                    }}
+                                                    title={isArabic ? 'تغذية العهدة من خزينة أو حساب آخر' : 'Fund this custody from safe'}
+                                                >
+                                                    <Plus size={14} />
+                                                    <span>{isArabic ? 'تغذية عهدة' : 'Top Up'}</span>
+                                                </button>
+                                                <button
+                                                    className="safe-action-btn transfer"
+                                                    onClick={() => {
+                                                        setTransferSourceSafeId(safe.id);
+                                                        setTransferTargetSafeId('');
+                                                        setIsTransferModalOpen(true);
+                                                    }}
+                                                    title={isArabic ? 'توريد / تسوية العهدة للخزينة' : 'Return custody to safe'}
+                                                >
+                                                    <ArrowRightLeft size={14} />
+                                                    <span>{isArabic ? 'توريد للخزينة' : 'Return to Safe'}</span>
+                                                </button>
+                                                <button
+                                                    className="safe-action-btn statement"
+                                                    style={{ gridColumn: 'span 2' }}
+                                                    onClick={() => handleOpenStatement(safe)}
+                                                >
+                                                    <FileText size={15} />
+                                                    <span>{isArabic ? 'كشف حركة العهدة' : 'Custody Statement'}</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div style={{
+                                                display: 'flex',
+                                                gap: '8px',
+                                                borderTop: '1px solid var(--border-color)',
+                                                paddingTop: '14px'
+                                            }}>
+                                                <button
+                                                    className="safe-action-btn statement"
+                                                    onClick={() => handleOpenStatement(safe)}
+                                                >
+                                                    <FileText size={15} />
+                                                    <span>{isArabic ? 'كشف حساب' : 'Statement'}</span>
+                                                </button>
+                                                <button
+                                                    className="safe-action-btn transfer"
+                                                    onClick={() => {
+                                                        setTransferSourceSafeId(safe.id);
+                                                        setTransferTargetSafeId('');
+                                                        setIsTransferModalOpen(true);
+                                                    }}
+                                                    title={isArabic ? 'تحويل من/إلى هذه الخزينة' : 'Transfer'}
+                                                >
+                                                    <ArrowRightLeft size={15} />
+                                                    <span>{isArabic ? 'تحويل' : 'Transfer'}</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -1658,9 +1729,16 @@ export default function OfficeFinances() {
                     <TransferSafeModal
                         safes={safes}
                         initialSourceSafeId={transferSourceSafeId}
-                        onClose={() => setIsTransferModalOpen(false)}
+                        initialTargetSafeId={transferTargetSafeId}
+                        onClose={() => {
+                            setIsTransferModalOpen(false);
+                            setTransferSourceSafeId('');
+                            setTransferTargetSafeId('');
+                        }}
                         onSuccess={() => {
                             setIsTransferModalOpen(false);
+                            setTransferSourceSafeId('');
+                            setTransferTargetSafeId('');
                             loadData();
                         }}
                     />
@@ -1964,14 +2042,18 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
 // -------------------------------------------------------------
 // SUBCOMPONENT: Transfer Between Safes Modal
 // -------------------------------------------------------------
-function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
+function TransferSafeModal({ safes, initialSourceSafeId, initialTargetSafeId, onClose, onSuccess }) {
     const { i18n } = useTranslation();
     const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
     const { currency: fmtCurrency } = useFormat();
 
-    const [fromSafeId, setFromSafeId] = useState(initialSourceSafeId || (safes[0]?.id || ''));
-    const [toSafeId, setToSafeId] = useState(safes.find(s => s.id !== (initialSourceSafeId || safes[0]?.id))?.id || '');
+    const [fromSafeId, setFromSafeId] = useState(
+        initialSourceSafeId || (safes.find(s => s.id !== initialTargetSafeId)?.id || (safes[0]?.id || ''))
+    );
+    const [toSafeId, setToSafeId] = useState(
+        initialTargetSafeId || (safes.find(s => s.id !== (initialSourceSafeId || safes[0]?.id))?.id || '')
+    );
     const [amount, setAmount] = useState('');
     const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10));
     const [notes, setNotes] = useState('');
@@ -2069,7 +2151,7 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                 <div className="modal-header">
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <ArrowRightLeft size={20} style={{ color: 'var(--color-primary)' }} />
-                        <span>{isArabic ? 'تحويل أموال بين خزائن الشركة' : 'Internal Safe Transfer'}</span>
+                        <span>{isArabic ? 'تحويل أموال الخزائن والعهد' : 'Safe & Custody Fund Transfer'}</span>
                     </h2>
                     <button className="modal-close" onClick={onClose} title={isArabic ? 'إغلاق' : 'Close'}><X size={18} /></button>
                 </div>
@@ -2078,18 +2160,27 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
                     <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                         {/* Source Safe */}
                         <div className="form-group">
-                            <label>{isArabic ? 'من الخزينة / الحساب (المصدر)' : 'From Safe / Account'} *</label>
+                            <label>{isArabic ? 'من الخزينة أو العهدة (المصدر)' : 'From Safe or Custody (Source)'} *</label>
                             <select
                                 value={fromSafeId}
                                 onChange={(e) => setFromSafeId(e.target.value)}
                                 required
                             >
-                                <option value="">-- {isArabic ? 'اختر الخزينة' : 'Select Source'} --</option>
-                                {safes.map(s => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name}  —  [{fmtCurrency(s.balance)}]
-                                    </option>
-                                ))}
+                                <option value="">-- {isArabic ? 'اختر المصدر (خزينة أو عهدة موظف)' : 'Select Source (Safe or Custody)'} --</option>
+                                <optgroup label={isArabic ? '🏦 خزائن وحسابات الشركة' : 'Company Safes & Accounts'}>
+                                    {safes.filter(s => s.type !== 'CUSTODY').map(s => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.name}  —  [{fmtCurrency(s.balance)}]
+                                        </option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label={isArabic ? '🛡️ عهد الموظفين' : 'Member Custodies'}>
+                                    {safes.filter(s => s.type === 'CUSTODY').map(s => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.name}  —  [{fmtCurrency(s.balance)}]
+                                        </option>
+                                    ))}
+                                </optgroup>
                             </select>
                             {sourceSafe && (
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2103,18 +2194,27 @@ function TransferSafeModal({ safes, initialSourceSafeId, onClose, onSuccess }) {
 
                         {/* Destination Safe */}
                         <div className="form-group">
-                            <label>{isArabic ? 'إلى الخزينة / الحساب (الوجهة)' : 'To Safe / Account'} *</label>
+                            <label>{isArabic ? 'إلى الخزينة أو العهدة (الوجهة)' : 'To Safe or Custody (Destination)'} *</label>
                             <select
                                 value={toSafeId}
                                 onChange={(e) => setToSafeId(e.target.value)}
                                 required
                             >
-                                <option value="">-- {isArabic ? 'اختر الخزينة' : 'Select Destination'} --</option>
-                                {safes.filter(s => s.id !== fromSafeId).map(s => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name}  —  [{fmtCurrency(s.balance)}]
-                                    </option>
-                                ))}
+                                <option value="">-- {isArabic ? 'اختر الوجهة (خزينة أو عهدة موظف)' : 'Select Destination (Safe or Custody)'} --</option>
+                                <optgroup label={isArabic ? '🏦 خزائن وحسابات الشركة' : 'Company Safes & Accounts'}>
+                                    {safes.filter(s => s.type !== 'CUSTODY' && s.id !== fromSafeId).map(s => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.name}  —  [{fmtCurrency(s.balance)}]
+                                        </option>
+                                    ))}
+                                </optgroup>
+                                <optgroup label={isArabic ? '🛡️ عهد الموظفين' : 'Member Custodies'}>
+                                    {safes.filter(s => s.type === 'CUSTODY' && s.id !== fromSafeId).map(s => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.name}  —  [{fmtCurrency(s.balance)}]
+                                        </option>
+                                    ))}
+                                </optgroup>
                             </select>
                         </div>
 

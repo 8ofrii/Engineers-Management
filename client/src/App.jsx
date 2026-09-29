@@ -35,6 +35,9 @@ import BankStatementReview from './pages/BankStatementReview';
 import Billing from './pages/Billing';
 import PlatformPayments from './pages/PlatformPayments';
 import Landing from './pages/Landing';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import NotFound from './pages/NotFound';
 
 function App() {
     return (
@@ -258,7 +261,9 @@ function App() {
                         {/* Public marketing landing page */}
                         <Route path="/" element={<Landing />} />
                         {/* Catch-all → marketing page (logged-in users see "Open App" CTA) */}
-                        <Route path="*" element={<Navigate to="/" replace />} />
+                        <Route path="/terms" element={<TermsOfService />} />
+                        <Route path="/privacy" element={<PrivacyPolicy />} />
+                        <Route path="*" element={<NotFound />} />
                     </Routes>
                         </ErrorBoundary>
                 </BrowserRouter>

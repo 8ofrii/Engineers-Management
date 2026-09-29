@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Image as ImageIcon, Trash2, X } from 'lucide-react';
+import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Pencil, Image as ImageIcon, Trash2, X } from 'lucide-react';
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI, projectsAPI, transactionsAPI } from '../services/api';
@@ -177,6 +177,237 @@ export default function Workforce() {
 
     return (
         <Layout>
+            <style>{`
+                .workforce-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: var(--spacing-lg);
+                }
+                @media (max-width: 1100px) {
+                    .workforce-grid {
+                        grid-template-columns: repeat(2, minmax(0, 1fr));
+                    }
+                }
+                @media (max-width: 650px) {
+                    .workforce-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                .workman-card {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    padding: 20px;
+                    min-height: 240px;
+                    border-radius: 12px;
+                    background: var(--bg-card, #141416);
+                    border: 1px solid var(--border-color);
+                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                }
+                .workman-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+                }
+
+                .workman-card-header {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 12px;
+                    margin-bottom: 14px;
+                }
+                .workman-card-name {
+                    font-size: 1.15rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    line-height: 1.35;
+                    margin: 0;
+                    word-break: break-word;
+                }
+                .workman-card-subname {
+                    display: block;
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                    margin-top: 3px;
+                }
+
+                .workman-status-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 4px 10px;
+                    border-radius: 9999px;
+                    font-size: 0.72rem;
+                    font-weight: 600;
+                    letter-spacing: 0.3px;
+                    line-height: 1;
+                    flex-shrink: 0;
+                    white-space: nowrap;
+                }
+                .workman-status-badge.active {
+                    background: rgba(16, 185, 129, 0.12);
+                    border: 1px solid rgba(16, 185, 129, 0.28);
+                    color: #34d399;
+                }
+                .workman-status-badge.inactive {
+                    background: rgba(148, 163, 184, 0.1);
+                    border: 1px solid rgba(148, 163, 184, 0.25);
+                    color: #94a3b8;
+                }
+                body.light-mode .workman-status-badge.active {
+                    background: #ecfdf5;
+                    border-color: #a7f3d0;
+                    color: #065f46;
+                }
+                body.light-mode .workman-status-badge.inactive {
+                    background: var(--bg-tertiary);
+                    border-color: var(--border-color);
+                    color: var(--text-secondary);
+                }
+
+                .status-indicator-dot {
+                    width: 7px;
+                    height: 7px;
+                    border-radius: 50%;
+                    display: inline-block;
+                    flex-shrink: 0;
+                }
+                .status-indicator-dot.active {
+                    background-color: #10b981;
+                    box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+                }
+                .status-indicator-dot.inactive {
+                    background-color: #94a3b8;
+                }
+
+                .workman-card-stats {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-bottom: 16px;
+                    flex: 1;
+                }
+
+                .workman-stat-row {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 10px;
+                }
+
+                .workman-phone-pill {
+                    display: inline-block;
+                    direction: ltr;
+                    unicode-bidi: isolate;
+                    color: var(--text-primary);
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    padding: 3px 10px;
+                    border-radius: 6px;
+                    font-size: 0.82rem;
+                    font-weight: 600;
+                    text-decoration: none;
+                    transition: all 0.15s ease;
+                }
+                .workman-phone-pill:hover {
+                    background: rgba(255, 255, 255, 0.12);
+                    border-color: rgba(255, 255, 255, 0.22);
+                }
+                body.light-mode .workman-phone-pill {
+                    background: var(--bg-tertiary);
+                    border-color: var(--border-color);
+                    color: var(--text-primary);
+                }
+                body.light-mode .workman-phone-pill:hover {
+                    background: var(--bg-primary);
+                    border-color: var(--border-color-light);
+                }
+
+                .workman-rate-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    font-size: 0.78rem;
+                    font-weight: 600;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    background: var(--bg-tertiary);
+                    border: 1px solid var(--border-color);
+                    color: var(--text-primary);
+                }
+
+                .workman-kpi-box {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    background: rgba(16, 185, 129, 0.08);
+                    border: 1px solid rgba(16, 185, 129, 0.22);
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    margin-top: 2px;
+                }
+                body.light-mode .workman-kpi-box {
+                    background: rgba(16, 185, 129, 0.07);
+                    border-color: rgba(16, 185, 129, 0.25);
+                }
+
+                .workman-card-footer {
+                    margin-top: auto;
+                    padding-top: 14px;
+                    border-top: 1px solid var(--border-color);
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: 8px;
+                }
+                .workman-action-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 14px;
+                    font-size: 0.8rem;
+                    font-weight: 600;
+                    border-radius: 6px;
+                    border: 1px solid var(--border-color);
+                    background: rgba(255, 255, 255, 0.03);
+                    color: var(--text-secondary);
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+                .workman-action-btn:hover {
+                    color: var(--text-primary);
+                    background: rgba(255, 255, 255, 0.08);
+                    border-color: rgba(255, 255, 255, 0.2);
+                }
+                .workman-action-btn.delete {
+                    color: #f87171;
+                    border-color: rgba(239, 68, 68, 0.25);
+                    background: rgba(239, 68, 68, 0.05);
+                }
+                .workman-action-btn.delete:hover {
+                    background: rgba(239, 68, 68, 0.15);
+                    border-color: rgba(239, 68, 68, 0.45);
+                    color: #ef4444;
+                }
+                body.light-mode .workman-action-btn {
+                    border-color: var(--border-color);
+                    background: var(--bg-tertiary);
+                    color: var(--text-secondary);
+                }
+                body.light-mode .workman-action-btn:hover {
+                    background: var(--bg-primary);
+                    color: var(--text-primary);
+                    border-color: var(--border-color-light);
+                }
+                body.light-mode .workman-action-btn.delete {
+                    color: #dc2626;
+                    border-color: rgba(220, 38, 38, 0.28);
+                    background: rgba(220, 38, 38, 0.06);
+                }
+                body.light-mode .workman-action-btn.delete:hover {
+                    background: rgba(220, 38, 38, 0.12);
+                    border-color: rgba(220, 38, 38, 0.5);
+                }
+            `}</style>
             <div>
                 <div className="flex-between mb-xl flex-wrap gap-md">
                     <div>
@@ -364,157 +595,143 @@ export default function Workforce() {
                         </button>
                     </div>
                 ) : (
-                    <div className="grid grid-3">
-                        {filteredWorkmen.map((workman) => (
-                            <div key={workman.id} className="card" style={{ position: 'relative' }}>
-                                <div className="flex-between mb-md" style={{ alignItems: 'flex-start' }}>
-                                    <div>
-                                        <h3 style={{ marginBottom: '4px', fontSize: '1.1rem' }}>{workman.name}</h3>
-                                        {workman.nameAr && (
-                                            <p className="text-secondary" style={{ fontSize: '13px' }}>{workman.nameAr}</p>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-sm">
-                                        <span className={`badge ${workman.isActive ? 'badge-success' : 'badge-secondary'}`}>
-                                            {workman.isActive ? t('common.active') : t('common.inactive')}
+                    <div className="workforce-grid">
+                        {filteredWorkmen.map((workman) => {
+                            const workmanPhones = Array.isArray(workman.phones) && workman.phones.length > 0
+                                ? workman.phones.filter(Boolean)
+                                : (workman.phone ? [workman.phone] : []);
+
+                            return (
+                                <div key={workman.id} className="card workman-card">
+                                    {/* 1. Header: Name, Arabic Name, Status Badge */}
+                                    <div className="workman-card-header">
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <h3 className="workman-card-name" title={workman.name}>
+                                                {workman.name}
+                                            </h3>
+                                            {workman.nameAr && (
+                                                <span className="workman-card-subname">
+                                                    {workman.nameAr}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <span className={`workman-status-badge ${workman.isActive ? 'active' : 'inactive'}`}>
+                                            <span className={`status-indicator-dot ${workman.isActive ? 'active' : 'inactive'}`} />
+                                            <span>
+                                                {workman.isActive ? t('common.active') : t('common.inactive')}
+                                            </span>
                                         </span>
-                                        <button
-                                            onClick={() => {
-                                                setSelectedWorkman(workman);
-                                                setModalOpen(true);
-                                            }}
-                                            className="btn-icon"
-                                            style={{
-                                                width: '32px',
-                                                height: '32px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: 'var(--text-secondary)',
-                                                background: 'var(--bg-tertiary)',
-                                                border: '1px solid var(--border-color)',
-                                                borderRadius: 'var(--radius-md)',
-                                                marginLeft: '8px',
-                                                cursor: 'pointer'
-                                            }}
-                                            title={t('common.edit')}
-                                        >
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteClick(workman)}
-                                            className="btn-icon"
-                                            style={{
-                                                width: '32px',
-                                                height: '32px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#ef4444',
-                                                background: 'transparent',
-                                                border: '1px solid #ef4444',
-                                                borderRadius: 'var(--radius-md)',
-                                                marginLeft: '8px',
-                                                cursor: 'pointer'
-                                            }}
-                                            title={t('common.delete')}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
                                     </div>
-                                </div>
 
-                                <div className="flex gap-sm mb-md" style={{ flexWrap: 'wrap' }}>
-                                    <span
-                                        className="badge"
-                                        style={{
-                                            backgroundColor: (tradeColors[workman.trade] || tradeColors['OTHER']).bg,
-                                            color: (tradeColors[workman.trade] || tradeColors['OTHER']).text,
-                                            border: `1px solid ${(tradeColors[workman.trade] || tradeColors['OTHER']).border}`
-                                        }}
-                                    >
-                                        {workman.trade === 'OTHER' && workman.customTrade
-                                            ? workman.customTrade
-                                            : t(`labor.trades.${workman.trade}`)}
-                                    </span>
-                                    <span className="badge badge-info">
-                                        {formatCurrency(workman.dailyRate)}/day
-                                    </span>
-                                </div>
+                                    {/* 2. Stats / Body: Trade & Rate, Phones, National ID, Total Paid */}
+                                    <div className="workman-card-stats">
+                                        {/* Trade & Daily Rate */}
+                                        <div className="flex gap-xs items-center flex-wrap">
+                                            <span
+                                                className="badge"
+                                                style={{
+                                                    backgroundColor: (tradeColors[workman.trade] || tradeColors['OTHER']).bg,
+                                                    color: (tradeColors[workman.trade] || tradeColors['OTHER']).text,
+                                                    border: `1px solid ${(tradeColors[workman.trade] || tradeColors['OTHER']).border}`,
+                                                    fontSize: '0.78rem'
+                                                }}
+                                            >
+                                                {workman.trade === 'OTHER' && workman.customTrade
+                                                    ? workman.customTrade
+                                                    : t(`labor.trades.${workman.trade}`)}
+                                            </span>
+                                            <span className="workman-rate-badge">
+                                                {formatCurrency(workman.dailyRate)} / {t('labor.day', 'day')}
+                                            </span>
+                                        </div>
 
-                                <div className="divider"></div>
-
-                                <div style={{ display: 'grid', gap: '8px', fontSize: '14px' }}>
-                                    {(() => {
-                                        const workmanPhones = Array.isArray(workman.phones) && workman.phones.length > 0
-                                            ? workman.phones.filter(Boolean)
-                                            : (workman.phone ? [workman.phone] : []);
-                                        if (workmanPhones.length === 0) return null;
-                                        return (
-                                            <div className="flex gap-sm" style={{ color: 'var(--text-secondary)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                                                <Phone size={16} style={{ marginTop: '3px', flexShrink: 0 }} />
-                                                <div className="flex gap-xs" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                                        {/* Phone Numbers */}
+                                        {workmanPhones.length > 0 && (
+                                            <div className="workman-stat-row">
+                                                <Phone size={15} style={{ color: 'var(--text-tertiary)', marginTop: '3px', flexShrink: 0 }} />
+                                                <div className="flex gap-xs flex-wrap items-center">
                                                     {workmanPhones.map((p, idx) => (
                                                         <a
                                                             key={idx}
                                                             href={`tel:${p}`}
-                                                            style={{
-                                                                direction: 'ltr',
-                                                                display: 'inline-block',
-                                                                color: 'inherit',
-                                                                textDecoration: 'none',
-                                                                background: 'var(--bg-secondary)',
-                                                                padding: '2px 8px',
-                                                                borderRadius: '4px',
-                                                                fontSize: '12px',
-                                                                fontWeight: 500
-                                                            }}
-                                                            onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                                                            onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                                                            className="workman-phone-pill"
+                                                            title={t('common.call', 'Call')}
                                                         >
                                                             {p}
                                                         </a>
                                                     ))}
                                                 </div>
                                             </div>
-                                        );
-                                    })()}
-                                    {workman.nationalId && (
-                                        <div className="flex gap-sm" style={{ color: 'var(--text-secondary)' }}>
-                                            <CreditCard size={16} />
-                                            <span>{workman.nationalId}</span>
-                                        </div>
-                                    )}
-                                    {workman.nationalIdImage && (
-                                        <div
-                                            className="flex gap-sm items-center"
-                                            style={{ color: 'var(--color-primary)', cursor: 'pointer', userSelect: 'none' }}
-                                            onClick={() => setPreviewImage({
-                                                url: workman.nationalIdImage,
-                                                name: workman.name,
-                                                nationalId: workman.nationalId
-                                            })}
-                                        >
-                                            <ImageIcon size={16} />
-                                            <span style={{ textDecoration: 'underline' }}>{t('labor.viewId', 'عرض صورة البطاقة')}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex gap-sm" style={{
-                                        background: 'hsla(140, 70%, 45%, 0.12)',
-                                        border: '1px solid hsla(140, 70%, 45%, 0.25)',
-                                        borderRadius: 'var(--radius-md)',
-                                        padding: '8px 12px',
-                                        marginTop: 8
-                                    }}>
-                                        <DollarSign size={16} style={{ color: '#10b981', flexShrink: 0 }} />
-                                        <div>
-                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>{t('labor.totalPaid')}</div>
-                                            <div style={{ fontWeight: 800, color: '#10b981', fontSize: '1.05rem' }}>{formatCurrency(workman.totalPaid || 0)}</div>
+                                        )}
+
+                                        {/* National ID */}
+                                        {workman.nationalId && (
+                                            <div className="workman-stat-row" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                                <CreditCard size={15} style={{ color: 'var(--text-tertiary)', flexShrink: 0, marginTop: '2px' }} />
+                                                <span style={{ direction: 'ltr', unicodeBidi: 'isolate', fontFamily: 'monospace', fontWeight: 600 }}>
+                                                    {workman.nationalId}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* National ID Image Link */}
+                                        {workman.nationalIdImage && (
+                                            <div
+                                                className="flex gap-sm items-center"
+                                                style={{ color: 'var(--color-primary)', cursor: 'pointer', userSelect: 'none', fontSize: '0.82rem' }}
+                                                onClick={() => setPreviewImage({
+                                                    url: workman.nationalIdImage,
+                                                    name: workman.name,
+                                                    nationalId: workman.nationalId
+                                                })}
+                                            >
+                                                <ImageIcon size={15} style={{ flexShrink: 0 }} />
+                                                <span style={{ textDecoration: 'underline' }}>
+                                                    {t('labor.viewId', 'عرض صورة البطاقة')}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Total Paid KPI Box */}
+                                        <div className="workman-kpi-box">
+                                            <DollarSign size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                                            <div>
+                                                <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>
+                                                    {t('labor.totalPaid', 'TOTAL PAID')}
+                                                </div>
+                                                <div style={{ fontWeight: 800, color: '#10b981', fontSize: '1rem', lineHeight: 1.2 }}>
+                                                    {formatCurrency(workman.totalPaid || 0)}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {/* 3. Card Footer: Bottom Action Buttons */}
+                                    <div className="workman-card-footer">
+                                        <button
+                                            className="workman-action-btn edit"
+                                            onClick={() => {
+                                                setSelectedWorkman(workman);
+                                                setModalOpen(true);
+                                            }}
+                                            title={t('common.edit')}
+                                        >
+                                            <Pencil size={13} />
+                                            <span>{t('common.edit', 'Edit')}</span>
+                                        </button>
+                                        <button
+                                            className="workman-action-btn delete"
+                                            onClick={() => handleDeleteClick(workman)}
+                                            title={t('common.delete')}
+                                        >
+                                            <Trash2 size={13} />
+                                            <span>{t('common.delete', 'Delete')}</span>
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 
