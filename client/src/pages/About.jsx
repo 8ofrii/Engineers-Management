@@ -21,6 +21,7 @@ export default function About() {
   const light = theme === 'light';
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     document.body.classList.toggle('light-mode', light);
     localStorage.setItem('theme_preset', theme);
     localStorage.setItem('theme_preset_v3', theme);

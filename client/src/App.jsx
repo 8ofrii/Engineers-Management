@@ -4,6 +4,7 @@ import { AlertProvider } from './context/AlertContext';
 import { CopilotProvider } from './context/CopilotContext';
 import { PrivateRoute } from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
+import ScrollToTop from './components/ScrollToTop';
 
 // Pages
 import Login from './pages/Login';
@@ -48,6 +49,7 @@ function App() {
             <AlertProvider>
                 <CopilotProvider>
                     <BrowserRouter>
+                        <ScrollToTop />
                         <ErrorBoundary>
                             <Routes>
                         {/* Public Routes */}
