@@ -267,12 +267,12 @@ export default function FAQ() {
                 'لم تجد الإجابة التي تبحث عنها؟ يسعدنا تواصلك المباشر مع فريق الدعم الفني.'
               )}
             </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link to="/contact" className="nf-btn-primary">
+            <div className="faq-cta-actions">
+              <Link to="/contact" className="faq-cta-btn-primary">
                 <Mail size={16} />
                 <span>{T('Contact Support', 'تواصل مع الدعم')}</span>
               </Link>
-              <Link to="/signup" className="nf-btn-ghost">
+              <Link to="/signup" className="faq-cta-btn-secondary">
                 <Rocket size={16} />
                 <span>{T('Start Free Trial', 'ابدأ التجربة المجانية')}</span>
               </Link>
