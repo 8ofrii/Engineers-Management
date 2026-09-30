@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { projectsAPI, documentsAPI } from '../services/api';
@@ -6,7 +7,7 @@ import { FolderKanban, Plus, Pencil, Trash2, Receipt, X, AlertTriangle, FileText
 import { useAlert } from '../context/AlertContext';
 import Layout from '../components/Layout';
 import AddProjectModal from '../components/AddProjectModal';
-import { useFormat } from '../utils/format';
+import { useFormat, getLocalizedName, getLocalizedSubName } from '../utils/format';
 
 export default function Projects() {
     const { t, i18n } = useTranslation();
@@ -135,7 +136,7 @@ export default function Projects() {
                 deleteTransactions: deleteRelatedTransactions
             });
             const deletedTxCount = res.data?.data?.deletedTransactionsCount || 0;
-            const targetName = deleteProjectTarget.name;
+            const targetName = getLocalizedName(deleteProjectTarget, isArabic);
             setDeleteProjectTarget(null);
             showAlert({
                 type: 'success',
@@ -257,7 +258,12 @@ export default function Projects() {
                             }}>
                                 <div className="flex-between mb-md">
                                     <div className="flex flex-col">
-                                        <h3>{project.name}</h3>
+                                        <h3>{getLocalizedName(project, isArabic)}</h3>
+                                        {getLocalizedSubName(project, isArabic) && (
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '-2px', marginBottom: '2px' }}>
+                                                {getLocalizedSubName(project, isArabic)}
+                                            </span>
+                                        )}
                                         {project.projectSafeBalance < 0 && (
                                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#f87171', fontSize: '0.75rem', fontWeight: 'bold' }}>
                                                 <AlertTriangle size={13} />
@@ -420,7 +426,7 @@ export default function Projects() {
                                             padding: '8px 12px',
                                             fontSize: '0.85rem'
                                         }}
-                                        onClick={() => viewProjectTransactions(project.id, project.name)}
+                                        onClick={() => viewProjectTransactions(project.id, getLocalizedName(project, isArabic))}
                                     >
                                         <Receipt size={15} />
                                         <span>{t('projects.viewTransactions')}</span>
@@ -441,7 +447,7 @@ export default function Projects() {
             />
 
             {/* Delete Project Confirmation Modal with Related Transactions Option */}
-            {deleteProjectTarget && (
+            {deleteProjectTarget && createPortal(
                 <div className="modal-overlay" onClick={() => !isDeleting && setDeleteProjectTarget(null)}>
                     <div 
                         className="modal-container" 
@@ -476,7 +482,7 @@ export default function Projects() {
                             </h2>
 
                             <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '20px', lineHeight: '1.6' }}>
-                                {t('common.deleteConfirmMessage', 'هل أنت متأكد من رغبتك في حذف')} <strong style={{ color: 'var(--text-primary)' }}>"{deleteProjectTarget.name}"</strong>؟
+                                {t('common.deleteConfirmMessage', 'هل أنت متأكد من رغبتك في حذف')} <strong style={{ color: 'var(--text-primary)' }}>"{getLocalizedName(deleteProjectTarget, isArabic)}"</strong>؟
                             </p>
 
                             {/* Option to delete related transactions */}
@@ -541,7 +547,8 @@ export default function Projects() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </Layout >
     );

@@ -62,6 +62,7 @@ model User {
   email                 String
   password              String
   name                  String
+  nameAr                String?
   role                  UserRole          @default(ENGINEER)
   company               String?
   phone                 String?
@@ -138,6 +139,7 @@ model Role {
 model Client {
   id              String        @id @default(uuid())
   name            String
+  nameAr          String?
   email           String?
   phone           String
   phones          String[]      @default([])
@@ -168,6 +170,7 @@ model Client {
 model Supplier {
   id           String           @id @default(uuid())
   name         String
+  nameAr       String?
   email        String
   phone        String
   phones       String[]         @default([])
@@ -202,6 +205,7 @@ model Supplier {
 model Project {
   id                   String               @id @default(uuid())
   name                 String
+  nameAr               String?
   description          String?
   status               ProjectStatus        @default(PLANNING)
   projectType          ProjectType          @default(OTHER)
@@ -247,6 +251,7 @@ model ProjectCostItem {
   projectId      String
   project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name           String
+  nameAr         String?
   totalQuantity  Decimal?      @db.Decimal(15, 2)
   unitOfMeasure  String?
   unitPrice      Decimal?      @db.Decimal(15, 2)
@@ -389,6 +394,7 @@ model Transaction {
   type              TransactionType
   category          TransactionCategory
   amount            Decimal             @db.Decimal(15, 2)
+  totalDueAmount    Decimal?            @db.Decimal(15, 2)
   description       String
   descriptionAr     String?
   debit             Decimal?            @db.Decimal(15, 2)
@@ -782,6 +788,12 @@ enum WorkmanTrade {
   GYPSUM
   ALUMINUM
   BLACKSMITH
+  IRON_WORKER
+  STOCKING_WORKER
+  MARBLE_CRAFTSMAN
+  CONCRETE_CUTTING
+  GUARD
+  MUNICIPAL_EMPLOYEE
 }
 
 enum WorkmanshipStatus {
@@ -1181,6 +1193,7 @@ model CompanySafe {
   currency       String          @default("EGP")
   isDefault      Boolean         @default(false)
   isActive       Boolean         @default(true)
+  isCustody      Boolean         @default(false)
   description    String?
   assignedUserId String?
   assignedUser   User?           @relation("AssignedSafeUser", fields: [assignedUserId], references: [id], onDelete: SetNull)

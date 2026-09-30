@@ -10,7 +10,7 @@ import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
 import RefundConfirmationModal from '../components/RefundConfirmationModal';
 import TransactionDetailModal from '../components/TransactionDetailModal';
 import TransactionActionsMenu from '../components/TransactionActionsMenu';
-import { useFormat, cleanTransactionDescription } from '../utils/format';
+import { useFormat, cleanTransactionDescription, getLocalizedName } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 import { apiErrorMessage } from '../utils/apiError';
 import { parseReceiptUrls } from '../utils/media';
@@ -323,11 +323,14 @@ export default function Finance() {
             const s = suppliers.find(x => x.id === targetId);
             if (s) {
                 const sName = (s.name || '').trim().toLowerCase();
+                const sNameAr = (s.nameAr || '').trim().toLowerCase();
                 const sCompany = (s.company || '').trim().toLowerCase();
                 const b = (tx.beneficiary || '').trim().toLowerCase();
                 const to = (tx.transactionTo || '').trim().toLowerCase();
                 const spName = (tx.supplier?.name || '').trim().toLowerCase();
+                const spNameAr = (tx.supplier?.nameAr || '').trim().toLowerCase();
                 if (sName && (b.includes(sName) || to.includes(sName) || spName.includes(sName))) return true;
+                if (sNameAr && (b.includes(sNameAr) || to.includes(sNameAr) || spNameAr.includes(sNameAr))) return true;
                 if (sCompany && (b.includes(sCompany) || to.includes(sCompany))) return true;
             }
             return false;
@@ -341,8 +344,11 @@ export default function Finance() {
         try {
             setLoading(true);
             const params = {};
-            if (filterType !== 'ALL' && filterType !== 'COMPANY_SHARE' && filterType !== 'MY_LEDGER') {
+            if (filterType !== 'ALL' && filterType !== 'COMPANY_SHARE' && filterType !== 'MY_LEDGER' && !(filterType === 'INCOME' && filterProjectId === 'OFFICE')) {
                 params.type = filterType;
+            }
+            if (filterProjectId) {
+                params.filterProjectId = filterProjectId;
             }
 
             const response = await transactionsAPI.getAll(params);
@@ -366,13 +372,13 @@ export default function Finance() {
                 // Pure site expenses (exclude internal management fee ledger records)
                 allTx = allTx.filter(tx => tx.type === 'EXPENSE' && tx.category !== 'MANAGEMENT_FEE_TRANSFER');
             } else if (filterType === 'INCOME') {
-                allTx = allTx.filter(tx => tx.type === 'INCOME');
+                allTx = allTx.filter(tx => tx.type === 'INCOME' || (filterProjectId === 'OFFICE' && tx.category === 'MANAGEMENT_FEE_TRANSFER'));
             }
 
             // Filter by project
             if (filterProjectId) {
                 if (filterProjectId === 'OFFICE') {
-                    allTx = allTx.filter(tx => tx.isOfficeExpense || !tx.projectId);
+                    allTx = allTx.filter(tx => tx.isOfficeExpense || !tx.projectId || tx.category === 'MANAGEMENT_FEE_TRANSFER');
                 } else {
                     allTx = allTx.filter(tx => tx.projectId === filterProjectId);
                 }
@@ -688,8 +694,8 @@ export default function Finance() {
                     : (tx.category || ''));
 
             const beneficiaryVal = tx.type === 'INCOME'
-                ? (tx.client?.name || tx.project?.client?.name || '')
-                : (tx.beneficiary || tx.supplier?.name || tx.workman?.name || '');
+                ? (getLocalizedName(tx.client, isArabic) || getLocalizedName(tx.project?.client, isArabic) || '')
+                : (tx.beneficiary || getLocalizedName(tx.supplier, isArabic) || getLocalizedName(tx.workman, isArabic) || '');
 
             const numAmount = Number(Number(tx.amount || 0).toFixed(2));
             totalAmountSum += numAmount;
@@ -698,11 +704,11 @@ export default function Finance() {
                 idx + 1,
                 formatDate(tx.transactionDate || tx.createdAt),
                 txType,
-                tx.project?.name || (isArabic ? 'عام / المقر' : 'General / HQ'),
+                getLocalizedName(tx.project, isArabic) || (isArabic ? 'عام / المقر' : 'General / HQ'),
                 catLabel,
                 tx.description || '',
-                tx.projectCostItem?.name || '',
-                tx.paidByClientContact || tx.transactionFrom || tx.payer?.name || tx.user?.name || '',
+                getLocalizedName(tx.projectCostItem, isArabic) || '',
+                tx.paidByClientContact || tx.transactionFrom || getLocalizedName(tx.payer, isArabic) || getLocalizedName(tx.user, isArabic) || '',
                 beneficiaryVal,
                 tx.transactionTo || '',
                 pMethod,
@@ -710,7 +716,7 @@ export default function Finance() {
                 status,
                 tx.physicalAccount || '',
                 tx.costCenter || '',
-                tx.creator?.name || ''
+                getLocalizedName(tx.creator, isArabic) || ''
             ]);
         });
 
@@ -954,9 +960,51 @@ export default function Finance() {
         );
     };
 
+    const getFeePercent = (tx, feeTx = null) => {
+        // 1. Try extracting percentage from description e.g. "(15%)" or "(10%)"
+        if (feeTx?.description) {
+            const match = feeTx.description.match(/\((\d+(?:\.\d+)?)%\)/);
+            if (match) return match[1];
+        }
+        if (tx?.description) {
+            const match = tx.description.match(/\((\d+(?:\.\d+)?)%\)/);
+            if (match) return match[1];
+        }
+        // 2. Try calculating percentage from fee amount / expense amount
+        if (feeTx && tx && Number(tx.amount) > 0) {
+            const pct = Math.round((Number(feeTx.amount) / Number(tx.amount)) * 100);
+            if (!isNaN(pct) && pct > 0) return pct;
+        }
+        if (tx?.nestedFees && tx.nestedFees.length > 0 && Number(tx.amount) > 0) {
+            const feeAmt = Number(tx.nestedFees[0].amount);
+            const pct = Math.round((feeAmt / Number(tx.amount)) * 100);
+            if (!isNaN(pct) && pct > 0) return pct;
+        }
+        // 3. Lookup project management fee percent
+        const proj = tx?.project || (tx?.projectId ? projects.find(p => p.id === tx.projectId) : null);
+        if (proj?.managementFeePercent !== undefined && proj?.managementFeePercent !== null) {
+            return proj.managementFeePercent;
+        }
+        return 10;
+    };
+
     const renderPayerOrClient = (tx) => {
+        if (tx.category === 'MANAGEMENT_FEE_TRANSFER') {
+            const projName = getLocalizedName(tx.project, isArabic) || 'الجزار2';
+            return (
+                <div style={{ lineHeight: 1.35 }}>
+                    <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '0.84rem' }} className="truncate">
+                        {isArabic ? `خزينة ${projName}` : `${projName} Safe`}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '2px', fontWeight: '600' }} className="truncate">
+                        {isArabic ? '➔ أرباح المقر الرئيسي' : '➔ HQ Office Profit'}
+                    </div>
+                </div>
+            );
+        }
+
         if (tx.type === 'INCOME') {
-            const clientName = tx.client?.name || tx.project?.client?.name || '';
+            const clientName = getLocalizedName(tx.client, isArabic) || getLocalizedName(tx.project?.client, isArabic) || '';
             const payerRep = tx.paidByClientContact || (tx.transactionFrom && tx.transactionFrom !== clientName ? tx.transactionFrom : '');
             return (
                 <div style={{ lineHeight: 1.35 }}>
@@ -971,8 +1019,8 @@ export default function Finance() {
                 </div>
             );
         } else {
-            const payer = tx.payer?.name || tx.user?.name || '';
-            const beneficiary = tx.beneficiary || tx.supplier?.name || tx.workman?.name || '';
+            const payer = getLocalizedName(tx.payer, isArabic) || getLocalizedName(tx.user, isArabic) || '';
+            const beneficiary = tx.beneficiary || getLocalizedName(tx.supplier, isArabic) || getLocalizedName(tx.workman, isArabic) || '';
             const recipient = tx.transactionTo || '';
             return (
                 <div style={{ lineHeight: 1.35 }}>
@@ -1380,7 +1428,7 @@ export default function Finance() {
                                 <option value="ALL">{t('common.allProjects') || 'المشاريع (الكل)'}</option>
                                 <option value="OFFICE">🏢 {isArabic ? 'المكتب / المقر الرئيسي' : 'Office / Headquarters'}</option>
                                 {projects.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                    <option key={p.id} value={p.id}>{getLocalizedName(p, isArabic)}</option>
                                 ))}
                             </select>
 
@@ -1425,7 +1473,7 @@ export default function Finance() {
                                                     : (t('teamManagement.roles.' + roleKey, { lng: 'en' }) || u.role);
                                                 return (
                                                     <option key={'paid-by-member-' + u.id} value={'MEMBER:' + u.id}>
-                                                        {u.name}{roleName ? ' (' + roleName + ')' : ''}
+                                                        {getLocalizedName(u, isArabic)}{roleName ? ' (' + roleName + ')' : ''}
                                                     </option>
                                                 );
                                             })}
@@ -1438,7 +1486,7 @@ export default function Finance() {
                                                 const extra = c.company || c.phone || '';
                                                 return (
                                                     <option key={'paid-by-client-' + c.id} value={'CLIENT:' + c.id}>
-                                                        {c.name}{extra ? ' (' + extra + ')' : ''}
+                                                        {getLocalizedName(c, isArabic)}{extra ? ' (' + extra + ')' : ''}
                                                     </option>
                                                 );
                                             })}
@@ -1517,7 +1565,7 @@ export default function Finance() {
                                                     : (t('labor.trades.' + tradeKey, { lng: 'en' }) || w.trade);
                                                 return (
                                                     <option key={'paid-to-workman-' + w.id} value={'WORKMAN:' + w.id}>
-                                                        {w.name}{tradeName ? ' (' + tradeName + ')' : ''}
+                                                        {getLocalizedName(w, isArabic)}{tradeName ? ' (' + tradeName + ')' : ''}
                                                     </option>
                                                 );
                                             })}
@@ -1539,7 +1587,7 @@ export default function Finance() {
                                                 }
                                                 return (
                                                     <option key={'paid-to-supplier-' + s.id} value={'SUPPLIER:' + s.id}>
-                                                        {s.name}{catDisplay ? ' (' + catDisplay + ')' : ''}
+                                                        {getLocalizedName(s, isArabic)}{catDisplay ? ' (' + catDisplay + ')' : ''}
                                                     </option>
                                                 );
                                             })}
@@ -2337,7 +2385,7 @@ export default function Finance() {
                                                 <tr key={tx.id} className="tx-row" style={{ background: 'hsla(38, 92%, 50%, 0.05)' }}>
                                                     <td style={{ textAlign: 'start', fontWeight: '500', fontSize: '0.82rem' }}>{formatDate(tx.transactionDate)}</td>
                                                     <td style={{ textAlign: 'start' }}>
-                                                        {tx.project?.name || (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر' : '🏢 Office & HQ') : '-')}
+                                                        {getLocalizedName(tx.project, isArabic) || (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر' : '🏢 Office & HQ') : '-')}
                                                     </td>
                                                     <td style={{ textAlign: 'start', fontWeight: '600' }}>
                                                         {(tx.category === 'OTHER' && tx.description && (tx.description.startsWith('Other - ') || tx.description.startsWith('أخرى - ')))
@@ -2351,10 +2399,47 @@ export default function Finance() {
                                                     <td style={{ textAlign: 'start' }}>
                                                          {renderPaymentMethod(tx.paymentMethod, tx)}
                                                      </td>
-                                                     <td style={{ textAlign: 'end', fontWeight: '700', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
-                                                         {fmtCurrency(tx.amount)}
+                                                     <td style={{ textAlign: 'end', fontWeight: '700', fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                                                         <div>{fmtCurrency(tx.amount)}</div>
+                                                         {Boolean(tx.totalDueAmount && Number(tx.totalDueAmount) !== Number(tx.amount)) && (
+                                                             <div style={{ marginTop: '2px', display: 'flex', justifyContent: 'flex-end' }}>
+                                                                 {Number(tx.totalDueAmount) > Number(tx.amount) ? (
+                                                                     <span style={{
+                                                                         fontSize: '0.68rem',
+                                                                         fontWeight: 700,
+                                                                         padding: '1px 6px',
+                                                                         borderRadius: '4px',
+                                                                         background: 'rgba(245, 158, 11, 0.15)',
+                                                                         color: '#d97706',
+                                                                         border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                                         display: 'inline-flex',
+                                                                         alignItems: 'center',
+                                                                         gap: '2px'
+                                                                     }} title={isArabic ? `إجمالي المستحق: ${fmtCurrency(tx.totalDueAmount)} | متبقي غير مسوى: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}` : `Total Due: ${fmtCurrency(tx.totalDueAmount)} | Remaining: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}`}>
+                                                                         <span>⚠️</span>
+                                                                         <span>{isArabic ? `باقي: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}` : `Due: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}`}</span>
+                                                                     </span>
+                                                                 ) : (
+                                                                     <span style={{
+                                                                         fontSize: '0.68rem',
+                                                                         fontWeight: 700,
+                                                                         padding: '1px 6px',
+                                                                         borderRadius: '4px',
+                                                                         background: 'rgba(59, 130, 246, 0.15)',
+                                                                         color: '#2563eb',
+                                                                         border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                                         display: 'inline-flex',
+                                                                         alignItems: 'center',
+                                                                         gap: '2px'
+                                                                     }} title={isArabic ? `إجمالي المستحق: ${fmtCurrency(tx.totalDueAmount)} | دفعة زائدة: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}` : `Total Due: ${fmtCurrency(tx.totalDueAmount)} | Overpaid: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}`}>
+                                                                         <span>ℹ️</span>
+                                                                         <span>{isArabic ? `زائد: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}` : `Over: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}`}</span>
+                                                                     </span>
+                                                                 )}
+                                                             </div>
+                                                         )}
                                                      </td>
-                                                     <td style={{ textAlign: 'start' }}>{tx.creator?.name || '-'}</td>
+                                                     <td style={{ textAlign: 'start' }}>{getLocalizedName(tx.creator, isArabic) || '-'}</td>
                                                      <td style={{ textAlign: 'center' }}>
                                                          <div className="tx-action-group">
                                                              <button
@@ -2396,15 +2481,15 @@ export default function Finance() {
                             const sortedTransactions = sortTransactionList(transactions, sortField, sortOrder);
 
                             sortedTransactions.forEach((tx) => {
-                                const isOffice = Boolean(tx.isOfficeExpense || !tx.projectId || !tx.project);
+                                const isOffice = Boolean(filterProjectId === 'OFFICE' || tx.isOfficeExpense || !tx.projectId || !tx.project);
                                 const groupKey = isOffice ? '__OFFICE__' : (tx.project?.id || tx.project?.name || '__UNASSIGNED__');
 
                                 if (!groupMap.has(groupKey)) {
                                     let displayName;
                                     if (isOffice) {
-                                        displayName = isArabic ? 'مصروفات المقر والشركة' : 'Office & HQ Expenses';
-                                    } else if (tx.project?.name) {
-                                        displayName = tx.project.name;
+                                        displayName = isArabic ? 'المقر الرئيسي والمكتب (أرباح ومصروفات)' : 'Headquarters & Office Finances';
+                                    } else if (tx.project) {
+                                        displayName = getLocalizedName(tx.project, isArabic);
                                     } else {
                                         displayName = t('common.unassigned') || (isArabic ? 'غير محدد' : 'Unassigned');
                                     }
@@ -2443,6 +2528,13 @@ export default function Finance() {
                                         return sum + impact;
                                     } else if (filterType === 'COMPANY_SHARE') {
                                         return sum + Number(tx.amount || 0);
+                                    } else if (isOffice) {
+                                        // Office HQ logic: Recognized management fees and direct incomes are (+), office expenses are (-)
+                                        if (tx.category === 'MANAGEMENT_FEE_TRANSFER' || tx.type === 'INCOME') {
+                                            return sum + Number(tx.amount || 0);
+                                        } else {
+                                            return sum - Number(tx.amount || 0);
+                                        }
                                     } else {
                                         // Standard project logic
                                         return sum + (tx.type === 'INCOME' ? Number(tx.amount) : -Number(tx.amount));
@@ -2479,12 +2571,12 @@ export default function Finance() {
                                                 {filterType === 'MY_LEDGER'
                                                     ? (t('finance.myNetCustody') || 'صافي العهدة')
                                                     : filterType === 'COMPANY_SHARE'
-                                                    ? (t('finance.totalCompanyShare') || (isArabic ? 'إجمالي ارباح المكتب' : 'Total Office Profit'))
+                                                    ? (t('finance.totalCompanyShare') || (isArabic ? 'إجمالي أرباح المكتب' : 'Total Office Profit'))
                                                     : isOffice
-                                                    ? (isArabic ? 'إجمالي مصروفات المقر' : 'Total Office Expenses')
+                                                    ? (isArabic ? 'صافي أرباح وإيرادات المقر' : 'Net HQ Profit & Income')
                                                     : (t('finance.projectNet') || 'صافي المشروع')}:
                                                 <span className={`project-net-val ${totalAmount >= 0 ? 'positive' : 'negative'}`}>
-                                                    {fmtCurrency(Math.abs(totalAmount))}
+                                                    {totalAmount < 0 ? '- ' : '+ '}{fmtCurrency(Math.abs(totalAmount))}
                                                 </span>
                                             </div>
                                         </div>
@@ -2532,8 +2624,8 @@ export default function Finance() {
                                                                         {/* 2. Type */}
                                                                         <td style={{ textAlign: 'center' }}>
                                                                             {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (
-                                                                                <span className="badge-type-pill profit">
-                                                                                    {isArabic ? 'أرباح مكتب' : 'PROFIT'}
+                                                                                <span className="badge-type-pill profit" title={isArabic ? 'أرباح مستحقة للمقر' : 'HQ Profit'}>
+                                                                                    {isArabic ? (isOffice ? 'إيراد أرباح' : 'أرباح مكتب') : 'PROFIT'}
                                                                                 </span>
                                                                             ) : (
                                                                                 <span className={`badge-type-pill ${tx.type === 'INCOME' ? 'income' : 'expense'}`}>
@@ -2545,7 +2637,10 @@ export default function Finance() {
                                                                         {/* 3. Category */}
                                                                         <td style={{ textAlign: 'start', fontWeight: '600', fontSize: '0.84rem' }}>
                                                                             <div className="truncate" title={catLabel}>
-                                                                                {catLabel}
+                                                                                {tx.category === 'MANAGEMENT_FEE_TRANSFER' ? (() => {
+                                                                                    const feePct = getFeePercent(tx);
+                                                                                    return isArabic ? `أتعاب كوست بلس (+${feePct}%)` : `Cost-Plus Fee (+${feePct}%)`;
+                                                                                })() : catLabel}
                                                                             </div>
                                                                         </td>
 
@@ -2567,11 +2662,14 @@ export default function Finance() {
                                                                                         #{tx.projectCostItem.name}
                                                                                     </span>
                                                                                 )}
-                                                                                {hasNestedFees && (
-                                                                                    <span className="fee-included-tag" title={isArabic ? 'يتضمن أتعاب إدارة كوست بلس (+10%)' : 'Includes Cost-Plus Fee (+10%)'}>
-                                                                                        {isArabic ? '+10% أتعاب' : '+10% Fee'}
-                                                                                    </span>
-                                                                                )}
+                                                                                {hasNestedFees && (() => {
+                                                                                    const feePct = getFeePercent(tx, tx.nestedFees?.[0]);
+                                                                                    return (
+                                                                                        <span className="fee-included-tag" title={isArabic ? `يتضمن أتعاب إدارة كوست بلس (+${feePct}%)` : `Includes Cost-Plus Fee (+${feePct}%)`}>
+                                                                                            {isArabic ? `+${feePct}% أتعاب` : `+${feePct}% Fee`}
+                                                                                        </span>
+                                                                                    );
+                                                                                })()}
                                                                             </div>
                                                                         </td>
 
@@ -2587,9 +2685,46 @@ export default function Finance() {
 
                                                                         {/* 7. Amount */}
                                                                         <td style={{ textAlign: 'end', fontWeight: '700', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', textDecoration: isCancelled ? 'line-through' : 'none' }}>
-                                                                            <span className={`tx-amount ${tx.type === 'INCOME' ? 'income' : 'expense'}`}>
-                                                                                {tx.type === 'INCOME' ? '+ ' : ''}{fmtCurrency(tx.amount)}
+                                                                            <span className={`tx-amount ${(tx.type === 'INCOME' || (isOffice && tx.category === 'MANAGEMENT_FEE_TRANSFER')) ? 'income' : 'expense'}`}>
+                                                                                {(tx.type === 'INCOME' || (isOffice && tx.category === 'MANAGEMENT_FEE_TRANSFER')) ? '+ ' : ''}{fmtCurrency(tx.amount)}
                                                                             </span>
+                                                                            {Boolean(tx.totalDueAmount && Number(tx.totalDueAmount) !== Number(tx.amount)) && (
+                                                                                <div style={{ marginTop: '2px', display: 'flex', justifyContent: 'flex-end' }}>
+                                                                                    {Number(tx.totalDueAmount) > Number(tx.amount) ? (
+                                                                                        <span style={{
+                                                                                            fontSize: '0.68rem',
+                                                                                            fontWeight: 700,
+                                                                                            padding: '1px 6px',
+                                                                                            borderRadius: '4px',
+                                                                                            background: 'rgba(245, 158, 11, 0.15)',
+                                                                                            color: '#d97706',
+                                                                                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                                                            display: 'inline-flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: '2px'
+                                                                                        }} title={isArabic ? `إجمالي المستحق: ${fmtCurrency(tx.totalDueAmount)} | متبقي غير مسوى: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}` : `Total Due: ${fmtCurrency(tx.totalDueAmount)} | Remaining: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}`}>
+                                                                                            <span>⚠️</span>
+                                                                                            <span>{isArabic ? `باقي: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}` : `Due: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}`}</span>
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span style={{
+                                                                                            fontSize: '0.68rem',
+                                                                                            fontWeight: 700,
+                                                                                            padding: '1px 6px',
+                                                                                            borderRadius: '4px',
+                                                                                            background: 'rgba(59, 130, 246, 0.15)',
+                                                                                            color: '#2563eb',
+                                                                                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                                                            display: 'inline-flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: '2px'
+                                                                                        }} title={isArabic ? `إجمالي المستحق: ${fmtCurrency(tx.totalDueAmount)} | دفعة زائدة: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}` : `Total Due: ${fmtCurrency(tx.totalDueAmount)} | Overpaid: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}`}>
+                                                                                            <span>ℹ️</span>
+                                                                                            <span>{isArabic ? `زائد: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}` : `Over: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}`}</span>
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
                                                                         </td>
 
                                                                         {/* 8. Status */}
@@ -2650,7 +2785,10 @@ export default function Finance() {
                                                                                 {/* 3. Category: Cost-Plus Fee with Sub-tree Indicator */}
                                                                                 <td style={{ textAlign: 'start', fontSize: '0.71rem' }} className="nested-fee-category">
                                                                                     <span style={{ opacity: 0.55, marginInlineEnd: '4px', display: 'inline-block', transform: isArabic ? 'scaleX(-1)' : 'none' }}>↳</span>
-                                                                                    {isArabic ? 'أتعاب كوست بلس (+10%)' : 'Cost-Plus Fee (+10%)'}
+                                                                                    {(() => {
+                                                                                        const feePct = getFeePercent(tx, feeTx);
+                                                                                        return isArabic ? `أتعاب كوست بلس (+${feePct}%)` : `Cost-Plus Fee (+${feePct}%)`;
+                                                                                    })()}
                                                                                 </td>
 
                                                                                 {/* 4. Description: Subordinate Auto-deducted Note */}

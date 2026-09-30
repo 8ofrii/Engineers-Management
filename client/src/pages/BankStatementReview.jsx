@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -322,7 +323,7 @@ function ManualPickerModal({ isOpen, row, onClose, onPick, currency }) {
 
     if (!isOpen || !row) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: 720 }}>
                 <div className="modal-header">
@@ -354,6 +355,7 @@ function ManualPickerModal({ isOpen, row, onClose, onPick, currency }) {
                     ))}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

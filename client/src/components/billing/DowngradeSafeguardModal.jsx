@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
     AlertTriangle, ShieldAlert, X, CheckCircle2, 
     Loader2, Clock, 
@@ -76,7 +77,7 @@ export default function DowngradeSafeguardModal({
     const currentPlanName = isAr && currentPlan?.nameAr ? currentPlan.nameAr : (currentPlan?.name || 'Premium Plan');
     const targetPlanName = isAr && targetPlan?.nameAr ? targetPlan.nameAr : (targetPlan?.name || 'Free Plan');
 
-    return (
+    return createPortal(
         <div style={{
             position: 'fixed',
             inset: 0,
@@ -529,6 +530,7 @@ export default function DowngradeSafeguardModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

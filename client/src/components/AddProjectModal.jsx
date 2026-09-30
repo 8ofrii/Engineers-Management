@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X, Plus, Upload, FileText, Trash2 } from 'lucide-react';
 import { clientsAPI, userAPI } from '../services/api';
@@ -25,6 +26,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
 
     const [formData, setFormData] = useState({
         name: '',
+        nameAr: '',
         description: '',
         status: 'PLANNING',
         projectType: 'OTHER',
@@ -50,8 +52,17 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
             loadEngineers();
             if (initialData) {
                 const isCompleted = initialData.status?.toUpperCase() === 'COMPLETED';
+                let initName = (initialData.name || '').trim();
+                let initNameAr = (initialData.nameAr || '').trim();
+
+                if (/[\u0600-\u06FF]/.test(initName) && !initNameAr) {
+                    initNameAr = initName;
+                    initName = '';
+                }
+
                 setFormData({
-                    name: initialData.name || '',
+                    name: initName,
+                    nameAr: initNameAr,
                     description: initialData.description || '',
                     status: initialData.status || 'PLANNING',
                     projectType: initialData.projectType || 'OTHER',
@@ -60,7 +71,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     endDate: initialData.endDate ? initialData.endDate.split('T')[0] : '',
                     budget: initialData.budget || '',
                     revenueModel: initialData.revenueModel || 'EXECUTION_COST_PLUS',
-                    managementFeePercent: initialData.managementFeePercent || '20',
+                    managementFeePercent: (initialData.managementFeePercent !== undefined && initialData.managementFeePercent !== null && initialData.managementFeePercent !== '') ? String(initialData.managementFeePercent) : '20',
                     totalContractValue: initialData.totalContractValue || '',
                     paymentTerms: initialData.paymentTerms || 'Net 30',
                     clientId: initialData.clientId || initialData.client?.id || '',
@@ -76,6 +87,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                 } else {
                     setFormData({
                         name: '',
+                        nameAr: '',
                         description: '',
                         status: 'PLANNING',
                         projectType: 'OTHER',
@@ -152,6 +164,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
         clearFormDraft(PROJECT_DRAFT_KEY);
         setFormData({
             name: '',
+            nameAr: '',
             description: '',
             status: 'PLANNING',
             projectType: 'OTHER',
@@ -173,12 +186,12 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
     const validate = () => {
         const newErrors = {};
 
-        if (!formData.name.trim()) newErrors.name = t('projects.modal.fields.name') + ' is required';
+        if (!formData.name?.trim() && !formData.nameAr?.trim()) newErrors.name = t('projects.modal.fields.name') + ' is required';
         if (!formData.clientId) newErrors.clientId = t('projects.modal.options.selectClient');
         if (!formData.startDate) newErrors.startDate = t('projects.modal.fields.startDate') + ' is required';
 
         if (formData.revenueModel === 'EXECUTION_COST_PLUS') {
-            if (!formData.managementFeePercent || formData.managementFeePercent <= 0) {
+            if (formData.managementFeePercent === '' || formData.managementFeePercent === null || formData.managementFeePercent === undefined || isNaN(Number(formData.managementFeePercent)) || Number(formData.managementFeePercent) < 0) {
                 newErrors.managementFeePercent = t('projects.modal.fields.managementFee') + ' is required';
             }
         }
@@ -221,7 +234,27 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
             if (!initialData) {
                 clearFormDraft(PROJECT_DRAFT_KEY);
             }
-            onSubmit(formData, contractFile ? {
+            let rawName = formData.name?.trim() || '';
+            let rawNameAr = formData.nameAr?.trim() || '';
+
+            // If user swapped them (Arabic in name, English in nameAr)
+            if (/[\u0600-\u06FF]/.test(rawName) && /[A-Za-z]/.test(rawNameAr)) {
+                const temp = rawName;
+                rawName = rawNameAr;
+                rawNameAr = temp;
+            } else if (/[\u0600-\u06FF]/.test(rawName) && !rawNameAr) {
+                rawNameAr = rawName;
+            }
+
+            const primaryName = rawName || rawNameAr || '';
+            const primaryNameAr = rawNameAr || null;
+
+            const cleanFormData = {
+                ...formData,
+                name: primaryName,
+                nameAr: primaryNameAr
+            };
+            onSubmit(cleanFormData, contractFile ? {
                 file: contractFile,
                 name: contractTitle.trim() || contractFile.name,
                 description: contractDescription.trim() || undefined,
@@ -242,7 +275,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
                 <div className="modal-header">
@@ -252,26 +285,41 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
                     {hasRestoredDraft && <DraftBanner onDiscard={handleDiscardDraft} />}
 
                     {/* Basic Information */}
                     <div className="form-section">
                         <h3 className="section-title">{t('projects.modal.sections.basic')}</h3>
 
-                        <div className="form-group full-width mb-md">
-                            <label htmlFor="name">{t('projects.modal.fields.name')} <span className="required">*</span></label>
-                            <input
-                                type="text"
-                                id="name"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleChange}
-                                className={errors.name ? 'error' : ''}
-                                placeholder={t('projects.modal.fields.name')}
-                                style={{ fontSize: '1.1rem', padding: '12px' }}
-                            />
-                            {errors.name && <span className="error-message">{errors.name}</span>}
+                        <div className="form-grid mb-md">
+                            <div className="form-group">
+                                <label htmlFor="name">{t('projects.modal.fields.name')} <span className="required">*</span></label>
+                                <input
+                                    type="text"
+                                    id="name"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    className={errors.name ? 'error' : ''}
+                                    placeholder={t('projects.modal.fields.name')}
+                                />
+                                {errors.name && <span className="error-message">{errors.name}</span>}
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="nameAr">{t('common.nameAr', 'Arabic Name')}</label>
+                                <input
+                                    type="text"
+                                    id="nameAr"
+                                    name="nameAr"
+                                    value={formData.nameAr || ''}
+                                    onChange={handleChange}
+                                    placeholder="الاسم بالعربي"
+                                    dir="rtl"
+                                />
+                            </div>
                         </div>
 
                         <div className="form-grid">
@@ -289,7 +337,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                                         <option value="">{t('projects.modal.options.selectClient')}</option>
                                         {clients.map(client => (
                                             <option key={client.id} value={client.id}>
-                                                {client.name} {client.company ? `(${client.company})` : ''}
+                                                {isArabic ? (client.nameAr || client.name) : (client.name || client.nameAr)} {client.company ? `(${client.company})` : ''}
                                             </option>
                                         ))}
                                     </select>
@@ -361,7 +409,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                                     <option value="">{t('projects.modal.options.selectEngineer') || 'Select Engineer (Optional)'}</option>
                                     {engineers.map((eng) => (
                                         <option key={eng.id} value={eng.id}>
-                                            {eng.name} ({eng.role || 'Member'})
+                                            {isArabic ? (eng.nameAr || eng.name) : (eng.name || eng.nameAr)} ({eng.role || 'Member'})
                                         </option>
                                     ))}
                                 </select>
@@ -704,6 +752,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                             </div>
                         )}
                     </div>
+                    </div>
 
                     <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={handleClose}>
@@ -740,6 +789,7 @@ export default function AddProjectModal({ isOpen, onClose, onSubmit, initialData
                     }
                 }}
             />
-        </div>
+        </div>,
+        document.body
     );
 }

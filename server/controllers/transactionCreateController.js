@@ -10,6 +10,7 @@
 // 1:1 for now to avoid behavior drift in the live POST /api/transactions.
 
 import prisma from '../lib/prisma.js';
+import { canAutoApprove } from '../lib/approvalThresholds.js';
 
 /**
  * @desc    Create transaction with V1.2 "Profit on Expense" Logic
@@ -77,10 +78,39 @@ export const createTransaction = async (req, res, next) => {
             }
         }
 
-        // V1.2: Determine payer (Manager can assign, Engineer defaults to self)
+        // Determine payer and approval authority:
+        // Any transaction recorded with or by employees who don't have approval authority
+        // must NOT be recorded as approved until the manager approves the transaction.
+        const managerRoles = ['PROJECT_MANAGER', 'ADMIN', 'SUPER_ADMIN', 'GENERAL_MANAGER'];
+        const isCallerManager = managerRoles.includes(req.user.role);
+
         let actualPayer = req.user.id;
-        if (payerUserId && (req.user.role === 'PROJECT_MANAGER' || req.user.role === 'ADMIN')) {
+        if (payerUserId && isCallerManager) {
             actualPayer = payerUserId;
+        }
+
+        let isPayerNonManager = false;
+        if (payerUserId && payerUserId !== req.user.id) {
+            const payerUser = await prisma.user.findUnique({
+                where: { id: payerUserId },
+                select: { role: true }
+            });
+            if (payerUser && !managerRoles.includes(payerUser.role)) {
+                isPayerNonManager = true;
+            }
+        } else if (!isCallerManager) {
+            isPayerNonManager = true;
+        }
+
+        let initialStatus = 'PENDING_APPROVAL';
+        if (isCallerManager && !isPayerNonManager) {
+            const tenantConfig = await prisma.tenant.findUnique({
+                where: { id: req.user.tenantId },
+                select: { approvalThresholds: true }
+            });
+            initialStatus = canAutoApprove(req.user.role, amount, tenantConfig) ? 'APPROVED' : 'PENDING_APPROVAL';
+        } else if (isCallerManager && (req.body.isApproved === true || req.body.status === 'APPROVED')) {
+            initialStatus = 'APPROVED';
         }
 
         // Resolve safe vs custody targets
@@ -91,19 +121,38 @@ export const createTransaction = async (req, res, next) => {
 
         if (typeof targetSafeId === 'string' && targetSafeId.startsWith('custody_')) {
             const custodyUserId = targetSafeId.replace('custody_', '');
-            targetSafeId = null;
             targetPaymentMethod = 'CUSTODY_WALLET';
             if (!targetPayerUserId) targetPayerUserId = custodyUserId;
             if (!targetCustodyWalletId) targetCustodyWalletId = custodyUserId;
-        }
 
-        if (targetPaymentMethod === 'CUSTODY_WALLET') {
-            targetSafeId = null;
-            if (!targetCustodyWalletId && targetPayerUserId) {
-                targetCustodyWalletId = targetPayerUserId;
+            // Check if an explicit custody safe exists for this user in company_safes
+            const explicitCustodySafe = await prisma.companySafe.findFirst({
+                where: { tenantId: req.user.tenantId, assignedUserId: custodyUserId, isCustody: true, isActive: true }
+            });
+            if (explicitCustodySafe) {
+                targetSafeId = explicitCustodySafe.id;
+            } else {
+                targetSafeId = null;
             }
         } else if (targetSafeId) {
-            targetCustodyWalletId = null;
+            const safeRecord = await prisma.companySafe.findFirst({
+                where: { id: targetSafeId, tenantId: req.user.tenantId }
+            });
+            if (safeRecord && safeRecord.isCustody) {
+                targetPaymentMethod = 'CUSTODY_WALLET';
+                if (safeRecord.assignedUserId) {
+                    if (!targetCustodyWalletId) targetCustodyWalletId = safeRecord.assignedUserId;
+                    if (!targetPayerUserId) targetPayerUserId = safeRecord.assignedUserId;
+                }
+            }
+        } else if (targetPaymentMethod === 'CUSTODY_WALLET' && (targetCustodyWalletId || targetPayerUserId)) {
+            const custodyUserId = targetCustodyWalletId || targetPayerUserId;
+            const explicitCustodySafe = await prisma.companySafe.findFirst({
+                where: { tenantId: req.user.tenantId, assignedUserId: custodyUserId, isCustody: true, isActive: true }
+            });
+            if (explicitCustodySafe) {
+                targetSafeId = explicitCustodySafe.id;
+            }
         }
 
         const result = await prisma.$transaction(async (tx) => {
@@ -111,14 +160,15 @@ export const createTransaction = async (req, res, next) => {
 
             // ========== V1.2 INCOME LOGIC ==========
             if (type === 'INCOME') {
-                // NEW: Add full amount to Project Safe (no split)
                 const transaction = await tx.transaction.create({
                     data: {
                         type: 'INCOME',
                         category: category || 'PAYMENT',
                         amount: Number(amount),
                         description: description || 'Client Payment',
-                        status: 'APPROVED',
+                        status: initialStatus,
+                        approvedBy: initialStatus === 'APPROVED' ? req.user.id : null,
+                        approvedAt: initialStatus === 'APPROVED' ? new Date() : null,
                         projectId: projectId || null,
                         projectCostItemId: projectCostItemId || null,
                         clientId: clientId || project?.clientId || null,
@@ -142,40 +192,53 @@ export const createTransaction = async (req, res, next) => {
                     }
                 });
 
-                // V1.2: Update Project Safe Balance (full amount) if attached to project
-                if (projectId) {
-                    await tx.project.update({
-                        where: {
-                            id: projectId,
-                            tenantId: req.user.tenantId
-                        },
-                        data: {
-                            projectSafeBalance: { increment: Number(amount) }
-                        }
-                    });
-                }
+                if (initialStatus === 'APPROVED') {
+                    // V1.2: Update Project Safe Balance (full amount) if attached to project
+                    if (projectId) {
+                        await tx.project.update({
+                            where: {
+                                id: projectId,
+                                tenantId: req.user.tenantId
+                            },
+                            data: {
+                                projectSafeBalance: { increment: Number(amount) }
+                            }
+                        });
+                    }
 
-                // Update Company Safe or Custody Balance if selected
-                if (targetSafeId) {
-                    await tx.companySafe.update({
-                        where: { id: targetSafeId },
-                        data: {
-                            balance: { increment: Number(amount) }
+                    // Update Company Safe or Custody Balance if selected
+                    if (targetSafeId) {
+                        await tx.companySafe.update({
+                            where: { id: targetSafeId },
+                            data: {
+                                balance: { increment: Number(amount) }
+                            }
+                        });
+                    }
+                    if (targetPaymentMethod === 'CUSTODY_WALLET' || targetCustodyWalletId) {
+                        const custodyUserId = targetCustodyWalletId || targetPayerUserId || actualPayer;
+                        if (custodyUserId) {
+                            await tx.user.update({
+                                where: { id: custodyUserId },
+                                data: { currentCustodyBalance: { increment: Number(amount) } }
+                            }).catch(e => console.error('Error incrementing custody balance:', e));
                         }
-                    });
-                } else if (targetPaymentMethod === 'CUSTODY_WALLET' && targetCustodyWalletId) {
-                    await tx.user.update({
-                        where: { id: targetCustodyWalletId },
-                        data: { currentCustodyBalance: { increment: Number(amount) } }
-                    }).catch(e => console.error('Error incrementing custody balance:', e));
-                }
+                    }
 
-                profitInfo = {
-                    type: 'INCOME',
-                    amountToSafe: Number(amount),
-                    profitRecognized: 0,
-                    message: 'Full amount added to Safe. Profit will be recognized on expenses.'
-                };
+                    profitInfo = {
+                        type: 'INCOME',
+                        amountToSafe: Number(amount),
+                        profitRecognized: 0,
+                        message: 'Full amount added to Safe. Profit will be recognized on expenses.'
+                    };
+                } else {
+                    profitInfo = {
+                        type: 'INCOME',
+                        amountToSafe: 0,
+                        profitRecognized: 0,
+                        message: 'Income saved as pending. Waiting for Manager approval.'
+                    };
+                }
 
                 return { transaction, profitInfo };
             }
@@ -207,7 +270,9 @@ export const createTransaction = async (req, res, next) => {
                         category,
                         amount: Number(amount),
                         description,
-                        status: 'APPROVED',
+                        status: initialStatus,
+                        approvedBy: initialStatus === 'APPROVED' ? req.user.id : null,
+                        approvedAt: initialStatus === 'APPROVED' ? new Date() : null,
                         projectId: projectId || null,
                         projectCostItemId: finalCostItemId || null,
                         supplierId: supplierId || null,
@@ -231,6 +296,24 @@ export const createTransaction = async (req, res, next) => {
                     }
                 });
 
+                if (initialStatus === 'PENDING_APPROVAL') {
+                    // Non-manager employee transaction: leave pending until approved by manager
+                    if (targetPaymentMethod === 'CUSTODY_WALLET' || targetCustodyWalletId) {
+                        const custodyUserId = targetCustodyWalletId || targetPayerUserId || actualPayer;
+                        if (custodyUserId) {
+                            await tx.user.update({
+                                where: { id: custodyUserId },
+                                data: { pendingClearance: { increment: Number(amount) } }
+                            }).catch(e => console.error('Error updating pending clearance:', e));
+                        }
+                    }
+                    profitInfo = {
+                        profit: 0,
+                        message: 'Transaction saved as pending. Waiting for Manager approval.'
+                    };
+                    return { transaction, profitInfo };
+                }
+
                 // Update Company Safe or Custody balance if selected
                 if (targetSafeId) {
                     await tx.companySafe.update({
@@ -239,12 +322,15 @@ export const createTransaction = async (req, res, next) => {
                             balance: { decrement: Number(amount) }
                         }
                     });
-                } else if (targetPaymentMethod === 'CUSTODY_WALLET') {
+                }
+                if (targetPaymentMethod === 'CUSTODY_WALLET' || targetCustodyWalletId) {
                     const custodyUserId = targetCustodyWalletId || targetPayerUserId || actualPayer;
-                    await tx.user.update({
-                        where: { id: custodyUserId },
-                        data: { currentCustodyBalance: { decrement: Number(amount) } }
-                    }).catch(e => console.error('Error deducting custody balance:', e));
+                    if (custodyUserId) {
+                        await tx.user.update({
+                            where: { id: custodyUserId },
+                            data: { currentCustodyBalance: { decrement: Number(amount) } }
+                        }).catch(e => console.error('Error deducting custody balance:', e));
+                    }
                 }
 
                 // Deduct from Project Safe or Office Expenses if project exists

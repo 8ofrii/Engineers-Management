@@ -15,6 +15,7 @@ export const getUsers = async (req, res) => {
             select: {
                 id: true,
                 name: true,
+                nameAr: true,
                 email: true,
                 role: true,
                 roleId: true,
@@ -44,7 +45,7 @@ export const getUsers = async (req, res) => {
 
 // Add New User (Invite)
 export const inviteUser = async (req, res) => {
-    const { email, role, roleId, permissions, name } = req.body;
+    const { email, role, roleId, permissions, name, nameAr } = req.body;
 
     if (!email) {
         return res.status(400).json({ success: false, message: 'Please provide an email address' });
@@ -127,6 +128,7 @@ export const inviteUser = async (req, res) => {
             newUser = await prisma.user.create({
                 data: {
                     name: (name && name.trim()) || normalizedEmail.split('@')[0],
+                    nameAr: (nameAr && nameAr.trim()) || null,
                     email: normalizedEmail,
                     password: placeholderPassword,
                     role: role || 'ENGINEER',
@@ -140,7 +142,7 @@ export const inviteUser = async (req, res) => {
                     permissions: permissions || []
                 },
                 select: {
-                    id: true, name: true, email: true, role: true, roleId: true, permissions: true, isVerified: true, verificationCode: true, verificationExpires: true
+                    id: true, name: true, nameAr: true, email: true, role: true, roleId: true, permissions: true, isVerified: true, verificationCode: true, verificationExpires: true
                 }
             });
         }
@@ -264,7 +266,7 @@ export const resendInvite = async (req, res) => {
 // Update User (Role/Details)
 export const updateUser = async (req, res) => {
     const { id } = req.params;
-    const { role, name, phone, phones, permissions, password } = req.body;
+    const { role, name, nameAr, phone, phones, permissions, password } = req.body;
 
     // Only SUPER_ADMIN may grant SUPER_ADMIN. Also forbid demoting an existing
     // SUPER_ADMIN unless the caller is one — otherwise an ADMIN could lock out
@@ -309,7 +311,9 @@ export const updateUser = async (req, res) => {
             select: { id: true, name: true, email: true, role: true, phone: true, phones: true, permissions: true, isActive: true }
         });
 
-        const updateData = { role, name, permissions };
+        const updateData = { role, permissions };
+        if (name !== undefined) updateData.name = name ? name.trim() : null;
+        if (nameAr !== undefined) updateData.nameAr = nameAr ? nameAr.trim() : null;
         if (normalizedPhones !== undefined) {
             updateData.phones = normalizedPhones;
             updateData.phone = primaryPhone;

@@ -9,6 +9,7 @@ const SupplierCategory = z.enum([
 
 const baseSupplier = z.object({
     name: z.string().min(1).max(200),
+    nameAr: z.string().max(200).optional().nullable(),
     email: z.string().email().max(254).or(z.literal('')).optional(),
     phone: z.string().max(30).or(z.literal('')).optional(),
     phones: z.array(z.string().max(30)).optional().default([]),

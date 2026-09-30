@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
     Sparkles, Save, Trash2, RefreshCw, X, Volume2, ImageIcon, AlertCircle, Loader2, FileText, ExternalLink
@@ -291,7 +292,7 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
     const matches = draft?.matches || {};
     const isReadOnly = draft && draft.status !== 'PENDING_REVIEW';
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div
                 className="modal-container"
@@ -578,7 +579,8 @@ export default function DraftReviewModal({ draftId, isOpen, onClose, onCommitted
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

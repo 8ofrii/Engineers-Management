@@ -23,8 +23,8 @@ export default function TransactionActionsMenu({
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
         const menuWidth = 165;
-        // Approximate heights: cancelled has 2 items (view, delete) ~ 88px, active has 3 items (view, edit, refund) ~ 128px
-        const estimatedHeight = isCancelled ? 90 : 130;
+        // Approximate heights: cancelled has 2 items (view, delete) ~ 88px, active has 4 items (view, edit, refund, delete) ~ 160px
+        const estimatedHeight = isCancelled ? 90 : 160;
         
         const spaceBelow = window.innerHeight - rect.bottom;
         const spaceAbove = rect.top;
@@ -148,7 +148,7 @@ export default function TransactionActionsMenu({
                         >
                             <Eye size={14} className="item-icon" />
                             <span className="item-label">
-                                {t ? t('common.view', isArabic ? 'عرض التفاصيل' : 'View Details') : (isArabic ? 'عرض التفاصيل' : 'View Details')}
+                                {t ? (t('common.view') === 'common.view' ? (isArabic ? 'عرض التفاصيل' : 'View Details') : t('common.view')) : (isArabic ? 'عرض التفاصيل' : 'View Details')}
                             </span>
                         </button>
 
@@ -162,7 +162,7 @@ export default function TransactionActionsMenu({
                                 >
                                     <Pencil size={14} className="item-icon" />
                                     <span className="item-label">
-                                        {isArabic ? 'تعديل المعاملة' : (t ? t('common.edit') || 'Edit' : 'Edit')}
+                                        {isArabic ? 'تعديل المعاملة' : (t ? (t('common.edit') === 'common.edit' ? 'Edit' : t('common.edit')) : 'Edit')}
                                     </span>
                                 </button>
 
@@ -174,12 +174,24 @@ export default function TransactionActionsMenu({
                                 >
                                     <RotateCcw size={14} className="item-icon" />
                                     <span className="item-label">
-                                        {isArabic ? 'استرداد وإلغاء' : (t ? t('finance.refund') || 'Refund' : 'Refund')}
+                                        {isArabic ? 'استرداد وإلغاء' : (t ? (t('finance.refund') === 'finance.refund' ? 'Refund' : t('finance.refund')) : 'Refund')}
+                                    </span>
+                                </button>
+
+                                {/* 4. Delete Transaction */}
+                                <button
+                                    type="button"
+                                    className="tx-dropdown-item delete"
+                                    onClick={(e) => handleAction(e, onDelete)}
+                                >
+                                    <Trash2 size={14} className="item-icon" />
+                                    <span className="item-label">
+                                        {isArabic ? 'حذف المعاملة' : (t ? (t('common.delete') === 'common.delete' ? 'Delete' : t('common.delete')) : 'Delete')}
                                     </span>
                                 </button>
                             </>
                         ) : (
-                            /* 4. Delete Permanently (only for cancelled / refunded) */
+                            /* Delete Permanently (only for cancelled / refunded) */
                             <button
                                 type="button"
                                 className="tx-dropdown-item delete"
@@ -187,7 +199,7 @@ export default function TransactionActionsMenu({
                             >
                                 <Trash2 size={14} className="item-icon" />
                                 <span className="item-label">
-                                    {isArabic ? 'حذف نهائي' : (t ? t('common.deletePermanently') || 'Delete Permanently' : 'Delete Permanently')}
+                                    {isArabic ? 'حذف نهائي' : (t ? (t('common.deletePermanently') === 'common.deletePermanently' ? 'Delete Permanently' : t('common.deletePermanently')) : 'Delete Permanently')}
                                 </span>
                             </button>
                         )}

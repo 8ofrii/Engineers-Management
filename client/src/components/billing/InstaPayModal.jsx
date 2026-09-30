@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
     X,
@@ -150,7 +151,7 @@ const InstaPayModal = ({
     );
     const whatsappUrl = `https://wa.me/${(target.whatsapp || '+201092041908').replace(/[^0-9]/g, '')}?text=${whatsappMessage}`;
 
-    return (
+    return createPortal(
         <div style={{
             position: 'fixed',
             inset: 0,
@@ -795,7 +796,8 @@ const InstaPayModal = ({
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

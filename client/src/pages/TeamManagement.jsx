@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { 
     Users, UserPlus, Trash2, Edit2, Search, X, Eye, EyeOff, 
@@ -6,7 +7,7 @@ import {
     Clock, CheckCircle2, RefreshCw, AlertTriangle, Wallet
 } from 'lucide-react';
 import { userAPI, rolesAPI } from '../services/api';
-import { useFormat } from '../utils/format';
+import { useFormat, getLocalizedName, getLocalizedSubName } from '../utils/format';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import CustomAlert from '../components/CustomAlert';
@@ -29,7 +30,7 @@ export default function TeamManagement() {
     const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
     const [selectedUser, setSelectedUser] = useState(null);
     const [formData, setFormData] = useState({
-        name: '', email: '', roleId: '', role: 'ENGINEER', password: '', phone: '', phones: [''], permissions: {}
+        name: '', nameAr: '', email: '', roleId: '', role: 'ENGINEER', password: '', phone: '', phones: [''], permissions: {}
     });
     const [showPassword, setShowPassword] = useState(false);
 
@@ -87,6 +88,7 @@ export default function TeamManagement() {
 
     const filteredUsers = users.filter(u =>
         (u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.nameAr && u.nameAr.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
@@ -198,8 +200,17 @@ export default function TeamManagement() {
             const userPhones = Array.isArray(user.phones) && user.phones.length > 0
                 ? user.phones
                 : (user.phone ? [user.phone] : ['']);
+            
+            let initName = (user.name || '').trim();
+            let initNameAr = (user.nameAr || '').trim();
+            if (/[\u0600-\u06FF]/.test(initName) && !initNameAr) {
+                initNameAr = initName;
+                initName = '';
+            }
+
             setFormData({
-                name: user.name || '',
+                name: initName,
+                nameAr: initNameAr,
                 email: user.email || '',
                 role: user.role || 'ENGINEER',
                 roleId: user.roleId || '',
@@ -211,6 +222,7 @@ export default function TeamManagement() {
         } else {
             setFormData({
                 name: '',
+                nameAr: '',
                 email: '',
                 role: 'ENGINEER',
                 roleId: '',
@@ -270,8 +282,24 @@ export default function TeamManagement() {
         e.preventDefault();
         try {
             const cleanPhones = (formData.phones || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            let rawName = formData.name?.trim() || '';
+            let rawNameAr = formData.nameAr?.trim() || '';
+
+            if (/[\u0600-\u06FF]/.test(rawName) && /[A-Za-z]/.test(rawNameAr)) {
+                const temp = rawName;
+                rawName = rawNameAr;
+                rawNameAr = temp;
+            } else if (/[\u0600-\u06FF]/.test(rawName) && !rawNameAr) {
+                rawNameAr = rawName;
+            }
+
+            const primaryName = rawName || rawNameAr || '';
+            const primaryNameAr = rawNameAr || null;
+
             const submitData = {
                 ...formData,
+                name: primaryName,
+                nameAr: primaryNameAr,
                 phone: cleanPhones[0] || formData.phone?.trim() || undefined,
                 phones: cleanPhones
             };
@@ -532,8 +560,13 @@ export default function TeamManagement() {
                                                         </div>
                                                         <div>
                                                             <div style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '0.95rem' }}>
-                                                                {user.name || user.email.split('@')[0]}
+                                                                {getLocalizedName(user, isRTL) || user.email.split('@')[0]}
                                                             </div>
+                                                            {getLocalizedSubName(user, isRTL) && (
+                                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                                                    {getLocalizedSubName(user, isRTL)}
+                                                                </div>
+                                                            )}
                                                             <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
                                                                 {user.email}
                                                             </div>
@@ -709,9 +742,9 @@ export default function TeamManagement() {
                 </div>
 
                 {/* MODAL 1: Add (Invite) / Edit Member Modal */}
-                {showModal && (
+                {showModal && createPortal(
                     <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                        <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '850px', borderRadius: '16px' }}>
+                        <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '850px', borderRadius: '16px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                             <div className="modal-header">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <UserPlus size={22} color="#3b82f6" />
@@ -724,7 +757,8 @@ export default function TeamManagement() {
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="modal-body" style={{ padding: '24px' }}>
+                            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                                <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
                                 {/* Form Inputs Section */}
                                 <div className="form-section">
                                     <h3 className="section-title">
@@ -752,16 +786,29 @@ export default function TeamManagement() {
                                             )}
                                         </div>
 
-                                        {/* Name (Optional in Add Mode, required in Edit) */}
+                                        {/* Name English */}
                                         <div className="form-group">
                                             <label style={{ fontWeight: 700 }}>
-                                                {isRTL ? 'الاسم (اختياري)' : 'Member Name (Optional)'}
+                                                {isRTL ? 'الاسم بالإنجليزية (اختياري)' : 'Member Name in English (Optional)'}
                                             </label>
                                             <input
                                                 type="text"
                                                 value={formData.name}
                                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                placeholder={isRTL ? 'مثال: م. أحمد سامي' : 'e.g. Eng. Ahmed Sami'}
+                                                placeholder="e.g. Eng. Ahmed Sami"
+                                            />
+                                        </div>
+
+                                        {/* Name Arabic */}
+                                        <div className="form-group">
+                                            <label style={{ fontWeight: 700 }}>
+                                                {isRTL ? 'الاسم بالعربية (اختياري)' : 'Member Name in Arabic (Optional)'}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.nameAr}
+                                                onChange={(e) => setFormData({ ...formData, nameAr: e.target.value })}
+                                                placeholder="مثال: م. أحمد سامي"
                                             />
                                         </div>
 
@@ -915,8 +962,9 @@ export default function TeamManagement() {
                                         ))}
                                     </div>
                                 </div>
+                                </div>
 
-                                <div className="modal-footer" style={{ marginTop: '24px' }}>
+                                <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', flexShrink: 0, padding: '16px 24px', background: 'var(--bg-primary)' }}>
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                                         {isRTL ? 'إلغاء' : 'Cancel'}
                                     </button>
@@ -926,11 +974,12 @@ export default function TeamManagement() {
                                 </div>
                             </form>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
 
                 {/* MODAL 2: Invitation Success Modal with Token & Shareable Link */}
-                {inviteSuccessModal.isOpen && (
+                {inviteSuccessModal.isOpen && createPortal(
                     <div className="modal-overlay" onClick={() => setInviteSuccessModal({ isOpen: false, inviteToken: '', inviteLink: '', email: '', role: '' })}>
                         <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', borderRadius: '16px', textAlign: 'center', padding: '32px' }}>
                             <div style={{
@@ -1035,7 +1084,8 @@ export default function TeamManagement() {
                                 {isRTL ? 'تم وإغلاق' : 'Done & Close'}
                             </button>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
 
                 {/* Alert */}

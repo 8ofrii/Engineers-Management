@@ -161,6 +161,29 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     }
 }));
 
+// Local disk subfolder resolution fallback: if a file without subfolder was requested (e.g. /uploads/receipt-xxx.png)
+app.use('/uploads', (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const cleanPath = req.path.replace(/^\/+/, '');
+    if (!cleanPath) return next();
+    const subdirs = ['receipts', 'audio', 'documents', 'images'];
+    for (const sub of subdirs) {
+        const candidate = path.join(__dirname, 'uploads', sub, cleanPath);
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+            const ext = path.extname(candidate).toLowerCase();
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('Content-Security-Policy', "default-src 'none'");
+            if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.webm', '.mp3', '.wav', '.m4a', '.ogg', '.aac', '.mp4', '.pdf'].includes(ext)) {
+                res.setHeader('Content-Disposition', 'inline');
+            } else {
+                res.setHeader('Content-Disposition', 'attachment');
+            }
+            return res.sendFile(candidate);
+        }
+    }
+    next();
+});
+
 // S3 / MinIO Object Storage Streaming Fallback
 // When media is persisted in MinIO/S3, transparently stream it through /uploads/*
 app.use('/uploads', async (req, res, next) => {

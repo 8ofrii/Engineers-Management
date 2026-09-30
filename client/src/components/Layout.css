@@ -259,6 +259,8 @@
     flex-direction: column;
     min-height: 100vh;
     background: var(--bg-secondary);
+    position: relative;
+    z-index: 1;
 }
 
 .topbar {
@@ -486,10 +488,12 @@ body:not(.light-mode) .layout {
     background: transparent;
 }
 
+body:not(.light-mode) .main-content {
+    background: transparent;
+}
+
 body:not(.light-mode) .content {
-    background: rgba(20, 20, 20, 0.85);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: transparent;
 }
 
 body:not(.light-mode) .topbar {

@@ -17,6 +17,7 @@ const dateString = z.union([z.string(), z.date()])
 // set by the server, never trusted from the client.
 const baseProject = z.object({
     name: z.string().min(1).max(200),
+    nameAr: z.string().max(200).optional().nullable(),
     description: z.string().max(2000).optional().nullable(),
     status: ProjectStatus.optional(),
     projectType: ProjectType.optional(),

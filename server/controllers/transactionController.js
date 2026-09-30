@@ -586,45 +586,70 @@ export const getTransactionsLedgerPdf = async (req, res, next) => {
         } else {
             // Build query based on filters
             const where = { tenantId };
+            const conditions = [];
 
             if (filterType && filterType !== 'ALL') {
                 if (filterType === 'COMPANY_SHARE') {
-                    where.OR = [
-                        { category: 'MANAGEMENT_FEE_TRANSFER' },
-                        { description: { contains: 'management fee', mode: 'insensitive' } },
-                        { description: { contains: 'أتعاب' } }
-                    ];
+                    conditions.push({
+                        OR: [
+                            { category: 'MANAGEMENT_FEE_TRANSFER' },
+                            { description: { contains: 'management fee', mode: 'insensitive' } },
+                            { description: { contains: 'أتعاب' } }
+                        ]
+                    });
                 } else if (filterType === 'EXPENSE') {
-                    where.type = 'EXPENSE';
-                    where.category = { not: 'MANAGEMENT_FEE_TRANSFER' };
+                    conditions.push({
+                        type: 'EXPENSE',
+                        category: { not: 'MANAGEMENT_FEE_TRANSFER' }
+                    });
                 } else if (filterType === 'INCOME') {
-                    where.type = 'INCOME';
+                    if (filterProjectId === 'OFFICE') {
+                        // For office / HQ, income includes direct office income and recognized project management fee profits
+                        conditions.push({
+                            OR: [
+                                { type: 'INCOME' },
+                                { category: 'MANAGEMENT_FEE_TRANSFER' }
+                            ]
+                        });
+                    } else {
+                        conditions.push({ type: 'INCOME' });
+                    }
                 } else if (filterType === 'MY_LEDGER') {
-                    where.OR = [
-                        { createdBy: req.user.id },
-                        { payerUserId: req.user.id },
-                        { toEngineerId: req.user.id }
-                    ];
+                    conditions.push({
+                        OR: [
+                            { createdBy: req.user.id },
+                            { payerUserId: req.user.id },
+                            { toEngineerId: req.user.id }
+                        ]
+                    });
                 }
             }
 
             if (filterProjectId && filterProjectId !== 'ALL') {
                 if (filterProjectId === 'OFFICE') {
-                    where.OR = [
-                        { isOfficeExpense: true },
-                        { projectId: null }
-                    ];
+                    // Headquarters view includes office expenses, unassigned transactions, and management fee profit transfers from projects
+                    conditions.push({
+                        OR: [
+                            { isOfficeExpense: true },
+                            { projectId: null },
+                            { category: 'MANAGEMENT_FEE_TRANSFER' }
+                        ]
+                    });
                 } else {
-                    where.projectId = filterProjectId;
+                    conditions.push({ projectId: filterProjectId });
                 }
             }
 
             if (filterWorkmanId && filterWorkmanId !== 'ALL') {
-                where.workmanId = filterWorkmanId;
+                conditions.push({ workmanId: filterWorkmanId });
             }
 
             if (filterSupplierId && filterSupplierId !== 'ALL') {
-                where.supplierId = filterSupplierId;
+                conditions.push({ supplierId: filterSupplierId });
+            }
+
+            if (conditions.length > 0) {
+                where.AND = conditions;
             }
 
             if (dateFrom || dateTo) {
@@ -1236,14 +1261,25 @@ export const parseReceiptAttachments = (val) => {
     if (Array.isArray(val)) {
         items = val;
     } else if (typeof val === 'string') {
-        const trimmed = val.trim();
+        let trimmed = val.trim();
         if (!trimmed) return [];
+        if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+            try {
+                const unquoted = JSON.parse(trimmed);
+                if (typeof unquoted === 'string') trimmed = unquoted.trim();
+            } catch (e) {}
+        }
         if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
             try {
                 const parsed = JSON.parse(trimmed);
                 if (Array.isArray(parsed)) items = parsed;
             } catch (e) {
-                items = [trimmed];
+                try {
+                    const inner = trimmed.slice(1, -1).trim();
+                    items = inner.split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+                } catch (err) {
+                    items = [trimmed];
+                }
             }
         } else {
             items = [trimmed];
@@ -1253,17 +1289,21 @@ export const parseReceiptAttachments = (val) => {
     return items.map((item, index) => {
         if (!item) return null;
         if (typeof item === 'string') {
+            const cleanStr = item.trim().replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+            if (!cleanStr) return null;
             return {
-                url: item,
+                url: cleanStr,
                 label: '',
-                name: item.split('/').pop() || item
+                name: cleanStr.split('/').pop() || cleanStr
             };
         }
         if (typeof item === 'object' && item.url) {
+            const cleanUrl = String(item.url).trim().replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+            if (!cleanUrl) return null;
             return {
-                url: item.url,
+                url: cleanUrl,
                 label: typeof item.label === 'string' ? item.label : '',
-                name: item.name || item.url.split('/').pop() || item.url,
+                name: item.name || cleanUrl.split('/').pop() || cleanUrl,
                 size: item.size || null
             };
         }
@@ -1529,7 +1569,7 @@ export const updateTransaction = async (req, res, next) => {
             beneficiary, transactionTo, transactionFrom, costCenter,
             invoiceNumber, payerUserId, projectCostItemId,
             clientId, supplierId, workmanId, physicalAccount, paidByClientContact,
-            safeId, isOfficeExpense
+            safeId, isOfficeExpense, totalDueAmount
         } = req.body;
 
         let transaction = await prisma.transaction.findFirst({
@@ -1559,30 +1599,49 @@ export const updateTransaction = async (req, res, next) => {
         // If safeId was passed with custody_ prefix
         if (typeof targetSafeId === 'string' && targetSafeId.startsWith('custody_')) {
             const custodyUserId = targetSafeId.replace('custody_', '');
-            targetSafeId = null;
             targetPaymentMethod = 'CUSTODY_WALLET';
             if (!targetPayerUserId) targetPayerUserId = custodyUserId;
             if (!targetCustodyWalletId) targetCustodyWalletId = custodyUserId;
-        }
 
-        // If target paymentMethod is CUSTODY_WALLET, ensure safeId is null
-        if (targetPaymentMethod === 'CUSTODY_WALLET') {
-            targetSafeId = null;
-            if (!targetCustodyWalletId && targetPayerUserId) {
-                targetCustodyWalletId = targetPayerUserId;
+            const explicitCustodySafe = await prisma.companySafe.findFirst({
+                where: { tenantId: req.user.tenantId, assignedUserId: custodyUserId, isCustody: true, isActive: true }
+            });
+            if (explicitCustodySafe) {
+                targetSafeId = explicitCustodySafe.id;
+            } else {
+                targetSafeId = null;
             }
         } else if (targetSafeId) {
-            targetCustodyWalletId = null;
+            const safeRecord = await prisma.companySafe.findFirst({
+                where: { id: targetSafeId, tenantId: req.user.tenantId }
+            });
+            if (safeRecord && safeRecord.isCustody) {
+                targetPaymentMethod = 'CUSTODY_WALLET';
+                if (safeRecord.assignedUserId) {
+                    if (!targetCustodyWalletId) targetCustodyWalletId = safeRecord.assignedUserId;
+                    if (!targetPayerUserId) targetPayerUserId = safeRecord.assignedUserId;
+                }
+            }
+        } else if (targetPaymentMethod === 'CUSTODY_WALLET' && (targetCustodyWalletId || targetPayerUserId)) {
+            const custodyUserId = targetCustodyWalletId || targetPayerUserId;
+            const explicitCustodySafe = await prisma.companySafe.findFirst({
+                where: { tenantId: req.user.tenantId, assignedUserId: custodyUserId, isCustody: true, isActive: true }
+            });
+            if (explicitCustodySafe) {
+                targetSafeId = explicitCustodySafe.id;
+            }
         }
 
         // Determine old vs new source entity for balance adjustments
-        const oldIsCustody = transaction.paymentMethod === 'CUSTODY_WALLET';
-        const oldCustodianId = oldIsCustody ? (transaction.payerUserId || transaction.custodyWalletId || transaction.createdBy) : null;
-        const oldSafeId = !oldIsCustody ? transaction.safeId : null;
+        const oldSafeId = transaction.safeId || null;
+        const oldCustodianId = (transaction.paymentMethod === 'CUSTODY_WALLET' || transaction.custodyWalletId)
+            ? (transaction.custodyWalletId || transaction.payerUserId || transaction.createdBy)
+            : null;
 
-        const newIsCustody = targetPaymentMethod === 'CUSTODY_WALLET';
-        const newCustodianId = newIsCustody ? (targetPayerUserId || targetCustodyWalletId || transaction.createdBy) : null;
-        const newSafeId = !newIsCustody ? targetSafeId : null;
+        const newSafeId = targetSafeId || null;
+        const newCustodianId = (targetPaymentMethod === 'CUSTODY_WALLET' || targetCustodyWalletId)
+            ? (targetCustodyWalletId || targetPayerUserId || transaction.createdBy)
+            : null;
 
         // Atomic update with financial recalculations
         const updated = await prisma.$transaction(async (tx) => {
@@ -1617,114 +1676,109 @@ export const updateTransaction = async (req, res, next) => {
                     voiceNoteUrl: req.body.voiceNoteUrl !== undefined ? (req.body.voiceNoteUrl || null) : undefined,
                     receiptPhotoUrl: req.body.receiptPhotoUrl !== undefined ? (req.body.receiptPhotoUrl || null) : undefined,
                     aiRawText: req.body.aiRawText !== undefined ? (req.body.aiRawText || null) : undefined,
-                    aiExtractedData: req.body.aiExtractedData !== undefined ? req.body.aiExtractedData : undefined
+                    aiExtractedData: req.body.aiExtractedData !== undefined ? req.body.aiExtractedData : undefined,
+                    totalDueAmount: totalDueAmount !== undefined ? ((totalDueAmount !== null && totalDueAmount !== '' && !isNaN(Number(totalDueAmount))) ? Number(totalDueAmount) : null) : undefined
                 }
             });
 
             // 2. Handle Safe and Custody Balance Adjustments if APPROVED
             if (transaction.status === 'APPROVED') {
-                // Revert old funding source
-                if (oldIsCustody && oldCustodianId) {
-                    if (oldCustodianId !== newCustodianId || !newIsCustody) {
-                        if (transaction.type === 'INCOME') {
-                            await tx.user.update({
-                                where: { id: oldCustodianId },
-                                data: { currentCustodyBalance: { decrement: oldAmount } }
-                            }).catch(e => console.error('Error decrementing old custody balance:', e));
-                        } else if (transaction.type === 'EXPENSE') {
-                            await tx.user.update({
-                                where: { id: oldCustodianId },
-                                data: { currentCustodyBalance: { increment: oldAmount } }
-                            }).catch(e => console.error('Error incrementing old custody balance:', e));
-                        }
-                    }
-                } else if (!oldIsCustody && oldSafeId) {
-                    if (oldSafeId !== newSafeId || newIsCustody) {
-                        if (transaction.type === 'INCOME') {
-                            await tx.companySafe.update({
-                                where: { id: oldSafeId },
-                                data: { balance: { decrement: oldAmount } }
-                            }).catch(e => console.error('Error decrementing old safe balance:', e));
-                        } else if (transaction.type === 'EXPENSE') {
-                            await tx.companySafe.update({
-                                where: { id: oldSafeId },
-                                data: { balance: { increment: oldAmount } }
-                            }).catch(e => console.error('Error incrementing old safe balance:', e));
-                        }
+                // Adjust Safe Balances
+                if (oldSafeId && oldSafeId !== newSafeId) {
+                    if (transaction.type === 'INCOME') {
+                        await tx.companySafe.update({
+                            where: { id: oldSafeId },
+                            data: { balance: { decrement: oldAmount } }
+                        }).catch(e => console.error('Error decrementing old safe balance:', e));
+                    } else if (transaction.type === 'EXPENSE') {
+                        await tx.companySafe.update({
+                            where: { id: oldSafeId },
+                            data: { balance: { increment: oldAmount } }
+                        }).catch(e => console.error('Error incrementing old safe balance:', e));
                     }
                 }
 
-                // Apply new funding source
-                if (newIsCustody && newCustodianId) {
-                    if (oldCustodianId !== newCustodianId || !oldIsCustody) {
-                        if (transaction.type === 'INCOME') {
-                            await tx.user.update({
-                                where: { id: newCustodianId },
-                                data: { currentCustodyBalance: { increment: newAmount } }
-                            }).catch(e => console.error('Error incrementing new custody balance:', e));
-                        } else if (transaction.type === 'EXPENSE') {
-                            await tx.user.update({
-                                where: { id: newCustodianId },
-                                data: { currentCustodyBalance: { decrement: newAmount } }
-                            }).catch(e => console.error('Error decrementing new custody balance:', e));
-                        }
-                    } else if (oldCustodianId === newCustodianId && diff !== 0) {
-                        // Same custodian, amount changed
-                        if (transaction.type === 'INCOME') {
-                            await tx.user.update({
-                                where: { id: newCustodianId },
-                                data: { currentCustodyBalance: { increment: diff } }
-                            }).catch(e => console.error('Error adjusting custody income balance:', e));
-                        } else if (transaction.type === 'EXPENSE') {
-                            await tx.user.update({
-                                where: { id: newCustodianId },
-                                data: { currentCustodyBalance: { decrement: diff } }
-                            }).catch(e => console.error('Error adjusting custody expense balance:', e));
-                        }
+                if (newSafeId && oldSafeId !== newSafeId) {
+                    if (transaction.type === 'INCOME') {
+                        await tx.companySafe.update({
+                            where: { id: newSafeId },
+                            data: { balance: { increment: newAmount } }
+                        }).catch(e => console.error('Error incrementing new safe balance:', e));
+                    } else if (transaction.type === 'EXPENSE') {
+                        await tx.companySafe.update({
+                            where: { id: newSafeId },
+                            data: { balance: { decrement: newAmount } }
+                        }).catch(e => console.error('Error decrementing new safe balance:', e));
                     }
-                } else if (!newIsCustody && newSafeId) {
-                    if (oldSafeId !== newSafeId || oldIsCustody) {
-                        if (transaction.type === 'INCOME') {
-                            await tx.companySafe.update({
-                                where: { id: newSafeId },
-                                data: { balance: { increment: newAmount } }
-                            }).catch(e => console.error('Error incrementing new safe balance:', e));
-                        } else if (transaction.type === 'EXPENSE') {
-                            await tx.companySafe.update({
-                                where: { id: newSafeId },
-                                data: { balance: { decrement: newAmount } }
-                            }).catch(e => console.error('Error decrementing new safe balance:', e));
-                        }
-                    } else if (oldSafeId === newSafeId && diff !== 0) {
-                        // Same safe, amount changed
-                        if (transaction.type === 'INCOME') {
-                            await tx.companySafe.update({
-                                where: { id: newSafeId },
-                                data: { balance: { increment: diff } }
-                            }).catch(e => console.error('Error adjusting safe income balance:', e));
-                        } else if (transaction.type === 'EXPENSE') {
-                            await tx.companySafe.update({
-                                where: { id: newSafeId },
-                                data: { balance: { decrement: diff } }
-                            }).catch(e => console.error('Error adjusting safe expense balance:', e));
-                        }
+                } else if (newSafeId && oldSafeId === newSafeId && diff !== 0) {
+                    if (transaction.type === 'INCOME') {
+                        await tx.companySafe.update({
+                            where: { id: newSafeId },
+                            data: { balance: { increment: diff } }
+                        }).catch(e => console.error('Error adjusting safe income balance:', e));
+                    } else if (transaction.type === 'EXPENSE') {
+                        await tx.companySafe.update({
+                            where: { id: newSafeId },
+                            data: { balance: { decrement: diff } }
+                        }).catch(e => console.error('Error adjusting safe expense balance:', e));
+                    }
+                }
+
+                // Adjust User Custody Balances
+                if (oldCustodianId && oldCustodianId !== newCustodianId) {
+                    if (transaction.type === 'INCOME') {
+                        await tx.user.update({
+                            where: { id: oldCustodianId },
+                            data: { currentCustodyBalance: { decrement: oldAmount } }
+                        }).catch(e => console.error('Error decrementing old custody balance:', e));
+                    } else if (transaction.type === 'EXPENSE') {
+                        await tx.user.update({
+                            where: { id: oldCustodianId },
+                            data: { currentCustodyBalance: { increment: oldAmount } }
+                        }).catch(e => console.error('Error incrementing old custody balance:', e));
+                    }
+                }
+
+                if (newCustodianId && oldCustodianId !== newCustodianId) {
+                    if (transaction.type === 'INCOME') {
+                        await tx.user.update({
+                            where: { id: newCustodianId },
+                            data: { currentCustodyBalance: { increment: newAmount } }
+                        }).catch(e => console.error('Error incrementing new custody balance:', e));
+                    } else if (transaction.type === 'EXPENSE') {
+                        await tx.user.update({
+                            where: { id: newCustodianId },
+                            data: { currentCustodyBalance: { decrement: newAmount } }
+                        }).catch(e => console.error('Error decrementing new custody balance:', e));
+                    }
+                } else if (newCustodianId && oldCustodianId === newCustodianId && diff !== 0) {
+                    if (transaction.type === 'INCOME') {
+                        await tx.user.update({
+                            where: { id: newCustodianId },
+                            data: { currentCustodyBalance: { increment: diff } }
+                        }).catch(e => console.error('Error adjusting custody income balance:', e));
+                    } else if (transaction.type === 'EXPENSE') {
+                        await tx.user.update({
+                            where: { id: newCustodianId },
+                            data: { currentCustodyBalance: { decrement: diff } }
+                        }).catch(e => console.error('Error adjusting custody expense balance:', e));
                     }
                 }
             } else if (transaction.status === 'PENDING_APPROVAL' || transaction.status === 'DRAFT') {
                 // Adjust pendingClearance reservations for expenses
                 if (transaction.type === 'EXPENSE') {
-                    if (oldIsCustody && oldCustodianId && (oldCustodianId !== newCustodianId || !newIsCustody)) {
+                    if (oldCustodianId && oldCustodianId !== newCustodianId) {
                         await tx.user.update({
                             where: { id: oldCustodianId },
                             data: { pendingClearance: { decrement: oldAmount } }
                         }).catch(e => console.error('Error decrementing old pending clearance:', e));
                     }
-                    if (newIsCustody && newCustodianId && (oldCustodianId !== newCustodianId || !oldIsCustody)) {
+                    if (newCustodianId && oldCustodianId !== newCustodianId) {
                         await tx.user.update({
                             where: { id: newCustodianId },
                             data: { pendingClearance: { increment: newAmount } }
                         }).catch(e => console.error('Error incrementing new pending clearance:', e));
-                    } else if (newIsCustody && newCustodianId && oldCustodianId === newCustodianId && diff !== 0) {
+                    } else if (newCustodianId && oldCustodianId === newCustodianId && diff !== 0) {
                         await tx.user.update({
                             where: { id: newCustodianId },
                             data: { pendingClearance: { increment: diff } }

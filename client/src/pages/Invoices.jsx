@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { invoicesAPI, clientsAPI, projectsAPI } from '../services/api';
 import i18n from '../utils/i18n';
+import { getLocalizedName } from '../utils/format';
 
 const STATUS_COLORS = {
     DRAFT:          { bg: '#f3f4f6', fg: '#374151' },
@@ -307,8 +308,8 @@ export default function Invoices() {
                                         transition: 'background 0.2s'
                                     }}>
                                         <Td><strong>{inv.invoiceNumber}</strong></Td>
-                                        <Td>{inv.client?.name || '-'}</Td>
-                                        <Td>{inv.project?.name || '—'}</Td>
+                                        <Td>{(inv.client ? getLocalizedName(inv.client, isArabic) : null) || '-'}</Td>
+                                        <Td>{(inv.project ? getLocalizedName(inv.project, isArabic) : null) || '—'}</Td>
                                         <Td>{fmtDate(inv.issueDate)}</Td>
                                         <Td style={{ color: isOverdue ? '#ef4444' : isDueSoon ? '#f59e0b' : undefined, fontWeight: (isOverdue || isDueSoon) ? 700 : undefined }}>
                                             {fmtDate(inv.dueDate)}
@@ -501,8 +502,8 @@ const Modal = ({ title, onClose, maxWidth = 560, children }) => (
 const ViewModal = ({ invoice, onClose, onDownload, onPrint, onDelete, canManage, isArabic }) => (
     <Modal title={invoice.invoiceNumber} onClose={onClose} maxWidth={680}>
         <div className="grid grid-2 mb-md" style={{ gap: 8 }}>
-            <Stat label="Client" value={invoice.client?.name || '-'} />
-            <Stat label="Project" value={invoice.project?.name || '—'} />
+            <Stat label="Client" value={(invoice.client ? getLocalizedName(invoice.client, isArabic) : null) || '-'} />
+            <Stat label="Project" value={(invoice.project ? getLocalizedName(invoice.project, isArabic) : null) || '—'} />
             <Stat label="Issue date" value={fmtDate(invoice.issueDate)} />
             <Stat label="Due date" value={fmtDate(invoice.dueDate)} />
             <Stat label="Status" value={invoice.status.replace('_', ' ')} />
@@ -626,14 +627,14 @@ const InvoiceForm = ({ invoice, clients, projects, onSubmit, onClose }) => {
                     <label className="input-label">{isAr ? 'العميل *' : 'Client *'}</label>
                     <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
                         <option value="">{isAr ? 'اختر العميل…' : 'Pick…'}</option>
-                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {clients.map(c => <option key={c.id} value={c.id}>{getLocalizedName(c, isAr)}</option>)}
                     </select>
                 </div>
                 <div className="input-group">
                     <label className="input-label">{isAr ? 'المشروع (اختياري)' : 'Project (optional)'}</label>
                     <select className="input" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                         <option value="">—</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {projects.map(p => <option key={p.id} value={p.id}>{getLocalizedName(p, isAr)}</option>)}
                     </select>
                 </div>
                 <div className="input-group">

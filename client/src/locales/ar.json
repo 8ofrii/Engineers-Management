@@ -427,6 +427,13 @@
       "FLOORING": "مبلط",
       "GYPSUM": "جبس",
       "ALUMINUM": "ألوميتال",
+      "BLACKSMITH": "حداد",
+      "IRON_WORKER": "حداد",
+      "STOCKING_WORKER": "عامل تشوين",
+      "MARBLE_CRAFTSMAN": "عامل رخام",
+      "CONCRETE_CUTTING": "عامل قص خراسانة",
+      "GUARD": "حارس",
+      "MUNICIPAL_EMPLOYEE": "موظف محليات",
       "OTHER": "أخرى"
     }
   },
@@ -695,6 +702,7 @@
     "cancel": "إلغاء",
     "save": "حفظ",
     "delete": "حذف",
+    "deletePermanently": "حذف نهائي",
     "edit": "تعديل",
     "sensitive": "حساس",
     "confirm": "تأكيد",

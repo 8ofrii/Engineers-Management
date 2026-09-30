@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, X } from 'lucide-react';
 import './Modal.css';
@@ -7,7 +8,7 @@ export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, it
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container" style={{ maxWidth: '480px', padding: '32px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose} style={{ position: 'absolute', right: '24px', top: '24px' }}>
@@ -74,6 +75,7 @@ export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, it
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

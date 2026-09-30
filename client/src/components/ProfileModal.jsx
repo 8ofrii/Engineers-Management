@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X, Upload, User, Building2, UserCircle, AlertCircle, Eye, EyeOff, CheckCircle, Trash2, AlertTriangle, ShieldAlert, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +16,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
 
     const [formData, setFormData] = useState({
         name: '',
+        nameAr: '',
         email: '',
         phone: '',
         company: '',
@@ -72,6 +74,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
             // Profile Data
             setFormData({
                 name: user.name || '',
+                nameAr: user.nameAr || '',
                 email: user.email || '',
                 phone: user.phone || '',
                 company: user.company || '',
@@ -340,6 +343,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
         try {
             const formDataToSend = new FormData();
             formDataToSend.append('name', formData.name);
+            formDataToSend.append('nameAr', formData.nameAr || '');
             formDataToSend.append('email', formData.email);
             formDataToSend.append('phone', formData.phone || '');
             formDataToSend.append('company', formData.company || '');
@@ -399,7 +403,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={handleOverlayClick}>
             <div className="modal-container" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header" style={{ flexDirection: 'column', gap: '20px', paddingBottom: '0' }}>
@@ -562,7 +566,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                                         <h3 className="section-title">{t('profile.sections.basic')}</h3>
                                         <div className="form-grid">
                                             <div className="form-group">
-                                                <label htmlFor="name">{t('profile.fields.name')} <span className="required">*</span></label>
+                                                <label htmlFor="name">{t('profile.fields.name')} ({isAr ? 'بالإنجليزية' : 'English'}) <span className="required">*</span></label>
                                                 <input
                                                     type="text"
                                                     id="name"
@@ -570,8 +574,21 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                                                     value={formData.name}
                                                     onChange={handleChange}
                                                     className={errors.name ? 'error' : ''}
+                                                    placeholder="e.g. Hossam Hassan"
                                                 />
                                                 {errors.name && <span className="error-message">{errors.name}</span>}
+                                            </div>
+
+                                            <div className="form-group">
+                                                <label htmlFor="nameAr">{isAr ? 'الاسم بالعربية' : 'Name in Arabic'}</label>
+                                                <input
+                                                    type="text"
+                                                    id="nameAr"
+                                                    name="nameAr"
+                                                    value={formData.nameAr}
+                                                    onChange={handleChange}
+                                                    placeholder="مثال: حسام حسن"
+                                                />
                                             </div>
 
                                             <div className="form-group">
@@ -939,6 +956,7 @@ export default function ProfileModal({ isOpen, onClose, forceChangePassword = fa
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

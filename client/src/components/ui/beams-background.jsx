@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
@@ -209,12 +209,15 @@ export function BeamsBackground({
         };
     }, [intensity, colorScheme]);
 
+    const isFixed = className && className.includes('fixed');
+
     return (
         <div
             className={cn(
-                "relative min-h-screen w-full overflow-hidden bg-neutral-950",
+                isFixed ? "w-full overflow-hidden bg-neutral-950" : "relative min-h-screen w-full overflow-hidden bg-neutral-950",
                 className
             )}
+            style={{ zIndex: isFixed ? -1 : undefined }}
         >
             <canvas
                 ref={canvasRef}

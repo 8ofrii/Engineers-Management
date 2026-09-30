@@ -12,7 +12,7 @@ import {
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
-import { useFormat } from '../utils/format';
+import { useFormat, getLocalizedName } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
 import { exportToXLSX } from '../utils/excelExport';
 import './Reports.css';
@@ -136,7 +136,7 @@ export default function Reports() {
 
         return {
             id: p.id,
-            name: p.name,
+            name: getLocalizedName(p, isArabic),
             budget,
             income: pIncome,
             spent: pSpent,
@@ -149,7 +149,7 @@ export default function Reports() {
     const handleExportXLSX = () => {
         const projectName = selectedProjectId === 'ALL'
             ? (isArabic ? 'جميع المشاريع' : 'All Projects')
-            : projects.find(p => p.id === selectedProjectId)?.name || selectedProjectId;
+            : (projects.find(p => p.id === selectedProjectId) ? getLocalizedName(projects.find(p => p.id === selectedProjectId), isArabic) : selectedProjectId);
 
         // Sheet 1: Executive Summary & KPIs
         const summaryRows = [
@@ -351,7 +351,7 @@ export default function Reports() {
                             >
                                 <option value="ALL">{isArabic ? '📂 جميع المشاريع' : '📂 All Projects'}</option>
                                 {projects.map(p => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                    <option key={p.id} value={p.id}>{getLocalizedName(p, isArabic)}</option>
                                 ))}
                             </select>
                         </div>
@@ -601,11 +601,11 @@ export default function Reports() {
                                 <strong>{isArabic ? 'تاريخ الاستخراج:' : 'Generated:'}</strong> {new Date().toLocaleDateString(isArabic ? 'ar-EG' : 'en-GB')} {new Date().toLocaleTimeString(isArabic ? 'ar-EG' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}
                             </div>
                             <div className="print-doc-date">
-                                <strong>{isArabic ? 'المسؤول:' : 'Prepared By:'}</strong> {user?.name || 'Authorized User'}
+                                <strong>{isArabic ? 'المسؤول:' : 'Prepared By:'}</strong> {(user ? getLocalizedName(user, isArabic) : null) || 'Authorized User'}
                             </div>
                             <div className="print-filter-badge">
                                 {isArabic ? 'النطاق: ' : 'Scope: '}
-                                {selectedProjectId === 'ALL' ? (isArabic ? 'كافة المشاريع' : 'All Projects') : (projects.find(p => p.id === selectedProjectId)?.name || selectedProjectId)}
+                                {selectedProjectId === 'ALL' ? (isArabic ? 'كافة المشاريع' : 'All Projects') : (projects.find(p => p.id === selectedProjectId) ? getLocalizedName(projects.find(p => p.id === selectedProjectId), isArabic) : selectedProjectId)}
                                 {' | '}
                                 {dateRange === 'THIS_MONTH' ? (isArabic ? 'هذا الشهر' : 'This Month') : dateRange === 'THIS_YEAR' ? (isArabic ? 'هذا العام' : 'This Year') : (isArabic ? 'كل الفترات' : 'All Time')}
                             </div>
@@ -701,7 +701,7 @@ export default function Reports() {
                     <div className="print-sign-block">
                         <div className="print-sign-col">
                             <div className="print-sign-title">{isArabic ? 'إعداد الحسابات' : 'Prepared By'}</div>
-                            <div className="print-sign-name">{user?.name || 'Authorized Accountant'}</div>
+                            <div className="print-sign-name">{(user ? getLocalizedName(user, isArabic) : null) || 'Authorized Accountant'}</div>
                         </div>
                         <div className="print-sign-col">
                             <div className="print-sign-title">{isArabic ? 'المراجعة المالية والتدقيق' : 'Financial Auditor'}</div>

@@ -21,7 +21,7 @@ import {
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
-import { useFormat } from '../utils/format';
+import { useFormat, getLocalizedName } from '../utils/format';
 import './Dashboard.css';
 
 export default function Dashboard() {
@@ -183,8 +183,9 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Stats Grid */}
+                {/* Stats Grid - Top Row: Projects, Clients, Suppliers | Bottom Row: Income, Expenses, Net Balance */}
                 <div className="stats-grid">
+                    {/* 1. Total Projects */}
                     <div className="stat-card card">
                         <div className="stat-icon" style={{ background: 'hsla(210, 100%, 60%, 0.15)' }}>
                             <FolderKanban size={24} style={{ color: 'var(--color-primary)' }} />
@@ -198,6 +199,35 @@ export default function Dashboard() {
                         </div>
                     </div>
 
+                    {/* 2. Clients */}
+                    <div className="stat-card card">
+                        <div className="stat-icon" style={{ background: 'hsla(160, 80%, 50%, 0.15)' }}>
+                            <Users size={24} style={{ color: 'var(--color-accent)' }} />
+                        </div>
+                        <div className="stat-content">
+                            <div className="stat-label">{t('dashboard.activeClients')}</div>
+                            <div className="stat-value">{stats.clients.total}</div>
+                            <div className="stat-meta">
+                                <Link to="/clients" className="stat-link">{t('dashboard.viewAll')}</Link>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. Suppliers */}
+                    <div className="stat-card card">
+                        <div className="stat-icon" style={{ background: 'hsla(35, 100%, 60%, 0.15)' }}>
+                            <Package size={24} style={{ color: 'var(--color-warning)' }} />
+                        </div>
+                        <div className="stat-content">
+                            <div className="stat-label">{t('dashboard.suppliers')}</div>
+                            <div className="stat-value">{stats.suppliers.total}</div>
+                            <div className="stat-meta">
+                                <Link to="/suppliers" className="stat-link">{t('dashboard.viewAll')}</Link>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. Total Income */}
                     <div className="stat-card card">
                         <div className="stat-icon" style={{ background: 'hsla(140, 70%, 55%, 0.15)' }}>
                             <TrendingUp size={24} style={{ color: 'var(--color-success)' }} />
@@ -212,6 +242,7 @@ export default function Dashboard() {
                         </div>
                     </div>
 
+                    {/* 5. Total Expenses */}
                     <div className="stat-card card">
                         <div className="stat-icon" style={{ background: 'hsla(0, 85%, 60%, 0.15)' }}>
                             <TrendingDown size={24} style={{ color: 'var(--color-danger)' }} />
@@ -226,6 +257,7 @@ export default function Dashboard() {
                         </div>
                     </div>
 
+                    {/* 6. Net Balance */}
                     <div className="stat-card card">
                         <div className="stat-icon" style={{ background: 'hsla(280, 70%, 60%, 0.15)' }}>
                             <DollarSign size={24} style={{ color: 'var(--color-secondary)' }} />
@@ -237,32 +269,6 @@ export default function Dashboard() {
                                 <span className={stats.transactions.balance >= 0 ? 'text-success' : 'text-danger'}>
                                     {stats.transactions.balance >= 0 ? t('dashboard.profit') : t('dashboard.loss')}
                                 </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="stat-card card">
-                        <div className="stat-icon" style={{ background: 'hsla(160, 80%, 50%, 0.15)' }}>
-                            <Users size={24} style={{ color: 'var(--color-accent)' }} />
-                        </div>
-                        <div className="stat-content">
-                            <div className="stat-label">{t('dashboard.activeClients')}</div>
-                            <div className="stat-value">{stats.clients.total}</div>
-                            <div className="stat-meta">
-                                <Link to="/clients" className="stat-link">{t('dashboard.viewAll')}</Link>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="stat-card card">
-                        <div className="stat-icon" style={{ background: 'hsla(35, 100%, 60%, 0.15)' }}>
-                            <Package size={24} style={{ color: 'var(--color-warning)' }} />
-                        </div>
-                        <div className="stat-content">
-                            <div className="stat-label">{t('dashboard.suppliers')}</div>
-                            <div className="stat-value">{stats.suppliers.total}</div>
-                            <div className="stat-meta">
-                                <Link to="/suppliers" className="stat-link">{t('dashboard.viewAll')}</Link>
                             </div>
                         </div>
                     </div>
@@ -377,8 +383,8 @@ export default function Dashboard() {
                                 {recentProjects.map((project) => (
                                     <Link key={project.id} to={`/projects/${project.id}`} className="project-item">
                                         <div className="project-info">
-                                            <h4>{project.name}</h4>
-                                            <p>{project.client?.name || t('common.noData')}</p>
+                                            <h4>{getLocalizedName(project, isArabic)}</h4>
+                                            <p>{getLocalizedName(project.client, isArabic) || t('common.noData')}</p>
                                         </div>
                                         <div className="project-meta">
                                             <span className={`badge badge-${getStatusColor(project.status.toLowerCase())}`}>

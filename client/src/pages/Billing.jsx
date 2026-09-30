@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { 
     CreditCard, HardDrive, Check, Loader2, ExternalLink, Calendar, 
@@ -1219,7 +1220,7 @@ export default function Billing() {
             </div>
 
             {/* AI Token Add-Ons Selection Modal (Vertical Stack) */}
-            {showAddOnsModal && (
+            {showAddOnsModal && createPortal(
                 <div
                     className="modal-overlay"
                     onClick={() => setShowAddOnsModal(false)}
@@ -1435,11 +1436,12 @@ export default function Billing() {
                             })}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Paymob Iframe Modal */}
-            {iframeUrl && (
+            {iframeUrl && createPortal(
                 <div
                     className="modal-overlay"
                     onClick={() => { setIframeUrl(null); load(); }}
@@ -1470,7 +1472,8 @@ export default function Billing() {
                             {t('billing.paymobNote', 'Powered by Paymob. Cards, mobile wallets, and Fawry are accepted. Close when done — your subscription updates automatically when payment is confirmed.')}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* InstaPay Egypt Checkout Modal */}
@@ -1502,7 +1505,7 @@ export default function Billing() {
             />
 
             {/* Custom UI Confirmation Dialog */}
-            {confirmDialog.isOpen && (
+            {confirmDialog.isOpen && createPortal(
                 <div 
                     className="modal-overlay" 
                     onClick={() => !confirmDialog.loading && setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
@@ -1641,7 +1644,8 @@ export default function Billing() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </Layout>
     );

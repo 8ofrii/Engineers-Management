@@ -12,6 +12,7 @@
 // DEFAULT_THRESHOLDS below — sensible Egyptian-construction defaults.
 
 export const ROLE_RANK = {
+    VIEWER: 0,
     ENGINEER: 1,
     ACCOUNTANT: 1,
     PROJECT_MANAGER: 2,
@@ -20,7 +21,6 @@ export const ROLE_RANK = {
 };
 
 export const DEFAULT_THRESHOLDS = [
-    { maxAmount: 5000, minRole: 'ENGINEER' },
     { maxAmount: 50000, minRole: 'PROJECT_MANAGER' },
     { maxAmount: null, minRole: 'ADMIN' }
 ];
@@ -90,6 +90,10 @@ export const requiredRoleForAmount = (amount, tenant) => {
  * Can the caller's role auto-approve a transaction at this amount?
  */
 export const canAutoApprove = (callerRole, amount, tenant) => {
+    const managerRoles = ['PROJECT_MANAGER', 'ADMIN', 'SUPER_ADMIN', 'GENERAL_MANAGER'];
+    if (!managerRoles.includes(callerRole)) {
+        return false;
+    }
     const required = requiredRoleForAmount(amount, tenant);
     return (ROLE_RANK[callerRole] || 0) >= (ROLE_RANK[required] || Infinity);
 };

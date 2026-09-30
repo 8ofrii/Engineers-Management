@@ -3,7 +3,8 @@ import { z } from 'zod';
 const WorkmanTrade = z.enum([
     'CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER', 'WELDER',
     'LABORER', 'FOREMAN', 'OTHER', 'CONCRETE', 'PLASTERER', 'FLOORING',
-    'GYPSUM', 'ALUMINUM'
+    'GYPSUM', 'ALUMINUM', 'BLACKSMITH', 'IRON_WORKER', 'STOCKING_WORKER',
+    'MARBLE_CRAFTSMAN', 'CONCRETE_CUTTING', 'GUARD', 'MUNICIPAL_EMPLOYEE'
 ]);
 
 const optionalDecimal = z.union([z.number(), z.string()])

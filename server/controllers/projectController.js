@@ -76,15 +76,27 @@ export const getProjects = async (req, res, next) => {
         const reconciledProjects = projects.map(p => {
             const ledger = projectLedgerMap[p.id];
             if (ledger && ledger.hasTx) {
-                // Project safe balance represents net available project funds (Income - Site Costs - Office Profit)
-                const safeBal = ledger.income - ledger.siteCost - ledger.profit;
+                const officeProfit = ledger.profit || ((ledger.siteCost * Number(p.managementFeePercent || 0)) / 100);
+                // Project safe balance represents net available funds: Total Income - (Total Site Expenses + Office Profit)
+                const safeBal = ledger.income - (ledger.siteCost + officeProfit);
                 p.actualCost = ledger.siteCost;
-                p.officeRevenue = ledger.profit;
+                p.officeRevenue = officeProfit;
                 p.projectSafeBalance = safeBal;
 
                 p.totalPaid = ledger.income;
+
+                // If project is still in progress but completionPercent was set to 100%, dynamically calculate it from executed budget
+                if (p.status === 'IN_PROGRESS' && p.completionPercent === 100) {
+                    const totalContract = Number(p.totalContractValue || p.budget || 0);
+                    p.completionPercent = totalContract > 0
+                        ? Math.min(99, Math.round(((p.actualCost + p.officeRevenue) / totalContract) * 100))
+                        : 0;
+                }
             } else {
                 p.totalPaid = 0;
+                p.actualCost = 0;
+                p.officeRevenue = 0;
+                p.projectSafeBalance = 0;
             }
             return p;
         });
@@ -163,11 +175,22 @@ export const getProject = async (req, res, next) => {
                 }
             });
             project.actualCost = siteCost;
-            project.officeRevenue = profit;
-            project.projectSafeBalance = income - siteCost - profit;
+            const officeProfit = profit || ((siteCost * Number(project.managementFeePercent || 0)) / 100);
+            project.officeRevenue = officeProfit;
+            project.projectSafeBalance = income - (siteCost + officeProfit);
             project.totalPaid = income;
+
+            if (project.status === 'IN_PROGRESS' && project.completionPercent === 100) {
+                const totalContract = Number(project.totalContractValue || project.budget || 0);
+                project.completionPercent = totalContract > 0
+                    ? Math.min(99, Math.round(((project.actualCost + project.officeRevenue) / totalContract) * 100))
+                    : 0;
+            }
         } else {
             project.totalPaid = 0;
+            project.actualCost = 0;
+            project.officeRevenue = 0;
+            project.projectSafeBalance = 0;
         }
 
         res.status(200).json({
@@ -219,6 +242,7 @@ export const createProject = async (req, res, next) => {
         const project = await prisma.project.create({
             data: {
                 name: req.body.name,
+                nameAr: req.body.nameAr || null,
                 description: req.body.description,
                 status: status,
                 completionPercent: completionPercent,
@@ -571,8 +595,13 @@ export const getProjectFinancials = async (req, res, next) => {
                 }
             });
             project.actualCost = siteCost;
-            project.officeRevenue = profit;
-            project.projectSafeBalance = income - siteCost - profit;
+            const officeProfit = profit || ((siteCost * Number(project.managementFeePercent || 0)) / 100);
+            project.officeRevenue = officeProfit;
+            project.projectSafeBalance = income - (siteCost + officeProfit);
+        } else {
+            project.actualCost = 0;
+            project.officeRevenue = 0;
+            project.projectSafeBalance = 0;
         }
 
         // Calculate custody holdings for this project

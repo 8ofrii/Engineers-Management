@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import './Modal.css';
@@ -33,9 +34,18 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
             const initPhones = Array.isArray(initialData.phones) && initialData.phones.length > 0
                 ? initialData.phones
                 : (initialData.phone ? [initialData.phone] : ['']);
+            
+            let initName = (initialData.name || '').trim();
+            let initNameAr = (initialData.nameAr || '').trim();
+
+            if (/[\u0600-\u06FF]/.test(initName) && !initNameAr) {
+                initNameAr = initName;
+                initName = '';
+            }
+
             setFormData({
-                name: initialData.name || '',
-                nameAr: initialData.nameAr || '',
+                name: initName,
+                nameAr: initNameAr,
                 trade: initialData.trade || 'MASON',
                 dailyRate: initialData.dailyRate || '',
                 phone: initialData.phone || initPhones[0] || '',
@@ -77,8 +87,9 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
 
     const trades = [
         'CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER',
-        'WELDER', 'LABORER', 'FOREMAN', 'CONCRETE', 'PLASTERER',
-        'FLOORING', 'GYPSUM', 'ALUMINUM', 'BLACKSMITH', 'OTHER'
+        'IRON_WORKER', 'STOCKING_WORKER', 'MARBLE_CRAFTSMAN', 'CONCRETE_CUTTING',
+        'GUARD', 'MUNICIPAL_EMPLOYEE', 'WELDER', 'LABORER', 'FOREMAN',
+        'CONCRETE', 'PLASTERER', 'FLOORING', 'GYPSUM', 'ALUMINUM', 'OTHER'
     ];
 
     const handleChange = (e) => {
@@ -156,7 +167,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
     const validate = () => {
         const newErrors = {};
 
-        if (!formData.name.trim()) {
+        if (!formData.name?.trim() && !formData.nameAr?.trim()) {
             newErrors.name = t('common.required');
         }
 
@@ -190,8 +201,26 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
             const rate = formData.dailyRate !== '' && formData.dailyRate !== null && !isNaN(parseFloat(formData.dailyRate))
                 ? parseFloat(formData.dailyRate)
                 : null;
+
+            let rawName = formData.name?.trim() || '';
+            let rawNameAr = formData.nameAr?.trim() || '';
+
+            // If user swapped them (Arabic in name, English in nameAr)
+            if (/[\u0600-\u06FF]/.test(rawName) && /[A-Za-z]/.test(rawNameAr)) {
+                const temp = rawName;
+                rawName = rawNameAr;
+                rawNameAr = temp;
+            } else if (/[\u0600-\u06FF]/.test(rawName) && !rawNameAr) {
+                rawNameAr = rawName;
+            }
+
+            const primaryName = rawName || rawNameAr || '';
+            const primaryNameAr = rawNameAr || null;
+
             await onSave({
                 ...formData,
+                name: primaryName,
+                nameAr: primaryNameAr,
                 dailyRate: rate,
                 phone: cleanPhones[0] || formData.phone?.trim() || null,
                 phones: cleanPhones
@@ -223,7 +252,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-container" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
@@ -233,9 +262,10 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
-                    {hasRestoredDraft && <DraftBanner onDiscard={handleDiscardDraft} />}
-                    <div className="form-grid">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
+                        {hasRestoredDraft && <DraftBanner onDiscard={handleDiscardDraft} />}
+                        <div className="form-grid">
                         <div className="form-group">
                             <label htmlFor="name">
                                 {t('common.name')} <span className="required">*</span>
@@ -388,8 +418,9 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div className="modal-footer">
+                <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={handleClose}>
                             {t('common.cancel')}
                         </button>
@@ -399,6 +430,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

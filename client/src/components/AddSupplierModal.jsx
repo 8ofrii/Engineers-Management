@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X, Plus, Check, Tag } from 'lucide-react';
 import { useAlert } from '../context/AlertContext';
@@ -16,6 +17,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
     const [newItemInput, setNewItemInput] = useState('');
     const [formData, setFormData] = useState({
         name: '',
+        nameAr: '',
         category: 'OTHER',
         categories: ['OTHER'],
         suppliedItems: [],
@@ -35,6 +37,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
         setHasRestoredDraft(false);
         setFormData({
             name: '',
+            nameAr: '',
             category: 'OTHER',
             categories: ['OTHER'],
             suppliedItems: [],
@@ -60,8 +63,17 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                 : (initialData.category ? [initialData.category] : ['OTHER']);
             const initItems = Array.isArray(initialData.suppliedItems) ? initialData.suppliedItems : [];
 
+            let initName = (initialData.name || '').trim();
+            let initNameAr = (initialData.nameAr || '').trim();
+
+            if (/[\u0600-\u06FF]/.test(initName) && !initNameAr) {
+                initNameAr = initName;
+                initName = '';
+            }
+
             setFormData({
-                name: initialData.name || '',
+                name: initName,
+                nameAr: initNameAr,
                 category: initCategories[0] || initialData.category || 'OTHER',
                 categories: initCategories,
                 suppliedItems: initItems,
@@ -86,6 +98,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
 
                 setFormData({
                     name: savedDraft.name || '',
+                    nameAr: savedDraft.nameAr || '',
                     category: draftCategories[0] || savedDraft.category || 'OTHER',
                     categories: draftCategories,
                     suppliedItems: draftItems,
@@ -197,7 +210,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
     const validate = () => {
         const newErrors = {};
 
-        if (!formData.name.trim()) {
+        if (!formData.name?.trim() && !formData.nameAr?.trim()) {
             newErrors.name = t('common.required');
         }
 
@@ -228,8 +241,25 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                 : [formData.category || 'OTHER'];
             const cleanItems = (formData.suppliedItems || []).map(item => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
 
+            let rawName = formData.name?.trim() || '';
+            let rawNameAr = formData.nameAr?.trim() || '';
+
+            // If user swapped them (Arabic in name, English in nameAr)
+            if (/[\u0600-\u06FF]/.test(rawName) && /[A-Za-z]/.test(rawNameAr)) {
+                const temp = rawName;
+                rawName = rawNameAr;
+                rawNameAr = temp;
+            } else if (/[\u0600-\u06FF]/.test(rawName) && !rawNameAr) {
+                rawNameAr = rawName;
+            }
+
+            const primaryName = rawName || rawNameAr || '';
+            const primaryNameAr = rawNameAr || null;
+
             const payload = {
                 ...formData,
+                name: primaryName,
+                nameAr: primaryNameAr,
                 category: cleanCategories[0] || 'OTHER',
                 categories: cleanCategories,
                 suppliedItems: cleanItems,
@@ -265,7 +295,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px' }}>
                 <div className="modal-header">
@@ -275,12 +305,13 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
                     {hasRestoredDraft && !initialData && (
                         <DraftBanner onDiscard={handleDiscardDraft} />
                     )}
                     <div className="form-grid">
-                        <div className="form-group full-width">
+                        <div className="form-group">
                             <label htmlFor="name">
                                 {t('suppliers.fields.name', 'Supplier Name')} <span className="required">*</span>
                             </label>
@@ -294,6 +325,21 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                                 placeholder={t('suppliers.placeholders.name', 'Enter supplier name')}
                             />
                             {errors.name && <span className="error-message">{errors.name}</span>}
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="nameAr">
+                                {t('common.nameAr', 'Arabic Name')}
+                            </label>
+                            <input
+                                type="text"
+                                id="nameAr"
+                                name="nameAr"
+                                value={formData.nameAr || ''}
+                                onChange={handleChange}
+                                placeholder="الاسم بالعربي"
+                                dir="rtl"
+                            />
                         </div>
 
                         {/* Multi-Category Selector */}
@@ -498,6 +544,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                             />
                         </div>
                     </div>
+                    </div>
 
                     <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={handleClose}>
@@ -509,6 +556,7 @@ export default function AddSupplierModal({ isOpen, onClose, onSave, initialData 
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

@@ -111,23 +111,51 @@ export const getSafes = async (req, res, next) => {
 
         // Compute inflow, outflow, and transfers for each safe to determine reconciled real-time balance
         const enrichedSafes = await Promise.all(safes.map(async (safe) => {
-            const [inflows, outflows, transfersIn, transfersOut] = await Promise.all([
+            const isCustodyWithUser = Boolean(safe.isCustody && safe.assignedUserId);
+
+            const safeInflowWhere = isCustodyWithUser
+                ? {
+                    tenantId,
+                    status: 'APPROVED',
+                    type: 'INCOME',
+                    OR: [
+                        { safeId: safe.id },
+                        { custodyWalletId: safe.assignedUserId, safeId: null },
+                        { payerUserId: safe.assignedUserId, paymentMethod: 'CUSTODY_WALLET', safeId: null }
+                    ]
+                }
+                : {
+                    safeId: safe.id,
+                    status: 'APPROVED',
+                    type: 'INCOME',
+                    tenantId
+                };
+
+            const safeOutflowWhere = isCustodyWithUser
+                ? {
+                    tenantId,
+                    status: 'APPROVED',
+                    type: 'EXPENSE',
+                    OR: [
+                        { safeId: safe.id },
+                        { custodyWalletId: safe.assignedUserId, safeId: null },
+                        { payerUserId: safe.assignedUserId, paymentMethod: 'CUSTODY_WALLET', safeId: null }
+                    ]
+                }
+                : {
+                    safeId: safe.id,
+                    status: 'APPROVED',
+                    type: 'EXPENSE',
+                    tenantId
+                };
+
+            const [inflows, outflows, transfersIn, transfersOut, custodyFundings, custodyReturns] = await Promise.all([
                 prisma.transaction.aggregate({
-                    where: {
-                        safeId: safe.id,
-                        status: 'APPROVED',
-                        type: 'INCOME',
-                        tenantId
-                    },
+                    where: safeInflowWhere,
                     _sum: { amount: true }
                 }),
                 prisma.transaction.aggregate({
-                    where: {
-                        safeId: safe.id,
-                        status: 'APPROVED',
-                        type: 'EXPENSE',
-                        tenantId
-                    },
+                    where: safeOutflowWhere,
                     _sum: { amount: true }
                 }),
                 prisma.safeTransfer.aggregate({
@@ -143,11 +171,23 @@ export const getSafes = async (req, res, next) => {
                         tenantId
                     },
                     _sum: { amount: true }
-                })
+                }),
+                isCustodyWithUser
+                    ? prisma.custodyTransfer.aggregate({
+                        where: { tenantId, engineerId: safe.assignedUserId, type: 'FUNDING' },
+                        _sum: { amount: true }
+                    })
+                    : Promise.resolve({ _sum: { amount: 0 } }),
+                isCustodyWithUser
+                    ? prisma.custodyTransfer.aggregate({
+                        where: { tenantId, engineerId: safe.assignedUserId, type: 'RETURN', relatedTransactionId: null },
+                        _sum: { amount: true }
+                    })
+                    : Promise.resolve({ _sum: { amount: 0 } })
             ]);
 
-            const totalIn = Number(inflows._sum.amount || 0);
-            const totalOut = Number(outflows._sum.amount || 0);
+            const totalIn = Number(inflows._sum.amount || 0) + Number(custodyFundings?._sum?.amount || 0);
+            const totalOut = Number(outflows._sum.amount || 0) + Number(custodyReturns?._sum?.amount || 0);
             const totalTrIn = Number(transfersIn._sum.amount || 0);
             const totalTrOut = Number(transfersOut._sum.amount || 0);
             const initial = Number(safe.initialBalance || 0);
@@ -163,6 +203,14 @@ export const getSafes = async (req, res, next) => {
                 }).catch(err => console.error(`Error auto-syncing safe ${safe.id} balance:`, err));
             }
 
+            // Also keep assigned user custody balance in sync for custody safes
+            if (isCustodyWithUser) {
+                await prisma.user.update({
+                    where: { id: safe.assignedUserId },
+                    data: { currentCustodyBalance: reconciledBalance }
+                }).catch(err => console.error(`Error auto-syncing user ${safe.assignedUserId} custody balance:`, err));
+            }
+
             return {
                 ...safe,
                 totalIncome: totalIn,
@@ -172,11 +220,16 @@ export const getSafes = async (req, res, next) => {
             };
         }));
 
-        // Fetch active tenant members to present custodies on the same plane as safes
+        // Fetch active tenant members who do not have an explicit custody safe
+        const usersWithExplicitCustodySafe = new Set(
+            enrichedSafes.filter(s => s.isCustody && s.assignedUserId).map(s => s.assignedUserId)
+        );
+
         const usersWithCustody = await prisma.user.findMany({
             where: {
                 tenantId,
-                isActive: true
+                isActive: true,
+                id: { notIn: Array.from(usersWithExplicitCustodySafe) }
             },
             select: {
                 id: true,
@@ -189,8 +242,12 @@ export const getSafes = async (req, res, next) => {
             orderBy: { name: 'asc' }
         });
 
-        const custodyEntities = await Promise.all(usersWithCustody.map(async (u) => {
+        const custodyEntities = (await Promise.all(usersWithCustody.map(async (u) => {
             const flows = await getCustodyFlows(u.id, tenantId);
+            const bal = Number(u.currentCustodyBalance || 0);
+            if (bal === 0 && flows.transactionCount === 0 && flows.totalIncome === 0 && flows.totalExpense === 0) {
+                return null;
+            }
             return {
                 id: `custody_${u.id}`,
                 userId: u.id,
@@ -199,7 +256,7 @@ export const getSafes = async (req, res, next) => {
                 type: 'CUSTODY',
                 accountNumber: null,
                 bankName: null,
-                balance: Number(u.currentCustodyBalance || 0),
+                balance: bal,
                 totalIncome: flows.totalIncome,
                 totalExpense: flows.totalExpense,
                 initialBalance: 0,
@@ -221,7 +278,7 @@ export const getSafes = async (req, res, next) => {
                     transfersTo: 0
                 }
             };
-        }));
+        }))).filter(Boolean);
 
         const allSafesAndCustodies = [...enrichedSafes, ...custodyEntities];
 
@@ -370,7 +427,8 @@ export const createSafe = async (req, res, next) => {
             currency,
             isDefault,
             description,
-            assignedUserId
+            assignedUserId,
+            isCustody
         } = req.body;
 
         if (!name || !name.trim()) {
@@ -395,6 +453,13 @@ export const createSafe = async (req, res, next) => {
             cleanAssignedUserId = memberId;
         }
 
+        if (isCustody && !cleanAssignedUserId) {
+            return res.status(400).json({
+                success: false,
+                message: 'A company member must be selected for custody accounts'
+            });
+        }
+
         const startBal = Number(initialBalance) || 0;
 
         const result = await prisma.$transaction(async (tx) => {
@@ -417,6 +482,8 @@ export const createSafe = async (req, res, next) => {
                     balance: startBal,
                     currency: currency || 'EGP',
                     isDefault: Boolean(isDefault),
+                    isActive: true,
+                    isCustody: Boolean(isCustody),
                     description: description ? description.trim() : null,
                     assignedUserId: cleanAssignedUserId,
                     tenantId
@@ -433,6 +500,13 @@ export const createSafe = async (req, res, next) => {
                     }
                 }
             });
+
+            if (startBal > 0 && isCustody && cleanAssignedUserId) {
+                await tx.user.update({
+                    where: { id: cleanAssignedUserId },
+                    data: { currentCustodyBalance: { increment: startBal } }
+                }).catch(err => console.error('Error syncing user custody initial balance:', err));
+            }
 
             return newSafe;
         });
@@ -476,7 +550,8 @@ export const updateSafe = async (req, res, next) => {
             description,
             isActive,
             isDefault,
-            assignedUserId
+            assignedUserId,
+            isCustody
         } = req.body;
 
         const existingSafe = await prisma.companySafe.findFirst({
@@ -527,6 +602,10 @@ export const updateSafe = async (req, res, next) => {
                 isActive: isActive !== undefined ? Boolean(isActive) : existingSafe.isActive,
                 isDefault: isDefault !== undefined ? Boolean(isDefault) : existingSafe.isDefault
             };
+
+            if (isCustody !== undefined) {
+                updateData.isCustody = Boolean(isCustody);
+            }
 
             if (assignedUserId !== undefined) {
                 updateData.assignedUserId = assignedUserUpdate;
@@ -903,6 +982,19 @@ export const transferBetweenSafes = async (req, res, next) => {
                 data: { balance: { increment: transferAmount } }
             });
 
+            if (fromSafe.isCustody && fromSafe.assignedUserId) {
+                await tx.user.update({
+                    where: { id: fromSafe.assignedUserId },
+                    data: { currentCustodyBalance: { decrement: transferAmount } }
+                }).catch(() => {});
+            }
+            if (toSafe.isCustody && toSafe.assignedUserId) {
+                await tx.user.update({
+                    where: { id: toSafe.assignedUserId },
+                    data: { currentCustodyBalance: { increment: transferAmount } }
+                }).catch(() => {});
+            }
+
             const transferRecord = await tx.safeTransfer.create({
                 data: {
                     amount: transferAmount,
@@ -1137,12 +1229,24 @@ export const getSafeStatement = async (req, res, next) => {
             });
         }
 
+        const isCustodyWithUser = Boolean(safe.isCustody && safe.assignedUserId);
+
         // 1. Fetch approved transactions tied to this safe
-        const txWhere = {
-            safeId: id,
-            status: 'APPROVED',
-            tenantId
-        };
+        const txWhere = isCustodyWithUser
+            ? {
+                tenantId,
+                status: 'APPROVED',
+                OR: [
+                    { safeId: id },
+                    { custodyWalletId: safe.assignedUserId, safeId: null },
+                    { payerUserId: safe.assignedUserId, paymentMethod: 'CUSTODY_WALLET', safeId: null }
+                ]
+            }
+            : {
+                safeId: id,
+                status: 'APPROVED',
+                tenantId
+            };
         if (dateFrom) txWhere.transactionDate = { gte: new Date(dateFrom) };
         if (dateTo) {
             txWhere.transactionDate = {
@@ -1197,6 +1301,18 @@ export const getSafeStatement = async (req, res, next) => {
             }
         });
 
+        // 3b. If custody safe with user, also fetch direct CustodyTransfer records
+        let custodyTransfers = [];
+        if (isCustodyWithUser) {
+            const ctWhere = { engineerId: safe.assignedUserId, tenantId };
+            if (dateFrom) ctWhere.createdAt = { gte: new Date(dateFrom) };
+            if (dateTo) ctWhere.createdAt = { ...(ctWhere.createdAt || {}), lte: new Date(`${dateTo}T23:59:59.999Z`) };
+            custodyTransfers = await prisma.custodyTransfer.findMany({
+                where: ctWhere,
+                orderBy: { createdAt: 'asc' }
+            });
+        }
+
         // 4. Map to unified ledger records
         const ledger = [];
 
@@ -1249,6 +1365,24 @@ export const getSafeStatement = async (req, res, next) => {
                 partyName: tr.toSafe?.name,
                 userName: tr.user?.name || null,
                 receiptUrl: tr.receiptUrl || null
+            });
+        });
+
+        custodyTransfers.forEach(ct => {
+            const isFunding = ct.type === 'FUNDING';
+            ledger.push({
+                id: ct.id,
+                date: ct.createdAt,
+                type: isFunding ? 'TRANSFER_IN' : 'TRANSFER_OUT',
+                inflow: isFunding ? Number(ct.amount) : 0,
+                outflow: !isFunding ? Number(ct.amount) : 0,
+                description: ct.description || (isFunding ? 'تغذية عهدة' : 'تسوية عهدة'),
+                reference: `CT-${ct.id.slice(0, 6)}`,
+                category: ct.type,
+                projectName: 'العهدة المالية',
+                partyName: safe.assignedUser?.name || safe.name,
+                userName: safe.assignedUser?.name || null,
+                receiptUrl: null
             });
         });
 

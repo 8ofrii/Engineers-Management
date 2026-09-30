@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Package, Search, ArrowRight, History, Plus, Trash2, Pencil, X, AlertTriangle, Store } from 'lucide-react';
 import Layout from '../components/Layout';
@@ -6,7 +7,7 @@ import { useAlert } from '../context/AlertContext';
 import AddMaterialModal from '../components/AddMaterialModal';
 import InventoryUsageModal from '../components/InventoryUsageModal';
 import { materialsAPI, projectsAPI, suppliersAPI, materialUsageAPI } from '../services/api';
-import { useFormat } from '../utils/format';
+import { useFormat, getLocalizedName } from '../utils/format';
 import { apiErrorMessage } from '../utils/apiError';
 
 export default function Inventory() {
@@ -97,8 +98,8 @@ export default function Inventory() {
                 type: 'success',
                 title: t('common.success', 'Success'),
                 message: isAr
-                    ? `تم شحن رصيد ${rechargingMaterial.nameAr || rechargingMaterial.name} بإضافة ${qty} ${rechargingMaterial.unit}${totalAmount > 0 && rechargeForm.createTransaction ? ` وتسجيل معاملة مصروف بقيمة ${formatCurrency(totalAmount)}` : ''} بنجاح!`
-                    : `Successfully recharged ${qty} ${rechargingMaterial.unit} to ${rechargingMaterial.name}${totalAmount > 0 && rechargeForm.createTransaction ? ` and recorded an expense of ${formatCurrency(totalAmount)}` : ''}!`
+                    ? `تم شحن رصيد ${getLocalizedName(rechargingMaterial, isAr)} بإضافة ${qty} ${rechargingMaterial.unit}${totalAmount > 0 && rechargeForm.createTransaction ? ` وتسجيل معاملة مصروف بقيمة ${formatCurrency(totalAmount)}` : ''} بنجاح!`
+                    : `Successfully recharged ${qty} ${rechargingMaterial.unit} to ${getLocalizedName(rechargingMaterial, isAr)}${totalAmount > 0 && rechargeForm.createTransaction ? ` and recorded an expense of ${formatCurrency(totalAmount)}` : ''}!`
             });
 
             setIsRechargeModalOpen(false);
@@ -116,7 +117,7 @@ export default function Inventory() {
         showAlert({
             type: 'warning',
             title: t('common.deleteConfirmTitle', 'Delete?'),
-            message: `${t('common.deleteConfirmMessage', 'Permanently delete')} "${material.nameAr || material.name}"?`,
+            message: `${t('common.deleteConfirmMessage', 'Permanently delete')} "${getLocalizedName(material, isAr)}"?`,
             showCancel: true,
             confirmText: t('common.delete', 'Delete'),
             onConfirm: async () => {
@@ -158,7 +159,7 @@ export default function Inventory() {
 
     const getBatchEntity = (batch) => {
         if (batch.supplierId && batch.supplier) {
-            const sName = batch.supplier.name || batch.supplier.company || 'Supplier';
+            const sName = getLocalizedName(batch.supplier, isAr) || batch.supplier.company || 'Supplier';
             return {
                 type: 'SUPPLIER',
                 id: `supp_${batch.supplierId}`,
@@ -169,7 +170,7 @@ export default function Inventory() {
             };
         }
         if (batch.projectId && batch.project) {
-            const pName = batch.project.name || 'Project';
+            const pName = getLocalizedName(batch.project, isAr) || 'Project';
             return {
                 type: 'PROJECT',
                 id: `proj_${batch.projectId}`,
@@ -194,7 +195,9 @@ export default function Inventory() {
         const q = searchQuery.toLowerCase();
         const matchesSearch = (batch.description?.toLowerCase().includes(q)) ||
             (batch.project?.name?.toLowerCase().includes(q)) ||
+            (batch.project?.nameAr?.toLowerCase().includes(q)) ||
             (batch.supplier?.name?.toLowerCase().includes(q)) ||
+            (batch.supplier?.nameAr?.toLowerCase().includes(q)) ||
             (batch.supplier?.company?.toLowerCase().includes(q));
 
         const matchesType = inventoryTypeFilter === 'ALL' ||
@@ -350,7 +353,7 @@ export default function Inventory() {
                                             <optgroup label={t('inventory.projectInventories') || (isAr ? 'مخزونات المشاريع' : 'Project Inventories')}>
                                                 {projects.map(p => (
                                                     <option key={`proj_${p.id}`} value={`proj_${p.id}`}>
-                                                        {isAr ? `مخزون ${p.name}` : `${p.name}'s Inventory`}
+                                                        {isAr ? `مخزون ${getLocalizedName(p, isAr)}` : `${getLocalizedName(p, isAr)}'s Inventory`}
                                                     </option>
                                                 ))}
                                             </optgroup>
@@ -359,7 +362,7 @@ export default function Inventory() {
                                             <optgroup label={t('inventory.supplierInventories') || (isAr ? 'مخزونات الموردين' : 'Supplier Inventories')}>
                                                 {suppliers.map(s => (
                                                     <option key={`supp_${s.id}`} value={`supp_${s.id}`}>
-                                                        {isAr ? `مخزون ${s.name}${s.company ? ` (${s.company})` : ''}` : `${s.name}'s Inventory`}
+                                                        {isAr ? `مخزون ${getLocalizedName(s, isAr)}${s.company ? ` (${s.company})` : ''}` : `${getLocalizedName(s, isAr)}'s Inventory`}
                                                     </option>
                                                 ))}
                                             </optgroup>
@@ -554,7 +557,7 @@ export default function Inventory() {
                                             flexDirection: 'column'
                                         }}>
                                             <div className="flex-between mb-xs" style={{ alignItems: 'flex-start', gap: 8 }}>
-                                                <h4 style={{ margin: 0, flex: 1, minWidth: 0 }}>{material.nameAr || material.name}</h4>
+                                                <h4 style={{ margin: 0, flex: 1, minWidth: 0 }}>{getLocalizedName(material, isAr)}</h4>
                                                 <div className="flex gap-xs" style={{ flexShrink: 0 }}>
                                                     {isLowStock && (
                                                         <span style={{
@@ -584,7 +587,7 @@ export default function Inventory() {
                                             </div>
 
                                             <div className="flex-between text-xs text-tertiary mb-md">
-                                                <span>{material.name}</span>
+                                                <span>{(isAr ? (material.name !== material.nameAr ? material.name : '') : (material.nameAr !== material.name ? material.nameAr : ''))}</span>
                                                 <span className="badge badge-info">{material.unit}</span>
                                             </div>
 
@@ -649,12 +652,12 @@ export default function Inventory() {
             />
 
             {/* Quick Recharge Material Stock Modal */}
-            {isRechargeModalOpen && rechargingMaterial && (
+            {isRechargeModalOpen && rechargingMaterial && createPortal(
                 <div className="modal-overlay" onClick={() => setIsRechargeModalOpen(false)}>
                     <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
                         <div className="modal-header">
                             <h2>
-                                {isAr ? `شحن رصيد: ${rechargingMaterial.nameAr || rechargingMaterial.name}` : `Recharge: ${rechargingMaterial.name}`}
+                                {isAr ? `شحن رصيد: ${getLocalizedName(rechargingMaterial, isAr)}` : `Recharge: ${getLocalizedName(rechargingMaterial, isAr)}`}
                             </h2>
                             <button className="modal-close" onClick={() => setIsRechargeModalOpen(false)}>
                                 <X size={24} />
@@ -778,7 +781,7 @@ export default function Inventory() {
                                         >
                                             <option value="">-- {isAr ? 'اختر المشروع' : 'Select Project'} --</option>
                                             {projects.map(p => (
-                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                                <option key={p.id} value={p.id}>{getLocalizedName(p, isAr)}</option>
                                             ))}
                                         </select>
                                     )}
@@ -792,14 +795,14 @@ export default function Inventory() {
                                                 setRechargeForm(prev => ({
                                                     ...prev,
                                                     supplierId: sId,
-                                                    supplierName: prev.supplierName || (supp ? (supp.name + (supp.company ? ` (${supp.company})` : '')) : '')
+                                                    supplierName: prev.supplierName || (supp ? (getLocalizedName(supp, isAr) + (supp.company ? ` (${supp.company})` : '')) : '')
                                                 }));
                                             }}
                                             style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #8b5cf6', backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
                                         >
                                             <option value="">-- {isAr ? 'اختر المورد' : 'Select Supplier'} --</option>
                                             {suppliers.map(s => (
-                                                <option key={s.id} value={s.id}>{s.name} {s.company ? `(${s.company})` : ''}</option>
+                                                <option key={s.id} value={s.id}>{getLocalizedName(s, isAr)} {s.company ? `(${s.company})` : ''}</option>
                                             ))}
                                         </select>
                                     )}
@@ -842,7 +845,8 @@ export default function Inventory() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             <InventoryUsageModal

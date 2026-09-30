@@ -93,3 +93,19 @@ inner_space_master_data.json
 scripts/*.mjs
 client/src/components/ui/beams-background-demo.tsx
 
+# Runtime PID & Scratch Scripts
+logs/*.pid
+scratch_*.cjs
+reconcile_all_projects.js
+server/check_*.cjs
+server/check_*.mjs
+server/check_*.js
+server/find_tenant.mjs
+server/migrate_db_plans.mjs
+server/remote_*.cjs
+server/remote_*.js
+server/test_custody_agg.cjs
+server/backups_transactions_pre_reset.json
+*.xlsx
+
+

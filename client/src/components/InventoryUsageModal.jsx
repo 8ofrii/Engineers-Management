@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X, Package } from 'lucide-react';
 import './Modal.css';
@@ -258,7 +259,7 @@ const InventoryUsageModal = ({
 
     if (!open) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-container" onClick={(e) => e.stopPropagation()} dir={isArabic ? 'rtl' : 'ltr'} style={{ maxWidth: '600px' }}>
                 <div className="modal-header">
@@ -271,7 +272,8 @@ const InventoryUsageModal = ({
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
                     {errors.submit && (
                         <div className="alert alert-error mb-md" style={{ padding: '10px', backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '4px' }}>
                             {errors.submit}
@@ -395,6 +397,7 @@ const InventoryUsageModal = ({
                         />
                         {errors.description && <span className="error-message">{errors.description}</span>}
                     </div>
+                    </div>
 
                     <div className="modal-footer" style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border-color)' }}>
                         <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={loading}>
@@ -408,7 +411,8 @@ const InventoryUsageModal = ({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

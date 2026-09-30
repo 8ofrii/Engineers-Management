@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X, Wallet, Plus, Upload, Paperclip, Trash2, FileText, FileSpreadsheet, ExternalLink, File, Store, Building2, Briefcase } from 'lucide-react';
 import { projectsAPI, materialUsageAPI, transactionsAPI, projectCostItemsAPI, userAPI, workmenAPI, clientsAPI, suppliersAPI, materialsAPI, documentsAPI, safesAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
-import { useFormat } from '../utils/format';
+import { useFormat, getLocalizedName } from '../utils/format';
 import AddWorkmanModal from './AddWorkmanModal';
 import './Modal.css';
 import CurrencyInput from './CurrencyInput';
 import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
 import DraftBanner from './DraftBanner';
+import { parseReceiptAttachments, resolveMediaUrl, getFileCategory, formatBytes, ACCEPTED_RECEIPT_MIME_TYPES } from '../utils/media';
 
 const TRANSACTION_DRAFT_KEY = 'hesaby_draft_transaction';
 
@@ -210,10 +212,11 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         physicalAccount: false
     });
 
-    // Attachment / Proof for Bank Transfer & Check
-    const [attachmentFile, setAttachmentFile] = useState(null);
-    const [attachmentPreview, setAttachmentPreview] = useState(null);
-    const [existingReceiptUrl, setExistingReceiptUrl] = useState(null);
+    // Multi-attachment state with optional per-file labels and preview
+    const [existingAttachments, setExistingAttachments] = useState([]);
+    const [newAttachments, setNewAttachments] = useState([]);
+    const [attachmentsModified, setAttachmentsModified] = useState(false);
+    const [previewModalItem, setPreviewModalItem] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
 
 
@@ -263,7 +266,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
         // Safe & Office Expense
         safeId: initialData?.safeId || '',
-        isOfficeExpense: initialData?.isOfficeExpense || false
+        isOfficeExpense: initialData?.isOfficeExpense || false,
+
+        // Total Incurred / Due Amount (Optional)
+        totalDueAmount: ''
     });
 
     // V1.2 UI Logic: New vs Existing Item Switch
@@ -303,7 +309,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 physicalAccount: '',
                 toEngineerId: '',
                 safeId: formData.safeId || '',
-                isOfficeExpense: false
+                isOfficeExpense: false,
+                totalDueAmount: ''
             });
             setErrors({});
         }
@@ -380,8 +387,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
     // Contextual beneficiary suggestions for office expenses (employees, utilities, stores, without site workmen)
     const officeBeneficiarySuggestions = useMemo(() => {
         const list = [
-            ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
-            ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+            ...users.map(u => ({ value: getLocalizedName(u, isRTL), label: `${getLocalizedName(u, isRTL)} (${formatUserRole(u.role)})` })),
+            ...suppliers.map(s => ({ value: getLocalizedName(s, isRTL), label: `${getLocalizedName(s, isRTL)} (${t('suppliers.title')})` })),
             ...existingBeneficiaries.map(b => ({ value: b, label: b }))
         ];
         return list.reduce((acc, current) => {
@@ -428,11 +435,13 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             paidByClientContact: '',
             toEngineerId: '',
             safeId: formData.safeId || '',
-            isOfficeExpense: false
+            isOfficeExpense: false,
+            totalDueAmount: ''
         });
-        setAttachmentFile(null);
-        setAttachmentPreview(null);
-        setExistingReceiptUrl(null);
+        setExistingAttachments([]);
+        setNewAttachments([]);
+        setAttachmentsModified(false);
+        setPreviewModalItem(null);
         setIsDragging(false);
         setErrors({});
     };
@@ -523,7 +532,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     customUnit: parsedCustomUnit,
                     clientId: initialData.clientId || initialData.client?.id || '',
                     paidByClientContact: initialData.paidByClientContact || '',
-                    beneficiary: initialData.beneficiary || initialData.supplier?.name || initialData.workman?.name || '',
+                    beneficiary: initialData.beneficiary || getLocalizedName(initialData.supplier, isRTL) || getLocalizedName(initialData.workman, isRTL) || '',
                     transactionFrom: initialData.transactionFrom || '',
                     transactionTo: initialData.transactionTo || '',
                     paymentMethod: initialData.paymentMethod || (initialData.type === 'INCOME' ? 'BANK_TRANSFER' : 'CUSTODY_WALLET'),
@@ -540,7 +549,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             ? `custody_${initialData.payerUserId || initialData.custodyWalletId || initialData.createdBy}`
                             : (formData.safeId || '')
                     ),
-                    isOfficeExpense: isOffice
+                    isOfficeExpense: isOffice,
+                    totalDueAmount: (initialData.totalDueAmount !== null && initialData.totalDueAmount !== undefined) ? String(initialData.totalDueAmount) : ''
                 });
                 if (isOffice) {
                     setCostItemMode('NEW');
@@ -548,15 +558,17 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     setSelectedProjectId('');
                     setSelectedProject(null);
                 }
-                setAttachmentFile(null);
-                setAttachmentPreview(null);
-                setExistingReceiptUrl(initialData.receiptPhotoUrl || null);
+                setExistingAttachments(parseReceiptAttachments(initialData.receiptPhotoUrl));
+                setNewAttachments([]);
+                setAttachmentsModified(false);
+                setPreviewModalItem(null);
                 setIsDragging(false);
 
             } else {
-                setAttachmentFile(null);
-                setAttachmentPreview(null);
-                setExistingReceiptUrl(null);
+                setExistingAttachments([]);
+                setNewAttachments([]);
+                setAttachmentsModified(false);
+                setPreviewModalItem(null);
                 setIsDragging(false);
                 // Check if there is a saved draft in localStorage
                 const savedDraft = getFormDraft(TRANSACTION_DRAFT_KEY);
@@ -596,7 +608,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         toEngineerId: savedDraft.formData?.toEngineerId || '',
                         safeId: savedDraft.formData?.safeId || formData.safeId || '',
                         targetSupplierId: savedDraft.formData?.targetSupplierId || '',
-                        isOfficeExpense: Boolean(savedDraft.formData?.isOfficeExpense)
+                        isOfficeExpense: Boolean(savedDraft.formData?.isOfficeExpense),
+                        totalDueAmount: savedDraft.formData?.totalDueAmount || ''
                     });
                     setHasRestoredDraft(true);
                 } else {
@@ -820,7 +833,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             setFormData(prev => ({
                 ...prev,
                 clientId: proj.client.id,
-                transactionFrom: prev.transactionFrom || proj.client.name
+                transactionFrom: prev.transactionFrom || getLocalizedName(proj.client, isRTL)
             }));
         }
         if (pId) {
@@ -890,15 +903,17 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
 
-        // Auto-calculate amount
+        // Auto-calculate amount & totalDueAmount
         if (name === 'quantity' || name === 'unitPrice') {
             const qty = name === 'quantity' ? parseFloat(value) : parseFloat(formData.quantity);
             const price = name === 'unitPrice' ? parseFloat(value) : parseFloat(formData.unitPrice);
-            if (!isNaN(qty) && !isNaN(price)) {
+            if (!isNaN(qty) && !isNaN(price) && qty > 0 && price > 0) {
+                const calculated = (qty * price).toFixed(2);
                 setFormData(prev => ({
                     ...prev,
                     [name]: value,
-                    amount: (qty * price).toString()
+                    totalDueAmount: prev.totalDueAmount ? prev.totalDueAmount : calculated,
+                    amount: prev.amount ? prev.amount : calculated
                 }));
             }
         }
@@ -991,7 +1006,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     ? (formData.targetSupplierId || formData.supplierId)
                     : (chosenMaterial?.supplierId || formData.supplierId);
 
-                const resolvedBeneficiary = formData.beneficiary?.trim() || (!isOffice && formData.workmanId ? workmen.find(w => w.id === formData.workmanId)?.name : (effectiveSupplierId ? suppliers.find(s => s.id === effectiveSupplierId)?.name : undefined));
+                const resolvedBeneficiary = formData.beneficiary?.trim() || (!isOffice && formData.workmanId ? getLocalizedName(workmen.find(w => w.id === formData.workmanId), isRTL) : (effectiveSupplierId ? getLocalizedName(suppliers.find(s => s.id === effectiveSupplierId), isRTL) : undefined));
 
                 const resolvedUnit = formData.unit === 'OTHER'
                     ? (formData.customUnit?.trim() || undefined)
@@ -1018,16 +1033,22 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     finalDescription = (isOffice ? (isRTL ? 'مصروف مقر ومكتب' : 'Office Expense') : (resolvedItemName || t(`finance.categories.${resolvedCategory?.toLowerCase()}`) || resolvedCategory || 'Site Expense'));
                 }
 
+                const selectedSafeObj = safes.find(s => s.id === formData.safeId);
+                const isCustodySafe = selectedSafeObj?.isCustody || selectedSafeObj?.type === 'CUSTODY' || (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_'));
+                const custodyUserId = (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_'))
+                    ? formData.safeId.replace('custody_', '')
+                    : (selectedSafeObj?.assignedUserId || undefined);
+
                 payload = {
                     type: 'EXPENSE',
                     category: resolvedCategory,
                     amount: Number(formData.amount),
                     projectId: (isOffice || isSupplierInv) ? undefined : (selectedProjectId || undefined),
-                    safeId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? null : (formData.safeId || undefined),
-                    custodyWalletId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? formData.safeId.replace('custody_', '') : undefined,
+                    safeId: formData.safeId || undefined,
+                    custodyWalletId: custodyUserId || undefined,
                     isOfficeExpense: isOffice,
                     projectCostItemId: (!isOffice && costItemMode === 'EXISTING') ? formData.projectCostItemId : undefined,
-                    payerUserId: formData.payerUserId || user?.id,
+                    payerUserId: custodyUserId || formData.payerUserId || user?.id,
                     workmanId: isOffice ? undefined : (formData.workmanId || undefined),
                     supplierId: effectiveSupplierId || undefined,
                     targetSupplierId: isSupplierInv ? effectiveSupplierId : undefined,
@@ -1037,39 +1058,51 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     materialId: (isMaterial && formData.materialId) ? formData.materialId : undefined,
                     description: finalDescription,
                     transactionDate: formData.transactionDate,
-                    paymentMethod: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? 'CUSTODY_WALLET' : formData.paymentMethod,
+                    paymentMethod: isCustodySafe ? 'CUSTODY_WALLET' : (formData.paymentMethod || 'CASH'),
                     itemName: resolvedItemName,
                     unit: isOffice ? (resolvedUnit || undefined) : (isMaterial ? (formData.unit || chosenMaterial?.unit) : (costItemMode === 'NEW' ? resolvedUnit : undefined)),
                     unitPrice: isOffice ? (formData.unitPrice ? Number(formData.unitPrice) : undefined) : (isMaterial ? (formData.unitPrice ? Number(formData.unitPrice) : (chosenMaterial?.unitPrice ? Number(chosenMaterial.unitPrice) : undefined)) : (costItemMode === 'NEW' && formData.unitPrice ? Number(formData.unitPrice) : undefined)),
                     quantity: formData.quantity ? Number(formData.quantity) : undefined,
-                    costCenter: formData.costCenter || (isOffice ? (isRTL ? 'المقر الرئيسي' : 'Headquarters') : (isSupplierInv ? (isRTL ? 'مخزون مورد' : 'Supplier Inventory') : (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')))),
+                    costCenter: formData.costCenter || (isOffice ? (isRTL ? 'المقر الرئيسي' : 'Headquarters') : (isSupplierInv ? (isRTL ? 'مخزون مورد' : 'Supplier Inventory') : (selectedProject ? (isRTL ? `موقع ${getLocalizedName(selectedProject, isRTL)}` : `${getLocalizedName(selectedProject, isRTL)} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse')))),
                     transactionTo: formData.transactionTo?.trim() || undefined,
-                    invoiceNumber: formData.invoiceNumber
+                    invoiceNumber: formData.invoiceNumber,
+                    totalDueAmount: (formData.totalDueAmount !== undefined && formData.totalDueAmount !== '' && formData.totalDueAmount !== null && !isNaN(Number(formData.totalDueAmount)))
+                        ? Number(formData.totalDueAmount)
+                        : null
                 };
             }
             else if (mode === 'INCOME') {
                 const resolvedClientId = formData.clientId || selectedProject?.client?.id || undefined;
                 const chosenClient = clients.find(c => c.id === resolvedClientId);
-                const clientName = chosenClient?.name || selectedProject?.client?.name || formData.transactionFrom || undefined;
+                const clientName = getLocalizedName(chosenClient, isRTL) || getLocalizedName(selectedProject?.client, isRTL) || formData.transactionFrom || undefined;
+
+                const selectedSafeObj = safes.find(s => s.id === formData.safeId);
+                const isCustodySafe = selectedSafeObj?.isCustody || selectedSafeObj?.type === 'CUSTODY' || (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_'));
+                const custodyUserId = (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_'))
+                    ? formData.safeId.replace('custody_', '')
+                    : (selectedSafeObj?.assignedUserId || undefined);
 
                 payload = {
                     type: 'INCOME',
                     category: 'PAYMENT',
                     amount: Number(formData.amount),
                     projectId: selectedProjectId || undefined,
-                    safeId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? null : (formData.safeId || undefined),
-                    custodyWalletId: (typeof formData.safeId === 'string' && formData.safeId.startsWith('custody_')) ? formData.safeId.replace('custody_', '') : undefined,
+                    safeId: formData.safeId || undefined,
+                    custodyWalletId: custodyUserId || undefined,
                     isOfficeExpense: Boolean(formData.isOfficeExpense),
                     projectCostItemId: formData.projectCostItemId || undefined,
                     description: formData.description?.trim() || t('finance.categories.payment') || 'Client Payment',
                     transactionDate: formData.transactionDate,
                     clientId: resolvedClientId,
                     paidByClientContact: formData.paidByClientContact?.trim() || undefined,
-                    paymentMethod: formData.paymentMethod || 'BANK_TRANSFER',
+                    paymentMethod: isCustodySafe ? 'CUSTODY_WALLET' : (formData.paymentMethod || 'BANK_TRANSFER'),
                     physicalAccount: formData.physicalAccount || undefined,
                     transactionFrom: clientName,
                     costCenter: formData.costCenter || undefined,
-                    invoiceNumber: formData.invoiceNumber
+                    invoiceNumber: formData.invoiceNumber,
+                    totalDueAmount: (formData.totalDueAmount !== undefined && formData.totalDueAmount !== '' && formData.totalDueAmount !== null && !isNaN(Number(formData.totalDueAmount)))
+                        ? Number(formData.totalDueAmount)
+                        : null
                 };
             }
             else if (mode === 'USAGE') {
@@ -1109,15 +1142,27 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                 }
             }
 
-            // Upload attachment (receipt / check copy / transfer proof) if provided
+            // Upload attachments (receipts / invoices / check copy / proof) if new files exist or existing modified
             const targetTxId = initialData?.id || resTx?.data?.data?.id || resTx?.data?.id;
-            if (targetTxId && attachmentFile) {
+            if (targetTxId && (newAttachments.length > 0 || attachmentsModified)) {
                 try {
                     const fd = new FormData();
-                    fd.append('file', attachmentFile);
+                    newAttachments.forEach((att) => {
+                        fd.append('files', att.file);
+                    });
+                    const newLabels = newAttachments.map(att => att.label || '');
+                    fd.append('fileLabels', JSON.stringify(newLabels));
+
+                    const kept = existingAttachments.map(att => ({
+                        url: att.url,
+                        label: att.label || '',
+                        name: att.name || att.url?.split('/').pop() || ''
+                    }));
+                    fd.append('keptExistingAttachments', JSON.stringify(kept));
+
                     await documentsAPI.uploadReceipt(targetTxId, fd);
                 } catch (uploadErr) {
-                    console.error("Attachment upload failed", uploadErr);
+                    console.error("Attachments upload failed", uploadErr);
                 }
             }
 
@@ -1208,13 +1253,79 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
         );
     };
 
+    const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+
+    const handleAddFiles = (fileList) => {
+        if (!fileList || fileList.length === 0) return;
+        const files = Array.from(fileList);
+        const validFiles = [];
+        for (const file of files) {
+            if (file.size > MAX_FILE_SIZE) {
+                showAlert({
+                    type: 'warning',
+                    title: isRTL ? 'حجم الملف كبير' : 'File Too Large',
+                    message: isRTL
+                        ? `الملف (${file.name}) يتجاوز الحد الأقصى المسموح (25 ميجابايت).`
+                        : `File (${file.name}) exceeds the 25 MB limit.`
+                });
+                continue;
+            }
+            const meta = getFileCategory(file.name);
+            const id = `new-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            validFiles.push({
+                id,
+                file,
+                name: file.name,
+                label: '',
+                ext: meta.ext,
+                size: file.size,
+                sizeStr: formatBytes(file.size),
+                isImg: meta.isImg,
+                isPdf: meta.isPdf,
+                isSpreadsheet: meta.isSpreadsheet,
+                isDoc: meta.isDoc,
+                previewUrl: meta.isImg ? URL.createObjectURL(file) : null,
+                isExisting: false
+            });
+        }
+        if (validFiles.length > 0) {
+            setNewAttachments(prev => [...prev, ...validFiles]);
+            setAttachmentsModified(true);
+        }
+    };
+
+    const handleRemoveExisting = (id) => {
+        setExistingAttachments(prev => prev.filter(item => item.id !== id));
+        setAttachmentsModified(true);
+    };
+
+    const handleRemoveNew = (id) => {
+        setNewAttachments(prev => {
+            const item = prev.find(i => i.id === id);
+            if (item?.previewUrl && item.previewUrl.startsWith('blob:')) {
+                try { URL.revokeObjectURL(item.previewUrl); } catch (e) {}
+            }
+            return prev.filter(i => i.id !== id);
+        });
+        setAttachmentsModified(true);
+    };
+
+    const handleUpdateLabel = (id, newLabel, isExisting) => {
+        if (isExisting) {
+            setExistingAttachments(prev => prev.map(item => item.id === id ? { ...item, label: newLabel } : item));
+        } else {
+            setNewAttachments(prev => prev.map(item => item.id === id ? { ...item, label: newLabel } : item));
+        }
+        setAttachmentsModified(true);
+    };
+
     const renderAttachmentUploader = () => {
         const isCheck = formData.paymentMethod === 'CHECK';
         const isBank = formData.paymentMethod === 'BANK_TRANSFER';
         const isCash = formData.paymentMethod === 'CASH';
 
         const title = isCheck
-            ? (isRTL ? 'صورة الشيك / المرفق' : 'Check Attachment / Photo')
+            ? (isRTL ? 'صورة الشيك / المرفقات' : 'Check Attachment / Photo')
             : isBank
             ? (isRTL ? 'إيصال التحويل البنكي / إنستاباي' : 'Bank Transaction / InstaPay Receipt')
             : isCash
@@ -1222,225 +1333,283 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
             : (isRTL ? 'المرفقات / صورة الإيصال أو الفاتورة' : 'Attachment / Receipt or Invoice Proof');
 
         const subtitle = isRTL
-            ? 'اضغط هنا أو اسحب الملف لرفع المرفق (صور، PDF، ملفات CSV، إكسيل، أو مستندات)'
-            : 'Click or drag & drop receipt / document (Images, PDFs, CSV, Excel, Word, Docs)';
+            ? 'اضغط هنا أو اسحب الملفات لرفع المرفقات (صور، PDF، ملفات CSV، إكسيل، أو مستندات)'
+            : 'Click or drag & drop receipts / documents (Images, PDFs, CSV, Excel, Word, Docs)';
 
-        const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
-
-        const handleFileSelection = (file) => {
-            if (!file) return;
-            if (file.size > MAX_FILE_SIZE) {
-                showAlert({
-                    type: 'warning',
-                    title: isRTL ? 'حجم الملف كبير' : 'File Too Large',
-                    message: isRTL ? 'الحد الأقصى لحجم الملف المرفوع هو 25 ميجابايت.' : 'Maximum allowed file size is 25 MB.'
-                });
-                return;
-            }
-            setAttachmentFile(file);
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (ev) => setAttachmentPreview(ev.target.result);
-                reader.readAsDataURL(file);
-            } else {
-                setAttachmentPreview(null);
-            }
-        };
-
-        const handleFileChange = (e) => {
-            const file = e.target.files?.[0];
-            handleFileSelection(file);
-        };
-
-        const handleDrop = (e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            const file = e.dataTransfer?.files?.[0];
-            handleFileSelection(file);
-        };
-
-        const handleRemove = () => {
-            setAttachmentFile(null);
-            setAttachmentPreview(null);
-            setExistingReceiptUrl(null);
-        };
-
-        const getFileInfo = () => {
-            let name = attachmentFile?.name || '';
-            let ext = '';
-            let sizeStr = '';
-
-            if (attachmentFile) {
-                ext = (name.split('.').pop() || '').toLowerCase();
-                const sizeKB = attachmentFile.size / 1024;
-                sizeStr = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(2)} MB` : `${sizeKB.toFixed(1)} KB`;
-            } else if (existingReceiptUrl) {
-                const parts = existingReceiptUrl.split('/');
-                name = parts[parts.length - 1]?.split('?')[0] || (isRTL ? 'مرفق سابق' : 'Stored Attachment');
-                ext = (name.split('.').pop() || '').toLowerCase();
-                sizeStr = isRTL ? 'ملف محفوظ مسبقاً' : 'Existing Attachment';
-            }
-
-            const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp', 'svg'].includes(ext) || attachmentFile?.type?.startsWith('image/');
-            const isPdf = ext === 'pdf' || attachmentFile?.type === 'application/pdf';
-            const isSpreadsheet = ['csv', 'xlsx', 'xls'].includes(ext) || attachmentFile?.type?.includes('csv') || attachmentFile?.type?.includes('spreadsheet') || attachmentFile?.type?.includes('excel');
-            const isDoc = ['doc', 'docx', 'txt', 'rtf'].includes(ext) || attachmentFile?.type?.includes('word') || attachmentFile?.type?.includes('text');
-
-            return { name, ext: ext.toUpperCase() || 'FILE', sizeStr, isImg, isPdf, isSpreadsheet, isDoc };
-        };
-
-        const fileInfo = (attachmentFile || existingReceiptUrl) ? getFileInfo() : null;
-        const ACCEPT_TYPES = "image/*,application/pdf,.csv,.xlsx,.xls,.doc,.docx,.txt,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+        const allAttachments = [...existingAttachments, ...newAttachments];
 
         return (
-            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '6px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
-                    <Paperclip size={16} style={{ color: 'var(--color-primary)' }} />
-                    {title}
-                </label>
+            <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, margin: 0 }}>
+                        <Paperclip size={16} style={{ color: 'var(--color-primary)' }} />
+                        <span>{title}</span>
+                        {allAttachments.length > 0 && (
+                            <span style={{
+                                fontSize: '0.75rem',
+                                padding: '1px 8px',
+                                borderRadius: '10px',
+                                background: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border-color)',
+                                fontWeight: 700,
+                                color: 'var(--color-primary)'
+                            }}>
+                                {allAttachments.length}
+                            </span>
+                        )}
+                    </label>
+                    {allAttachments.length > 0 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            {isRTL ? 'يمكنك إضافة تسمية اختيارية لكل مرفق' : 'Optional label can be set per attachment'}
+                        </span>
+                    )}
+                </div>
 
-                {attachmentFile || existingReceiptUrl ? (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        gap: '12px'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
-                            {fileInfo?.isImg && (attachmentPreview || existingReceiptUrl) ? (
-                                <img
-                                    src={attachmentPreview || (existingReceiptUrl.startsWith('http') ? existingReceiptUrl : `/uploads/${existingReceiptUrl.replace(/^(\/|uploads\/)/, '')}`)}
-                                    alt="Receipt preview"
+                {allAttachments.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {allAttachments.map((att) => {
+                            const isExisting = att.isExisting;
+                            const previewSrc = att.previewUrl || resolveMediaUrl(att.url);
+                            const canPreviewImg = att.isImg && Boolean(previewSrc);
+
+                            return (
+                                <div
+                                    key={att.id}
                                     style={{
-                                        width: '48px',
-                                        height: '48px',
-                                        objectFit: 'cover',
-                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '10px 14px',
+                                        borderRadius: '8px',
+                                        background: 'var(--bg-secondary)',
                                         border: '1px solid var(--border-color)',
-                                        flexShrink: 0
+                                        gap: '12px',
+                                        transition: 'all 0.15s ease'
                                     }}
-                                />
-                            ) : fileInfo?.isPdf ? (
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '6px',
-                                    background: 'rgba(239, 68, 68, 0.12)',
-                                    border: '1px solid rgba(239, 68, 68, 0.25)',
-                                    color: '#ef4444',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
-                                }}>
-                                    <FileText size={20} />
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 'bold', marginTop: '1px' }}>PDF</span>
-                                </div>
-                            ) : fileInfo?.isSpreadsheet ? (
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '6px',
-                                    background: 'rgba(16, 185, 129, 0.12)',
-                                    border: '1px solid rgba(16, 185, 129, 0.25)',
-                                    color: '#10b981',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
-                                }}>
-                                    <FileSpreadsheet size={20} />
-                                    <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '1px' }}>{fileInfo.ext}</span>
-                                </div>
-                            ) : (
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '6px',
-                                    background: 'rgba(59, 130, 246, 0.12)',
-                                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                                    color: '#3b82f6',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
-                                }}>
-                                    <FileText size={20} />
-                                    <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '1px' }}>{fileInfo?.ext || 'DOC'}</span>
-                                </div>
-                            )}
-
-                            <div style={{ overflow: 'hidden' }}>
-                                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.88rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={fileInfo?.name}>
-                                    {fileInfo?.name}
-                                </p>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                        {fileInfo?.sizeStr}
-                                    </span>
-                                    <span style={{
-                                        fontSize: '0.65rem',
-                                        padding: '1px 5px',
-                                        borderRadius: '4px',
-                                        background: 'var(--bg-tertiary)',
-                                        border: '1px solid var(--border-color)',
-                                        fontWeight: 600
-                                    }}>
-                                        {fileInfo?.ext}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                            {existingReceiptUrl && !attachmentFile && (
-                                <a
-                                    href={existingReceiptUrl.startsWith('http') ? existingReceiptUrl : `/uploads/${existingReceiptUrl.replace(/^(\/|uploads\/)/, '')}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="btn btn-sm btn-ghost"
-                                    style={{ textDecoration: 'none', padding: '5px 8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                    title={isRTL ? 'معاينة / فتح' : 'View / Open'}
                                 >
-                                    <ExternalLink size={14} />
-                                    <span>{isRTL ? 'عرض' : 'View'}</span>
-                                </a>
-                            )}
-                            <label
-                                className="btn btn-sm btn-ghost"
-                                style={{ cursor: 'pointer', margin: 0, padding: '5px 10px', fontSize: '0.8rem' }}
-                            >
-                                {isRTL ? 'تغيير' : 'Change'}
-                                <input
-                                    type="file"
-                                    accept={ACCEPT_TYPES}
-                                    onChange={handleFileChange}
-                                    style={{ display: 'none' }}
-                                />
-                            </label>
-                            <button
-                                type="button"
-                                onClick={handleRemove}
-                                className="btn-icon"
-                                title={isRTL ? 'حذف' : 'Remove'}
-                                style={{ padding: '6px', color: '#ef4444', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', border: '1px solid var(--border-color)' }}
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
+                                    {/* Left: Thumbnail & Details */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                                        {/* Thumbnail / Icon */}
+                                        {canPreviewImg ? (
+                                            <img
+                                                src={previewSrc}
+                                                alt={att.name || 'Attachment'}
+                                                onClick={() => setPreviewModalItem({ url: previewSrc, name: att.name || 'Attachment', isImg: true })}
+                                                style={{
+                                                    width: '48px',
+                                                    height: '48px',
+                                                    objectFit: 'cover',
+                                                    borderRadius: '6px',
+                                                    border: '1px solid var(--border-color)',
+                                                    flexShrink: 0,
+                                                    cursor: 'pointer'
+                                                }}
+                                                title={isRTL ? 'اضغط للمعاينة' : 'Click to preview'}
+                                            />
+                                        ) : att.isPdf ? (
+                                            <div style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: '6px',
+                                                background: 'rgba(239, 68, 68, 0.12)',
+                                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                                color: '#ef4444',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0
+                                            }}>
+                                                <FileText size={20} />
+                                                <span style={{ fontSize: '0.62rem', fontWeight: 'bold', marginTop: '1px' }}>PDF</span>
+                                            </div>
+                                        ) : att.isSpreadsheet ? (
+                                            <div style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: '6px',
+                                                background: 'rgba(16, 185, 129, 0.12)',
+                                                border: '1px solid rgba(16, 185, 129, 0.25)',
+                                                color: '#10b981',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0
+                                            }}>
+                                                <FileSpreadsheet size={20} />
+                                                <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '1px' }}>{att.ext || 'XLS'}</span>
+                                            </div>
+                                        ) : (
+                                            <div style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: '6px',
+                                                background: 'rgba(59, 130, 246, 0.12)',
+                                                border: '1px solid rgba(59, 130, 246, 0.25)',
+                                                color: '#3b82f6',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0
+                                            }}>
+                                                <FileText size={20} />
+                                                <span style={{ fontSize: '0.6rem', fontWeight: 'bold', marginTop: '1px' }}>{att.ext || 'DOC'}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Name, Meta & Optional Label Input */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <span style={{
+                                                    margin: 0,
+                                                    fontWeight: 600,
+                                                    fontSize: '0.86rem',
+                                                    textOverflow: 'ellipsis',
+                                                    overflow: 'hidden',
+                                                    whiteSpace: 'nowrap',
+                                                    maxWidth: '220px'
+                                                }} title={att.name}>
+                                                    {att.name}
+                                                </span>
+                                                <span style={{
+                                                    fontSize: '0.65rem',
+                                                    padding: '1px 5px',
+                                                    borderRadius: '4px',
+                                                    background: 'var(--bg-tertiary)',
+                                                    border: '1px solid var(--border-color)',
+                                                    fontWeight: 600
+                                                }}>
+                                                    {att.ext}
+                                                </span>
+                                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                                    {att.sizeStr || (isExisting ? (isRTL ? 'ملف محفوظ مسبقاً' : 'Saved Attachment') : '')}
+                                                </span>
+                                            </div>
+
+                                            {/* Optional Label Input */}
+                                            <div style={{ marginTop: '5px' }}>
+                                                <input
+                                                    type="text"
+                                                    value={att.label || ''}
+                                                    onChange={(e) => handleUpdateLabel(att.id, e.target.value, isExisting)}
+                                                    placeholder={isRTL ? "تسمية المرفق (اختياري: مثلاً فاتورة أسمنت، إذن توريد...)" : "Attachment label (optional: e.g. Cement invoice, Transfer receipt...)"}
+                                                    style={{
+                                                        width: '100%',
+                                                        maxWidth: '360px',
+                                                        height: '30px',
+                                                        fontSize: '0.8rem',
+                                                        padding: '3px 9px',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid var(--border-color)',
+                                                        background: 'var(--bg-primary)',
+                                                        color: 'var(--text-primary)'
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Actions */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                        {/* View / Open */}
+                                        {canPreviewImg ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setPreviewModalItem({ url: previewSrc, name: att.name || 'Attachment', isImg: true })}
+                                                className="btn btn-sm btn-ghost"
+                                                style={{ padding: '5px 8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                title={isRTL ? 'معاينة المرفق' : 'Preview Attachment'}
+                                            >
+                                                <ExternalLink size={14} />
+                                                <span>{isRTL ? 'عرض' : 'View'}</span>
+                                            </button>
+                                        ) : previewSrc ? (
+                                            <a
+                                                href={previewSrc}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="btn btn-sm btn-ghost"
+                                                style={{ textDecoration: 'none', padding: '5px 8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                title={isRTL ? 'فتح في نافذة جديدة' : 'Open in new tab'}
+                                            >
+                                                <ExternalLink size={14} />
+                                                <span>{isRTL ? 'عرض' : 'View'}</span>
+                                            </a>
+                                        ) : null}
+
+                                        {/* Delete */}
+                                        <button
+                                            type="button"
+                                            onClick={() => isExisting ? handleRemoveExisting(att.id) : handleRemoveNew(att.id)}
+                                            className="btn-icon"
+                                            title={isRTL ? 'حذف' : 'Remove'}
+                                            style={{
+                                                padding: '6px',
+                                                color: '#ef4444',
+                                                backgroundColor: 'var(--bg-tertiary)',
+                                                borderRadius: '6px',
+                                                border: '1px solid var(--border-color)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {/* Add more attachments strip */}
+                        <label
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                setIsDragging(false);
+                                handleAddFiles(e.dataTransfer?.files);
+                            }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                padding: '10px 14px',
+                                borderRadius: '8px',
+                                border: isDragging ? '2px dashed var(--color-primary)' : '1.5px dashed var(--border-color)',
+                                background: isDragging ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-secondary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                textAlign: 'center',
+                                color: 'var(--color-primary)',
+                                fontWeight: 600,
+                                fontSize: '0.85rem'
+                            }}
+                        >
+                            <Plus size={16} />
+                            <span>{isRTL ? 'إضافة مرفقات أخرى (اسحب أو اضغط للاختيار)' : 'Add more attachments (Drag & drop or click)'}</span>
+                            <input
+                                type="file"
+                                multiple
+                                accept={ACCEPTED_RECEIPT_MIME_TYPES}
+                                onChange={(e) => {
+                                    handleAddFiles(e.target.files);
+                                    e.target.value = '';
+                                }}
+                                style={{ display: 'none' }}
+                            />
+                        </label>
                     </div>
                 ) : (
                     <label
                         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                         onDragLeave={() => setIsDragging(false)}
-                        onDrop={handleDrop}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            setIsDragging(false);
+                            handleAddFiles(e.dataTransfer?.files);
+                        }}
                         style={{
                             display: 'flex',
                             flexDirection: 'column',
@@ -1480,8 +1649,12 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                         </div>
                         <input
                             type="file"
-                            accept={ACCEPT_TYPES}
-                            onChange={handleFileChange}
+                            multiple
+                            accept={ACCEPTED_RECEIPT_MIME_TYPES}
+                            onChange={(e) => {
+                                handleAddFiles(e.target.files);
+                                e.target.value = '';
+                            }}
                             style={{ display: 'none' }}
                         />
                     </label>
@@ -1492,7 +1665,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
 
@@ -1629,7 +1802,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
                     {hasRestoredDraft && !initialData && (
                         <DraftBanner onDiscard={handleDiscardDraft} />
                     )}
@@ -1700,7 +1874,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 >
                                     <option value="">-- {mode === 'TRANSFER' ? (isRTL ? 'بدون ربط بمشروع محدد' : 'General / No specific project') : t('finance.selectProject')} --</option>
                                     {projects.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                        <option key={p.id} value={p.id}>{getLocalizedName(p, isRTL)}</option>
                                     ))}
                                 </select>
                             )}
@@ -1766,7 +1940,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                     <option value="">-- {t('finance.selectPayer')} --</option>
                                     {users.map(u => (
                                         <option key={u.id} value={u.id}>
-                                            {u.name} ({formatUserRole(u.role)})
+                                            {getLocalizedName(u, isRTL)} ({formatUserRole(u.role)})
                                         </option>
                                     ))}
                                 </select>
@@ -1837,7 +2011,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                     {safes.filter(s => s.isCustody || s.type === 'CUSTODY').length > 0 && (
                                         <optgroup label={isRTL ? '💼 عُهد المهندسين والموظفين' : '💼 Employee Custodies'}>
                                             {safes.filter(s => s.isCustody || s.type === 'CUSTODY').map(s => {
-                                                const custodianName = s.assignedUser?.name || s.name.replace(/^عهدة:\s*/, '');
+                                                const custodianName = s.assignedUser ? getLocalizedName(s.assignedUser, isRTL) : s.name.replace(/^عهدة:\s*/, '');
                                                 return (
                                                     <option key={s.id} value={s.id}>
                                                         {isRTL ? `عهدة: ${custodianName}` : `Custody: ${custodianName}`} — {fmtCurrency(s.balance)}
@@ -1905,7 +2079,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                                 ...prev,
                                                                 projectCostItemId: '',
                                                                 category: 'MATERIALS',
-                                                                costCenter: prev.costCenter || (selectedProject ? (isRTL ? `موقع ${selectedProject.name}` : `${selectedProject.name} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
+                                                                costCenter: prev.costCenter || (selectedProject ? (isRTL ? `موقع ${getLocalizedName(selectedProject, isRTL)}` : `${getLocalizedName(selectedProject, isRTL)} Site`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
                                                             }));
                                                         }}
                                                         style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: costItemMode === 'MATERIAL' ? '700' : '500' }}
@@ -1931,7 +2105,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                                 setInventoryDestination('PROJECT');
                                                                 setFormData(prev => ({
                                                                     ...prev,
-                                                                    costCenter: selectedProject ? (isRTL ? `مخزن مشروع ${selectedProject.name}` : `${selectedProject.name} Site Warehouse`) : prev.costCenter
+                                                                    costCenter: selectedProject ? (isRTL ? `مخزن مشروع ${getLocalizedName(selectedProject, isRTL)}` : `${getLocalizedName(selectedProject, isRTL)} Site Warehouse`) : prev.costCenter
                                                                 }));
                                                             }}
                                                             style={{ borderRadius: '7px', fontSize: '0.85rem', fontWeight: inventoryDestination === 'PROJECT' ? '700' : '500' }}
@@ -1987,8 +2161,8 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                                 setFormData(prev => ({
                                                                     ...prev,
                                                                     targetSupplierId: sId,
-                                                                    beneficiary: supp?.name || prev.beneficiary,
-                                                                    costCenter: supp ? (isRTL ? `مخزن مورد: ${supp.name}` : `Supplier: ${supp.name}`) : prev.costCenter
+                                                                    beneficiary: supp ? getLocalizedName(supp, isRTL) : prev.beneficiary,
+                                                                    costCenter: supp ? (isRTL ? `مخزن مورد: ${getLocalizedName(supp, isRTL)}` : `Supplier: ${getLocalizedName(supp, isRTL)}`) : prev.costCenter
                                                                 }));
                                                                 if (errors.targetSupplierId) setErrors(prev => ({ ...prev, targetSupplierId: '' }));
                                                             }}
@@ -1998,7 +2172,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                             <option value="">-- {isRTL ? 'اختر المورد الذي ستبقى الخامة في مخزنه' : 'Select Supplier Holding the Inventory'} --</option>
                                                             {suppliers.map(s => (
                                                                 <option key={s.id} value={s.id}>
-                                                                    {s.name} {s.phone ? `(${s.phone})` : ''}
+                                                                    {getLocalizedName(s, isRTL)} {s.phone ? `(${s.phone})` : ''}
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -2030,7 +2204,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                                     unit: found?.unit || prev.unit,
                                                                     unitPrice: uPrice,
                                                                     amount: amt,
-                                                                    costCenter: prev.costCenter || (selectedProject ? (isRTL ? `مخزن مشروع ${selectedProject.name}` : `${selectedProject.name} Site Warehouse`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
+                                                                    costCenter: prev.costCenter || (selectedProject ? (isRTL ? `مخزن مشروع ${getLocalizedName(selectedProject, isRTL)}` : `${getLocalizedName(selectedProject, isRTL)} Site Warehouse`) : (isRTL ? 'المخزن الرئيسي' : 'Main Warehouse'))
                                                                 };
                                                             });
                                                             if (errors.materialId) setErrors(prev => ({ ...prev, materialId: '' }));
@@ -2064,7 +2238,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         <option value="">-- {t('finance.selectBand')} --</option>
                                                         {costItems.map(item => (
                                                             <option key={item.id} value={item.id}>
-                                                                {item.name}
+                                                                {getLocalizedName(item, isRTL)}
                                                             </option>
                                                         ))}
                                                     </select>
@@ -2228,10 +2402,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             formData.isOfficeExpense
                                                 ? officeBeneficiarySuggestions
                                                 : [
-                                                    ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
-                                                    ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
-                                                    ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
-                                                    ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
+                                                    ...suppliers.map(s => ({ value: getLocalizedName(s, isRTL), label: `${getLocalizedName(s, isRTL)} (${t('suppliers.title')})` })),
+                                                    ...workmen.map(w => ({ value: getLocalizedName(w, isRTL), label: `${getLocalizedName(w, isRTL)} (${formatTrade(w.trade)})` })),
+                                                    ...clients.map(c => ({ value: getLocalizedName(c, isRTL), label: `${getLocalizedName(c, isRTL)} (${t('clients.title')})` })),
+                                                    ...users.map(u => ({ value: getLocalizedName(u, isRTL), label: `${getLocalizedName(u, isRTL)} (${formatUserRole(u.role)})` })),
                                                     ...existingBeneficiaries.map(b => ({ value: b, label: b }))
                                                 ].reduce((acc, current) => {
                                                     const x = acc.find(item => item.value === current.value);
@@ -2249,10 +2423,10 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             "transactionTo",
                                             t('finance.transactionTo') || (isRTL ? 'المستلم / باليد' : 'Handover Recipient / Handed to'),
                                             [
-                                                ...users.map(u => ({ value: u.name, label: `${u.name} (${formatUserRole(u.role)})` })),
-                                                ...workmen.map(w => ({ value: w.name, label: `${w.name} (${formatTrade(w.trade)})` })),
-                                                ...clients.map(c => ({ value: c.name, label: `${c.name} (${t('clients.title')})` })),
-                                                ...suppliers.map(s => ({ value: s.name, label: `${s.name} (${t('suppliers.title')})` })),
+                                                ...users.map(u => ({ value: getLocalizedName(u, isRTL), label: `${getLocalizedName(u, isRTL)} (${formatUserRole(u.role)})` })),
+                                                ...workmen.map(w => ({ value: getLocalizedName(w, isRTL), label: `${getLocalizedName(w, isRTL)} (${formatTrade(w.trade)})` })),
+                                                ...clients.map(c => ({ value: getLocalizedName(c, isRTL), label: `${getLocalizedName(c, isRTL)} (${t('clients.title')})` })),
+                                                ...suppliers.map(s => ({ value: getLocalizedName(s, isRTL), label: `${getLocalizedName(s, isRTL)} (${t('suppliers.title')})` })),
                                                 ...existingTransactionTos.map(tt => ({ value: tt, label: tt }))
                                             ].reduce((acc, current) => {
                                                 const x = acc.find(item => item.value === current.value);
@@ -2285,7 +2459,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                                 <option value="">-- {t('labor.selectWorkman') || 'اختر الفني / الصنايعي'} --</option>
                                                                 {workmen.map(w => (
                                                                     <option key={w.id} value={w.id}>
-                                                                        {w.name} ({t(`labor.trades.${w.trade}`)})
+                                                                        {getLocalizedName(w, isRTL)} ({t(`labor.trades.${w.trade}`)})
                                                                     </option>
                                                                 ))}
                                                             </select>
@@ -2309,13 +2483,14 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                 </div>
 
                                 <div className="form-section">
-                                    <h3 className="section-title">{t('finance.detailsAndAmount') || 'التفاصيل والمبلغ'}</h3>
+                                    <h3 className="section-title">{t('finance.detailsAndAmount') || (isRTL ? 'التفاصيل والمبالغ المالية' : 'Details & Financial Amounts')}</h3>
                                     <div className="form-grid">
                                         {formData.isOfficeExpense ? (
                                             <>
-                                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                                                    <label style={{ fontSize: '0.95rem', fontWeight: 700 }}>
-                                                        {t('finance.amount')} (EGP) <span className="required" style={{ color: '#ef4444' }}>*</span>
+                                                {/* 1. Paid Amount (Mandatory) */}
+                                                <div className="form-group">
+                                                    <label style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                                        {isRTL ? 'المبلغ المدفوع (ج.م)' : 'Paid Amount (EGP)'} <span className="required" style={{ color: '#ef4444' }}>*</span>
                                                     </label>
                                                     <CurrencyInput
                                                         name="amount"
@@ -2323,10 +2498,28 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         onChange={handleChange}
                                                         placeholder="0.00"
                                                         className={errors.amount ? 'error' : ''}
-                                                        style={{ fontWeight: 'bold', fontSize: '1.25rem', padding: '12px' }}
+                                                        style={{ fontWeight: 'bold', fontSize: '1.15rem', padding: '10px' }}
                                                     />
                                                     {errors.amount && <span className="error-message">{errors.amount}</span>}
                                                 </div>
+
+                                                {/* 2. Total Incurred / Due Amount (Optional) */}
+                                                <div className="form-group">
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                        <label style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: 0, color: 'var(--text-primary)' }}>
+                                                            {isRTL ? 'المبلغ الإجمالي المستحق (ج.م)' : 'Total Due Amount (EGP)'}
+                                                        </label>
+                                                        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span>
+                                                    </div>
+                                                    <CurrencyInput
+                                                        name="totalDueAmount"
+                                                        value={formData.totalDueAmount}
+                                                        onChange={handleChange}
+                                                        placeholder={isRTL ? 'إجمالي الفاتورة / المستحق...' : 'Total invoice / contract due...'}
+                                                        style={{ fontWeight: '600', fontSize: '1.05rem', padding: '10px' }}
+                                                    />
+                                                </div>
+
                                                 <div className="form-group">
                                                     <label>{t('finance.quantity')} <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>({isRTL ? 'اختياري' : 'Optional'})</span></label>
                                                     <input
@@ -2426,19 +2619,97 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                         placeholder="0.00"
                                                     />
                                                 </div>
+
+                                                {/* 1. Paid Amount (Mandatory) */}
                                                 <div className="form-group">
-                                                    <label>{t('finance.amount')} (EGP) <span className="required">*</span></label>
+                                                    <label style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                                        {isRTL ? 'المبلغ المدفوع (ج.م)' : 'Paid Amount (EGP)'} <span className="required" style={{ color: '#ef4444' }}>*</span>
+                                                    </label>
                                                     <CurrencyInput
                                                         name="amount"
                                                         value={formData.amount}
                                                         onChange={handleChange}
                                                         placeholder="0.00"
                                                         className={errors.amount ? 'error' : ''}
-                                                        style={{ fontWeight: 'bold', fontSize: '1.1rem' }}
+                                                        style={{ fontWeight: 'bold', fontSize: '1.15rem' }}
                                                     />
                                                     {errors.amount && <span className="error-message">{errors.amount}</span>}
                                                 </div>
+
+                                                {/* 2. Total Incurred / Due Amount (Optional) */}
+                                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                        <label style={{ fontSize: '0.92rem', fontWeight: 700, marginBottom: 0, color: 'var(--text-primary)' }}>
+                                                            {isRTL ? 'المبلغ الإجمالي المستحق (ج.م)' : 'Total Due Amount (EGP)'}
+                                                        </label>
+                                                        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>({isRTL ? 'اختياري — في حال وجود متبقي غير مسوى أو دفعة جزئية' : 'Optional — if partially settled or remaining balance'})</span>
+                                                    </div>
+                                                    <CurrencyInput
+                                                        name="totalDueAmount"
+                                                        value={formData.totalDueAmount}
+                                                        onChange={handleChange}
+                                                        placeholder={isRTL ? 'أدخل إجمالي الفاتورة / المستحق الفعلي...' : 'e.g. Total invoice/due amount...'}
+                                                        style={{ fontWeight: '600', fontSize: '1.05rem' }}
+                                                    />
+                                                </div>
                                             </>
+                                        )}
+
+                                        {/* Real-time Settlement Difference Indicator */}
+                                        {Boolean(formData.totalDueAmount && !isNaN(Number(formData.totalDueAmount)) && Number(formData.totalDueAmount) > 0) && (
+                                            <div style={{
+                                                gridColumn: 'span 2',
+                                                padding: '12px 16px',
+                                                borderRadius: '10px',
+                                                border: '1px solid',
+                                                marginTop: '4px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '12px',
+                                                flexWrap: 'wrap',
+                                                ...(Number(formData.totalDueAmount) > Number(formData.amount || 0)
+                                                    ? { background: 'rgba(245, 158, 11, 0.12)', borderColor: 'rgba(245, 158, 11, 0.35)', color: '#d97706' }
+                                                    : Number(formData.totalDueAmount) < Number(formData.amount || 0)
+                                                        ? { background: 'rgba(59, 130, 246, 0.12)', borderColor: 'rgba(59, 130, 246, 0.35)', color: '#2563eb' }
+                                                        : { background: 'rgba(16, 185, 129, 0.12)', borderColor: 'rgba(16, 185, 129, 0.35)', color: '#059669' })
+                                            }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem' }}>
+                                                    {Number(formData.totalDueAmount) > Number(formData.amount || 0) ? (
+                                                        <>
+                                                            <span style={{ fontSize: '1.15rem' }}>⚠️</span>
+                                                            <span>
+                                                                {isRTL ? 'معاملة غير مسواة بالكامل (باقي مستحق بذمة الشركة / المشروع):' : 'Unsettled Transaction (Remaining Due Balance):'}
+                                                            </span>
+                                                            <span style={{ fontWeight: 800, fontSize: '1rem' }}>
+                                                                +{fmtCurrency(Number(formData.totalDueAmount) - Number(formData.amount || 0))}
+                                                            </span>
+                                                        </>
+                                                    ) : Number(formData.totalDueAmount) < Number(formData.amount || 0) ? (
+                                                        <>
+                                                            <span style={{ fontSize: '1.15rem' }}>ℹ️</span>
+                                                            <span>
+                                                                {isRTL ? 'دفعة زائدة / رصيد دائن لدى المستفيد:' : 'Overpaid / Credit Balance with Payee:'}
+                                                            </span>
+                                                            <span style={{ fontWeight: 800, fontSize: '1rem' }}>
+                                                                -{fmtCurrency(Number(formData.amount || 0) - Number(formData.totalDueAmount))}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span style={{ fontSize: '1.15rem' }}>✓</span>
+                                                            <span>
+                                                                {isRTL ? 'مسوى بالكامل (المبلغ المدفوع يطابق إجمالي المستحق)' : 'Fully Settled (Paid Amount matches Total Due)'}
+                                                            </span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', fontWeight: 600, opacity: 0.9 }}>
+                                                    {isRTL
+                                                        ? `المستحق: ${fmtCurrency(formData.totalDueAmount)} | المدفوع: ${fmtCurrency(formData.amount || 0)}`
+                                                        : `Due: ${fmtCurrency(formData.totalDueAmount)} | Paid: ${fmtCurrency(formData.amount || 0)}`}
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -2465,7 +2736,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                     setFormData(prev => ({
                                                         ...prev,
                                                         clientId: cId,
-                                                        transactionFrom: chosen ? chosen.name : prev.transactionFrom
+                                                        transactionFrom: chosen ? getLocalizedName(chosen, isRTL) : prev.transactionFrom
                                                     }));
                                                 }}
                                                 style={{ fontSize: '0.95rem', padding: '10px', width: '100%' }}
@@ -2473,7 +2744,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 <option value="">-- {t('clients.selectClient', 'اختر العميل')} --</option>
                                                 {clients.map(c => (
                                                     <option key={c.id} value={c.id}>
-                                                        {c.name} {c.company ? `(${c.company})` : ''}
+                                                        {getLocalizedName(c, isRTL)} {c.company ? `(${c.company})` : ''}
                                                     </option>
                                                 ))}
                                             </select>
@@ -2591,7 +2862,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                             </option>
                                             {materialBatches.map(b => (
                                                 <option key={b.id} value={b.id}>
-                                                    {b.description} {b.project?.name ? `(${b.project.name})` : ''} — {isRTL ? 'المتبقي:' : 'Remaining:'} {fmtCurrency(b.remainingValue)}
+                                                    {b.description} {b.project ? `(${getLocalizedName(b.project, isRTL)})` : ''} — {isRTL ? 'المتبقي:' : 'Remaining:'} {fmtCurrency(b.remainingValue)}
                                                 </option>
                                             ))}
                                         </select>
@@ -2618,9 +2889,9 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                     <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>
                                                         {fmtCurrency(selectedBatch.remainingValue)}
                                                     </div>
-                                                    {selectedBatch.project?.name && (
+                                                    {selectedBatch.project && (
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                                                            {isRTL ? 'المشروع:' : 'Project:'} <strong>{selectedBatch.project.name}</strong>
+                                                            {isRTL ? 'المشروع:' : 'Project:'} <strong>{getLocalizedName(selectedBatch.project, isRTL)}</strong>
                                                         </div>
                                                     )}
                                                 </div>
@@ -2756,7 +3027,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 {t('finance.senderCustody', 'المُحوّل (من عهدة):')}
                                             </div>
                                             <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-primary)', marginTop: '2px' }}>
-                                                {user?.name} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-tertiary)' }}>({formatUserRole(user?.role)})</span>
+                                                {getLocalizedName(user, isRTL)} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-tertiary)' }}>({formatUserRole(user?.role)})</span>
                                             </div>
                                         </div>
                                         <div style={{ textAlign: isRTL ? 'left' : 'right' }}>
@@ -2782,7 +3053,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                                                 <option value="">-- {t('finance.selectReceiver', 'اختر المهندس المستلم')} --</option>
                                                 {users.filter(u => u.id !== user?.id).map(u => (
                                                     <option key={u.id} value={u.id}>
-                                                        {u.name} — {formatUserRole(u.role)}
+                                                        {getLocalizedName(u, isRTL)} — {formatUserRole(u.role)}
                                                     </option>
                                                 ))}
                                             </select>
@@ -2842,7 +3113,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                             {errors.description && <span className="error-message">{errors.description}</span>}
                         </div>
                     </div>
-
+                    </div>
 
                     <div className="modal-footer" style={{ borderTop: 'none', paddingTop: 0 }}>
                         <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
@@ -2873,6 +3144,99 @@ export default function AddTransactionModal({ isOpen, onClose, onSubmit, initial
                     }
                 }}
             />
-        </div >
+
+            {/* Instant Image Lightbox Preview Modal */}
+            {previewModalItem && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                        backdropFilter: 'blur(4px)',
+                        zIndex: 999999,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                    }}
+                    onClick={() => setPreviewModalItem(null)}
+                >
+                    <div
+                        style={{
+                            position: 'relative',
+                            maxWidth: '92vw',
+                            maxHeight: '90vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '10px',
+                            color: '#fff'
+                        }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.95rem', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '70vw' }}>
+                                {previewModalItem.name}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <a
+                                    href={previewModalItem.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                        color: '#60a5fa',
+                                        fontSize: '0.85rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        textDecoration: 'none'
+                                    }}
+                                >
+                                    <ExternalLink size={15} />
+                                    <span>{isRTL ? 'فتح بالحجم الكامل' : 'Open Full Size'}</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewModalItem(null)}
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.15)',
+                                        border: 'none',
+                                        color: '#fff',
+                                        borderRadius: '50%',
+                                        width: '32px',
+                                        height: '32px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <img
+                            src={previewModalItem.url}
+                            alt={previewModalItem.name}
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '80vh',
+                                objectFit: 'contain',
+                                borderRadius: '8px',
+                                boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6)'
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+        </div >,
+        document.body
     );
 }

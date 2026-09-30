@@ -32,12 +32,14 @@ export const inviteUserSchema = z.object({
     roleId: z.string().uuid().optional().nullable(),
     permissions: z.array(z.string().max(100)).max(200).optional().default([]),
     name: z.string().max(120).optional().nullable(),
+    nameAr: z.string().max(120).optional().nullable(),
     phone: z.string().max(30).optional().nullable(),
     phones: z.array(z.string().max(30)).optional().default([])
 });
 
 export const updateUserSchema = z.object({
     name: z.string().min(1).max(120).optional(),
+    nameAr: z.string().max(120).optional().nullable(),
     phone: z.string().max(30).optional().nullable(),
     phones: z.array(z.string().max(30)).optional(),
     role: UserRole.optional(),

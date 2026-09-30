@@ -1,24 +1,45 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { suppliersAPI } from '../services/api';
-import { Package, Plus, Mail, Phone, Pencil, Trash2, Search, Tag, Building2 } from 'lucide-react';
+import { suppliersAPI, projectsAPI, transactionsAPI } from '../services/api';
+import { Package, Plus, Mail, Phone, Pencil, Trash2, Search, Tag, Building2, Wallet, ChevronDown, X } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAlert } from '../context/AlertContext';
 import AddSupplierModal from '../components/AddSupplierModal';
 import { apiErrorMessage } from '../utils/apiError';
+import { useFormat, getLocalizedName, getLocalizedSubName } from '../utils/format';
 
 export default function Suppliers() {
     const { t, i18n } = useTranslation();
-    const isArabic = i18n.language === 'ar';
+    const isArabic = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const { showAlert } = useAlert();
+    const { currency: formatCurrency } = useFormat();
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategories, setSelectedCategories] = useState([]);
+    const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+    const [filterProjectId, setFilterProjectId] = useState('ALL');
+    const [projects, setProjects] = useState([]);
+    const [supplierProjectMap, setSupplierProjectMap] = useState({}); // supplierId -> Set of projectIds
+    const filterRef = useRef(null);
 
     useEffect(() => {
         loadSuppliers();
+        loadProjects();
+    }, []);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (filterRef.current && !filterRef.current.contains(event.target)) {
+                setIsFilterDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
     }, []);
 
     const loadSuppliers = async () => {
@@ -30,6 +51,27 @@ export default function Suppliers() {
             showAlert({ type: 'error', title: t('common.error', 'Error'), message: apiErrorMessage(error, 'Failed to load suppliers.') });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadProjects = async () => {
+        try {
+            const [projRes, txRes] = await Promise.all([
+                projectsAPI.getAll(),
+                transactionsAPI.getAll()
+            ]);
+            setProjects(projRes.data.data || []);
+            // Build a map: supplierId -> [projectId]
+            const map = {};
+            (txRes.data.data || []).forEach(tx => {
+                if (tx.supplierId && tx.projectId) {
+                    if (!map[tx.supplierId]) map[tx.supplierId] = new Set();
+                    map[tx.supplierId].add(tx.projectId);
+                }
+            });
+            setSupplierProjectMap(map);
+        } catch (e) {
+            console.error('Failed to load projects or transactions mapping:', e);
         }
     };
 
@@ -58,7 +100,7 @@ export default function Suppliers() {
         showAlert({
             type: 'warning',
             title: t('common.deleteConfirmTitle'),
-            message: `${t('common.deleteConfirmMessage')} "${supplier.name}"?`,
+            message: `${t('common.deleteConfirmMessage')} "${getLocalizedName(supplier, isArabic)}"?`,
             showCancel: true,
             confirmText: t('common.delete'),
             onConfirm: async () => {
@@ -74,20 +116,67 @@ export default function Suppliers() {
         });
     };
 
+    // Toggle category filter
+    const toggleCategory = (cat) => {
+        if (cat === 'ALL') {
+            setSelectedCategories([]);
+        } else {
+            setSelectedCategories(prev =>
+                prev.includes(cat)
+                    ? prev.filter(c => c !== cat)
+                    : [...prev, cat]
+            );
+        }
+    };
+
+    // Dynamic category list
+    const baseCategories = [
+        'CONCRETE', 'STEEL', 'CEMENT', 'BRICKS', 'SAND',
+        'ELECTRICAL', 'PLUMBING', 'PAINT', 'WOOD', 'TOOLS',
+        'MATERIALS', 'EQUIPMENT', 'SERVICES', 'LABOR', 'OTHER'
+    ];
+
+    const customCategories = Array.from(new Set(
+        suppliers
+            .filter(s => s.category === 'OTHER' && s.customCategory)
+            .map(s => s.customCategory.trim().toUpperCase())
+    ));
+
+    const categoryList = ['ALL', ...baseCategories, ...customCategories];
+
     const filteredSuppliers = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
-        if (!q) return suppliers;
         return suppliers.filter(s => {
-            const matchName = (s.name || '').toLowerCase().includes(q);
-            const matchCompany = (s.company || '').toLowerCase().includes(q);
-            const matchEmail = (s.email || '').toLowerCase().includes(q);
-            const matchPhone = (s.phone || '').toLowerCase().includes(q) || (Array.isArray(s.phones) && s.phones.some(p => (p || '').toLowerCase().includes(q)));
-            const matchCategory = (s.category || '').toLowerCase().includes(q) ||
-                (Array.isArray(s.categories) && s.categories.some(c => (c || '').toLowerCase().includes(q) || (t(`suppliers.categories.${c}`) || '').toLowerCase().includes(q)));
-            const matchItems = Array.isArray(s.suppliedItems) && s.suppliedItems.some(item => (item || '').toLowerCase().includes(q));
-            return matchName || matchCompany || matchEmail || matchPhone || matchCategory || matchItems;
+            // Project filter
+            const projMatch = filterProjectId === 'ALL' ||
+                (supplierProjectMap[s.id] && supplierProjectMap[s.id].has(filterProjectId)) ||
+                (Array.isArray(s.transactions) && s.transactions.some(t => t.projectId === filterProjectId));
+
+            // Category filter
+            const sCats = Array.isArray(s.categories) && s.categories.length > 0
+                ? s.categories
+                : (s.category ? [s.category] : []);
+            
+            const catMatch = selectedCategories.length === 0 ||
+                sCats.some(c => selectedCategories.includes(c)) ||
+                (s.category === 'OTHER' && s.customCategory && selectedCategories.includes(s.customCategory.trim().toUpperCase()));
+
+            // Search query
+            let searchMatch = true;
+            if (q) {
+                const matchName = (s.name || '').toLowerCase().includes(q) || (s.nameAr || '').toLowerCase().includes(q);
+                const matchCompany = (s.company || '').toLowerCase().includes(q);
+                const matchEmail = (s.email || '').toLowerCase().includes(q);
+                const matchPhone = (s.phone || '').toLowerCase().includes(q) || (Array.isArray(s.phones) && s.phones.some(p => (p || '').toLowerCase().includes(q)));
+                const matchCategory = (s.category || '').toLowerCase().includes(q) ||
+                    (Array.isArray(s.categories) && s.categories.some(c => (c || '').toLowerCase().includes(q) || (t(`suppliers.categories.${c}`) || '').toLowerCase().includes(q)));
+                const matchItems = Array.isArray(s.suppliedItems) && s.suppliedItems.some(item => (item || '').toLowerCase().includes(q));
+                searchMatch = matchName || matchCompany || matchEmail || matchPhone || matchCategory || matchItems;
+            }
+
+            return projMatch && catMatch && searchMatch;
         });
-    }, [suppliers, searchQuery, t]);
+    }, [suppliers, searchQuery, filterProjectId, selectedCategories, supplierProjectMap, t]);
 
     if (loading) {
         return (
@@ -123,7 +212,7 @@ export default function Suppliers() {
                     flex-direction: column;
                     justify-content: space-between;
                     padding: 20px;
-                    min-height: 220px;
+                    min-height: 240px;
                     border-radius: 12px;
                     background: var(--bg-card, #141416);
                     border: 1px solid var(--border-color);
@@ -148,6 +237,12 @@ export default function Suppliers() {
                     line-height: 1.35;
                     margin: 0;
                     word-break: break-word;
+                }
+                .supplier-card-subname {
+                    display: block;
+                    font-size: 0.8rem;
+                    color: var(--text-secondary);
+                    margin-top: 3px;
                 }
                 .supplier-card-company {
                     display: inline-flex;
@@ -256,6 +351,21 @@ export default function Suppliers() {
                     text-decoration: underline;
                 }
 
+                .supplier-kpi-box {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    background: rgba(16, 185, 129, 0.08);
+                    border: 1px solid rgba(16, 185, 129, 0.22);
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    margin-top: 4px;
+                }
+                body.light-mode .supplier-kpi-box {
+                    background: rgba(16, 185, 129, 0.07);
+                    border-color: rgba(16, 185, 129, 0.25);
+                }
+
                 .supplier-card-footer {
                     margin-top: auto;
                     padding-top: 14px;
@@ -330,37 +440,233 @@ export default function Suppliers() {
                     </button>
                 </div>
 
-                {/* Search Bar */}
-                {suppliers.length > 0 && (
-                    <div style={{ position: 'relative', marginBottom: '20px', maxWidth: '500px' }}>
-                        <Search
-                            size={18}
-                            style={{
+                {/* Filters Row: Project Filter + Category Filter + Search Input */}
+                <div className="mb-lg flex gap-md flex-wrap" style={{ alignItems: 'flex-end' }}>
+                    {/* 1. Project filter */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px', flex: '1 1 220px', maxWidth: '300px' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {isArabic ? 'المشروع' : 'Project'}
+                        </label>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                            <select
+                                value={filterProjectId}
+                                onChange={e => setFilterProjectId(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    height: '42px',
+                                    padding: isArabic ? '0 14px 0 36px' : '0 36px 0 14px',
+                                    borderRadius: '10px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-tertiary)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 500,
+                                    outline: 'none',
+                                    cursor: 'pointer',
+                                    appearance: 'none',
+                                    WebkitAppearance: 'none'
+                                }}
+                            >
+                                <option value="ALL">{isArabic ? 'جميع المشاريع' : 'All Projects'}</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                        {getLocalizedName(p, isArabic)}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown size={16} style={{
                                 position: 'absolute',
+                                [isArabic ? 'left' : 'right']: '12px',
                                 top: '50%',
-                                [isArabic ? 'right' : 'left']: '14px',
                                 transform: 'translateY(-50%)',
-                                color: 'var(--text-tertiary)',
-                                pointerEvents: 'none'
-                            }}
-                        />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={t('suppliers.placeholders.search', isArabic ? 'بحث باسم المورد أو مجالات التوريد أو الأصناف المحددة...' : 'Search by supplier name, categories, or items...')}
-                            style={{
-                                width: '100%',
-                                padding: isArabic ? '10px 42px 10px 14px' : '10px 14px 10px 42px',
-                                borderRadius: '10px',
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.9rem'
-                            }}
-                        />
+                                pointerEvents: 'none',
+                                color: 'var(--text-secondary)'
+                            }} />
+                        </div>
                     </div>
-                )}
+
+                    {/* 2. Category filter */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px', flex: '1 1 220px', maxWidth: '300px', position: 'relative' }} ref={filterRef}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {isArabic ? 'المجال / الفئة' : 'Category / Field'}
+                        </label>
+                        <div 
+                            style={{ 
+                                width: '100%',
+                                height: '42px',
+                                padding: isArabic ? '0 14px 0 36px' : '0 36px 0 14px',
+                                border: '1px solid var(--border-color)', 
+                                borderRadius: '10px', 
+                                background: 'var(--bg-tertiary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                fontSize: '0.9rem',
+                                boxSizing: 'border-box',
+                                position: 'relative'
+                            }}
+                            onClick={(e) => {
+                                if (!e.target.closest('.chip-remove')) {
+                                    setIsFilterDropdownOpen(!isFilterDropdownOpen);
+                                }
+                            }}
+                        >
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                flex: 1
+                            }}>
+                                {selectedCategories.length === 0 ? (
+                                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                        {isArabic ? 'جميع المجالات والفئات' : 'All Categories'}
+                                    </span>
+                                ) : selectedCategories.length === 1 ? (
+                                    <span 
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            padding: '2px 8px',
+                                            background: 'var(--bg-secondary)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '12px',
+                                            fontSize: '12px',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        {baseCategories.includes(selectedCategories[0]) ? t(`suppliers.categories.${selectedCategories[0]}`, selectedCategories[0]) : selectedCategories[0]}
+                                        <span 
+                                            className="chip-remove"
+                                            style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center',
+                                                cursor: 'pointer', 
+                                                opacity: 0.7
+                                            }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleCategory(selectedCategories[0]);
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
+                                        >
+                                            <X size={11} />
+                                        </span>
+                                    </span>
+                                ) : (
+                                    <span style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: '13px' }}>
+                                        {isArabic ? `${selectedCategories.length} فئات محددة` : `${selectedCategories.length} categories selected`}
+                                    </span>
+                                )}
+                            </div>
+                            <ChevronDown size={16} style={{
+                                position: 'absolute',
+                                [isArabic ? 'left' : 'right']: '12px',
+                                top: '50%',
+                                transform: isFilterDropdownOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
+                                transition: 'transform 0.2s',
+                                color: 'var(--text-secondary)',
+                                pointerEvents: 'none'
+                            }} />
+                        </div>
+
+                        {isFilterDropdownOpen && (
+                            <div 
+                                style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    marginTop: '4px',
+                                    background: 'var(--bg-primary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '10px',
+                                    boxShadow: 'var(--shadow-md, 0 8px 24px rgba(0,0,0,0.25))',
+                                    zIndex: 100,
+                                    maxHeight: '300px',
+                                    overflowY: 'auto'
+                                }}
+                            >
+                                {categoryList.map(cat => {
+                                    const isActive = cat === 'ALL'
+                                        ? selectedCategories.length === 0
+                                        : selectedCategories.includes(cat);
+                                    
+                                    return (
+                                        <div 
+                                            key={cat}
+                                            onClick={() => {
+                                                toggleCategory(cat);
+                                            }}
+                                            style={{
+                                                padding: '10px 16px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px',
+                                                borderBottom: '1px solid var(--border-color)',
+                                                background: isActive ? 'var(--bg-tertiary)' : 'transparent'
+                                            }}
+                                        >
+                                            <input 
+                                                type="checkbox" 
+                                                checked={isActive}
+                                                onChange={() => {}}
+                                                style={{ pointerEvents: 'none' }}
+                                            />
+                                            <span style={{ fontSize: '0.88rem' }}>
+                                                {cat === 'ALL' 
+                                                    ? (isArabic ? 'جميع المجالات والفئات' : 'All Categories') 
+                                                    : (baseCategories.includes(cat) ? t(`suppliers.categories.${cat}`, cat) : cat)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 3. Search Bar */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: '1 1 240px', minWidth: '220px' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {isArabic ? 'البحث السريع' : 'Search'}
+                        </label>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                            <Search
+                                size={18}
+                                style={{
+                                    position: 'absolute',
+                                    top: '50%',
+                                    [isArabic ? 'right' : 'left']: '14px',
+                                    transform: 'translateY(-50%)',
+                                    color: 'var(--text-tertiary)',
+                                    pointerEvents: 'none'
+                                }}
+                            />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder={t('suppliers.placeholders.search', isArabic ? 'بحث باسم المورد أو الأصناف...' : 'Search by name or items...')}
+                                style={{
+                                    width: '100%',
+                                    height: '42px',
+                                    padding: isArabic ? '0 42px 0 14px' : '0 14px 0 42px',
+                                    borderRadius: '10px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-tertiary)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.9rem'
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
 
                 {suppliers.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
@@ -374,7 +680,11 @@ export default function Suppliers() {
                     </div>
                 ) : filteredSuppliers.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-xl)' }}>
-                        <p className="text-secondary">{isArabic ? `لا توجد نتائج مطابقة لبحثك: "${searchQuery}"` : `No results matching: "${searchQuery}"`}</p>
+                        <p className="text-secondary">
+                            {isArabic 
+                                ? `لا توجد نتائج مطابقة لمعايير البحث والفلترة` 
+                                : `No suppliers match the selected filters`}
+                        </p>
                     </div>
                 ) : (
                     <div className="suppliers-grid">
@@ -387,14 +697,24 @@ export default function Suppliers() {
                                 ? supplier.phones.filter(Boolean)
                                 : (supplier.phone ? [supplier.phone] : []);
 
+                            // Calculate total paid (global vs per selected project)
+                            const displayedTotalPaid = filterProjectId === 'ALL'
+                                ? (supplier.totalPaid || 0)
+                                : ((supplier.transactions || []).filter(t => t.projectId === filterProjectId).reduce((sum, t) => sum + Number(t.amount || 0), 0));
+
                             return (
                                 <div key={supplier.id} className="card supplier-card">
-                                    {/* 1. Header: Name, Company, Primary Category Badge */}
+                                    {/* 1. Header: Name, Arabic Subname, Company, Primary Category Badge */}
                                     <div className="supplier-card-header">
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <h3 className="supplier-card-name" title={supplier.name}>
-                                                {supplier.name}
+                                            <h3 className="supplier-card-name" title={getLocalizedName(supplier, isArabic)}>
+                                                {getLocalizedName(supplier, isArabic)}
                                             </h3>
+                                            {getLocalizedSubName(supplier, isArabic) && (
+                                                <span className="supplier-card-subname">
+                                                    {getLocalizedSubName(supplier, isArabic)}
+                                                </span>
+                                            )}
                                             {supplier.company && (
                                                 <div className="supplier-card-company">
                                                     <Building2 size={13} style={{ flexShrink: 0 }} />
@@ -413,7 +733,7 @@ export default function Suppliers() {
                                         )}
                                     </div>
 
-                                    {/* 2. Body Details: Additional Category Chips, Supplied Items, Phone, Email */}
+                                    {/* 2. Body Details: Additional Category Chips, Supplied Items, Phone, Email, Total Paid KPI */}
                                     <div className="supplier-card-stats">
                                         {/* Multi-Categories chips if more than 1 */}
                                         {cats.length > 1 && (
@@ -458,7 +778,7 @@ export default function Suppliers() {
                                         )}
 
                                         {/* Email (only if present, no empty '-') */}
-                                        {supplier.email && supplier.email.trim() && (
+                                        {supplier.email && supplier.email.trim() && supplier.email !== '-' && (
                                             <div className="supplier-stat-row">
                                                 <Mail size={15} style={{ color: 'var(--text-tertiary)', marginTop: '3px', flexShrink: 0 }} />
                                                 <a
@@ -470,6 +790,19 @@ export default function Suppliers() {
                                                 </a>
                                             </div>
                                         )}
+
+                                        {/* Total Paid KPI Box */}
+                                        <div className="supplier-kpi-box">
+                                            <Wallet size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                                            <div>
+                                                <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>
+                                                    {isArabic ? 'إجمالي المدفوع' : 'TOTAL PAID'}
+                                                </div>
+                                                <div style={{ fontWeight: 800, color: '#10b981', fontSize: '1rem', lineHeight: 1.2 }}>
+                                                    {formatCurrency(displayedTotalPaid)}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* 3. Card Footer: Bottom Action Buttons */}
@@ -499,7 +832,10 @@ export default function Suppliers() {
 
                 <AddSupplierModal
                     isOpen={modalOpen}
-                    onClose={() => setModalOpen(false)}
+                    onClose={() => {
+                        setModalOpen(false);
+                        setSelectedSupplier(null);
+                    }}
                     onSave={handleSaveSupplier}
                     initialData={selectedSupplier}
                 />
@@ -507,3 +843,4 @@ export default function Suppliers() {
         </Layout>
     );
 }
+

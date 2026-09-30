@@ -12,11 +12,25 @@ export const ACCEPTED_RECEIPT_MIME_TYPES = "image/*,application/pdf,.csv,.xlsx,.
  * Resolves media URLs (whether absolute S3, relative /uploads/, or data/blob URLs).
  */
 export const resolveMediaUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
-        return url;
+    if (!url || typeof url !== 'string') return null;
+    let clean = url.trim().replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+    if (!clean) return null;
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('blob:') || clean.startsWith('data:')) {
+        return clean;
     }
-    const clean = url.replace(/^(\/?uploads\/|\/+)/, '');
+    clean = clean.replace(/^(\/?uploads\/|\/+)/, '');
+    if (clean.startsWith('receipt-') && !clean.startsWith('receipts/')) {
+        return `/uploads/receipts/${clean}`;
+    }
+    if (clean.startsWith('voice-') && !clean.startsWith('audio/')) {
+        return `/uploads/audio/${clean}`;
+    }
+    if (clean.startsWith('doc-') && !clean.startsWith('documents/')) {
+        return `/uploads/documents/${clean}`;
+    }
+    if (clean.startsWith('img-') && !clean.startsWith('images/')) {
+        return `/uploads/images/${clean}`;
+    }
     return `/uploads/${clean}`;
 };
 
@@ -29,7 +43,7 @@ export const resolveMediaUrl = (url) => {
  * - null / undefined / empty string
  * 
  * Returns an array of rich attachment objects:
- * [{ id, url, label, name, ext, isImg, isPdf, isSpreadsheet, isDoc }]
+ * [{ id, url, label, name, ext, isImg, isPdf, isSpreadsheet, isDoc, isExisting }]
  */
 export const parseReceiptAttachments = (val) => {
     if (!val) return [];
@@ -38,8 +52,15 @@ export const parseReceiptAttachments = (val) => {
     if (Array.isArray(val)) {
         items = val;
     } else if (typeof val === 'string') {
-        const trimmed = val.trim();
+        let trimmed = val.trim();
         if (!trimmed) return [];
+        // Handle escaped or double-encoded strings
+        if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+            try {
+                const unquoted = JSON.parse(trimmed);
+                if (typeof unquoted === 'string') trimmed = unquoted.trim();
+            } catch (e) {}
+        }
         if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
             try {
                 const parsed = JSON.parse(trimmed);
@@ -47,7 +68,13 @@ export const parseReceiptAttachments = (val) => {
                     items = parsed;
                 }
             } catch (e) {
-                items = [trimmed];
+                try {
+                    const inner = trimmed.slice(1, -1).trim();
+                    const parts = inner.split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+                    items = parts;
+                } catch (err) {
+                    items = [trimmed];
+                }
             }
         } else {
             items = [trimmed];
@@ -57,11 +84,13 @@ export const parseReceiptAttachments = (val) => {
     return items.map((item, index) => {
         if (!item) return null;
         if (typeof item === 'string') {
-            const resolved = resolveMediaUrl(item);
+            const cleanStr = item.trim().replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+            if (!cleanStr) return null;
+            const resolved = resolveMediaUrl(cleanStr);
             if (!resolved) return null;
             const meta = getFileCategory(resolved);
             return {
-                id: `att-${index}-${resolved}`,
+                id: `att-exist-${index}-${resolved}`,
                 url: resolved,
                 label: '',
                 name: meta.name,
@@ -69,15 +98,18 @@ export const parseReceiptAttachments = (val) => {
                 isImg: meta.isImg,
                 isPdf: meta.isPdf,
                 isSpreadsheet: meta.isSpreadsheet,
-                isDoc: meta.isDoc
+                isDoc: meta.isDoc,
+                isExisting: true
             };
         }
         if (typeof item === 'object' && item.url) {
-            const resolved = resolveMediaUrl(item.url);
+            const cleanUrl = String(item.url).trim().replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+            if (!cleanUrl) return null;
+            const resolved = resolveMediaUrl(cleanUrl);
             if (!resolved) return null;
             const meta = getFileCategory(item.name || resolved);
             return {
-                id: item.id || `att-${index}-${resolved}`,
+                id: item.id || `att-exist-${index}-${resolved}`,
                 url: resolved,
                 label: typeof item.label === 'string' ? item.label : '',
                 name: item.name || meta.name,
@@ -86,7 +118,8 @@ export const parseReceiptAttachments = (val) => {
                 isImg: meta.isImg,
                 isPdf: meta.isPdf,
                 isSpreadsheet: meta.isSpreadsheet,
-                isDoc: meta.isDoc
+                isDoc: meta.isDoc,
+                isExisting: true
             };
         }
         return null;
@@ -119,10 +152,11 @@ export const getFileCategory = (filenameOrUrl) => {
     if (!filenameOrUrl) {
         return { name: '', ext: 'FILE', isImg: false, isPdf: false, isSpreadsheet: false, isDoc: false };
     }
-    const clean = filenameOrUrl.split('?')[0];
+    let clean = String(filenameOrUrl).trim().replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+    clean = clean.split('?')[0];
     const parts = clean.split('/');
     const rawName = decodeURIComponent(parts[parts.length - 1] || clean);
-    const ext = (rawName.split('.').pop() || '').toLowerCase();
+    const ext = (rawName.split('.').pop() || '').replace(/["'\[\]]+$/g, '').toLowerCase();
 
     const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp', 'svg'].includes(ext);
     const isPdf = ext === 'pdf';
@@ -138,3 +172,4 @@ export const getFileCategory = (filenameOrUrl) => {
         isDoc
     };
 };
+

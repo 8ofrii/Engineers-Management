@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { saveFormDraft, getFormDraft, clearFormDraft } from '../utils/formDraft';
@@ -14,6 +15,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
     const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
+        nameAr: '',
         email: '',
         phone: '',
         phones: [''],
@@ -32,8 +34,19 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
             const initPhones = Array.isArray(initialData.phones) && initialData.phones.length > 0
                 ? initialData.phones
                 : (initialData.phone ? [initialData.phone] : ['']);
+            
+            let initName = (initialData.name || '').trim();
+            let initNameAr = (initialData.nameAr || '').trim();
+            
+            // If name is Arabic and nameAr is empty, put it in nameAr
+            if (/[\u0600-\u06FF]/.test(initName) && !initNameAr) {
+                initNameAr = initName;
+                initName = '';
+            }
+
             setFormData({
-                name: initialData.name || '',
+                name: initName,
+                nameAr: initNameAr,
                 email: initialData.email || '',
                 phone: initialData.phone || initPhones[0] || '',
                 phones: initPhones,
@@ -63,6 +76,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
             } else {
                 setFormData({
                     name: '',
+                    nameAr: '',
                     email: '',
                     phone: '',
                     phones: [''],
@@ -100,6 +114,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
         clearFormDraft(CLIENT_DRAFT_KEY);
         setFormData({
             name: '',
+            nameAr: '',
             email: '',
             phone: '',
             phones: [''],
@@ -117,7 +132,9 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
     const validate = () => {
         const newErrors = {};
 
-        if (!formData.name.trim()) newErrors.name = t('clients.modal.fields.name') + ' is required';
+        if (!formData.name?.trim() && !formData.nameAr?.trim()) {
+            newErrors.name = t('clients.modal.fields.name') + ' is required';
+        }
         if (formData.email && formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email.trim())) {
             newErrors.email = t('clients.modal.fields.email') + ' is invalid';
         }
@@ -132,8 +149,25 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
         e.preventDefault();
         if (validate()) {
             const cleanPhones = (formData.phones || []).map(p => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+            let rawName = formData.name?.trim() || '';
+            let rawNameAr = formData.nameAr?.trim() || '';
+
+            // If user swapped them (Arabic in name, English in nameAr)
+            if (/[\u0600-\u06FF]/.test(rawName) && /[A-Za-z]/.test(rawNameAr)) {
+                const temp = rawName;
+                rawName = rawNameAr;
+                rawNameAr = temp;
+            } else if (/[\u0600-\u06FF]/.test(rawName) && !rawNameAr) {
+                rawNameAr = rawName;
+            }
+
+            const primaryName = rawName || rawNameAr || '';
+            const primaryNameAr = rawNameAr || null;
+
             const dataToClean = {
                 ...formData,
+                name: primaryName,
+                nameAr: primaryNameAr,
                 phone: cleanPhones[0] || formData.phone?.trim() || '',
                 phones: cleanPhones
             };
@@ -159,7 +193,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={handleClose}>
             <div className="modal-container" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
@@ -169,7 +203,8 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
                     {hasRestoredDraft && <DraftBanner onDiscard={handleDiscardDraft} />}
 
                     {/* Basic Information */}
@@ -188,6 +223,19 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                                     placeholder={t('clients.modal.placeholders.name')}
                                 />
                                 {errors.name && <span className="error-message">{errors.name}</span>}
+                            </div>
+
+                            <div className="form-group">
+                                <label htmlFor="nameAr">{t('common.nameAr', 'Arabic Name')}</label>
+                                <input
+                                    type="text"
+                                    id="nameAr"
+                                    name="nameAr"
+                                    value={formData.nameAr || ''}
+                                    onChange={handleChange}
+                                    placeholder="الاسم بالعربي"
+                                    dir="rtl"
+                                />
                             </div>
 
                             <div className="form-group">
@@ -313,6 +361,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                             </div>
                         </div>
                     </div>
+                    </div>
 
                     <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={handleClose}>
@@ -324,6 +373,7 @@ export default function AddClientModal({ isOpen, onClose, onSubmit, initialData 
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

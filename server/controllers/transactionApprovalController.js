@@ -227,6 +227,17 @@ export const approveTransaction = async (req, res, next) => {
                         }
                     });
                 }
+                if (transaction.paymentMethod === 'CUSTODY_WALLET' || transaction.custodyWalletId) {
+                    const custodyUserId = transaction.custodyWalletId || transaction.payerUserId || transaction.createdBy;
+                    if (custodyUserId) {
+                        await tx.user.update({
+                            where: { id: custodyUserId },
+                            data: {
+                                currentCustodyBalance: { increment: transaction.amount }
+                            }
+                        }).catch(e => console.error('Error incrementing custody balance:', e));
+                    }
+                }
             }
 
             // Make sure we have the latest project data for calculation if project exists
@@ -333,29 +344,31 @@ export const approveTransaction = async (req, res, next) => {
                 }
 
                 // LINK 4: Handle custody payment clearance
-                if (transaction.paymentMethod === 'CUSTODY_WALLET') {
-                    // Reduce the user's pending clearance
-                    await tx.user.update({
-                        where: { id: transaction.createdBy },
-                        data: {
-                            currentCustodyBalance: { decrement: transaction.amount },
-                            pendingClearance: { decrement: transaction.amount }
-                        }
-                    });
+                if (transaction.paymentMethod === 'CUSTODY_WALLET' || transaction.custodyWalletId) {
+                    const custodyUserId = transaction.custodyWalletId || transaction.payerUserId || transaction.createdBy;
+                    if (custodyUserId) {
+                        const userRecord = await tx.user.findUnique({ where: { id: custodyUserId } });
+                        await tx.user.update({
+                            where: { id: custodyUserId },
+                            data: {
+                                currentCustodyBalance: { decrement: transaction.amount },
+                                pendingClearance: { decrement: transaction.amount }
+                            }
+                        }).catch(e => console.error('Error updating user custody balance on approval:', e));
 
-                    await tx.custodyTransfer.create({
-                        data: {
-                            type: 'CLEARANCE',
-                            amount: transaction.amount,
-                            description: `Cleared: ${transaction.description}`,
-                            engineerId: transaction.createdBy,
-                            // Note: balance is computed below
-                            balanceBefore: transaction.user.currentCustodyBalance,
-                            balanceAfter: Number(transaction.user.currentCustodyBalance) - Number(transaction.amount),
-                            relatedTransactionId: id,
-                            tenantId: req.user.tenantId
-                        }
-                    });
+                        await tx.custodyTransfer.create({
+                            data: {
+                                type: 'CLEARANCE',
+                                amount: transaction.amount,
+                                description: `Cleared: ${transaction.description}`,
+                                engineerId: custodyUserId,
+                                balanceBefore: userRecord ? userRecord.currentCustodyBalance : 0,
+                                balanceAfter: userRecord ? (Number(userRecord.currentCustodyBalance) - Number(transaction.amount)) : 0,
+                                relatedTransactionId: id,
+                                tenantId: req.user.tenantId
+                            }
+                        }).catch(e => console.error('Error creating custody clearance log:', e));
+                    }
                 }
 
                 // LINK 5: Create material batch if it's a material purchase (inventory)
@@ -477,8 +490,10 @@ export const rejectTransaction = async (req, res, next) => {
             });
         }
 
+        const custodyUserId = transaction.custodyWalletId || transaction.payerUserId || transaction.createdBy;
+
         // Update transaction and remove from pending clearance
-        const [updated] = await prisma.$transaction([
+        const mutations = [
             prisma.transaction.update({
                 where: { id },
                 data: {
@@ -488,14 +503,6 @@ export const rejectTransaction = async (req, res, next) => {
                     approvedAt: new Date()
                 }
             }),
-
-            prisma.user.update({
-                where: { id: transaction.createdBy },
-                data: {
-                    pendingClearance: { decrement: transaction.amount }
-                }
-            }),
-
             prisma.notification.create({
                 data: {
                     userId: transaction.createdBy,
@@ -506,7 +513,20 @@ export const rejectTransaction = async (req, res, next) => {
                     resourceType: 'transaction'
                 }
             })
-        ]);
+        ];
+
+        if (custodyUserId && (transaction.paymentMethod === 'CUSTODY_WALLET' || transaction.custodyWalletId)) {
+            mutations.push(
+                prisma.user.update({
+                    where: { id: custodyUserId },
+                    data: {
+                        pendingClearance: { decrement: transaction.amount }
+                    }
+                }).catch(e => console.error('Error reverting pending clearance on rejection:', e))
+            );
+        }
+
+        const [updated] = await prisma.$transaction(mutations);
 
         await auditFromReq(req, {
             action: 'REJECT',

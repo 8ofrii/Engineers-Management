@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { HardHat, Plus, Phone, CreditCard, DollarSign, Edit2, Pencil, Image as ImageIcon, Trash2, X } from 'lucide-react';
+import { HardHat, Plus, Phone, CreditCard, Wallet, Edit2, Pencil, Image as ImageIcon, Trash2, X, ChevronDown } from 'lucide-react';
 import Layout from '../components/Layout';
 import AddWorkmanModal from '../components/AddWorkmanModal';
 import { workmenAPI, projectsAPI, transactionsAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
 import { apiErrorMessage } from '../utils/apiError';
-import { useFormat } from '../utils/format';
+import { useFormat, getLocalizedName, getLocalizedSubName } from '../utils/format';
 
 export default function Workforce() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = i18n.language === 'ar' || i18n.language?.startsWith('ar');
     const { showAlert } = useAlert();
     const { currency: formatCurrency } = useFormat();
     const [workmen, setWorkmen] = useState([]);
@@ -94,7 +96,7 @@ export default function Workforce() {
         showAlert({
             type: 'warning',
             title: t('common.deleteConfirmTitle'),
-            message: `${t('common.deleteConfirmMessage')} "${workman.name}"?`,
+            message: `${t('common.deleteConfirmMessage')} "${getLocalizedName(workman, isArabic)}"?`,
             showCancel: true,
             confirmText: t('common.delete'),
             onConfirm: async () => {
@@ -124,7 +126,12 @@ export default function Workforce() {
     };
 
     // Calculate dynamic trades based on workmen data
-    const baseTrades = ['CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER', 'WELDER', 'LABORER', 'FOREMAN', 'CONCRETE', 'PLASTERER', 'FLOORING', 'GYPSUM', 'ALUMINUM'];
+    const baseTrades = [
+        'CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER',
+        'IRON_WORKER', 'STOCKING_WORKER', 'MARBLE_CRAFTSMAN', 'CONCRETE_CUTTING',
+        'GUARD', 'MUNICIPAL_EMPLOYEE', 'WELDER', 'LABORER', 'FOREMAN',
+        'CONCRETE', 'PLASTERER', 'FLOORING', 'GYPSUM', 'ALUMINUM'
+    ];
     
     const customTrades = Array.from(new Set(
         workmen
@@ -159,6 +166,12 @@ export default function Workforce() {
         'GYPSUM': { bg: '#7B1FA2', text: 'white', border: '#7B1FA2' }, // Purple 700
         'ALUMINUM': { bg: '#546E7A', text: 'white', border: '#546E7A' }, // Blue Grey 600
         'BLACKSMITH': { bg: '#37474F', text: 'white', border: '#37474F' }, // Charcoal / Steel
+        'IRON_WORKER': { bg: '#37474F', text: 'white', border: '#37474F' }, // Charcoal / Steel
+        'STOCKING_WORKER': { bg: '#00838F', text: 'white', border: '#00838F' }, // Cyan 800
+        'MARBLE_CRAFTSMAN': { bg: '#4E342E', text: 'white', border: '#4E342E' }, // Dark Warm Marble
+        'CONCRETE_CUTTING': { bg: '#C62828', text: 'white', border: '#C62828' }, // Dark Red
+        'GUARD': { bg: '#283593', text: 'white', border: '#283593' }, // Indigo Navy
+        'MUNICIPAL_EMPLOYEE': { bg: '#00695C', text: 'white', border: '#00695C' }, // Dark Teal
         'WELDER': { bg: '#F57C00', text: 'white', border: '#F57C00' }, // Orange 700
         'LABORER': { bg: '#795548', text: 'white', border: '#795548' }, // Brown 500
         'FOREMAN': { bg: '#303F9F', text: 'white', border: '#303F9F' }, // Indigo 700
@@ -424,96 +437,134 @@ export default function Workforce() {
                 </div>
 
                 {/* Trade Filter Dropdown + Project Filter */}
-                <div className="mb-lg flex gap-md flex-wrap" style={{ alignItems: 'flex-start' }}>
-                    {/* Project filter (#9) */}
-                    <select
-                        value={filterProjectId}
-                        onChange={e => setFilterProjectId(e.target.value)}
-                        style={{
-                            padding: '8px 12px',
-                            borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--bg-tertiary)',
-                            color: 'var(--text-primary)',
-                            fontSize: '0.9rem',
-                            minWidth: 180
-                        }}
-                    >
-                        <option value="ALL">{t('common.allProjects') || 'All Projects'}</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                <div className="mb-lg flex gap-md flex-wrap" style={{ alignItems: 'flex-end' }}>
+                    {/* Project filter */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '240px', flex: '1 1 240px', maxWidth: '320px' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {isArabic ? 'المشروع' : 'Project'}
+                        </label>
+                        <div style={{ position: 'relative', width: '100%' }}>
+                            <select
+                                value={filterProjectId}
+                                onChange={e => setFilterProjectId(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    height: '42px',
+                                    padding: isArabic ? '0 14px 0 36px' : '0 36px 0 14px',
+                                    borderRadius: '10px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-tertiary)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '0.9rem',
+                                    fontWeight: 500,
+                                    outline: 'none',
+                                    cursor: 'pointer',
+                                    appearance: 'none',
+                                    WebkitAppearance: 'none'
+                                }}
+                            >
+                                <option value="ALL">{isArabic ? 'جميع المشاريع' : 'All Projects'}</option>
+                                {projects.map(p => <option key={p.id} value={p.id}>{getLocalizedName(p, isArabic)}</option>)}
+                            </select>
+                            <ChevronDown size={16} style={{
+                                position: 'absolute',
+                                [isArabic ? 'left' : 'right']: '12px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                pointerEvents: 'none',
+                                color: 'var(--text-secondary)'
+                            }} />
+                        </div>
+                    </div>
 
-                <div className="mb-lg" style={{ position: 'relative', width: '300px' }} ref={filterRef}>
-                    <div 
-                        className="form-group" 
-                        style={{ marginBottom: 0, position: 'relative' }}
-                    >
+                    {/* Trade / Category filter */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '240px', flex: '1 1 240px', maxWidth: '320px', position: 'relative' }} ref={filterRef}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {isArabic ? 'المهنة / الفئة' : 'Category / Trade'}
+                        </label>
                         <div 
                             style={{ 
-                                padding: '6px 12px', 
+                                width: '100%',
+                                height: '42px',
+                                padding: isArabic ? '0 14px 0 36px' : '0 36px 0 14px',
                                 border: '1px solid var(--border-color)', 
-                                borderRadius: 'var(--radius-md)', 
+                                borderRadius: '10px', 
                                 background: 'var(--bg-tertiary)',
                                 cursor: 'pointer',
                                 display: 'flex',
-                                flexWrap: 'wrap',
-                                gap: '6px',
                                 alignItems: 'center',
-                                minHeight: '42px'
+                                fontSize: '0.9rem',
+                                boxSizing: 'border-box',
+                                position: 'relative'
                             }}
                             onClick={(e) => {
-                                // Only toggle if not clicking on a chip remove button
                                 if (!e.target.closest('.chip-remove')) {
                                     setIsFilterDropdownOpen(!isFilterDropdownOpen);
                                 }
                             }}
                         >
-                            {selectedTrades.length === 0 ? (
-                                <span style={{ padding: '4px 4px', color: 'var(--text-secondary)' }}>
-                                    {t('common.all')}
-                                </span>
-                            ) : (
-                                selectedTrades.map(trade => (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                flex: 1
+                            }}>
+                                {selectedTrades.length === 0 ? (
+                                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                                        {isArabic ? 'جميع الفئات والمهن' : 'All Categories'}
+                                    </span>
+                                ) : selectedTrades.length === 1 ? (
                                     <span 
-                                        key={trade}
                                         style={{
-                                            display: 'flex',
+                                            display: 'inline-flex',
                                             alignItems: 'center',
                                             gap: '4px',
-                                            padding: '4px 10px',
+                                            padding: '2px 8px',
                                             background: 'var(--bg-secondary)',
                                             border: '1px solid var(--border-color)',
-                                            borderRadius: '16px',
-                                            fontSize: '13px'
+                                            borderRadius: '12px',
+                                            fontSize: '12px',
+                                            fontWeight: 600
                                         }}
                                     >
-                                        {baseTrades.includes(trade) ? t(`labor.trades.${trade}`) : trade}
-                                        <div 
+                                        {baseTrades.includes(selectedTrades[0]) ? t(`labor.trades.${selectedTrades[0]}`) : selectedTrades[0]}
+                                        <span 
                                             className="chip-remove"
                                             style={{ 
                                                 display: 'flex', 
                                                 alignItems: 'center', 
                                                 justifyContent: 'center',
                                                 cursor: 'pointer', 
-                                                opacity: 0.7,
-                                                background: 'var(--bg-tertiary)',
-                                                borderRadius: '50%',
-                                                padding: '2px',
-                                                marginLeft: '4px'
+                                                opacity: 0.7
                                             }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                toggleTrade(trade);
+                                                toggleTrade(selectedTrades[0]);
                                             }}
                                             onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
                                             onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
                                         >
-                                            <X size={12} />
-                                        </div>
+                                            <X size={11} />
+                                        </span>
                                     </span>
-                                ))
-                            )}
-                            <span style={{ marginLeft: 'auto', transform: isFilterDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', padding: '4px' }}>▼</span>
+                                ) : (
+                                    <span style={{ color: 'var(--color-primary-light)', fontWeight: 600, fontSize: '13px' }}>
+                                        {isArabic ? `${selectedTrades.length} فئات محددة` : `${selectedTrades.length} categories selected`}
+                                    </span>
+                                )}
+                            </div>
+                            <ChevronDown size={16} style={{
+                                position: 'absolute',
+                                [isArabic ? 'left' : 'right']: '12px',
+                                top: '50%',
+                                transform: isFilterDropdownOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
+                                transition: 'transform 0.2s',
+                                color: 'var(--text-secondary)',
+                                pointerEvents: 'none'
+                            }} />
                         </div>
 
                         {isFilterDropdownOpen && (
@@ -526,8 +577,8 @@ export default function Workforce() {
                                     marginTop: '4px',
                                     background: 'var(--bg-primary)',
                                     border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-md)',
-                                    boxShadow: 'var(--shadow-md)',
+                                    borderRadius: '10px',
+                                    boxShadow: 'var(--shadow-md, 0 8px 24px rgba(0,0,0,0.25))',
                                     zIndex: 100,
                                     maxHeight: '300px',
                                     overflowY: 'auto'
@@ -538,7 +589,6 @@ export default function Workforce() {
                                         ? selectedTrades.length === 0
                                         : selectedTrades.includes(trade);
                                     
-                                    // Use 'OTHER' color for custom trades
                                     const colors = tradeColors[trade] || tradeColors['OTHER'];
                                     
                                     return (
@@ -560,7 +610,7 @@ export default function Workforce() {
                                             <input 
                                                 type="checkbox" 
                                                 checked={isActive}
-                                                onChange={() => {}} // Handle click on parent div
+                                                onChange={() => {}}
                                                 style={{ pointerEvents: 'none' }}
                                             />
                                             <span style={{ 
@@ -570,9 +620,9 @@ export default function Workforce() {
                                                 borderRadius: '50%',
                                                 backgroundColor: colors.bg
                                             }}></span>
-                                            <span>
+                                            <span style={{ fontSize: '0.88rem' }}>
                                                 {trade === 'ALL' 
-                                                    ? t('common.all') 
+                                                    ? (isArabic ? 'جميع الفئات والمهن' : 'All Categories') 
                                                     : (baseTrades.includes(trade) ? t(`labor.trades.${trade}`) : trade)}
                                             </span>
                                         </div>
@@ -582,7 +632,6 @@ export default function Workforce() {
                         )}
                     </div>
                 </div>
-                </div>{/* close outer flex wrapper */}
 
                 {filteredWorkmen.length === 0 ? (
                     <div className="card text-center" style={{ padding: 'var(--spacing-2xl)' }}>
@@ -606,12 +655,12 @@ export default function Workforce() {
                                     {/* 1. Header: Name, Arabic Name, Status Badge */}
                                     <div className="workman-card-header">
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <h3 className="workman-card-name" title={workman.name}>
-                                                {workman.name}
+                                            <h3 className="workman-card-name" title={getLocalizedName(workman, isArabic)}>
+                                                {getLocalizedName(workman, isArabic)}
                                             </h3>
-                                            {workman.nameAr && (
+                                            {getLocalizedSubName(workman, isArabic) && (
                                                 <span className="workman-card-subname">
-                                                    {workman.nameAr}
+                                                    {getLocalizedSubName(workman, isArabic)}
                                                 </span>
                                             )}
                                         </div>
@@ -682,7 +731,7 @@ export default function Workforce() {
                                                 style={{ color: 'var(--color-primary)', cursor: 'pointer', userSelect: 'none', fontSize: '0.82rem' }}
                                                 onClick={() => setPreviewImage({
                                                     url: workman.nationalIdImage,
-                                                    name: workman.name,
+                                                    name: getLocalizedName(workman, isArabic),
                                                     nationalId: workman.nationalId
                                                 })}
                                             >
@@ -695,7 +744,7 @@ export default function Workforce() {
 
                                         {/* Total Paid KPI Box */}
                                         <div className="workman-kpi-box">
-                                            <DollarSign size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                                            <Wallet size={16} style={{ color: '#10b981', flexShrink: 0 }} />
                                             <div>
                                                 <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>
                                                     {t('labor.totalPaid', 'TOTAL PAID')}
@@ -746,7 +795,7 @@ export default function Workforce() {
                 />
 
                 {/* National ID Image Preview Modal Popup */}
-                {previewImage && (
+                {previewImage && createPortal(
                     <div
                         className="modal-overlay"
                         onClick={() => setPreviewImage(null)}
@@ -846,7 +895,8 @@ export default function Workforce() {
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
             </div>
         </Layout>

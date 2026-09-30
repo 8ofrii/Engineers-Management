@@ -6,6 +6,7 @@ import VoiceRecorderModal from '../components/VoiceRecorderModal';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { dsrAPI, projectsAPI } from '../services/api';
+import { getLocalizedName } from '../utils/format';
 
 const STATUS_COLORS = {
     DRAFT:        { bg: '#f3f4f6', fg: '#374151', label: 'Draft' },
@@ -244,7 +245,7 @@ export default function DailySiteReports() {
                         <label className="input-label">{t('dsr.project', 'Project')}</label>
                         <select className="input" value={filters.projectId} onChange={(e) => setFilters({ ...filters, projectId: e.target.value })}>
                             <option value="">{t('dsr.allProjects', 'All projects')}</option>
-                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            {projects.map(p => <option key={p.id} value={p.id}>{getLocalizedName(p, isArabic)}</option>)}
                         </select>
                     </div>
                     <div className="input-group">
@@ -303,7 +304,7 @@ export default function DailySiteReports() {
             {reports.length > 0 && (() => {
                 const projectHours = {};
                 reports.forEach(r => {
-                    const pName = r.project?.name || (isArabic ? 'غير محدد' : 'Unassigned');
+                    const pName = getLocalizedName(r.project, isArabic) || (isArabic ? 'غير محدد' : 'Unassigned');
                     projectHours[pName] = (projectHours[pName] || 0) + (Number(r.hoursWorked) || 0);
                 });
                 const entries = Object.entries(projectHours).sort(([, a], [, b]) => b - a);
@@ -358,7 +359,7 @@ export default function DailySiteReports() {
                                     <div className="flex-between" style={{ alignItems: 'flex-start', gap: 12 }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div className="flex gap-sm" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                                                <strong>{r.project?.name}</strong>
+                                                <strong>{getLocalizedName(r.project, isArabic)}</strong>
                                                 <span style={{
                                                     padding: '2px 8px',
                                                     borderRadius: 6,
@@ -377,7 +378,7 @@ export default function DailySiteReports() {
                                             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
                                                 <strong>{fmtDate(r.reportDate)}</strong>
                                                 {' · '}
-                                                {r.reporter?.name}
+                                                {getLocalizedName(r.reporter, isArabic)}
                                                 {r.hoursWorked != null && ` · ${r.hoursWorked}h ${isArabic ? 'ساعة مسجلة' : 'logged'}`}
                                             </div>
                                             {r.progressNotes && (
@@ -424,7 +425,7 @@ export default function DailySiteReports() {
                     >
                         <div className="flex-between mb-md">
                             <div>
-                                <h2 style={{ margin: 0 }}>{detail.project?.name}</h2>
+                                <h2 style={{ margin: 0 }}>{getLocalizedName(detail.project, isArabic)}</h2>
                                 <p className="text-secondary" style={{ margin: '4px 0 0' }}>
                                     Daily Site Report · <strong>{fmtDate(detail.reportDate)}</strong>
                                 </p>
@@ -435,7 +436,7 @@ export default function DailySiteReports() {
                         {/* Status + meta */}
                         <div className="grid grid-3 mb-md" style={{ gap: 12 }}>
                             <Stat label="Status" value={STATUS_COLORS[detail.status]?.label || detail.status} />
-                            <Stat label="Reporter" value={detail.reporter?.name || '—'} />
+                            <Stat label="Reporter" value={getLocalizedName(detail.reporter, isArabic) || '—'} />
                             <Stat
                                 label="Hours logged"
                                 value={detail.hoursWorked != null ? `${detail.hoursWorked} h` : '—'}
@@ -560,7 +561,7 @@ export default function DailySiteReports() {
                                     <h4 style={{ marginTop: 0 }}>{t('dsr.managerNote', 'Manager note')}</h4>
                                     <p style={{ fontStyle: 'italic', margin: 0 }}>"{detail.acknowledgeNotes}"</p>
                                     <p className="text-secondary" style={{ fontSize: 11, marginTop: 4 }}>
-                                        — {detail.acknowledger?.name} {isArabic ? 'في' : 'on'} {fmtDateTime(detail.acknowledgedAt)}
+                                        — {getLocalizedName(detail.acknowledger, isArabic)} {isArabic ? 'في' : 'on'} {fmtDateTime(detail.acknowledgedAt)}
                                     </p>
                                 </div>
                             </div>
@@ -625,7 +626,7 @@ export default function DailySiteReports() {
                                     required
                                 >
                                     <option value="">{isArabic ? 'اختر المشروع...' : 'Select Project...'}</option>
-                                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    {projects.map(p => <option key={p.id} value={p.id}>{getLocalizedName(p, isArabic)}</option>)}
                                 </select>
                             </div>
 

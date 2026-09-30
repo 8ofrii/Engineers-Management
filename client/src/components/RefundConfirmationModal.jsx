@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { RotateCcw, X, AlertCircle } from 'lucide-react';
 import './Modal.css';
@@ -17,7 +18,7 @@ export default function RefundConfirmationModal({
     const amount = Number(transaction.amount || 0).toLocaleString();
     const isExpense = transaction.type === 'EXPENSE';
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={isLoading ? undefined : onClose}>
             <div
                 className="modal-container"
@@ -186,6 +187,7 @@ export default function RefundConfirmationModal({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

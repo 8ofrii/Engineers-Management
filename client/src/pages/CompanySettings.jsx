@@ -30,7 +30,7 @@ export default function CompanySettings() {
 
     // Profile State
     const [profileData, setProfileData] = useState({
-        name: '', email: '', phone: '', company: '', phones: [''],
+        name: '', nameAr: '', email: '', phone: '', company: '', phones: [''],
         currentPassword: '', newPassword: '', confirmPassword: ''
     });
     const [profileImg, setProfileImg] = useState(null);
@@ -100,6 +100,7 @@ export default function CompanySettings() {
                 : (uData.phone ? [uData.phone] : ['']);
             setProfileData({
                 name: uData.name || '',
+                nameAr: uData.nameAr || '',
                 email: uData.email || '',
                 phone: uData.phone || uPhones[0] || '',
                 phones: uPhones,
@@ -302,6 +303,7 @@ export default function CompanySettings() {
         try {
             const data = new FormData();
             data.append('name', profileData.name);
+            data.append('nameAr', profileData.nameAr || '');
             data.append('email', profileData.email);
             const cleanUserPhones = (profileData.phones || []).map(p => (p || '').trim()).filter(Boolean);
             const primaryUserPhone = cleanUserPhones[0] || profileData.phone || '';
@@ -808,7 +810,7 @@ export default function CompanySettings() {
                                         }}>
                                             <div className="form-group" style={{ margin: 0 }}>
                                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--text-primary)' }}>
-                                                    {isAr ? 'الاسم الكامل' : 'Full Name'} <span style={{ color: '#ef4444' }}>*</span>
+                                                    {isAr ? 'الاسم بالإنجليزية' : 'Full Name in English'} <span style={{ color: '#ef4444' }}>*</span>
                                                 </label>
                                                 <input
                                                     type="text"
@@ -816,6 +818,21 @@ export default function CompanySettings() {
                                                     value={profileData.name}
                                                     onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                                                     required
+                                                    placeholder="e.g. Hossam Hassan"
+                                                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                                                />
+                                            </div>
+
+                                            <div className="form-group" style={{ margin: 0 }}>
+                                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                                                    {isAr ? 'الاسم بالعربية' : 'Full Name in Arabic'}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="form-control"
+                                                    value={profileData.nameAr}
+                                                    onChange={(e) => setProfileData({ ...profileData, nameAr: e.target.value })}
+                                                    placeholder="مثال: حسام حسن"
                                                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                                                 />
                                             </div>

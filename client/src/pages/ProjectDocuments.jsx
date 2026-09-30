@@ -6,6 +6,7 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { documentsAPI } from '../services/api';
+import { getLocalizedName } from '../utils/format';
 
 const CATEGORIES = [
     { value: 'PHOTO_PROGRESS', label: 'Site Progress', icon: '🏗️' },
@@ -39,7 +40,8 @@ const fullUrl = (url) => {
 };
 
 export default function ProjectDocuments() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isArabic = (i18n.language || '').startsWith('ar');
     const { projectId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -363,7 +365,7 @@ export default function ProjectDocuments() {
                                     </div>
                                     <div className="flex-between" style={{ marginTop: 6, alignItems: 'center' }}>
                                         <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                                            {doc.uploader?.name || 'Unknown'} · {fmtDate(doc.uploadedAt)}
+                                            {getLocalizedName(doc.uploader, isArabic) || 'Unknown'} · {fmtDate(doc.uploadedAt)}
                                         </div>
                                         <a
                                             href={fullUrl(doc.url)}
@@ -426,7 +428,7 @@ export default function ProjectDocuments() {
                         <div style={{ fontWeight: 600 }}>{lightbox.name}</div>
                         {lightbox.description && <div style={{ fontSize: 12, marginTop: 4 }}>{lightbox.description}</div>}
                         <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>
-                            {lightbox.uploader?.name || 'Unknown'} · {fmtDate(lightbox.uploadedAt)}
+                            {getLocalizedName(lightbox.uploader, isArabic) || 'Unknown'} · {fmtDate(lightbox.uploadedAt)}
                         </div>
                     </div>
                 </div>

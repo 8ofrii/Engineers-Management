@@ -429,6 +429,13 @@
       "FLOORING": "Flooring",
       "GYPSUM": "Gypsum",
       "ALUMINUM": "Aluminum",
+      "BLACKSMITH": "Iron Worker",
+      "IRON_WORKER": "Iron Worker",
+      "STOCKING_WORKER": "Stocking Worker",
+      "MARBLE_CRAFTSMAN": "Marble Craftsman",
+      "CONCRETE_CUTTING": "Concrete Cutting",
+      "GUARD": "Guard",
+      "MUNICIPAL_EMPLOYEE": "Municipal Employee",
       "OTHER": "Other"
     }
   },
@@ -697,6 +704,7 @@
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
+    "deletePermanently": "Delete Permanently",
     "edit": "Edit",
     "add": "Add",
     "sensitive": "SENSITIVE",

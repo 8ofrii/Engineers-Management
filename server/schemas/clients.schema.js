@@ -4,6 +4,7 @@ const ClientStatus = z.enum(['ACTIVE', 'INACTIVE', 'PENDING']);
 
 const baseClient = z.object({
     name: z.string().min(1).max(200),
+    nameAr: z.string().max(200).optional().nullable(),
     email: z.string().email().max(254).optional().nullable().or(z.literal('')),
     phone: z.string().max(30).optional().nullable().or(z.literal('')),
     phones: z.array(z.string().max(30)).optional().default([]),

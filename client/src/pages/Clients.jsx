@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import AddClientModal from '../components/AddClientModal';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import { getLocalizedName, getLocalizedSubName } from '../utils/format';
 
 export default function Clients() {
     const { t, i18n } = useTranslation();
@@ -523,9 +524,14 @@ export default function Clients() {
                                     {/* 1. Header: Full Name and Status Badge */}
                                     <div className="client-card-header">
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <h3 className="client-card-name" title={client.name}>
-                                                {client.name}
+                                            <h3 className="client-card-name" title={getLocalizedName(client, isArabic)}>
+                                                {getLocalizedName(client, isArabic)}
                                             </h3>
+                                            {getLocalizedSubName(client, isArabic) && (
+                                                <span className="client-card-subname" style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', display: 'block', marginTop: '1px' }}>
+                                                    {getLocalizedSubName(client, isArabic)}
+                                                </span>
+                                            )}
                                             {client.company && (
                                                 <div className="client-card-company">
                                                     <Building2 size={13} style={{ flexShrink: 0 }} />
@@ -593,10 +599,10 @@ export default function Clients() {
                                                                     key={proj.id}
                                                                     to={`/projects/${proj.id}`}
                                                                     className="client-project-pill"
-                                                                    title={proj.name}
+                                                                    title={getLocalizedName(proj, isArabic)}
                                                                 >
                                                                     <span className="truncate" style={{ maxWidth: '200px' }}>
-                                                                        {proj.name}
+                                                                        {getLocalizedName(proj, isArabic)}
                                                                     </span>
                                                                 </Link>
                                                             ))}
@@ -613,10 +619,10 @@ export default function Clients() {
                                                                     key={proj.id}
                                                                     to={`/projects/${proj.id}`}
                                                                     className="client-project-pill completed"
-                                                                    title={proj.name}
+                                                                    title={getLocalizedName(proj, isArabic)}
                                                                 >
                                                                     <span className="truncate" style={{ maxWidth: '200px' }}>
-                                                                        {proj.name}
+                                                                        {getLocalizedName(proj, isArabic)}
                                                                     </span>
                                                                 </Link>
                                                             ))}
@@ -673,7 +679,7 @@ export default function Clients() {
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleConfirmDelete}
-                itemName={clientToDelete?.name}
+                itemName={getLocalizedName(clientToDelete, isArabic)}
                 title={t('common.deleteConfirmTitle')}
                 message={t('common.deleteConfirmMessage')}
             />

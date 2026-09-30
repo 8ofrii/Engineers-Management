@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -10,11 +11,11 @@ import {
     FileSpreadsheet, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
-import { resolveMediaUrl, parseReceiptUrls, getFileCategory, formatBytes } from '../utils/media';
-import { cleanTransactionDescription } from '../utils/format';
+import { resolveMediaUrl, parseReceiptUrls, parseReceiptAttachments, getFileCategory, formatBytes } from '../utils/media';
+import { cleanTransactionDescription, getLocalizedName } from '../utils/format';
 import './TransactionDetailModal.css';
 
-export { resolveMediaUrl, parseReceiptUrls };
+export { resolveMediaUrl, parseReceiptUrls, parseReceiptAttachments };
 
 export default function TransactionDetailModal({
     isOpen,
@@ -63,9 +64,10 @@ export default function TransactionDetailModal({
     const isPending = tx.status === 'PENDING_APPROVAL';
 
     const voiceUrl = resolveMediaUrl(tx.voiceNoteUrl);
-    const receiptUrls = parseReceiptUrls(tx.receiptPhotoUrl);
+    const receiptAttachments = parseReceiptAttachments(tx.receiptPhotoUrl);
+    const receiptUrls = receiptAttachments.map(a => a.url);
     const receiptUrl = receiptUrls[0] || null;
-    const imageAttachments = receiptUrls.filter(u => getFileCategory(u).isImg);
+    const imageAttachments = receiptAttachments.filter(a => a.isImg).map(a => a.url);
 
     // Audio Player Controls
     const togglePlay = () => {
@@ -256,7 +258,7 @@ export default function TransactionDetailModal({
     const aiData = tx.aiExtractedData && typeof tx.aiExtractedData === 'object' ? tx.aiExtractedData : null;
     const extractedItems = Array.isArray(aiData?.items) ? aiData.items : (Array.isArray(aiData?.line_items) ? aiData.line_items : []);
 
-    return (
+    return createPortal(
         <div className="modal-overlay tx-detail-overlay" onClick={onClose}>
             <div
                 className="modal-container tx-detail-modal"
@@ -349,7 +351,7 @@ export default function TransactionDetailModal({
                                 )}
                             </div>
                             <div className="tx-detail-subtitle">
-                                {tx.project?.name || (isIncome ? (isArabic ? '🏢 إيرادات المقر والشركة' : '🏢 Company & HQ Revenue') : (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر والشركة' : '🏢 Office & HQ Expenses') : (isArabic ? 'غير مسند لمشروع' : 'Unassigned Project')))} · {formatDate(tx.transactionDate || tx.createdAt)}
+                                {(tx.project ? getLocalizedName(tx.project, isArabic) : null) || (isIncome ? (isArabic ? '🏢 إيرادات المقر والشركة' : '🏢 Company & HQ Revenue') : (tx.isOfficeExpense || !tx.projectId ? (isArabic ? '🏢 مصروفات المقر والشركة' : '🏢 Office & HQ Expenses') : (isArabic ? 'غير مسند لمشروع' : 'Unassigned Project')))} · {formatDate(tx.transactionDate || tx.createdAt)}
                             </div>
                         </div>
                     </div>
@@ -366,12 +368,55 @@ export default function TransactionDetailModal({
                             {isProfit
                                 ? (isArabic ? 'أرباح المكتب' : 'Office Profit')
                                 : isIncome
-                                    ? (isArabic ? 'إجمالي المقبوضات' : 'Received Amount')
-                                    : (isArabic ? 'إجمالي المصروفات' : 'Spent Amount')}
+                                    ? (isArabic ? 'المبلغ المستلم / المقبوض' : 'Received / Paid Amount')
+                                    : (isArabic ? 'المبلغ المدفوع الفعلي' : 'Paid Amount')}
                         </div>
                         <div className={`tx-hero-amount ${isCancelled ? 'cancelled' : ''}`}>
                             {fmtCurrency(tx.amount)}
                         </div>
+
+                        {/* Settlement Difference Details if totalDueAmount exists */}
+                        {Boolean(tx.totalDueAmount && !isNaN(Number(tx.totalDueAmount))) && (
+                            <div style={{
+                                marginTop: '10px',
+                                padding: '8px 14px',
+                                borderRadius: '8px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                flexWrap: 'wrap',
+                                justifyContent: 'center',
+                                ...(Number(tx.totalDueAmount) > Number(tx.amount)
+                                    ? { background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#b45309' }
+                                    : Number(tx.totalDueAmount) < Number(tx.amount)
+                                        ? { background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#1d4ed8' }
+                                        : { background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#047857' })
+                            }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                                    {isArabic ? 'إجمالي المستحق:' : 'Total Due:'} <strong>{fmtCurrency(tx.totalDueAmount)}</strong>
+                                </span>
+                                <span style={{ opacity: 0.5 }}>|</span>
+                                {Number(tx.totalDueAmount) > Number(tx.amount) ? (
+                                    <span style={{ fontSize: '0.84rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <span>⚠️</span>
+                                        <span>{isArabic ? 'متبقي غير مسوى:' : 'Remaining Unsettled:'}</span>
+                                        <strong style={{ fontSize: '0.92rem' }}>+{fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}</strong>
+                                    </span>
+                                ) : Number(tx.totalDueAmount) < Number(tx.amount) ? (
+                                    <span style={{ fontSize: '0.84rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <span>ℹ️</span>
+                                        <span>{isArabic ? 'دفعة زائدة:' : 'Overpaid / Credit:'}</span>
+                                        <strong style={{ fontSize: '0.92rem' }}>-{fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}</strong>
+                                    </span>
+                                ) : (
+                                    <span style={{ fontSize: '0.84rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <span>✓</span>
+                                        <span>{isArabic ? 'مسوى بالكامل ومطابق' : 'Fully Settled & Matched'}</span>
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         {tx.description && (
                             <div className="tx-hero-desc">
                                 {cleanTransactionDescription(tx.description)}
@@ -513,92 +558,99 @@ export default function TransactionDetailModal({
                                             )}
                                         </div>
 
-                                        {receiptUrls.length === 1 ? (
+                                        {receiptAttachments.length === 1 ? (
                                             (() => {
-                                                const u = receiptUrls[0];
+                                                const att = receiptAttachments[0];
+                                                const u = att.url;
                                                 const meta = getFileCategory(u);
-                                                if (meta.isImg) {
-                                                    return (
-                                                        <div
-                                                            className="receipt-image-wrapper"
-                                                            onClick={() => setZoomedImageIndex(0)}
-                                                        >
-                                                            <img
-                                                                src={u}
-                                                                alt="Receipt Evidence"
-                                                                className="receipt-thumbnail"
-                                                            />
-                                                            <div className="receipt-zoom-hint">
-                                                                <Maximize2 size={16} />
-                                                                <span>{isArabic ? 'انقر للتكبير' : 'Click to zoom'}</span>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                if (meta.isPdf) {
-                                                    return (
-                                                        <div className="pdf-preview-box">
-                                                            <FileText size={44} className="text-danger" />
-                                                            <div className="pdf-file-title" title={meta.name}>
-                                                                {meta.name || (isArabic ? 'مستند PDF مرفق' : 'Attached PDF Document')}
-                                                            </div>
-                                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                                <a
-                                                                    href={u}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="btn btn-secondary btn-sm"
-                                                                >
-                                                                    <ExternalLink size={14} />
-                                                                    {isArabic ? 'عرض المستند' : 'View Document'}
-                                                                </a>
-                                                                <a
-                                                                    href={u}
-                                                                    download
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="btn btn-secondary btn-sm"
-                                                                >
-                                                                    <Download size={14} />
-                                                                    {isArabic ? 'تحميل' : 'Download'}
-                                                                </a>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
                                                 return (
-                                                    <div className="pdf-preview-box" style={{ borderColor: 'rgba(59, 130, 246, 0.3)' }}>
-                                                        {meta.isSpreadsheet ? <FileSpreadsheet size={44} style={{ color: '#10b981' }} /> : <FileText size={44} style={{ color: '#3b82f6' }} />}
-                                                        <div className="pdf-file-title" title={meta.name}>
-                                                            {meta.name || (isArabic ? 'مستند مرفق' : 'Attached Document')}
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                                            <a
-                                                                href={u}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="btn btn-secondary btn-sm"
+                                                    <div>
+                                                        {att.label && (
+                                                            <div style={{ marginBottom: '8px', fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{ background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                                                                    🏷️ {att.label}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {meta.isImg ? (
+                                                            <div
+                                                                className="receipt-image-wrapper"
+                                                                onClick={() => setZoomedImageIndex(0)}
                                                             >
-                                                                <ExternalLink size={14} />
-                                                                {isArabic ? 'فتح الملف' : 'Open File'}
-                                                            </a>
-                                                            <a
-                                                                href={u}
-                                                                download
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="btn btn-secondary btn-sm"
-                                                            >
-                                                                <Download size={14} />
-                                                                {isArabic ? 'تحميل' : 'Download'}
-                                                            </a>
-                                                        </div>
+                                                                <img
+                                                                    src={u}
+                                                                    alt={att.label || "Receipt Evidence"}
+                                                                    className="receipt-thumbnail"
+                                                                />
+                                                                <div className="receipt-zoom-hint">
+                                                                    <Maximize2 size={16} />
+                                                                    <span>{isArabic ? 'انقر للتكبير' : 'Click to zoom'}</span>
+                                                                </div>
+                                                            </div>
+                                                        ) : meta.isPdf ? (
+                                                            <div className="pdf-preview-box">
+                                                                <FileText size={44} className="text-danger" />
+                                                                <div className="pdf-file-title" title={att.name || meta.name}>
+                                                                    {att.name || meta.name || (isArabic ? 'مستند PDF مرفق' : 'Attached PDF Document')}
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                                    <a
+                                                                        href={u}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="btn btn-secondary btn-sm"
+                                                                    >
+                                                                        <ExternalLink size={14} />
+                                                                        {isArabic ? 'عرض المستند' : 'View Document'}
+                                                                    </a>
+                                                                    <a
+                                                                        href={u}
+                                                                        download
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="btn btn-secondary btn-sm"
+                                                                    >
+                                                                        <Download size={14} />
+                                                                        {isArabic ? 'تحميل' : 'Download'}
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="pdf-preview-box" style={{ borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+                                                                {meta.isSpreadsheet ? <FileSpreadsheet size={44} style={{ color: '#10b981' }} /> : <FileText size={44} style={{ color: '#3b82f6' }} />}
+                                                                <div className="pdf-file-title" title={att.name || meta.name}>
+                                                                    {att.name || meta.name || (isArabic ? 'مستند مرفق' : 'Attached Document')}
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                                    <a
+                                                                        href={u}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="btn btn-secondary btn-sm"
+                                                                    >
+                                                                        <ExternalLink size={14} />
+                                                                        {isArabic ? 'فتح الملف' : 'Open File'}
+                                                                    </a>
+                                                                    <a
+                                                                        href={u}
+                                                                        download
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="btn btn-secondary btn-sm"
+                                                                    >
+                                                                        <Download size={14} />
+                                                                        {isArabic ? 'تحميل' : 'Download'}
+                                                                    </a>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })()
                                         ) : (
                                             <div className="receipt-gallery-grid">
-                                                {receiptUrls.map((u, idx) => {
+                                                {receiptAttachments.map((att, idx) => {
+                                                    const u = att.url;
                                                     const meta = getFileCategory(u);
                                                     const imgIndex = imageAttachments.indexOf(u);
                                                     return (
@@ -608,7 +660,7 @@ export default function TransactionDetailModal({
                                                                     className="gallery-thumb-container"
                                                                     onClick={() => setZoomedImageIndex(imgIndex)}
                                                                 >
-                                                                    <img src={u} alt={meta.name} className="gallery-thumb-img" />
+                                                                    <img src={u} alt={att.label || att.name || meta.name} className="gallery-thumb-img" />
                                                                     <div className="gallery-thumb-overlay">
                                                                         <Maximize2 size={16} />
                                                                     </div>
@@ -622,18 +674,23 @@ export default function TransactionDetailModal({
                                                             ) : meta.isSpreadsheet ? (
                                                                 <div className="gallery-doc-container sheet">
                                                                     <FileSpreadsheet size={32} style={{ color: '#10b981' }} />
-                                                                    <span className="gallery-type-badge sheet">{meta.ext}</span>
+                                                                    <span className="gallery-type-badge sheet">{att.ext || meta.ext}</span>
                                                                 </div>
                                                             ) : (
                                                                 <div className="gallery-doc-container doc">
                                                                     <FileText size={32} style={{ color: '#3b82f6' }} />
-                                                                    <span className="gallery-type-badge doc">{meta.ext}</span>
+                                                                    <span className="gallery-type-badge doc">{att.ext || meta.ext}</span>
                                                                 </div>
                                                             )}
 
                                                             <div className="gallery-item-info">
-                                                                <span className="gallery-item-name" title={meta.name}>
-                                                                    {meta.name}
+                                                                {att.label && (
+                                                                    <span style={{ fontWeight: 700, fontSize: '0.76rem', color: 'var(--color-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.label}>
+                                                                        🏷️ {att.label}
+                                                                    </span>
+                                                                )}
+                                                                <span className="gallery-item-name" title={att.name || meta.name}>
+                                                                    {att.name || meta.name}
                                                                 </span>
                                                                 <div className="gallery-item-actions">
                                                                     <a
@@ -718,7 +775,7 @@ export default function TransactionDetailModal({
                                     {isArabic ? 'المشروع' : 'Project'}
                                 </div>
                                 <div className="tx-item-value font-semibold">
-                                    {tx.project?.name || (isArabic ? 'غير محدد' : 'Unspecified')}
+                                    {(tx.project ? getLocalizedName(tx.project, isArabic) : null) || (isArabic ? 'غير محدد' : 'Unspecified')}
                                 </div>
                             </div>
 
@@ -744,6 +801,45 @@ export default function TransactionDetailModal({
                                 </div>
                             </div>
 
+                            {/* Total Due Amount & Settlement Status (If present) */}
+                            {Boolean(tx.totalDueAmount && !isNaN(Number(tx.totalDueAmount))) && (
+                                <>
+                                    <div className="tx-detail-item">
+                                        <div className="tx-item-label">
+                                            <TrendingUp size={14} />
+                                            {isArabic ? 'المبلغ الإجمالي المستحق' : 'Total Due Amount'}
+                                        </div>
+                                        <div className="tx-item-value" style={{ fontWeight: 700 }}>
+                                            {fmtCurrency(tx.totalDueAmount)}
+                                        </div>
+                                    </div>
+                                    <div className="tx-detail-item">
+                                        <div className="tx-item-label">
+                                            <AlertCircle size={14} />
+                                            {isArabic ? 'حالة التسوية والمطابقة' : 'Settlement Status'}
+                                        </div>
+                                        <div className="tx-item-value">
+                                            {Number(tx.totalDueAmount) > Number(tx.amount) ? (
+                                                <span style={{ color: '#d97706', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span>⚠️</span>
+                                                    <span>{isArabic ? `باقي مستحق غير مسوى (+${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))})` : `Unsettled Balance (+${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))})`}</span>
+                                                </span>
+                                            ) : Number(tx.totalDueAmount) < Number(tx.amount) ? (
+                                                <span style={{ color: '#2563eb', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span>ℹ️</span>
+                                                    <span>{isArabic ? `دفعة زائدة (-${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))})` : `Overpaid (-${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))})`}</span>
+                                                </span>
+                                            ) : (
+                                                <span style={{ color: '#10b981', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span>✓</span>
+                                                    <span>{isArabic ? 'مسوى بالكامل ومطابق' : 'Fully Settled & Matched'}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
                             {/* Payer or Client */}
                             <div className="tx-detail-item">
                                 <div className="tx-item-label">
@@ -752,8 +848,8 @@ export default function TransactionDetailModal({
                                 </div>
                                 <div className="tx-item-value">
                                     {isIncome
-                                        ? (tx.client?.name || tx.paidByClientContact || tx.transactionFrom || '-')
-                                        : (tx.payer?.name || tx.user?.name || '-')}
+                                        ? ((tx.client ? getLocalizedName(tx.client, isArabic) : null) || tx.paidByClientContact || tx.transactionFrom || '-')
+                                        : ((tx.payer ? getLocalizedName(tx.payer, isArabic) : null) || (tx.user ? getLocalizedName(tx.user, isArabic) : null) || '-')}
                                 </div>
                             </div>
 
@@ -765,7 +861,7 @@ export default function TransactionDetailModal({
                                         {isArabic ? 'المستفيد / المورد / المعلم' : 'Beneficiary / Supplier'}
                                     </div>
                                     <div className="tx-item-value">
-                                        {tx.beneficiary || tx.supplier?.name || tx.workman?.name || tx.transactionTo || '-'}
+                                        {tx.beneficiary || (tx.supplier ? getLocalizedName(tx.supplier, isArabic) : null) || (tx.workman ? getLocalizedName(tx.workman, isArabic) : null) || tx.transactionTo || '-'}
                                     </div>
                                 </div>
                             )}
@@ -814,7 +910,7 @@ export default function TransactionDetailModal({
                                     {isArabic ? 'تم الإنشاء بواسطة' : 'Created By'}
                                 </div>
                                 <div className="tx-item-value">
-                                    {tx.user?.name || tx.creator?.name || '-'} ({formatDate(tx.createdAt)})
+                                    {(tx.user ? getLocalizedName(tx.user, isArabic) : null) || (tx.creator ? getLocalizedName(tx.creator, isArabic) : null) || '-'} ({formatDate(tx.createdAt)})
                                 </div>
                             </div>
 
@@ -826,7 +922,7 @@ export default function TransactionDetailModal({
                                         {isArabic ? 'تم الاعتماد بواسطة' : 'Approved By'}
                                     </div>
                                     <div className="tx-item-value">
-                                        {tx.approver?.name || (isArabic ? 'الإدارة' : 'Manager')} ({formatDate(tx.approvedAt)})
+                                        {(tx.approver ? getLocalizedName(tx.approver, isArabic) : null) || (isArabic ? 'الإدارة' : 'Manager')} ({formatDate(tx.approvedAt)})
                                     </div>
                                 </div>
                             )}
@@ -839,30 +935,30 @@ export default function TransactionDetailModal({
                             <>
                                 <div className="voucher-sign-col">
                                     <div className="voucher-sign-title">{isArabic ? 'المسلِّم / القائم بالسداد' : 'Depositor / Payer'}</div>
-                                    <div className="voucher-sign-line">{tx.client?.name || tx.transactionFrom || tx.beneficiary || '____________________'}</div>
+                                    <div className="voucher-sign-line">{(tx.client ? getLocalizedName(tx.client, isArabic) : null) || tx.transactionFrom || tx.beneficiary || '____________________'}</div>
                                 </div>
                                 <div className="voucher-sign-col">
                                     <div className="voucher-sign-title">{isArabic ? 'المستلم / أمين الخزينة' : 'Received By / Cashier'}</div>
-                                    <div className="voucher-sign-line">{tx.user?.name || user?.name || 'Authorized'}</div>
+                                    <div className="voucher-sign-line">{(tx.user ? getLocalizedName(tx.user, isArabic) : null) || (user ? getLocalizedName(user, isArabic) : null) || 'Authorized'}</div>
                                 </div>
                                 <div className="voucher-sign-col">
                                     <div className="voucher-sign-title">{isArabic ? 'اعتماد الإدارة المالية' : 'Financial Approval'}</div>
-                                    <div className="voucher-sign-line">{tx.approver?.name || (isApproved ? (isArabic ? 'الإدارة المالية' : 'Financial Dept') : '____________________')}</div>
+                                    <div className="voucher-sign-line">{(tx.approver ? getLocalizedName(tx.approver, isArabic) : null) || (isApproved ? (isArabic ? 'الإدارة المالية' : 'Financial Dept') : '____________________')}</div>
                                 </div>
                             </>
                         ) : (
                             <>
                                 <div className="voucher-sign-col">
                                     <div className="voucher-sign-title">{isArabic ? 'المحاسب المسؤول / الصراف' : 'Accountant / Cashier'}</div>
-                                    <div className="voucher-sign-line">{tx.payer?.name || tx.user?.name || user?.name || 'Authorized'}</div>
+                                    <div className="voucher-sign-line">{(tx.payer ? getLocalizedName(tx.payer, isArabic) : null) || (tx.user ? getLocalizedName(tx.user, isArabic) : null) || (user ? getLocalizedName(user, isArabic) : null) || 'Authorized'}</div>
                                 </div>
                                 <div className="voucher-sign-col">
                                     <div className="voucher-sign-title">{isArabic ? 'المستلم / المستفيد' : 'Beneficiary / Recipient'}</div>
-                                    <div className="voucher-sign-line">{tx.beneficiary || tx.supplier?.name || tx.workman?.name || '____________________'}</div>
+                                    <div className="voucher-sign-line">{tx.beneficiary || (tx.supplier ? getLocalizedName(tx.supplier, isArabic) : null) || (tx.workman ? getLocalizedName(tx.workman, isArabic) : null) || '____________________'}</div>
                                 </div>
                                 <div className="voucher-sign-col">
                                     <div className="voucher-sign-title">{isArabic ? 'اعتماد الإدارة المالية' : 'Financial Approval'}</div>
-                                    <div className="voucher-sign-line">{tx.approver?.name || (isApproved ? (isArabic ? 'الإدارة المالية' : 'Financial Dept') : '____________________')}</div>
+                                    <div className="voucher-sign-line">{(tx.approver ? getLocalizedName(tx.approver, isArabic) : null) || (isApproved ? (isArabic ? 'الإدارة المالية' : 'Financial Dept') : '____________________')}</div>
                                 </div>
                             </>
                         )}
@@ -987,6 +1083,7 @@ export default function TransactionDetailModal({
                     </div>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 }

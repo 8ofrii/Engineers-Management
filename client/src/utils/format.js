@@ -70,16 +70,92 @@ export const cleanTransactionDescription = (desc) => {
     return cleaned;
 };
 
+const HAS_ARABIC_REGEX = /[\u0600-\u06FF]/;
+const HAS_LATIN_REGEX = /[A-Za-z]/;
+
+// Bilingual helper for entity names (Workman, Client, Supplier, Project, Material, User, etc.)
+// When in Arabic UI: prioritizes Arabic script name, falls back to English.
+// When in English UI: prioritizes English/Latin script name, falls back to Arabic.
+export const getLocalizedName = (entity, langOrIsArabic = 'en') => {
+    if (!entity) return '';
+    if (typeof entity === 'string') return entity;
+    const isArabic = typeof langOrIsArabic === 'boolean'
+        ? langOrIsArabic
+        : (typeof langOrIsArabic === 'string' && langOrIsArabic.startsWith('ar'));
+
+    const val1 = (entity.nameAr && typeof entity.nameAr === 'string') ? entity.nameAr.trim() : (entity.descriptionAr && typeof entity.descriptionAr === 'string' ? entity.descriptionAr.trim() : '');
+    const val2 = (entity.name && typeof entity.name === 'string') ? entity.name.trim() : (entity.description && typeof entity.description === 'string' ? entity.description.trim() : '');
+
+    const val1IsArabic = HAS_ARABIC_REGEX.test(val1);
+    const val2IsArabic = HAS_ARABIC_REGEX.test(val2);
+    const val1IsLatin = HAS_LATIN_REGEX.test(val1);
+    const val2IsLatin = HAS_LATIN_REGEX.test(val2);
+
+    if (isArabic) {
+        // Arabic primary requested: prefer string with Arabic letters
+        if (val1IsArabic) return val1;
+        if (val2IsArabic) return val2;
+        return val1 || val2 || '';
+    } else {
+        // English primary requested: prefer string with Latin letters
+        if (val2IsLatin) return val2;
+        if (val1IsLatin) return val1;
+        return val2 || val1 || '';
+    }
+};
+
+// Returns the secondary / subtitle name in the alternate language, or null if no distinct alternate name exists.
+// When in Arabic UI: returns English version underneath (if distinct from Arabic primary).
+// When in English UI: returns Arabic version underneath (if distinct from English primary).
+export const getLocalizedSubName = (entity, langOrIsArabic = 'en') => {
+    if (!entity || typeof entity === 'string') return null;
+    const isArabic = typeof langOrIsArabic === 'boolean'
+        ? langOrIsArabic
+        : (typeof langOrIsArabic === 'string' && langOrIsArabic.startsWith('ar'));
+
+    const val1 = (entity.nameAr && typeof entity.nameAr === 'string') ? entity.nameAr.trim() : (entity.descriptionAr && typeof entity.descriptionAr === 'string' ? entity.descriptionAr.trim() : '');
+    const val2 = (entity.name && typeof entity.name === 'string') ? entity.name.trim() : (entity.description && typeof entity.description === 'string' ? entity.description.trim() : '');
+
+    if (!val1 && !val2) return null;
+    if (val1 && val2 && val1.toLowerCase() === val2.toLowerCase()) return null;
+
+    const primaryName = getLocalizedName(entity, isArabic);
+
+    if (isArabic) {
+        // We want English subtitle underneath
+        if (val2 && HAS_LATIN_REGEX.test(val2) && val2 !== primaryName) return val2;
+        if (val1 && HAS_LATIN_REGEX.test(val1) && val1 !== primaryName) return val1;
+        // If neither has latin letters, only show if distinct from primary
+        if (val2 && val2 !== primaryName) return val2;
+        if (val1 && val1 !== primaryName) return val1;
+        return null;
+    } else {
+        // We want Arabic subtitle underneath
+        if (val1 && HAS_ARABIC_REGEX.test(val1) && val1 !== primaryName) return val1;
+        if (val2 && HAS_ARABIC_REGEX.test(val2) && val2 !== primaryName) return val2;
+        // If neither has arabic letters, only show if distinct from primary
+        if (val1 && val1 !== primaryName) return val1;
+        if (val2 && val2 !== primaryName) return val2;
+        return null;
+    }
+};
+
 // Convenience hook so components don't have to thread `i18n.language` through every callsite.
 export const useFormat = () => {
     const { i18n } = useTranslation();
     const lang = i18n.language?.startsWith('ar') ? 'ar' : 'en';
+    const isArabic = lang === 'ar';
     return {
         currency: (amount, opts) => formatCurrency(amount, lang, opts),
         number: (amount, opts) => formatNumber(amount, lang, opts),
         date: (dateString) => formatDate(dateString, lang),
         formatDate: (dateString) => formatDate(dateString, lang),
-        lang
+        name: (entity) => getLocalizedName(entity, isArabic),
+        getLocalizedName: (entity) => getLocalizedName(entity, isArabic),
+        subName: (entity) => getLocalizedSubName(entity, isArabic),
+        getLocalizedSubName: (entity) => getLocalizedSubName(entity, isArabic),
+        lang,
+        isArabic
     };
 };
 

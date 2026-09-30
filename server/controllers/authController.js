@@ -256,6 +256,7 @@ export const verifyEmail = async (req, res, next) => {
             user: {
                 id: updatedUser.id,
                 name: updatedUser.name,
+                nameAr: updatedUser.nameAr,
                 email: updatedUser.email,
                 role: updatedUser.role,
                 company: updatedUser.tenant ? updatedUser.tenant.name : updatedUser.company,
@@ -359,6 +360,7 @@ export const login = async (req, res, next) => {
             user: {
                 id: user.id,
                 name: user.name,
+                nameAr: user.nameAr,
                 email: user.email,
                 role: user.role,
                 company: user.tenant ? user.tenant.name : user.company,
@@ -407,6 +409,7 @@ export const login2FA = async (req, res, next) => {
             user: {
                 id: user.id,
                 name: user.name,
+                nameAr: user.nameAr,
                 email: user.email,
                 role: user.role,
                 company: user.tenant ? user.tenant.name : user.company,
@@ -561,6 +564,7 @@ export const getMe = async (req, res, next) => {
             data: {
                 id: user.id,
                 name: user.name,
+                nameAr: user.nameAr,
                 email: user.email,
                 role: user.role,
                 company: user.tenant ? user.tenant.name : user.company,
@@ -584,7 +588,7 @@ export const getMe = async (req, res, next) => {
 // @access  Private
 export const updateProfile = async (req, res, next) => {
     try {
-        const { name, email, phone, phones, company, currentPassword, newPassword } = req.body;
+        const { name, nameAr, email, phone, phones, company, currentPassword, newPassword } = req.body;
         const userId = req.user.id;
 
         // Get current user
@@ -599,7 +603,8 @@ export const updateProfile = async (req, res, next) => {
         // Prepare update data
         const updateData = {};
 
-        if (name) updateData.name = name;
+        if (name !== undefined) updateData.name = name;
+        if (nameAr !== undefined) updateData.nameAr = nameAr ? nameAr.trim() : null;
         if (email && email !== user.email) {
             // Check if email is already taken in THIS tenant
             // If user is trying to change email to one that exists in another tenant, it's fine!
@@ -680,6 +685,7 @@ export const updateProfile = async (req, res, next) => {
             select: {
                 id: true,
                 name: true,
+                nameAr: true,
                 email: true,
                 role: true,
                 company: true,

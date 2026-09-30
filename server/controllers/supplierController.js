@@ -11,16 +11,33 @@ export const getSuppliers = async (req, res, next) => {
                 tenantId: req.user.tenantId,
                 deletedAt: null
             },
+            include: {
+                transactions: {
+                    where: {
+                        status: 'APPROVED',
+                        type: 'EXPENSE'
+                    },
+                    select: {
+                        id: true,
+                        amount: true,
+                        projectId: true
+                    }
+                }
+            },
             orderBy: {
                 createdAt: 'desc'
             }
         });
 
-        const formatted = suppliers.map(s => ({
-            ...s,
-            categories: (Array.isArray(s.categories) && s.categories.length > 0) ? s.categories : (s.category ? [s.category] : []),
-            suppliedItems: Array.isArray(s.suppliedItems) ? s.suppliedItems : []
-        }));
+        const formatted = suppliers.map(s => {
+            const totalPaid = (s.transactions || []).reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+            return {
+                ...s,
+                totalPaid,
+                categories: (Array.isArray(s.categories) && s.categories.length > 0) ? s.categories : (s.category ? [s.category] : []),
+                suppliedItems: Array.isArray(s.suppliedItems) ? s.suppliedItems : []
+            };
+        });
 
         res.status(200).json({
             success: true,
@@ -42,6 +59,19 @@ export const getSupplier = async (req, res, next) => {
                 id: req.params.id,
                 tenantId: req.user.tenantId,
                 deletedAt: null
+            },
+            include: {
+                transactions: {
+                    where: {
+                        status: 'APPROVED',
+                        type: 'EXPENSE'
+                    },
+                    select: {
+                        id: true,
+                        amount: true,
+                        projectId: true
+                    }
+                }
             }
         });
 
@@ -52,8 +82,11 @@ export const getSupplier = async (req, res, next) => {
             });
         }
 
+        const totalPaid = (supplier.transactions || []).reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+
         const formatted = {
             ...supplier,
+            totalPaid,
             categories: (Array.isArray(supplier.categories) && supplier.categories.length > 0) ? supplier.categories : (supplier.category ? [supplier.category] : []),
             suppliedItems: Array.isArray(supplier.suppliedItems) ? supplier.suppliedItems : []
         };

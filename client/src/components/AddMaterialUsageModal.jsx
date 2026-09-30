@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { projectsAPI, materialsAPI } from '../services/api';
@@ -73,7 +74,7 @@ export default function AddMaterialUsageModal({ isOpen, onClose, onSubmit }) {
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
@@ -83,7 +84,8 @@ export default function AddMaterialUsageModal({ isOpen, onClose, onSubmit }) {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
                     <div className="form-section">
                         <div className="form-grid">
 
@@ -162,6 +164,7 @@ export default function AddMaterialUsageModal({ isOpen, onClose, onSubmit }) {
 
                         </div>
                     </div>
+                    </div>
 
                     <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -173,6 +176,7 @@ export default function AddMaterialUsageModal({ isOpen, onClose, onSubmit }) {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

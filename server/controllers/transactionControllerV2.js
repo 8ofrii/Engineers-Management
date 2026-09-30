@@ -131,7 +131,8 @@ export const createTransactionV2 = async (req, res, next) => {
             safeId,
             isOfficeExpense,
             inventoryDestination,
-            targetSupplierId
+            targetSupplierId,
+            totalDueAmount
         } = req.body;
 
         const isSupplierInventory = (createBatch || req.body.materialId) && (inventoryDestination === 'SUPPLIER' || (!projectId && (targetSupplierId || supplierId)));
@@ -165,23 +166,36 @@ export const createTransactionV2 = async (req, res, next) => {
         }
 
         // Determine payer (Manager can assign, Engineer defaults to self)
+        const managerRoles = ['PROJECT_MANAGER', 'ADMIN', 'SUPER_ADMIN', 'GENERAL_MANAGER'];
+        const isCallerManager = managerRoles.includes(req.user.role);
+
         let actualPayer = req.user.id;
-        if (payerUserId && (req.user.role === 'PROJECT_MANAGER' || req.user.role === 'ADMIN')) {
+        if (payerUserId && isCallerManager) {
             actualPayer = payerUserId;
         }
 
-        // Income is money coming IN to the company/project from clients — auto-approved immediately.
-        // Expenses require approval thresholds based on creator role and amount.
-        const callerRole = req.user.role;
-        let initialStatus = 'APPROVED';
-        if (type === 'EXPENSE') {
+        let isPayerNonManager = false;
+        if (payerUserId && payerUserId !== req.user.id) {
+            const payerUser = await prisma.user.findUnique({
+                where: { id: payerUserId },
+                select: { role: true }
+            });
+            if (payerUser && !managerRoles.includes(payerUser.role)) {
+                isPayerNonManager = true;
+            }
+        } else if (!isCallerManager) {
+            isPayerNonManager = true;
+        }
+
+        let initialStatus = 'PENDING_APPROVAL';
+        if (isCallerManager && !isPayerNonManager) {
             const tenantConfig = await prisma.tenant.findUnique({
                 where: { id: req.user.tenantId },
                 select: { approvalThresholds: true }
             });
-            initialStatus = canAutoApprove(callerRole, amount, tenantConfig)
-                ? 'APPROVED'
-                : 'PENDING_APPROVAL';
+            initialStatus = canAutoApprove(req.user.role, amount, tenantConfig) ? 'APPROVED' : 'PENDING_APPROVAL';
+        } else if (isCallerManager && (req.body.isApproved === true || req.body.status === 'APPROVED')) {
+            initialStatus = 'APPROVED';
         }
 
         // Resolve safe vs custody targets
@@ -192,19 +206,38 @@ export const createTransactionV2 = async (req, res, next) => {
 
         if (typeof targetSafeId === 'string' && targetSafeId.startsWith('custody_')) {
             const custodyUserId = targetSafeId.replace('custody_', '');
-            targetSafeId = null;
             targetPaymentMethod = 'CUSTODY_WALLET';
             if (!targetPayerUserId) targetPayerUserId = custodyUserId;
             if (!targetCustodyWalletId) targetCustodyWalletId = custodyUserId;
-        }
 
-        if (targetPaymentMethod === 'CUSTODY_WALLET') {
-            targetSafeId = null;
-            if (!targetCustodyWalletId && targetPayerUserId) {
-                targetCustodyWalletId = targetPayerUserId;
+            // Check if an explicit custody safe exists for this user in company_safes
+            const explicitCustodySafe = await prisma.companySafe.findFirst({
+                where: { tenantId: req.user.tenantId, assignedUserId: custodyUserId, isCustody: true, isActive: true }
+            });
+            if (explicitCustodySafe) {
+                targetSafeId = explicitCustodySafe.id;
+            } else {
+                targetSafeId = null;
             }
         } else if (targetSafeId) {
-            targetCustodyWalletId = null;
+            const safeRecord = await prisma.companySafe.findFirst({
+                where: { id: targetSafeId, tenantId: req.user.tenantId }
+            });
+            if (safeRecord && safeRecord.isCustody) {
+                targetPaymentMethod = 'CUSTODY_WALLET';
+                if (safeRecord.assignedUserId) {
+                    if (!targetCustodyWalletId) targetCustodyWalletId = safeRecord.assignedUserId;
+                    if (!targetPayerUserId) targetPayerUserId = safeRecord.assignedUserId;
+                }
+            }
+        } else if (targetPaymentMethod === 'CUSTODY_WALLET' && (targetCustodyWalletId || targetPayerUserId)) {
+            const custodyUserId = targetCustodyWalletId || targetPayerUserId;
+            const explicitCustodySafe = await prisma.companySafe.findFirst({
+                where: { tenantId: req.user.tenantId, assignedUserId: custodyUserId, isCustody: true, isActive: true }
+            });
+            if (explicitCustodySafe) {
+                targetSafeId = explicitCustodySafe.id;
+            }
         }
 
         const result = await prisma.$transaction(async (tx) => {
@@ -238,6 +271,7 @@ export const createTransactionV2 = async (req, res, next) => {
                         receiptPhotoUrl: receiptPhotoUrl || null,
                         aiRawText: aiRawText || null,
                         aiExtractedData: aiExtractedData || null,
+                        totalDueAmount: (totalDueAmount !== undefined && totalDueAmount !== null && totalDueAmount !== '' && !isNaN(Number(totalDueAmount))) ? Number(totalDueAmount) : null,
                         tenantId: req.user.tenantId
                     }
                 });
@@ -248,11 +282,15 @@ export const createTransactionV2 = async (req, res, next) => {
                             where: { id: targetSafeId, tenantId: req.user.tenantId },
                             data: { balance: { increment: Number(amount) } }
                         });
-                    } else if (targetPaymentMethod === 'CUSTODY_WALLET' && targetCustodyWalletId) {
-                        await tx.user.update({
-                            where: { id: targetCustodyWalletId },
-                            data: { currentCustodyBalance: { increment: Number(amount) } }
-                        }).catch(e => console.error('Error incrementing custody balance:', e));
+                    }
+                    if (targetPaymentMethod === 'CUSTODY_WALLET' || targetCustodyWalletId) {
+                        const custodyUserId = targetCustodyWalletId || targetPayerUserId || actualPayer;
+                        if (custodyUserId) {
+                            await tx.user.update({
+                                where: { id: custodyUserId },
+                                data: { currentCustodyBalance: { increment: Number(amount) } }
+                            }).catch(e => console.error('Error incrementing custody balance:', e));
+                        }
                     }
                     if (projectId) {
                         await tx.project.update({
@@ -324,6 +362,7 @@ export const createTransactionV2 = async (req, res, next) => {
                         receiptPhotoUrl: receiptPhotoUrl || null,
                         aiRawText: aiRawText || null,
                         aiExtractedData: aiExtractedData || null,
+                        totalDueAmount: (totalDueAmount !== undefined && totalDueAmount !== null && totalDueAmount !== '' && !isNaN(Number(totalDueAmount))) ? Number(totalDueAmount) : null,
                         tenantId: req.user.tenantId
                     }
                 });
@@ -352,12 +391,15 @@ export const createTransactionV2 = async (req, res, next) => {
                         where: { id: targetSafeId, tenantId: req.user.tenantId },
                         data: { balance: { decrement: Number(amount) } }
                     });
-                } else if (targetPaymentMethod === 'CUSTODY_WALLET') {
+                }
+                if (targetPaymentMethod === 'CUSTODY_WALLET' || targetCustodyWalletId) {
                     const custodyUserId = targetCustodyWalletId || targetPayerUserId || actualPayer;
-                    await tx.user.update({
-                        where: { id: custodyUserId },
-                        data: { currentCustodyBalance: { decrement: Number(amount) } }
-                    }).catch(e => console.error('Error deducting custody balance:', e));
+                    if (custodyUserId) {
+                        await tx.user.update({
+                            where: { id: custodyUserId },
+                            data: { currentCustodyBalance: { decrement: Number(amount) } }
+                        }).catch(e => console.error('Error deducting custody balance:', e));
+                    }
                 }
 
                 // If APPROVED, Deduct from Project Safe if project linked

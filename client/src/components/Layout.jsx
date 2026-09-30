@@ -49,6 +49,7 @@ import AddTransactionModal from './AddTransactionModal';
 import AddProjectModal from './AddProjectModal';
 import { useCopilot } from '../context/CopilotContext';
 import { transactionsAPI } from '../services/api';
+import { getLocalizedName } from '../utils/format';
 import './Layout.css';
 
 // Module-level persistent scroll tracker across route changes and Layout remounts
@@ -266,7 +267,7 @@ export default function Layout({ children }) {
                 <BeamsBackground
                     colorScheme="ember"
                     intensity="medium"
-                    className="fixed inset-0 pointer-events-none z-0"
+                    className="fixed inset-0 pointer-events-none -z-10"
                 />
             )}
             {/* Sidebar */}
@@ -492,7 +493,7 @@ export default function Layout({ children }) {
                                 )}
                             </div>
                             <div className="user-details">
-                                <div className="user-name">{user?.name}</div>
+                                <div className="user-name">{getLocalizedName(user, i18n.language === 'ar')}</div>
                                 <div className="user-email">{user?.email}</div>
                             </div>
                         </div>

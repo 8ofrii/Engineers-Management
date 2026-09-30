@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { suppliersAPI } from '../services/api';
@@ -149,7 +150,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
@@ -159,7 +160,8 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="modal-body">
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
                     {hasRestoredDraft && !initialData && (
                         <DraftBanner onDiscard={handleDiscardDraft} />
                     )}
@@ -271,6 +273,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                             </div>
                         </div>
                     </div>
+                    </div>
 
                     <div className="modal-footer">
                         <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -282,6 +285,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, initialData 
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

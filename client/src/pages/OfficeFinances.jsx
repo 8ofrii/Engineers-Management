@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -32,7 +33,7 @@ import {
 import Layout from '../components/Layout';
 import { safesAPI, transactionsAPI, userAPI } from '../services/api';
 import { useAlert } from '../context/AlertContext';
-import { useFormat, cleanTransactionDescription } from '../utils/format';
+import { useFormat, cleanTransactionDescription, getLocalizedName, getLocalizedSubName } from '../utils/format';
 import { exportToXLSX } from '../utils/excelExport';
 import AddTransactionModal from '../components/AddTransactionModal';
 import TransactionDetailModal from '../components/TransactionDetailModal';
@@ -89,6 +90,7 @@ export default function OfficeFinances() {
     // Modals
     const [isAddSafeModalOpen, setIsAddSafeModalOpen] = useState(false);
     const [editingSafe, setEditingSafe] = useState(null);
+    const [safeModalInitialMode, setSafeModalInitialMode] = useState('SAFE');
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [transferSourceSafeId, setTransferSourceSafeId] = useState('');
     const [transferTargetSafeId, setTransferTargetSafeId] = useState('');
@@ -237,6 +239,11 @@ export default function OfficeFinances() {
     // Filter safes
     const filteredSafes = safes.filter(s => {
         if (safeTypeFilter === 'ALL') return true;
+        if (safeTypeFilter === 'CUSTODY') return s.isCustody || s.type === 'CUSTODY';
+        if (safeTypeFilter === 'CASH_SAFE') return !s.isCustody && s.type === 'CASH_SAFE';
+        if (safeTypeFilter === 'BANK_ACCOUNT') return !s.isCustody && s.type === 'BANK_ACCOUNT';
+        if (safeTypeFilter === 'MOBILE_WALLET') return !s.isCustody && s.type === 'MOBILE_WALLET';
+        if (safeTypeFilter === 'OWNER_ACCOUNT') return !s.isCustody && s.type === 'OWNER_ACCOUNT';
         return s.type === safeTypeFilter;
     });
 
@@ -265,12 +272,26 @@ export default function OfficeFinances() {
 
     const displayedTxs = isTxExpanded ? filteredTxs : filteredTxs.slice(0, 5);
 
-    const getSafeTypeBadge = (type) => {
+    const getSafeTypeBadge = (safeOrType) => {
+        let type = safeOrType;
+        let isCustody = false;
+        if (typeof safeOrType === 'object' && safeOrType !== null) {
+            type = safeOrType.type;
+            isCustody = Boolean(safeOrType.isCustody);
+        } else if (safeOrType === 'CUSTODY') {
+            isCustody = true;
+        }
+
+        if (isCustody) {
+            if (type === 'BANK_ACCOUNT') {
+                return { label: isArabic ? 'عهدة حساب بنكي' : 'Bank Custody', color: '#8b5cf6', icon: Building2 };
+            }
+            return { label: isArabic ? 'عهدة نقدية (كاش)' : 'Cash Custody', color: '#8b5cf6', icon: Wallet };
+        }
+
         switch (type) {
-            case 'CUSTODY':
-                return { label: isArabic ? 'عهدة موظف' : 'Member Custody', color: '#8b5cf6', icon: UserCheck };
             case 'BANK_ACCOUNT':
-                return { label: isArabic ? 'حساب بنكي' : 'Bank Account', color: '#2563eb', icon: CreditCard };
+                return { label: isArabic ? 'حساب بنكي للشركة' : 'Bank Account', color: '#2563eb', icon: CreditCard };
             case 'MOBILE_WALLET':
                 return { label: isArabic ? 'محفظة إلكترونية' : 'Mobile Wallet', color: '#8b5cf6', icon: Smartphone };
             case 'OWNER_ACCOUNT':
@@ -366,12 +387,33 @@ export default function OfficeFinances() {
                             style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: 'var(--radius-md)' }}
                         >
                             <ArrowRightLeft size={18} />
-                            <span>{isArabic ? 'تحويل بين الخزائن' : 'Transfer Safes'}</span>
+                            <span>{isArabic ? 'تحويل بين الخزائن والعهد' : 'Transfer Safes'}</span>
                         </button>
                         <button
                             className="btn btn-secondary"
                             onClick={() => {
                                 setEditingSafe(null);
+                                setSafeModalInitialMode('CUSTODY');
+                                setIsAddSafeModalOpen(true);
+                            }}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                borderRadius: 'var(--radius-md)',
+                                color: '#8b5cf6',
+                                borderColor: 'rgba(139, 92, 246, 0.4)',
+                                background: 'rgba(139, 92, 246, 0.08)'
+                            }}
+                        >
+                            <UserCheck size={18} />
+                            <span>{isArabic ? 'إضافة عهدة مالية' : 'Add Custody'}</span>
+                        </button>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => {
+                                setEditingSafe(null);
+                                setSafeModalInitialMode('SAFE');
                                 setIsAddSafeModalOpen(true);
                             }}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', borderRadius: 'var(--radius-md)' }}
@@ -670,6 +712,13 @@ export default function OfficeFinances() {
                             box-shadow: 0 25px 60px rgba(60, 45, 20, 0.22) !important;
                             color: #1c1710 !important;
                         }
+                        .modal-container.office-modal form {
+                            display: flex;
+                            flex-direction: column;
+                            flex: 1;
+                            min-height: 0;
+                            overflow: hidden;
+                        }
                         .modal-container.office-modal .modal-header {
                             background: var(--bg-elevated, #17171d) !important;
                             border-bottom: 1px solid var(--border-color) !important;
@@ -677,6 +726,7 @@ export default function OfficeFinances() {
                             display: flex;
                             align-items: center;
                             justify-content: space-between;
+                            flex-shrink: 0;
                         }
                         body.light-mode .modal-container.office-modal .modal-header {
                             background: #fdfaf2 !important;
@@ -723,6 +773,8 @@ export default function OfficeFinances() {
                             color: var(--text-primary) !important;
                             padding: 24px;
                             overflow-y: auto;
+                            flex: 1;
+                            min-height: 0;
                         }
                         body.light-mode .modal-container.office-modal .modal-body {
                             background: #fdfaf2 !important;
@@ -736,6 +788,7 @@ export default function OfficeFinances() {
                             align-items: center;
                             justify-content: flex-end;
                             gap: 12px;
+                            flex-shrink: 0;
                         }
                         body.light-mode .modal-container.office-modal .modal-footer {
                             background: #f7f1e5 !important;
@@ -957,7 +1010,7 @@ export default function OfficeFinances() {
                             gap: '20px'
                         }}>
                             {filteredSafes.map(safe => {
-                                const badgeInfo = getSafeTypeBadge(safe.type);
+                                const badgeInfo = getSafeTypeBadge(safe);
                                 const IconComponent = badgeInfo.icon;
                                 const isPositive = Number(safe.balance) >= 0;
 
@@ -1012,7 +1065,7 @@ export default function OfficeFinances() {
                                                             {isArabic ? 'الخزينة الافتراضية' : 'Default'}
                                                         </span>
                                                     )}
-                                                    {safe.isCustody ? (
+                                                    {safe.isCustody && (
                                                         <span style={{
                                                             fontSize: '0.72rem',
                                                             padding: '2px 8px',
@@ -1021,16 +1074,18 @@ export default function OfficeFinances() {
                                                             color: '#8b5cf6',
                                                             fontWeight: 700
                                                         }}>
-                                                            {isArabic ? 'عهدة شخصية' : 'Personal Custody'}
+                                                            {isArabic ? 'عهدة موظف' : 'Custody'}
                                                         </span>
-                                                    ) : (
+                                                    )}
+                                                    {(!String(safe.id).startsWith('custody_')) && (
                                                         <button
                                                             className="safe-edit-btn"
                                                             onClick={() => {
                                                                 setEditingSafe(safe);
+                                                                setSafeModalInitialMode(safe.isCustody ? 'CUSTODY' : 'SAFE');
                                                                 setIsAddSafeModalOpen(true);
                                                             }}
-                                                            title={isArabic ? 'تعديل بيانات الخزينة' : 'Edit Safe'}
+                                                            title={isArabic ? (safe.isCustody ? 'تعديل بيانات العهدة' : 'تعديل بيانات الخزينة') : 'Edit Details'}
                                                         >
                                                             <Pencil size={14} />
                                                         </button>
@@ -1039,16 +1094,22 @@ export default function OfficeFinances() {
                                             </div>
 
                                             {/* Safe Name */}
-                                            <h3 style={{
-                                                margin: '0 0 10px',
-                                                fontSize: '1.18rem',
-                                                fontWeight: 800,
-                                                color: 'var(--text-primary)',
-                                                minHeight: '1.75rem',
-                                                lineHeight: 1.3
-                                            }}>
-                                                {safe.name}
-                                            </h3>
+                                            <div style={{ margin: '0 0 10px', minHeight: '1.75rem' }}>
+                                                <h3 style={{
+                                                    margin: 0,
+                                                    fontSize: '1.18rem',
+                                                    fontWeight: 800,
+                                                    color: 'var(--text-primary)',
+                                                    lineHeight: 1.3
+                                                }}>
+                                                    {getLocalizedName(safe, isArabic)}
+                                                </h3>
+                                                {getLocalizedSubName(safe, isArabic) && (
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', display: 'block', marginTop: '1px' }}>
+                                                        {getLocalizedSubName(safe, isArabic)}
+                                                    </span>
+                                                )}
+                                            </div>
 
                                             {/* Live Balance Box - Positioned immediately under Safe Name for exact vertical alignment across all cards */}
                                             <div className="safe-card-balance-box" style={{ marginBottom: '12px' }}>
@@ -1585,6 +1646,43 @@ export default function OfficeFinances() {
                                                         }}>
                                                             {isFee || isIncome ? '+' : '-'}{fmtCurrency(tx.amount)}
                                                         </span>
+                                                        {Boolean(tx.totalDueAmount && Number(tx.totalDueAmount) !== Number(tx.amount)) && (
+                                                            <div style={{ marginTop: '2px', display: 'flex', justifyContent: isArabic ? 'flex-start' : 'flex-end' }}>
+                                                                {Number(tx.totalDueAmount) > Number(tx.amount) ? (
+                                                                    <span style={{
+                                                                        fontSize: '0.68rem',
+                                                                        fontWeight: 700,
+                                                                        padding: '1px 6px',
+                                                                        borderRadius: '4px',
+                                                                        background: 'rgba(245, 158, 11, 0.15)',
+                                                                        color: '#d97706',
+                                                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '2px'
+                                                                    }} title={isArabic ? `إجمالي المستحق: ${fmtCurrency(tx.totalDueAmount)} | متبقي غير مسوى: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}` : `Total Due: ${fmtCurrency(tx.totalDueAmount)} | Remaining: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}`}>
+                                                                        <span>⚠️</span>
+                                                                        <span>{isArabic ? `باقي: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}` : `Due: ${fmtCurrency(Number(tx.totalDueAmount) - Number(tx.amount))}`}</span>
+                                                                    </span>
+                                                                ) : (
+                                                                    <span style={{
+                                                                        fontSize: '0.68rem',
+                                                                        fontWeight: 700,
+                                                                        padding: '1px 6px',
+                                                                        borderRadius: '4px',
+                                                                        background: 'rgba(59, 130, 246, 0.15)',
+                                                                        color: '#2563eb',
+                                                                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '2px'
+                                                                    }} title={isArabic ? `إجمالي المستحق: ${fmtCurrency(tx.totalDueAmount)} | دفعة زائدة: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}` : `Total Due: ${fmtCurrency(tx.totalDueAmount)} | Overpaid: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}`}>
+                                                                        <span>ℹ️</span>
+                                                                        <span>{isArabic ? `زائد: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}` : `Over: ${fmtCurrency(Number(tx.amount) - Number(tx.totalDueAmount))}`}</span>
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td style={{ textAlign: 'start' }}>
                                                         {tx.safe ? (
@@ -1710,6 +1808,7 @@ export default function OfficeFinances() {
                 {isAddSafeModalOpen && (
                     <CreateEditSafeModal
                         safe={editingSafe}
+                        initialMode={safeModalInitialMode}
                         onClose={() => {
                             setIsAddSafeModalOpen(false);
                             setEditingSafe(null);
@@ -1804,13 +1903,27 @@ export default function OfficeFinances() {
 // -------------------------------------------------------------
 // SUBCOMPONENT: Create / Edit Safe Modal
 // -------------------------------------------------------------
-function CreateEditSafeModal({ safe, onClose, onSuccess }) {
+function CreateEditSafeModal({ safe, initialMode = 'SAFE', onClose, onSuccess }) {
     const { i18n } = useTranslation();
     const isArabic = i18n.language === 'ar';
     const { showAlert } = useAlert();
 
-    const [name, setName] = useState(safe?.name || '');
-    const [nameAr, setNameAr] = useState(safe?.nameAr || '');
+    const [accountCategory, setAccountCategory] = useState(
+        safe ? (safe.isCustody ? 'CUSTODY' : 'SAFE') : (initialMode === 'CUSTODY' ? 'CUSTODY' : 'SAFE')
+    );
+    const [custodyKind, setCustodyKind] = useState(
+        safe?.type === 'BANK_ACCOUNT' ? 'BANK' : 'CASH'
+    );
+
+    let initialSafeName = (safe?.name || '').trim();
+    let initialSafeNameAr = (safe?.nameAr || '').trim();
+    if (/[\u0600-\u06FF]/.test(initialSafeName) && !initialSafeNameAr) {
+        initialSafeNameAr = initialSafeName;
+        initialSafeName = '';
+    }
+
+    const [name, setName] = useState(initialSafeName);
+    const [nameAr, setNameAr] = useState(initialSafeNameAr);
     const [type, setType] = useState(safe?.type || 'CASH_SAFE');
     const [bankName, setBankName] = useState(safe?.bankName || '');
     const [accountNumber, setAccountNumber] = useState(safe?.accountNumber || '');
@@ -1842,151 +1955,499 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
         return () => { isMounted = false; };
     }, [safe]);
 
+    const handleCategorySwitch = (newCategory) => {
+        setAccountCategory(newCategory);
+        if (newCategory === 'CUSTODY') {
+            setIsDefault(false);
+            const selectedUser = companyUsers.find(u => u.id === assignedUserId);
+            if (selectedUser && (!name || name.startsWith('خزينة') || name.startsWith('حساب') || name.startsWith('Safe') || name.startsWith('Account'))) {
+                setName(custodyKind === 'BANK'
+                    ? (isArabic ? `عهدة حساب بنكي: ${selectedUser.name}` : `Bank Custody: ${selectedUser.name}`)
+                    : (isArabic ? `عهدة نقدية: ${selectedUser.name}` : `Cash Custody: ${selectedUser.name}`));
+            }
+        }
+    };
+
+    const handleCustodyKindChange = (kind) => {
+        setCustodyKind(kind);
+        const selectedUser = companyUsers.find(u => u.id === assignedUserId);
+        if (selectedUser && (!name || name.startsWith('عهدة') || name.startsWith('Custody') || !name.trim())) {
+            setName(kind === 'BANK'
+                ? (isArabic ? `عهدة حساب بنكي: ${selectedUser.name}` : `Bank Custody: ${selectedUser.name}`)
+                : (isArabic ? `عهدة نقدية: ${selectedUser.name}` : `Cash Custody: ${selectedUser.name}`));
+        }
+    };
+
+    const handleMemberSelect = (userId) => {
+        setAssignedUserId(userId);
+        if (accountCategory === 'CUSTODY') {
+            const selectedUser = companyUsers.find(u => u.id === userId);
+            if (selectedUser && (!name || name.startsWith('عهدة') || name.startsWith('Custody') || !name.trim())) {
+                setName(custodyKind === 'BANK'
+                    ? (isArabic ? `عهدة حساب بنكي: ${selectedUser.name}` : `Bank Custody: ${selectedUser.name}`)
+                    : (isArabic ? `عهدة نقدية: ${selectedUser.name}` : `Cash Custody: ${selectedUser.name}`));
+            }
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        const isCustodyMode = accountCategory === 'CUSTODY';
+
         if (!name.trim()) {
-            showAlert({ type: 'warning', message: isArabic ? 'يرجى إدخال اسم الخزينة' : 'Safe name is required' });
+            showAlert({
+                type: 'warning',
+                message: isArabic
+                    ? (isCustodyMode ? 'يرجى إدخال اسم العهدة' : 'يرجى إدخال اسم الخزينة')
+                    : (isCustodyMode ? 'Custody name is required' : 'Safe name is required')
+            });
             return;
+        }
+
+        if (isCustodyMode) {
+            if (!assignedUserId) {
+                showAlert({
+                    type: 'warning',
+                    message: isArabic ? 'يرجى اختيار الموظف أو المهندس المسؤول عن العهدة' : 'Please select a company member for this custody'
+                });
+                return;
+            }
+            if (custodyKind === 'BANK') {
+                if (!bankName.trim()) {
+                    showAlert({
+                        type: 'warning',
+                        message: isArabic ? 'يرجى إدخال اسم البنك للعهدة البنكية' : 'Bank name is required for bank custody'
+                    });
+                    return;
+                }
+                if (!accountNumber.trim()) {
+                    showAlert({
+                        type: 'warning',
+                        message: isArabic ? 'يرجى إدخال رقم الحساب أو الآيبان (IBAN)' : 'Account or IBAN number is required for bank custody'
+                    });
+                    return;
+                }
+            }
         }
 
         try {
             setLoading(true);
+            const resolvedType = isCustodyMode
+                ? (custodyKind === 'BANK' ? 'BANK_ACCOUNT' : 'CASH_SAFE')
+                : type;
+
+            let rawName = name.trim();
+            let rawNameAr = nameAr.trim();
+
+            if (/[\u0600-\u06FF]/.test(rawName) && /[A-Za-z]/.test(rawNameAr)) {
+                const temp = rawName;
+                rawName = rawNameAr;
+                rawNameAr = temp;
+            } else if (/[\u0600-\u06FF]/.test(rawName) && !rawNameAr) {
+                rawNameAr = rawName;
+            }
+
             const payload = {
-                name: name.trim(),
-                nameAr: nameAr ? nameAr.trim() : null,
-                type,
-                bankName: bankName ? bankName.trim() : null,
-                accountNumber: accountNumber ? accountNumber.trim() : null,
+                name: rawName || rawNameAr,
+                nameAr: rawNameAr || null,
+                type: resolvedType,
+                isCustody: isCustodyMode,
+                bankName: (isCustodyMode ? custodyKind === 'BANK' : resolvedType === 'BANK_ACCOUNT') ? (bankName ? bankName.trim() : null) : null,
+                accountNumber: (isCustodyMode ? custodyKind === 'BANK' : (resolvedType === 'BANK_ACCOUNT' || resolvedType === 'MOBILE_WALLET')) ? (accountNumber ? accountNumber.trim() : null) : null,
                 description: description ? description.trim() : null,
-                isDefault,
+                isDefault: isCustodyMode ? false : isDefault,
                 assignedUserId: assignedUserId || null
             };
 
             if (safe) {
                 await safesAPI.update(safe.id, payload);
-                showAlert({ type: 'success', message: isArabic ? 'تم تحديث بيانات الخزينة بنجاح' : 'Safe updated successfully' });
+                showAlert({
+                    type: 'success',
+                    message: isArabic
+                        ? (isCustodyMode ? 'تم تحديث بيانات العهدة بنجاح' : 'تم تحديث بيانات الخزينة بنجاح')
+                        : 'Updated successfully'
+                });
             } else {
                 payload.initialBalance = Number(initialBalance) || 0;
                 await safesAPI.create(payload);
-                showAlert({ type: 'success', message: isArabic ? 'تم إنشاء الخزينة بنجاح' : 'Safe created successfully' });
+                showAlert({
+                    type: 'success',
+                    message: isArabic
+                        ? (isCustodyMode ? 'تم إنشاء العهدة المالية بنجاح' : 'تم إنشاء الخزينة بنجاح')
+                        : 'Created successfully'
+                });
             }
             onSuccess();
         } catch (error) {
-            console.error('Save safe error:', error);
-            showAlert({ type: 'error', message: error.response?.data?.message || (isArabic ? 'فشل حفظ الخزينة' : 'Failed to save safe') });
+            console.error('Save safe/custody error:', error);
+            showAlert({
+                type: 'error',
+                message: error.response?.data?.message || (isArabic ? 'فشل حفظ البيانات' : 'Failed to save')
+            });
         } finally {
             setLoading(false);
         }
     };
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-container office-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', width: '100%' }}>
+            <div className="modal-container office-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', width: '100%' }}>
                 <div className="modal-header">
-                    <h2>
-                        {safe
-                            ? (isArabic ? 'تعديل بيانات الخزينة' : 'Edit Safe')
-                            : (isArabic ? 'إضافة خزينة / حساب مالي جديد' : 'Add New Safe / Account')}
-                    </h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '10px',
+                            background: accountCategory === 'CUSTODY' ? 'rgba(139, 92, 246, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                            color: accountCategory === 'CUSTODY' ? '#8b5cf6' : '#3b82f6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {accountCategory === 'CUSTODY' ? <UserCheck size={20} /> : <Building2 size={20} />}
+                        </div>
+                        <div>
+                            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+                                {safe
+                                    ? (isArabic
+                                        ? (accountCategory === 'CUSTODY' ? 'تعديل بيانات العهدة المالية' : 'تعديل بيانات الخزينة / الحساب')
+                                        : (accountCategory === 'CUSTODY' ? 'Edit Custody Account' : 'Edit Safe / Account'))
+                                    : (isArabic
+                                        ? (accountCategory === 'CUSTODY' ? 'إضافة عهدة مالية جديدة' : 'إضافة خزينة / حساب مالي جديد')
+                                        : (accountCategory === 'CUSTODY' ? 'Add New Custody Account' : 'Add New Safe / Account'))}
+                            </h2>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                                {accountCategory === 'CUSTODY'
+                                    ? (isArabic ? 'عهدة نقدية كاش أو حساب بنكي مخصص لموظف أو مهندس' : 'Cash or bank account custody assigned to a team member')
+                                    : (isArabic ? 'إدارة الخزائن المركزية والحسابات البنكية والمحافظ العامة' : 'Manage general company safes, banks, and wallets')}
+                            </div>
+                        </div>
+                    </div>
                     <button className="modal-close" onClick={onClose} title={isArabic ? 'إغلاق' : 'Close'}><X size={18} /></button>
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {/* Name */}
-                        <div className="form-group">
-                            <label style={{ fontWeight: 600 }}>{isArabic ? 'اسم الخزينة / الحساب' : 'Safe / Account Name'} *</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder={isArabic ? 'مثال: الخزينة الرئيسية، بنك CIB، فودافون كاش' : 'e.g. Main Safe, CIB Bank, Vodafone Cash'}
-                                required
-                            />
-                        </div>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                    <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', flex: 1 }}>
+                        {/* Account Classification Toggle (Company Safe vs Custody) */}
+                        {!safe && (
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '8px',
+                                padding: '4px',
+                                background: 'var(--bg-secondary)',
+                                borderRadius: '10px',
+                                border: '1px solid var(--border-color)',
+                                marginBottom: '2px'
+                            }}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleCategorySwitch('SAFE')}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        fontSize: '0.86rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        background: accountCategory === 'SAFE' ? 'var(--color-primary)' : 'transparent',
+                                        color: accountCategory === 'SAFE' ? '#ffffff' : 'var(--text-secondary)'
+                                    }}
+                                >
+                                    <Building2 size={16} />
+                                    <span>{isArabic ? 'خزينة / حساب للشركة' : 'Company Safe / Account'}</span>
+                                </button>
 
-                        {/* Type */}
-                        <div className="form-group">
-                            <label style={{ fontWeight: 600 }}>{isArabic ? 'نوع الخزينة / الحساب' : 'Type'} *</label>
-                            <select value={type} onChange={(e) => setType(e.target.value)}>
-                                <option value="CASH_SAFE">{isArabic ? '💵 خزينة نقدية (كاش)' : 'Cash Safe'}</option>
-                                <option value="BANK_ACCOUNT">{isArabic ? '🏦 حساب بنكي للشركة' : 'Company Bank Account'}</option>
-                                <option value="MOBILE_WALLET">{isArabic ? '📱 محفظة إلكترونية (إنستاباي / فودافون كاش)' : 'Mobile Wallet / InstaPay'}</option>
-                                <option value="OWNER_ACCOUNT">{isArabic ? '👤 حساب جاري شريك أو مدير' : 'Owner / Manager Account'}</option>
-                                <option value="OTHER">{isArabic ? '📦 أخرى' : 'Other'}</option>
-                            </select>
-                        </div>
-
-                        {/* Bank Name if Bank */}
-                        {type === 'BANK_ACCOUNT' && (
-                            <div className="form-group">
-                                <label style={{ fontWeight: 600 }}>{isArabic ? 'اسم البنك' : 'Bank Name'}</label>
-                                <input
-                                    type="text"
-                                    value={bankName}
-                                    onChange={(e) => setBankName(e.target.value)}
-                                    placeholder={isArabic ? 'مثال: البنك الأهلي المصري، CIB' : 'e.g. National Bank of Egypt'}
-                                />
+                                <button
+                                    type="button"
+                                    onClick={() => handleCategorySwitch('CUSTODY')}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        fontWeight: 700,
+                                        fontSize: '0.86rem',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s',
+                                        background: accountCategory === 'CUSTODY' ? '#8b5cf6' : 'transparent',
+                                        color: accountCategory === 'CUSTODY' ? '#ffffff' : 'var(--text-secondary)'
+                                    }}
+                                >
+                                    <UserCheck size={16} />
+                                    <span>{isArabic ? 'عهدة موظف / مهندس' : 'Staff Custody'}</span>
+                                </button>
                             </div>
                         )}
 
-                        {/* Account Number / Phone */}
-                        {(type === 'BANK_ACCOUNT' || type === 'MOBILE_WALLET') && (
-                            <div className="form-group">
-                                <label style={{ fontWeight: 600 }}>
-                                    {type === 'MOBILE_WALLET'
-                                        ? (isArabic ? 'رقم المحفظة / عنوان إنستاباي' : 'Wallet / InstaPay IPA')
-                                        : (isArabic ? 'رقم الحساب / الآيبان IBAN' : 'Account / IBAN Number')}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={accountNumber}
-                                    onChange={(e) => setAccountNumber(e.target.value)}
-                                    placeholder={type === 'MOBILE_WALLET' ? '01xxxxxxxxx / username@instapay' : 'EGxxxxxxxxxxxxxxxxxxxx'}
-                                />
-                            </div>
-                        )}
+                        {/* ========================================================= */}
+                        {/* CASE A: CUSTODY MODE FIELDS                              */}
+                        {/* ========================================================= */}
+                        {accountCategory === 'CUSTODY' ? (
+                            <>
+                                {/* Custody Kind (Cash vs Bank Account) */}
+                                <div className="form-group">
+                                    <label style={{ fontWeight: 600 }}>
+                                        {isArabic ? 'طبيعة العهدة المالية' : 'Custody Classification'} *
+                                    </label>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCustodyKindChange('CASH')}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                padding: '12px 14px',
+                                                borderRadius: '10px',
+                                                border: `2px solid ${custodyKind === 'CASH' ? '#10b981' : 'var(--border-color)'}`,
+                                                background: custodyKind === 'CASH' ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-secondary)',
+                                                cursor: 'pointer',
+                                                textAlign: isArabic ? 'right' : 'left'
+                                            }}
+                                        >
+                                            <Wallet size={20} style={{ color: custodyKind === 'CASH' ? '#10b981' : 'var(--text-tertiary)', flexShrink: 0 }} />
+                                            <div>
+                                                <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
+                                                    {isArabic ? '💵 عهدة نقدية (كاش)' : 'Cash Safe Custody'}
+                                                </div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                                                    {isArabic ? 'أموال كاش ورقية في ذمة الموظف' : 'Physical cash in hand'}
+                                                </div>
+                                            </div>
+                                        </button>
 
-                        {/* Assigned Member / Custodian (Optional) */}
-                        <div className="form-group">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <label style={{ fontWeight: 600, margin: 0 }}>
-                                    {isArabic ? 'العضو المسؤول عن الخزينة (اختياري)' : 'Assigned Member / Custodian'}
-                                </label>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                                    {isArabic ? 'اختياري' : 'Optional'}
-                                </span>
-                            </div>
-                            <select
-                                value={assignedUserId}
-                                onChange={(e) => setAssignedUserId(e.target.value)}
-                                disabled={loadingUsers}
-                            >
-                                <option value="">
-                                    {loadingUsers
-                                        ? (isArabic ? 'جاري تحميل قائمة الأعضاء...' : 'Loading members...')
-                                        : (isArabic ? '— بدون تعيين (خزينة عامة للشركة) —' : '— None / General Company Safe —')}
-                                </option>
-                                {companyUsers.map((u) => {
-                                    const roleName = u.customRole?.name || u.role?.replace(/_/g, ' ');
-                                    return (
-                                        <option key={u.id} value={u.id}>
-                                            {u.name} {roleName ? `(${roleName})` : ''}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCustodyKindChange('BANK')}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                padding: '12px 14px',
+                                                borderRadius: '10px',
+                                                border: `2px solid ${custodyKind === 'BANK' ? '#3b82f6' : 'var(--border-color)'}`,
+                                                background: custodyKind === 'BANK' ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-secondary)',
+                                                cursor: 'pointer',
+                                                textAlign: isArabic ? 'right' : 'left'
+                                            }}
+                                        >
+                                            <Building2 size={20} style={{ color: custodyKind === 'BANK' ? '#3b82f6' : 'var(--text-tertiary)', flexShrink: 0 }} />
+                                            <div>
+                                                <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.88rem' }}>
+                                                    {isArabic ? '🏦 عهدة حساب بنكي' : 'Bank Account Custody'}
+                                                </div>
+                                                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                                                    {isArabic ? 'حساب بنكي وآيبان باسم الموظف' : 'Bank account & IBAN'}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Custodian Member (Required) */}
+                                <div className="form-group">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                        <label style={{ fontWeight: 600, margin: 0 }}>
+                                            {isArabic ? 'الموظف / المهندس المسؤول عن العهدة' : 'Custodian Member'} *
+                                        </label>
+                                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.1)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                                            {isArabic ? 'مطلوب للعهدة' : 'Required'}
+                                        </span>
+                                    </div>
+                                    <select
+                                        value={assignedUserId}
+                                        onChange={(e) => handleMemberSelect(e.target.value)}
+                                        disabled={loadingUsers}
+                                        required
+                                    >
+                                        <option value="">
+                                            {loadingUsers
+                                                ? (isArabic ? 'جاري تحميل قائمة الأعضاء...' : 'Loading members...')
+                                                : (isArabic ? '— اختر الموظف أو المهندس المسؤول —' : '— Select Custodian Member —')}
                                         </option>
-                                    );
-                                })}
-                            </select>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
-                                {isArabic
-                                    ? 'يمكنك ربط الخزينة أو العهدة النقدية بأحد موظفي أو مسؤولي الشركة أو تركها عامة'
-                                    : 'Optionally link this safe or cash account to a specific company employee or leave unassigned'}
-                            </span>
-                        </div>
+                                        {companyUsers.map((u) => {
+                                            const roleName = u.customRole?.name || u.role?.replace(/_/g, ' ');
+                                            return (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.name} {roleName ? `(${roleName})` : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
 
-                        {/* Initial Balance (Only for new safe) */}
+                                {/* Bank Details if Bank Custody */}
+                                {custodyKind === 'BANK' && (
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                        <div className="form-group">
+                                            <label style={{ fontWeight: 600 }}>{isArabic ? 'اسم البنك' : 'Bank Name'} *</label>
+                                            <input
+                                                type="text"
+                                                value={bankName}
+                                                onChange={(e) => setBankName(e.target.value)}
+                                                placeholder={isArabic ? 'مثال: البنك الأهلي، CIB، بنك مصر' : 'e.g. National Bank of Egypt, CIB'}
+                                                required
+                                            />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label style={{ fontWeight: 600 }}>{isArabic ? 'رقم الحساب / الآيبان (IBAN)' : 'IBAN / Account Number'} *</label>
+                                            <input
+                                                type="text"
+                                                value={accountNumber}
+                                                onChange={(e) => setAccountNumber(e.target.value)}
+                                                placeholder="EGxxxxxxxxxxxxxxxxxxxx"
+                                                dir="ltr"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Custody Display Name */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>{isArabic ? 'مسمى العهدة بالإنجليزية' : 'Custody Name (English)'} *</label>
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            placeholder={isArabic ? 'مثال: Cash Custody: Eng. Ahmed' : 'e.g. Cash Custody: Eng. Ahmed'}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>{isArabic ? 'مسمى العهدة بالعربية' : 'Custody Name (Arabic)'}</label>
+                                        <input
+                                            type="text"
+                                            value={nameAr}
+                                            onChange={(e) => setNameAr(e.target.value)}
+                                            placeholder={isArabic ? 'مثال: عهدة نقدية: م. أحمد' : 'e.g. عهدة نقدية: م. أحمد'}
+                                            dir="rtl"
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            /* ========================================================= */
+                            /* CASE B: STANDARD COMPANY SAFE / ACCOUNT                   */
+                            /* ========================================================= */
+                            <>
+                                {/* Safe Name */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>{isArabic ? 'الاسم بالإنجليزية / الأساسي' : 'English / Primary Name'} *</label>
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            placeholder={isArabic ? 'Main Safe, CIB Bank' : 'e.g. Main Safe, CIB Bank'}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>{isArabic ? 'الاسم بالعربية' : 'Arabic Name'}</label>
+                                        <input
+                                            type="text"
+                                            value={nameAr}
+                                            onChange={(e) => setNameAr(e.target.value)}
+                                            placeholder="الخزينة الرئيسية، بنك CIB"
+                                            dir="rtl"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Type */}
+                                <div className="form-group">
+                                    <label style={{ fontWeight: 600 }}>{isArabic ? 'نوع الخزينة / الحساب' : 'Type'} *</label>
+                                    <select value={type} onChange={(e) => setType(e.target.value)}>
+                                        <option value="CASH_SAFE">{isArabic ? '💵 خزينة نقدية (كاش)' : 'Cash Safe'}</option>
+                                        <option value="BANK_ACCOUNT">{isArabic ? '🏦 حساب بنكي للشركة' : 'Company Bank Account'}</option>
+                                        <option value="MOBILE_WALLET">{isArabic ? '📱 محفظة إلكترونية (إنستاباي / فودافون كاش)' : 'Mobile Wallet / InstaPay'}</option>
+                                        <option value="OWNER_ACCOUNT">{isArabic ? '👤 حساب جاري شريك أو مدير' : 'Owner / Manager Account'}</option>
+                                        <option value="OTHER">{isArabic ? '📦 أخرى' : 'Other'}</option>
+                                    </select>
+                                </div>
+
+                                {/* Bank Name if Bank */}
+                                {type === 'BANK_ACCOUNT' && (
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>{isArabic ? 'اسم البنك' : 'Bank Name'}</label>
+                                        <input
+                                            type="text"
+                                            value={bankName}
+                                            onChange={(e) => setBankName(e.target.value)}
+                                            placeholder={isArabic ? 'مثال: البنك الأهلي المصري، CIB' : 'e.g. National Bank of Egypt'}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Account Number / Phone */}
+                                {(type === 'BANK_ACCOUNT' || type === 'MOBILE_WALLET') && (
+                                    <div className="form-group">
+                                        <label style={{ fontWeight: 600 }}>
+                                            {type === 'MOBILE_WALLET'
+                                                ? (isArabic ? 'رقم المحفظة / عنوان إنستاباي' : 'Wallet / InstaPay IPA')
+                                                : (isArabic ? 'رقم الحساب / الآيبان IBAN' : 'Account / IBAN Number')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={accountNumber}
+                                            onChange={(e) => setAccountNumber(e.target.value)}
+                                            placeholder={type === 'MOBILE_WALLET' ? '01xxxxxxxxx / username@instapay' : 'EGxxxxxxxxxxxxxxxxxxxx'}
+                                            dir="ltr"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Assigned Member (Optional for company safe) */}
+                                <div className="form-group">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                        <label style={{ fontWeight: 600, margin: 0 }}>
+                                            {isArabic ? 'العضو المسؤول عن الخزينة (اختياري)' : 'Assigned Member / Custodian'}
+                                        </label>
+                                        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                                            {isArabic ? 'اختياري' : 'Optional'}
+                                        </span>
+                                    </div>
+                                    <select
+                                        value={assignedUserId}
+                                        onChange={(e) => setAssignedUserId(e.target.value)}
+                                        disabled={loadingUsers}
+                                    >
+                                        <option value="">
+                                            {loadingUsers
+                                                ? (isArabic ? 'جاري تحميل قائمة الأعضاء...' : 'Loading members...')
+                                                : (isArabic ? '— بدون تعيين (خزينة عامة للشركة) —' : '— None / General Company Safe —')}
+                                        </option>
+                                        {companyUsers.map((u) => {
+                                            const roleName = u.customRole?.name || u.role?.replace(/_/g, ' ');
+                                            return (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.name} {roleName ? `(${roleName})` : ''}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Common: Initial Balance (Only for new safe/custody) */}
                         {!safe && (
                             <div className="form-group">
-                                <label style={{ fontWeight: 600 }}>{isArabic ? 'الرصيد الافتتاحي (ج.م)' : 'Opening Balance (EGP)'}</label>
+                                <label style={{ fontWeight: 600 }}>
+                                    {accountCategory === 'CUSTODY'
+                                        ? (isArabic ? 'الرصيد الافتتاحي للعهدة (ج.م)' : 'Opening Custody Balance (EGP)')
+                                        : (isArabic ? 'الرصيد الافتتاحي (ج.م)' : 'Opening Balance (EGP)')}
+                                </label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -1994,48 +2455,67 @@ function CreateEditSafeModal({ safe, onClose, onSuccess }) {
                                     onChange={(e) => setInitialBalance(e.target.value)}
                                     placeholder="0.00"
                                 />
-                                <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
-                                    {isArabic ? 'الرصيد الموجود في الخزينة عند بدء التسجيل' : 'Current funds inside this safe at start'}
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
+                                    {accountCategory === 'CUSTODY'
+                                        ? (isArabic ? 'الرصيد المسلم كعهدة نقدية أو بنكية في بداية التسجيل' : 'Current funds delivered to the custodian upon setup')
+                                        : (isArabic ? 'الرصيد الموجود في الخزينة عند بدء التسجيل' : 'Current funds inside this safe at start')}
                                 </span>
                             </div>
                         )}
 
-                        {/* Description */}
+                        {/* Common: Description */}
                         <div className="form-group">
                             <label style={{ fontWeight: 600 }}>{isArabic ? 'ملاحظات / وصف' : 'Description / Notes'}</label>
                             <textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 rows={2}
-                                placeholder={isArabic ? 'أي تفاصيل إضافية عن هذه الخزينة...' : 'Optional details...'}
+                                placeholder={accountCategory === 'CUSTODY'
+                                    ? (isArabic ? 'أي شروط أو تفاصيل إضافية عن هذه العهدة...' : 'Additional notes about this custody...')
+                                    : (isArabic ? 'أي تفاصيل إضافية عن هذه الخزينة...' : 'Optional details...')}
                             />
                         </div>
 
-                        {/* Is Default */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
-                                <input
-                                    type="checkbox"
-                                    checked={isDefault}
-                                    onChange={(e) => setIsDefault(e.target.checked)}
-                                    style={{ width: '16px', height: '16px' }}
-                                />
-                                <span>{isArabic ? 'تعيين كخزينة افتراضية للمعاملات' : 'Set as default company safe'}</span>
-                            </label>
-                        </div>
+                        {/* Safe Only: Is Default */}
+                        {accountCategory === 'SAFE' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isDefault}
+                                        onChange={(e) => setIsDefault(e.target.checked)}
+                                        style={{ width: '16px', height: '16px' }}
+                                    />
+                                    <span>{isArabic ? 'تعيين كخزينة افتراضية للمعاملات' : 'Set as default company safe'}</span>
+                                </label>
+                            </div>
+                        )}
                     </div>
 
-                    <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <div className="modal-footer" style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                         <button type="button" className="btn btn-secondary" onClick={onClose}>
                             {isArabic ? 'إلغاء' : 'Cancel'}
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? (isArabic ? 'جاري الحفظ...' : 'Saving...') : (isArabic ? 'حفظ الخزينة' : 'Save Safe')}
+                        <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={loading}
+                            style={{
+                                background: accountCategory === 'CUSTODY' ? '#8b5cf6' : undefined,
+                                borderColor: accountCategory === 'CUSTODY' ? '#8b5cf6' : undefined
+                            }}
+                        >
+                            {loading
+                                ? (isArabic ? 'جاري الحفظ...' : 'Saving...')
+                                : (isArabic
+                                    ? (accountCategory === 'CUSTODY' ? 'حفظ العهدة' : 'حفظ الخزينة')
+                                    : (accountCategory === 'CUSTODY' ? 'Save Custody' : 'Save Safe'))}
                         </button>
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
@@ -2145,7 +2625,7 @@ function TransferSafeModal({ safes, initialSourceSafeId, initialTargetSafeId, on
         }
     };
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container office-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', width: '100%' }}>
                 <div className="modal-header">
@@ -2379,7 +2859,8 @@ function TransferSafeModal({ safes, initialSourceSafeId, initialTargetSafeId, on
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
@@ -2413,7 +2894,7 @@ function SafeStatementModal({
 
     const statement = statementData?.statement || [];
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-container office-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '960px', width: '100%', maxHeight: '90vh' }}>
                 <div className="modal-header">
@@ -2610,6 +3091,7 @@ function SafeStatementModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

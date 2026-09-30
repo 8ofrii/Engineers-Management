@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react';
 
 const CustomAlert = ({ isOpen, type = 'info', title, message, onConfirm, onCancel, confirmText = 'OK', cancelText = 'Cancel', showCancel = false }) => {
@@ -36,7 +37,7 @@ const CustomAlert = ({ isOpen, type = 'info', title, message, onConfirm, onCance
     const config = typeConfigs[type] || typeConfigs.info;
     const Icon = config.icon;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)',
@@ -112,7 +113,8 @@ const CustomAlert = ({ isOpen, type = 'info', title, message, onConfirm, onCance
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
