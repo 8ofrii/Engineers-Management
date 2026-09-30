@@ -236,7 +236,7 @@ export default function Projects() {
                         </button>
                     </div>
                 ) : (
-                    <div className="grid grid-2">
+                    <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 350px), 1fr))', gap: 'var(--spacing-lg)' }}>
                         {displayedProjects.map((project) => {
                             const displayBudget = Number(project.totalContractValue || project.budget || 0);
                             const totalPaid = Number(project.totalPaid ?? 0);
@@ -251,35 +251,53 @@ export default function Projects() {
                                 : Math.min(100, Math.max(0, Number(project.completionPercent || 0)));
                             return (
                             <div key={project.id} className="card proj-card" style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                height: '100%',
                                 padding: 'var(--spacing-lg)',
                                 border: project.projectSafeBalance < 0 ? '2px solid #ef4444' : '1px solid var(--border-color)',
                                 borderRadius: 'var(--radius-lg)',
                                 boxShadow: project.projectSafeBalance < 0 ? '0 0 15px rgba(239, 68, 68, 0.2)' : 'none'
                             }}>
-                                <div className="flex-between mb-md">
-                                    <div className="flex flex-col">
-                                        <h3>{getLocalizedName(project, isArabic)}</h3>
+                                {/* Top Header Row: Project Name & Top Action Controls */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    justifyContent: 'space-between',
+                                    gap: '12px',
+                                    marginBottom: '10px'
+                                }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <h3 style={{
+                                            margin: 0,
+                                            fontSize: '1.25rem',
+                                            fontWeight: 700,
+                                            lineHeight: 1.3,
+                                            color: 'var(--text-primary)',
+                                            wordBreak: 'break-word'
+                                        }}>
+                                            {getLocalizedName(project, isArabic)}
+                                        </h3>
                                         {getLocalizedSubName(project, isArabic) && (
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '-2px', marginBottom: '2px' }}>
+                                            <div style={{
+                                                fontSize: '0.82rem',
+                                                color: 'var(--text-tertiary)',
+                                                marginTop: '2px',
+                                                wordBreak: 'break-word'
+                                            }}>
                                                 {getLocalizedSubName(project, isArabic)}
-                                            </span>
-                                        )}
-                                        {project.projectSafeBalance < 0 && (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#f87171', fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                                <AlertTriangle size={13} />
-                                                {t('projects.negativeBalanceAlert') || 'عجز في خزينة المشروع'}
-                                            </span>
+                                            </div>
                                         )}
                                     </div>
-                                    <div className="flex gap-sm" style={{ alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                         {/* Completion % ring */}
-                                        <div title={`${completionPct}% ${isArabic ? 'مكتمل' : (t('projects.complete', 'complete'))}`} style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
-                                            <svg width="40" height="40" style={{ transform: 'rotate(-90deg)' }}>
-                                                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--bg-tertiary)" strokeWidth="4" />
-                                                <circle cx="20" cy="20" r="16" fill="none"
+                                        <div title={`${completionPct}% ${isArabic ? 'مكتمل' : (t('projects.complete', 'complete'))}`} style={{ position: 'relative', width: 38, height: 38, flexShrink: 0 }}>
+                                            <svg width="38" height="38" style={{ transform: 'rotate(-90deg)' }}>
+                                                <circle cx="19" cy="19" r="15" fill="none" stroke="var(--bg-tertiary)" strokeWidth="3.5" />
+                                                <circle cx="19" cy="19" r="15" fill="none"
                                                     stroke={completionPct >= 100 ? '#10b981' : completionPct >= 50 ? 'var(--color-primary-light)' : '#f59e0b'}
-                                                    strokeWidth="4"
-                                                    strokeDasharray={`${(completionPct / 100) * 100.5} 100.5`}
+                                                    strokeWidth="3.5"
+                                                    strokeDasharray={`${(completionPct / 100) * 94.2} 94.2`}
                                                     strokeLinecap="round"
                                                 />
                                             </svg>
@@ -287,62 +305,103 @@ export default function Projects() {
                                                 {completionPct}%
                                             </span>
                                         </div>
-                                        <span className={`badge badge-${getStatusColor(project.status.toLowerCase())}`}>
+                                        <span className={`badge badge-${getStatusColor(project.status.toLowerCase())}`} style={{ whiteSpace: 'nowrap' }}>
                                             {t(`projects.status.${project.status.toLowerCase()}`)}
                                         </span>
                                         <button
                                             className="icon-btn"
                                             onClick={() => openEditModal(project)}
                                             title={t('common.edit')}
+                                            style={{ width: 28, height: 28, padding: 0 }}
                                         >
-                                            <Pencil size={14} />
+                                            <Pencil size={13} />
                                         </button>
                                         <button
                                             className="icon-btn danger"
                                             onClick={() => handleDeleteClick(project)}
                                             title={t('common.delete')}
+                                            style={{ width: 28, height: 28, padding: 0 }}
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={13} />
                                         </button>
                                     </div>
                                 </div>
-                                <p className="text-secondary mb-md">{project.description || t('common.noData')}</p>
+
+                                {/* Negative Safe Balance Alert Banner */}
+                                {project.projectSafeBalance < 0 && (
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        background: 'rgba(239, 68, 68, 0.12)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        borderRadius: '8px',
+                                        padding: '5px 10px',
+                                        marginBottom: '10px',
+                                        color: '#f87171',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600
+                                    }}>
+                                        <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                                        <span>{t('projects.negativeBalanceAlert') || (isArabic ? 'عجز في خزينة المشروع' : 'Negative Safe Balance')}</span>
+                                    </div>
+                                )}
+
+                                {/* Description with uniform clamp */}
+                                <p className="text-secondary" style={{
+                                    margin: '0 0 var(--spacing-md) 0',
+                                    fontSize: '0.85rem',
+                                    minHeight: '2.4em',
+                                    lineHeight: 1.4,
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden'
+                                }}>
+                                    {project.description || (
+                                        <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                                            {t('common.noData')}
+                                        </span>
+                                    )}
+                                </p>
+
+                                {/* Middle 3 Stats Grid */}
                                 <div style={{
                                     display: 'grid',
-                                    gridTemplateColumns: 'repeat(3, 1fr)',
-                                    gap: '10px',
+                                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                                    gap: '8px',
                                     marginBottom: 'var(--spacing-md)'
                                 }}>
-                                    <div className="stat-cell">
-                                        <label>
+                                    <div className="stat-cell" style={{ padding: '8px 8px', textAlign: 'center' }}>
+                                        <label style={{ fontSize: '0.7rem', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={isArabic ? 'إجمالي المدفوع' : (t('projects.totalPaid') || 'Total Paid')}>
                                             {isArabic ? 'إجمالي المدفوع' : (t('projects.totalPaid') || 'Total Paid')}
                                         </label>
-                                        <b className="pos">
+                                        <b className="pos" style={{ fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }} title={formatCurrency(totalPaid)}>
                                             {formatCurrency(totalPaid)}
                                         </b>
                                     </div>
-                                    <div className="stat-cell">
-                                        <label>
+                                    <div className="stat-cell" style={{ padding: '8px 8px', textAlign: 'center' }}>
+                                        <label style={{ fontSize: '0.7rem', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t('projects.officeProfit') || 'أرباح المكتب'}>
                                             {t('projects.officeProfit') || 'أرباح المكتب'}
                                         </label>
-                                        <b className="acc">
+                                        <b className="acc" style={{ fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }} title={formatCurrency(project.officeRevenue)}>
                                             {formatCurrency(project.officeRevenue)}
                                         </b>
                                     </div>
-                                    <div className="stat-cell">
-                                        <label>
+                                    <div className="stat-cell" style={{ padding: '8px 8px', textAlign: 'center' }}>
+                                        <label style={{ fontSize: '0.7rem', marginBottom: '3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={t('projects.safeBalance') || 'خزينة المشروع'}>
                                             {t('projects.safeBalance') || 'خزينة المشروع'}
                                         </label>
-                                        <b className={project.projectSafeBalance < 0 ? 'neg' : 'pos'}>
+                                        <b className={project.projectSafeBalance < 0 ? 'neg' : 'pos'} style={{ fontSize: '0.92rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }} title={formatCurrency(project.projectSafeBalance)}>
                                             {formatCurrency(project.projectSafeBalance)}
                                         </b>
                                     </div>
                                 </div>
 
-                                {/* Budget progress bar (#1) */}
+                                {/* Budget progress bar */}
                                 <div style={{ marginBottom: 'var(--spacing-md)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
-                                        <span>{isArabic ? 'المستخدم من الميزانية' : t('projects.budgetUsed', 'Budget Used')}: {budgetPct}%</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 5 }}>
+                                        <span>{isArabic ? 'المستخدم من الميزانية' : t('projects.budgetUsed', 'Budget Used')}: <strong>{budgetPct}%</strong></span>
                                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: budgetBarColor, fontWeight: 700 }}>
                                             <span className="dot" style={{ background: budgetBarColor }} />
                                             {budgetPct >= 90
@@ -357,32 +416,45 @@ export default function Projects() {
                                     </div>
                                 </div>
 
-                                <div className="flex-between">
-                                    <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                {/* Budget / Spent / Remaining Summary Box */}
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                                    gap: '8px',
+                                    padding: '8px 10px',
+                                    background: 'var(--bg-tertiary)',
+                                    borderRadius: '10px',
+                                    border: '1px solid var(--border-color)',
+                                    marginBottom: 'var(--spacing-md)'
+                                }}>
+                                    <div style={{ minWidth: 0, textAlign: isArabic ? 'right' : 'left' }}>
+                                        <div className="text-secondary" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                             {t('projects.budget')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
+                                        <div style={{ fontSize: '0.88rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(displayBudget)}>
                                             {formatCurrency(displayBudget)}
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                    <div style={{ minWidth: 0, textAlign: 'center' }}>
+                                        <div className="text-secondary" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                             {t('projects.spent')}
                                         </div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>
+                                        <div style={{ fontSize: '0.88rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={formatCurrency(project.actualCost)}>
                                             {formatCurrency(project.actualCost)}
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="text-secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
+                                    <div style={{ minWidth: 0, textAlign: isArabic ? 'left' : 'right' }}>
+                                        <div className="text-secondary" style={{ fontSize: '0.7rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                             {t('projects.remaining')}
                                         </div>
                                         <div
                                             title={isArabic ? 'المتبقي = إجمالي الميزانية - إجمالي المصروفات' : 'Remaining = Total Budget - Total Expenses'}
                                             style={{
-                                                fontSize: 'var(--font-size-md)',
+                                                fontSize: '0.88rem',
                                                 fontWeight: 600,
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
                                                 color: remaining < 0 ? 'var(--color-danger)' : 'var(--color-success)'
                                             }}
                                         >
@@ -391,12 +463,13 @@ export default function Projects() {
                                     </div>
                                 </div>
 
-                                {/* Action Buttons: Documents & Transactions */}
+                                {/* Action Buttons: Documents & Transactions (Pinned to Bottom) */}
                                 <div style={{
                                     display: 'grid',
                                     gridTemplateColumns: '1fr 1fr',
                                     gap: '10px',
-                                    marginTop: 'var(--spacing-md)'
+                                    marginTop: 'auto',
+                                    paddingTop: 'var(--spacing-xs)'
                                 }}>
                                     <button
                                         type="button"
