@@ -334,6 +334,9 @@ export function resolvePaymentMethod(data = {}, fullText = '') {
  */
 export function normalizeExtractedData(data, rawText = '', context = {}) {
     if (!data) return null;
+    if (typeof data === 'string') {
+        data = { summary: data };
+    }
 
     // 1. Total Amount
     let totalAmount = data.totalAmount ?? data.amount ?? data.total ?? null;
@@ -342,6 +345,14 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
     }
     if (typeof totalAmount === 'string') {
         totalAmount = parseFloat(totalAmount.replace(/[^0-9.]/g, '')) || null;
+    }
+    // Fallback regex amount extraction from text if not in structured field
+    if (totalAmount === null) {
+        const fullSource = `${rawText} ${data.summary || ''} ${data.description || ''}`;
+        const numMatch = fullSource.match(/(?:مبلغ|قيمة|بقيمة|بمبلغ|total|amount|صافي)?\s*([0-9]+(?:[.,][0-9]{1,2})?)\s*(?:جنيه|ج\.م|egp|le)?/i);
+        if (numMatch && numMatch[1]) {
+            totalAmount = parseFloat(numMatch[1].replace(',', '')) || null;
+        }
     }
 
     let feeAmount = data.taxAmount ?? data.fees ?? data.fee ?? null;
@@ -362,19 +373,59 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
     if (!vendor && data.recipient) {
         vendor = typeof data.recipient === 'object' ? (data.recipient.name || data.recipient.phone_number) : data.recipient;
     }
-    const supplierId = data.supplierId || data.supplier_id || null;
+    let supplierId = data.supplierId || data.supplier_id || null;
+    if (!vendor && Array.isArray(context.suppliers)) {
+        const fullSource = `${rawText} ${data.summary || ''}`;
+        for (const s of context.suppliers) {
+            if (s.name && fullSource.includes(s.name)) {
+                vendor = s.name;
+                supplierId = s.id;
+                break;
+            }
+        }
+    }
 
     // 3. Project Name & Project ID
-    const projectName = data.projectName || data.project || data.project_name || null;
-    const projectId = data.projectId || data.project_id || null;
+    let projectName = data.projectName || data.project || data.project_name || null;
+    let projectId = data.projectId || data.project_id || null;
+    if (!projectName && Array.isArray(context.projects)) {
+        const fullSource = `${rawText} ${data.summary || ''}`;
+        for (const p of context.projects) {
+            if (p.name && fullSource.includes(p.name)) {
+                projectName = p.name;
+                projectId = p.id;
+                break;
+            }
+        }
+    }
 
     // 4. Client Name & Client ID
-    const clientName = data.clientName || data.client || data.client_name || null;
-    const clientId = data.clientId || data.client_id || null;
+    let clientName = data.clientName || data.client || data.client_name || null;
+    let clientId = data.clientId || data.client_id || null;
+    if (!clientName && Array.isArray(context.clients)) {
+        const fullSource = `${rawText} ${data.summary || ''}`;
+        for (const c of context.clients) {
+            if (c.name && fullSource.includes(c.name)) {
+                clientName = c.name;
+                clientId = c.id;
+                break;
+            }
+        }
+    }
 
     // 5. Workman / Craftsman & Workman ID
-    const workmanName = data.workmanName || data.workman || data.technician || data.craftsman || null;
-    const workmanId = data.workmanId || data.workman_id || null;
+    let workmanName = data.workmanName || data.workman || data.technician || data.craftsman || null;
+    let workmanId = data.workmanId || data.workman_id || null;
+    if (!workmanName && Array.isArray(context.workmen)) {
+        const fullSource = `${rawText} ${data.summary || ''}`;
+        for (const w of context.workmen) {
+            if (w.name && fullSource.includes(w.name)) {
+                workmanName = w.name;
+                workmanId = w.id;
+                break;
+            }
+        }
+    }
 
     // 6. Payer / Custody User ID
     const payerUserId = data.payerUserId || data.payer_user_id || data.engineerId || null;
@@ -511,6 +562,116 @@ function extractJsonFromText(rawText) {
 }
 
 /**
+ * Call the MicroMind Voice Workflow (prediction/5da17804-194a-4aad-a7af-9041e768426c)
+ */
+export async function callMicroMindVoiceExtraction(prompt, context = {}) {
+    const apiUrl = process.env.MICROMIND_VOICE_API_URL || "https://core.aimicromind.com/api/v1/prediction/5da17804-194a-4aad-a7af-9041e768426c";
+    if (!apiUrl || !prompt) return null;
+
+    try {
+        const dynamicContextText = buildDynamicContext(context);
+        const question = `قم باستخراج بيانات المعاملة المالية من التسجيل الصوتي بدقة في صيغة JSON تحتوي على:
+{
+  "totalAmount": number,
+  "amount": number,
+  "vendor": string or null,
+  "category": string,
+  "paymentMethod": string,
+  "projectName": string or null,
+  "workmanName": string or null,
+  "summary": string,
+  "is_stock_purchase": boolean,
+  "items": [{"name": string, "quantity": number, "unitPrice": number, "total": number}]
+}
+الكلام المسجل من الموقع:
+"""${prompt}"""
+${dynamicContextText}`;
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question })
+        });
+
+        if (!response.ok) {
+            logger.warn({ status: response.status }, 'MicroMind Voice API responded with non-200');
+            return null;
+        }
+
+        const data = await response.json();
+        const rawContent = data.json?.answer || data.text || data.response || data.answer || (typeof data === 'string' ? data : JSON.stringify(data));
+        const rawParsed = extractJsonFromText(rawContent);
+        if (rawParsed) {
+            return normalizeExtractedData(rawParsed, prompt, context);
+        }
+    } catch (err) {
+        logger.warn({ err }, 'Failed to call MicroMind Voice API');
+    }
+    return null;
+}
+
+/**
+ * Call the MicroMind Image Workflow (prediction/ad975b06-b1d3-4862-8018-87e3e79517af)
+ * Accepts image bytes and optional voice/text clarification.
+ */
+export async function callMicroMindImageExtraction(imageBuffer, mimeType, context = {}, clarificationText = '') {
+    const apiUrl = process.env.MICROMIND_IMAGE_API_URL || "https://core.aimicromind.com/api/v1/prediction/ad975b06-b1d3-4862-8018-87e3e79517af";
+    if (!apiUrl || !imageBuffer) return null;
+
+    try {
+        const dynamicContextText = buildDynamicContext(context);
+        const question = `قم باستخراج بيانات الفاتورة أو الإيصال المرفق بدقة في صيغة JSON تحتوي على:
+{
+  "totalAmount": number,
+  "amount": number,
+  "subtotal": number or null,
+  "taxAmount": number or null,
+  "vendor": string or null,
+  "category": string,
+  "paymentMethod": string,
+  "transactionDate": "YYYY-MM-DD",
+  "projectName": string or null,
+  "summary": string,
+  "items": [{"name": string, "quantity": number, "unitPrice": number, "total": number}]
+}
+${clarificationText ? `\nتوضيح إضافي مرفق مع الفاتورة / الإيصال:\n"""${clarificationText}"""` : ''}
+${dynamicContextText}`;
+
+        const base64Data = `data:${mimeType || 'image/jpeg'};base64,${imageBuffer.toString('base64')}`;
+        const payload = {
+            question,
+            uploads: [{
+                data: base64Data,
+                type: 'file',
+                name: 'receipt.jpg',
+                mime: mimeType || 'image/jpeg'
+            }]
+        };
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            logger.warn({ status: response.status }, 'MicroMind Image API responded with non-200');
+            return null;
+        }
+
+        const data = await response.json();
+        const rawContent = data.json?.answer || data.text || data.response || data.answer || (typeof data === 'string' ? data : JSON.stringify(data));
+        const rawParsed = extractJsonFromText(rawContent);
+        if (rawParsed) {
+            return normalizeExtractedData(rawParsed, clarificationText || 'إيصال مرفق', context);
+        }
+    } catch (err) {
+        logger.warn({ err }, 'Failed to call MicroMind Image API');
+    }
+    return null;
+}
+
+/**
  * Call the MicroMind / GPT 5.6 Luna Pro agent backend for extraction with live company master data
  */
 async function callMicroMindExtraction(prompt, context = {}) {
@@ -607,18 +768,31 @@ function extractHeuristicsFromText(text) {
  * @param {Buffer} imageBuffer - Image or PDF bytes
  * @param {string} mimeType - MIME type (e.g. 'image/jpeg', 'application/pdf')
  * @param {object} context - Company context (projects, suppliers, materials)
+ * @param {string} clarificationText - Optional spoken voice note transcript or text clarifying the image
  * @returns {Promise<object>} parsed_data matching the receipt schema
  */
-export const processReceiptImage = async (imageBuffer, mimeType, context = {}) => {
+export const processReceiptImage = async (imageBuffer, mimeType, context = {}, clarificationText = '') => {
+    // Step 1: Direct Primary Option: Call MicroMind Image Workflow (with optional voice clarification)
+    if (imageBuffer && mimeType && mimeType.startsWith('image/')) {
+        try {
+            const parsed = await callMicroMindImageExtraction(imageBuffer, mimeType, context, clarificationText);
+            if (parsed && (parsed.totalAmount !== null || parsed.vendor !== null || parsed.summary)) {
+                logger.info({ totalAmount: parsed.totalAmount, vendor: parsed.vendor }, 'MicroMind Image Workflow successfully extracted receipt details');
+                return parsed;
+            }
+        } catch (err) {
+            logger.warn({ err }, 'MicroMind Image extraction error, falling back to OCR pipeline');
+        }
+    }
+
     let documentText = '';
 
-    // Step 1: High-accuracy OCR / Document text extraction
+    // Step 2: High-accuracy OCR / Document text extraction
     if (mimeType === 'application/pdf') {
         documentText = await parsePdfBuffer(imageBuffer);
     } else if (mimeType && mimeType.startsWith('image/')) {
         documentText = await extractTextFromImageBuffer(imageBuffer);
     } else {
-        // Try both
         documentText = await extractTextFromImageBuffer(imageBuffer);
         if (!documentText) {
             documentText = await parsePdfBuffer(imageBuffer);
@@ -627,15 +801,18 @@ export const processReceiptImage = async (imageBuffer, mimeType, context = {}) =
 
     logger.info({ textLength: documentText?.length || 0 }, 'Document/Receipt OCR text extraction completed');
 
-    // Step 2: Primary Option: Call MicroMind Agent (GPT 5.6 Luna Pro) with dynamic context
-    if (process.env.MICROMIND_API_URL && documentText) {
+    // Combine OCR text with voice clarification if provided
+    const combinedText = [clarificationText, documentText].filter(Boolean).join('\n\n');
+
+    // Step 3: Call MicroMind Agent with OCR text
+    if (process.env.MICROMIND_API_URL && combinedText) {
         try {
-            const parsed = await callMicroMindExtraction(documentText, context);
+            const parsed = await callMicroMindExtraction(combinedText, context);
             if (parsed && (parsed.totalAmount !== null || parsed.vendor !== null)) {
                 return parsed;
             }
         } catch (err) {
-            logger.warn({ err }, 'MicroMind extraction failed, falling back to local extractor');
+            logger.warn({ err }, 'MicroMind OCR extraction failed, falling back to secondary extractor');
         }
     }
 
@@ -773,7 +950,24 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
         transcriptText = clientTranscript.trim();
     }
 
-    // Step 2: Primary Option: Call MicroMind Agent (GPT 5.6 Luna Pro) with dynamic context!
+    // Step 2: Primary Option: Call MicroMind Voice Workflow (prediction/5da17804-194a-4aad-a7af-9041e768426c)
+    if (transcriptText) {
+        try {
+            const parsed = await callMicroMindVoiceExtraction(transcriptText, context);
+            if (parsed && (parsed.totalAmount !== null || parsed.vendor !== null || parsed.summary)) {
+                logger.info({ totalAmount: parsed.totalAmount, vendor: parsed.vendor }, 'MicroMind Voice Workflow successfully parsed transaction');
+                const finalTranscript = parsed.cleanedTranscript || transcriptText;
+                return {
+                    raw_text: finalTranscript,
+                    parsed_data: parsed
+                };
+            }
+        } catch (err) {
+            logger.warn({ err }, 'MicroMind dedicated voice extraction failed, falling back to agent extraction');
+        }
+    }
+
+    // Step 2b: Fallback to general MicroMind Agent if available
     if (process.env.MICROMIND_API_URL && transcriptText) {
         try {
             const parsed = await callMicroMindExtraction(transcriptText, context);
@@ -785,7 +979,7 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
                 };
             }
         } catch (err) {
-            logger.warn({ err }, 'MicroMind voice extraction fallback');
+            logger.warn({ err }, 'MicroMind general voice extraction fallback');
         }
     }
 

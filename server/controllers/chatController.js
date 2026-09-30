@@ -93,8 +93,9 @@ export const sendMessage = async (req, res, next) => {
                 confidence: 1.0
             };
         } else {
-            // Step 3: Check if Micromind Agent is configured
-            if (process.env.MICROMIND_API_URL) {
+            // Step 3: Call MicroMind Copilot / ReportBot Workflow (prediction/837100dc-002e-446b-9d88-ba7134bc49c3)
+            const copilotUrl = process.env.MICROMIND_COPILOT_API_URL || process.env.MICROMIND_API_URL || "https://core.aimicromind.com/api/v1/prediction/837100dc-002e-446b-9d88-ba7134bc49c3";
+            if (copilotUrl) {
                 try {
                     // Fetch tenant name for context
                     const tenant = await prisma.tenant.findUnique({
@@ -106,7 +107,7 @@ export const sendMessage = async (req, res, next) => {
 [Formatting Guideline: Reply in natural human conversational speech. Avoid heavy raw markdown formatting, headers (###), or excessive asterisks (**). Keep answers conversational, clear, warm, and concise.]
 ${userMessage}`;
 
-                    const micromindRes = await fetch(process.env.MICROMIND_API_URL, {
+                    const micromindRes = await fetch(copilotUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -114,13 +115,18 @@ ${userMessage}`;
                         })
                     });
 
-                    const micromindData = await micromindRes.json();
-
-                    if (micromindData && (micromindData.text || micromindData.response)) {
-                        aiResponse = micromindData.text || micromindData.response;
+                    if (micromindRes.ok) {
+                        const micromindData = await micromindRes.json();
+                        const candidate = micromindData.json?.answer || micromindData.text || micromindData.response || micromindData.answer;
+                        if (candidate && typeof candidate === 'string' && candidate.trim()) {
+                            aiResponse = candidate.trim();
+                        }
+                    } else {
+                        const errBody = await micromindRes.text().catch(() => '');
+                        logger.warn({ status: micromindRes.status, errBody }, 'MicroMind Copilot returned non-200, falling back to local chat tools');
                     }
                 } catch (microErr) {
-                    logger.error({ err: microErr }, 'Micromind Agent error, falling back to local chat tools');
+                    logger.error({ err: microErr }, 'MicroMind Copilot error, falling back to local chat tools');
                 }
             }
 

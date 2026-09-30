@@ -32,19 +32,28 @@ export default function DraftCaptureFAB() {
     const [busy, setBusy] = useState(false);
     const fileInputRef = useRef(null);
 
+    // Image Clarification Modal State (accepts voice to clarify what the image is)
+    const [imageModalOpen, setImageModalOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
+    const [voiceClarifyOpen, setVoiceClarifyOpen] = useState(false);
+    const [clarificationVoiceBlob, setClarificationVoiceBlob] = useState(null);
+    const [clarificationText, setClarificationText] = useState('');
+
     // Dynamic Progressive AI Scanning Modal State via unified hook
     const { processing, startProcessing, finishProcessing, stopProcessing } = useAIProcessing();
 
     // Close on Escape key
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (e.key === 'Escape' && open) {
-                setOpen(false);
+            if (e.key === 'Escape') {
+                if (open) setOpen(false);
+                if (imageModalOpen && !busy) handleCancelImageModal();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [open]);
+    }, [open, imageModalOpen, busy]);
 
     // Hide on the review screen — its own action buttons would clash with the FAB.
     if (HIDE_ON_PATHS.some(p => location.pathname.startsWith(p) && location.pathname !== '/drafts')) {
@@ -93,19 +102,49 @@ export default function DraftCaptureFAB() {
         }
     };
 
-    const handlePhotoSelected = async (e) => {
+    const handlePhotoSelected = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setSelectedImage(file);
+        if (file.type.startsWith('image/')) {
+            setImagePreview(URL.createObjectURL(file));
+        } else {
+            setImagePreview(null);
+        }
+        setClarificationVoiceBlob(null);
+        setClarificationText('');
+        setImageModalOpen(true);
+        if (e.target) e.target.value = '';
+    };
+
+    const handleCancelImageModal = () => {
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setSelectedImage(null);
+        setImagePreview(null);
+        setClarificationVoiceBlob(null);
+        setClarificationText('');
+        setImageModalOpen(false);
+    };
+
+    const executeReceiptScan = async (withClarification = true) => {
+        if (!selectedImage) return;
+        setImageModalOpen(false);
         setBusy(true);
         startProcessing('receipt');
 
         try {
-            const r = await aiExtractAPI.receipt(file);
+            const clarifyParam = withClarification ? (clarificationVoiceBlob || clarificationText) : null;
+            const r = await aiExtractAPI.receipt(selectedImage, clarifyParam);
             finishProcessing();
 
             setTimeout(() => {
                 stopProcessing();
                 setBusy(false);
+                if (imagePreview) URL.revokeObjectURL(imagePreview);
+                setSelectedImage(null);
+                setImagePreview(null);
+                setClarificationVoiceBlob(null);
+                setClarificationText('');
                 navigate(`/drafts/${r.data.draft.id}`);
             }, 500);
         } catch (err) {
@@ -116,8 +155,6 @@ export default function DraftCaptureFAB() {
                 title: t('common.error', 'Error'),
                 message: err.response?.data?.message || (isRTL ? 'فشل معالجة وقراءة الفاتورة' : 'Receipt extraction failed')
             });
-        } finally {
-            if (e.target) e.target.value = '';
         }
     };
 

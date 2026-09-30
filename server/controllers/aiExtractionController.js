@@ -1,4 +1,6 @@
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import * as aiService from '../services/aiService.js';
 import { matchExtractionToTenant } from '../services/matchingService.js';
 import { uploadBuffer, uploadFile } from '../lib/storage.js';
@@ -153,7 +155,8 @@ export const extractFromVoice = async (req, res) => {
  * vision, then persisted to S3 alongside the draft so user can re-view it.
  */
 export const extractFromReceipt = async (req, res) => {
-    if (!req.file) {
+    const imageFile = req.file || req.files?.['image']?.[0] || req.files?.[0];
+    if (!imageFile) {
         return res.status(400).json({ success: false, message: 'Image file is required (field "image")' });
     }
 
@@ -163,9 +166,30 @@ export const extractFromReceipt = async (req, res) => {
         // Fetch comprehensive master data context
         const companyContext = await getTenantMasterDataContext(req.user.tenantId);
 
-        const parsed = await aiService.processReceiptImage(req.file.buffer, req.file.mimetype, companyContext);
-        const imageUrl = await uploadBuffer(req.file.buffer, req.file.mimetype, 'images/receipt-drafts');
-        const matched = await matchExtractionToTenant(parsed, 'RECEIPT', req.user.tenantId, req.user.id, parsed?.description || parsed?.summary || '');
+        // Check for optional voice clarification audio file or text clarification
+        let clarificationText = req.body.transcript || req.body.clarification || req.body.question || '';
+        let audioClarificationUrl = null;
+
+        const audioFile = req.files?.['audio']?.[0];
+        if (audioFile) {
+            const tempAudioPath = path.join(os.tmpdir(), `clarify-${Date.now()}-${audioFile.originalname || 'voice.webm'}`);
+            try {
+                fs.writeFileSync(tempAudioPath, audioFile.buffer);
+                const voiceRes = await aiService.processVoiceNote(tempAudioPath, '', companyContext);
+                if (voiceRes?.raw_text) {
+                    clarificationText = voiceRes.raw_text;
+                }
+                audioClarificationUrl = await uploadBuffer(audioFile.buffer, audioFile.mimetype, 'audio/receipt-clarifications');
+            } catch (vErr) {
+                logger.warn({ err: vErr }, 'Failed to transcribe voice clarification for receipt');
+            } finally {
+                try { if (fs.existsSync(tempAudioPath)) fs.unlinkSync(tempAudioPath); } catch (_) {}
+            }
+        }
+
+        const parsed = await aiService.processReceiptImage(imageFile.buffer, imageFile.mimetype, companyContext, clarificationText);
+        const imageUrl = await uploadBuffer(imageFile.buffer, imageFile.mimetype, 'images/receipt-drafts');
+        const matched = await matchExtractionToTenant(parsed, 'RECEIPT', req.user.tenantId, req.user.id, clarificationText || parsed?.description || parsed?.summary || '');
 
         const draft = await prisma.transactionDraft.create({
             data: {
@@ -173,7 +197,8 @@ export const extractFromReceipt = async (req, res) => {
                 createdById: req.user.id,
                 source: 'RECEIPT',
                 originalMediaUrl: imageUrl,
-                originalMediaMime: req.file.mimetype,
+                originalMediaMime: imageFile.mimetype,
+                transcript: clarificationText || null,
                 rawExtraction: parsed,
                 matchedDraft: matched.draft,
                 confidence: parsed?.confidence ?? null
@@ -186,11 +211,12 @@ export const extractFromReceipt = async (req, res) => {
             entityId: draft.id,
             metadata: {
                 source: 'receipt',
-                provider: 'openai:gpt-4o-mini-vision',
+                provider: 'micromind:image-workflow',
                 category: matched.draft.category,
                 amount: matched.draft.amount,
                 vendor: matched.draft.supplierId ? 'matched' : 'unmatched',
-                bytes: req.file.size
+                hasVoiceClarification: !!audioFile || !!clarificationText,
+                bytes: imageFile.size
             }
         });
 
@@ -198,6 +224,7 @@ export const extractFromReceipt = async (req, res) => {
             success: true,
             draft: {
                 ...draft,
+                audioClarificationUrl,
                 matches: matched.matches
             }
         });

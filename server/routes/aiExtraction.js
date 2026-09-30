@@ -23,6 +23,6 @@ router.use(protect);
 router.use(aiLimiter);
 
 router.post('/extract/voice', audioUpload.single('audio'), ctrl.extractFromVoice);
-router.post('/extract/receipt', receiptMemoryUpload.single('image'), ctrl.extractFromReceipt);
+router.post('/extract/receipt', receiptMemoryUpload.fields([{ name: 'image', maxCount: 1 }, { name: 'audio', maxCount: 1 }]), ctrl.extractFromReceipt);
 
 export default router;

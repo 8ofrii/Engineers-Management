@@ -182,9 +182,23 @@ export const aiExtractAPI = {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
     },
-    receipt: (imageFile) => {
+    receipt: (imageFile, optionalAudioOrClarification = null) => {
         const fd = new FormData();
         fd.append('image', imageFile, imageFile.name || 'receipt.jpg');
+        if (optionalAudioOrClarification) {
+            if (optionalAudioOrClarification instanceof Blob) {
+                const type = optionalAudioOrClarification.type || '';
+                const ext = type.includes('mp4') ? 'mp4' 
+                    : type.includes('aac') ? 'aac' 
+                    : type.includes('m4a') ? 'm4a' 
+                    : type.includes('ogg') ? 'ogg' 
+                    : type.includes('wav') ? 'wav' 
+                    : 'webm';
+                fd.append('audio', optionalAudioOrClarification, `clarify.${ext}`);
+            } else if (typeof optionalAudioOrClarification === 'string') {
+                fd.append('clarification', optionalAudioOrClarification);
+            }
+        }
         return api.post('/ai/extract/receipt', fd, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
