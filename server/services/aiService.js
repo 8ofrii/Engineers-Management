@@ -346,7 +346,7 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
     }
 
     // 1. Total Amount
-    let totalAmount = data.totalAmount ?? data.amount ?? data.total ?? null;
+    let totalAmount = data.totalAmount ?? data.amount ?? data.total ?? data.answer ?? null;
     if (typeof totalAmount === 'object' && totalAmount !== null) {
         totalAmount = totalAmount.value ?? totalAmount.amount ?? null;
     }
@@ -438,7 +438,7 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
     const payerUserId = data.payerUserId || data.payer_user_id || data.engineerId || null;
 
     // 7. Transaction Type (EXPENSE or REVENUE)
-    let transactionType = data.transactionType || data.type || null;
+    let transactionType = data.transactionType || data.type || data.source || null;
     if (!transactionType) {
         if (data.category === 'CLIENT_PAYMENT' || rawText.includes('استلام دفعة') || rawText.includes('تحصيل من العميل')) {
             transactionType = 'REVENUE';
@@ -530,6 +530,7 @@ export function normalizeExtractedData(data, rawText = '', context = {}) {
         category,
         paymentMethod,
         is_stock_purchase: !!data.is_stock_purchase,
+        isOfficeExpense: Boolean(data.isOfficeExpense || data.is_office_expense || data.category === 'OFFICE_EXPENSES'),
         cleanedTranscript: (typeof (data.cleanedTranscript || data.cleaned_transcript || data.verbatimTranscript) === 'string' && (data.cleanedTranscript || data.cleaned_transcript || data.verbatimTranscript).trim())
             ? (data.cleanedTranscript || data.cleaned_transcript || data.verbatimTranscript).trim()
             : null,
