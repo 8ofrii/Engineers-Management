@@ -232,12 +232,15 @@ export function BeamsBackground({
         };
     }, [intensity, colorScheme]);
 
+    const isFixed = className && className.includes('fixed');
+
     return (
         <div
             className={cn(
-                "relative min-h-screen w-full overflow-hidden bg-neutral-950",
+                isFixed ? "w-full overflow-hidden bg-transparent" : "relative min-h-screen w-full overflow-hidden bg-neutral-950",
                 className
             )}
+            style={{ zIndex: isFixed ? 0 : undefined }}
         >
             <canvas
                 ref={canvasRef}

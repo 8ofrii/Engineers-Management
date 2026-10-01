@@ -214,10 +214,10 @@ export function BeamsBackground({
     return (
         <div
             className={cn(
-                isFixed ? "w-full overflow-hidden bg-neutral-950" : "relative min-h-screen w-full overflow-hidden bg-neutral-950",
+                isFixed ? "w-full overflow-hidden bg-transparent" : "relative min-h-screen w-full overflow-hidden bg-neutral-950",
                 className
             )}
-            style={{ zIndex: isFixed ? -1 : undefined }}
+            style={{ zIndex: isFixed ? 0 : undefined }}
         >
             <canvas
                 ref={canvasRef}

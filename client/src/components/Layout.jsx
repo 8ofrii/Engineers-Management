@@ -267,7 +267,7 @@ export default function Layout({ children }) {
                 <BeamsBackground
                     colorScheme="ember"
                     intensity="medium"
-                    className="fixed inset-0 pointer-events-none -z-10"
+                    className="fixed inset-0 pointer-events-none z-0"
                 />
             )}
             {/* Sidebar */}
