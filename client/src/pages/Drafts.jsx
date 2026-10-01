@@ -12,6 +12,61 @@ import AIProcessingModal, { useAIProcessing } from '../components/AIProcessingMo
 
 const sourceIcon = (source) => source === 'VOICE' ? <Volume2 size={20} /> : <ImageIcon size={20} />;
 
+const typeBadge = (type, isOffice, isRTL) => {
+    if (type === 'INCOME') {
+        return (
+            <span style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: '#34d399',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                padding: '2px 8px',
+                borderRadius: 10,
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4
+            }}>
+                {isRTL ? 'إيراد / دفعة' : 'Income'}
+            </span>
+        );
+    }
+    if (isOffice) {
+        return (
+            <span style={{
+                background: 'rgba(168, 85, 247, 0.15)',
+                color: '#c084fc',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                padding: '2px 8px',
+                borderRadius: 10,
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4
+            }}>
+                {isRTL ? 'مقر الشركة' : 'Office HQ'}
+            </span>
+        );
+    }
+    return (
+        <span style={{
+            background: 'rgba(59, 130, 246, 0.15)',
+            color: '#60a5fa',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            padding: '2px 8px',
+            borderRadius: 10,
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4
+        }}>
+            {isRTL ? 'مشروع موقع' : 'Site Project'}
+        </span>
+    );
+};
+
 const statusBadge = (status) => {
     const map = {
         PENDING_REVIEW: { bg: 'rgba(245, 158, 11, 0.15)', fg: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)', label: 'Pending review' },

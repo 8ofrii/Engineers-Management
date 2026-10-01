@@ -163,6 +163,11 @@ export function buildDynamicContext(context = {}) {
 - INSULATION_LABOR (مصنعية عزل / عزل حمامات واسطح)
 - HVAC_PREP (تاسيس تكيف / نحاس تكييف)
 - ALUMETAL (الوميتال / قطاعات / زجاج)
+- CLIENT_PAYMENT (دفعة عميل / إيراد وارد / تحصيل من العميل)
+- OFFICE_EXPENSES (مصاريف مقر الشركة / مصاريف إدارية / إيجار المقر / كهرباء المقر / بوفيه المقر / أدوات مكتبية)
+- SITE_OVERHEAD (مصاريف موقع / حراسة / غفير / بوفيه موقع)
+- EQUIPMENT_RENTAL (إيجار معدات / خلاطة / ونش / لودر / حفار)
+- SUBCONTRACTOR (مقاول باطن / مقاولات متخصصة)
 - OTHER (أخرى / متنوع)
 
 **Allowed Payment Methods:**
@@ -206,6 +211,7 @@ You natively understand Egyptian Arabic, all regional accents (Cairo, Delta, Upp
   "category": "Exact enum key from Allowed Cost Categories list",
   "paymentMethod": "CASH | CUSTODY_WALLET | BANK_TRANSFER | CHECK | CREDIT_CARD | OTHER",
   "is_stock_purchase": Boolean (True for physical building materials. False for labor/services/wages),
+  "isOfficeExpense": Boolean (True if this is an office/headquarters overhead expense, like office rent, office electricity, office buffet/tea, admin supplies; False for site construction projects),
   "cleanedTranscript": "String (Accurate verbatim Egyptian Arabic transcript of what was spoken, fixing phonetic speech-to-text slips or misheard words e.g. correcting 'تم' to 'طن' before materials and numbers like 'طن أسمنت', and restoring proper names of suppliers like 'عبده رزق' and projects to their true spelling as registered in company master data, keeping the user's natural spoken words and numbers intact)",
   "items": [
     { "name": "String", "materialId": "String or null", "quantity": Number, "unit": "String", "unitPrice": Number or null, "total": Number or null }
@@ -238,6 +244,7 @@ Your role is to extract structured accounting data from receipts, invoices, and 
   "clientId": "String (Exact matching Client ID UUID from Company Existing Clients, or null if not mentioned)",
   "clientName": "String or null (Client name)",
   "category": "Exact enum key from Allowed Cost Categories",
+  "isOfficeExpense": Boolean (True if office overhead; False for site construction projects),
   "paymentMethod": "CASH | CUSTODY_WALLET | BANK_TRANSFER | CHECK | CREDIT_CARD | OTHER",
   "transactionDate": "YYYY-MM-DD",
   "items": [

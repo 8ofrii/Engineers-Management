@@ -320,9 +320,39 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
     const category = mapToExactCategory(ext.category, items, fullText);
     const paymentMethod = ext.paymentMethod || resolvePaymentMethod(ext, fullText);
 
+    // Detect Office / Headquarters Overhead Expense
+    const isOfficeExpense = Boolean(
+        ext.isOfficeExpense || 
+        ext.is_office_expense || 
+        category === 'OFFICE_EXPENSES' || 
+        category === 'OFFICE_EXPENSE' || 
+        (!projectMatch && (
+            fullText.includes('مقر الشركة') || 
+            fullText.includes('المكتب الرئيسي') || 
+            fullText.includes('إيجار المقر') || 
+            fullText.includes('إيجار المكتب') || 
+            fullText.includes('فاتورة كهرباء المقر') ||
+            fullText.includes('مصاريف إدارة') ||
+            fullText.includes('مصاريف إدارية')
+        ))
+    );
+
     // Resolve transaction type (EXPENSE or INCOME)
     let type = 'EXPENSE';
-    if (ext.transactionType === 'REVENUE' || ext.transactionType === 'INCOME' || (clientMatch && (category === 'CLIENT_PAYMENT' || fullText.includes('استلام دفعة') || fullText.includes('تحصيل من العميل')))) {
+    if (
+        ext.transactionType === 'REVENUE' || 
+        ext.transactionType === 'INCOME' || 
+        ext.type === 'INCOME' || 
+        ext.type === 'REVENUE' || 
+        category === 'PAYMENT' || 
+        category === 'CLIENT_PAYMENT' || 
+        (clientMatch && (category === 'CLIENT_PAYMENT' || category === 'PAYMENT' || fullText.includes('استلام دفعة') || fullText.includes('تحصيل من العميل') || fullText.includes('دفعة من'))) ||
+        fullText.includes('استلمنا دفعة') ||
+        fullText.includes('تحصيل دفعة') ||
+        fullText.includes('العميل حول') ||
+        fullText.includes('قبضنا من العميل') ||
+        fullText.includes('دفعة تحت الحساب من')
+    ) {
         type = 'INCOME';
     }
 
@@ -339,11 +369,12 @@ export const matchExtractionToTenant = async (extraction, source, tenantId, user
             payerUserId: payerUserMatch?.id || userId || null,
             description: ext.summary ?? ext.description ?? '',
             // Resolved IDs pre-fill the form cleanly
-            supplierId: supplierMatch?.id ?? null,
+            supplierId: type === 'INCOME' ? null : (supplierMatch?.id ?? null),
             clientId: clientMatch?.id ?? null,
-            projectId: projectMatch?.id ?? null,
+            projectId: isOfficeExpense ? null : (projectMatch?.id ?? null),
             workmanId: workmanMatch?.id ?? null,
             isStockPurchase: !!ext.is_stock_purchase,
+            isOfficeExpense,
             items: matchedItems
         },
         matches: {

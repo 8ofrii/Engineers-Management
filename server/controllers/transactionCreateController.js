@@ -53,7 +53,7 @@ export const createTransaction = async (req, res, next) => {
         } = req.body;
 
         // Validate required fields: projectId is required UNLESS isOfficeExpense is true
-        if (!type || !amount || (!projectId && !isOfficeExpense)) {
+        if (!type || !amount || (!projectId && !isOfficeExpense && type !== 'INCOME')) {
             return res.status(400).json({
                 success: false,
                 message: 'Type, amount, and projectId (or office expense flag) are required'
