@@ -563,14 +563,53 @@ function extractJsonFromText(rawText) {
 
 /**
  * Call the MicroMind Voice Workflow (prediction/5da17804-194a-4aad-a7af-9041e768426c)
+ * Sends raw audio buffer / file directly to the MicroMind workflow (OpenAI Whisper + Gemini 3.8 Flash).
+ * Also accepts an optional fallback text prompt if audio is not available.
+ * 
+ * @param {Buffer|string} audioBufferOrPath - Audio file buffer or absolute path to audio file on disk, OR text prompt.
+ * @param {string} [mimeType='audio/webm'] - MIME type of the audio
+ * @param {object} [context={}] - Company context (projects, suppliers, materials, etc.)
+ * @param {string} [optionalTranscript=''] - Optional text transcript if already available
  */
-export async function callMicroMindVoiceExtraction(prompt, context = {}) {
+export async function callMicroMindVoiceExtraction(audioBufferOrPath, mimeType = 'audio/webm', context = {}, optionalTranscript = '') {
     const apiUrl = process.env.MICROMIND_VOICE_API_URL || "https://core.aimicromind.com/api/v1/prediction/5da17804-194a-4aad-a7af-9041e768426c";
-    if (!apiUrl || !prompt) return null;
+    if (!apiUrl || !audioBufferOrPath) return null;
 
     try {
+        let audioBuffer = null;
+        let actualMime = typeof mimeType === 'string' && mimeType.includes('/') ? mimeType : 'audio/webm';
+        let textPrompt = '';
+
+        if (Buffer.isBuffer(audioBufferOrPath)) {
+            audioBuffer = audioBufferOrPath;
+        } else if (typeof audioBufferOrPath === 'string') {
+            // Check if it's an existing file path
+            if (fs.existsSync(audioBufferOrPath)) {
+                try {
+                    const stat = fs.statSync(audioBufferOrPath);
+                    if (stat.isFile()) {
+                        audioBuffer = fs.readFileSync(audioBufferOrPath);
+                        const ext = path.extname(audioBufferOrPath).toLowerCase();
+                        if (ext === '.mp4' || ext === '.m4a') actualMime = 'audio/mp4';
+                        else if (ext === '.wav') actualMime = 'audio/wav';
+                        else if (ext === '.ogg') actualMime = 'audio/ogg';
+                        else if (ext === '.mp3') actualMime = 'audio/mpeg';
+                        else if (ext === '.aac') actualMime = 'audio/aac';
+                        else if (ext === '.webm') actualMime = 'audio/webm';
+                    }
+                } catch (_) {}
+            }
+            if (!audioBuffer) {
+                // It was passed as a text prompt directly (for backward compatibility)
+                textPrompt = audioBufferOrPath;
+                if (typeof mimeType === 'object' && mimeType !== null) {
+                    context = mimeType;
+                }
+            }
+        }
+
         const dynamicContextText = buildDynamicContext(context);
-        const question = `قم باستخراج بيانات المعاملة المالية من التسجيل الصوتي بدقة في صيغة JSON تحتوي على:
+        const question = `قم باستخراج بيانات المعاملة المالية من التسجيل الصوتي بدقة متناهية في صيغة JSON تحتوي على:
 {
   "totalAmount": number,
   "amount": number,
@@ -580,29 +619,64 @@ export async function callMicroMindVoiceExtraction(prompt, context = {}) {
   "projectName": string or null,
   "workmanName": string or null,
   "summary": string,
+  "cleanedTranscript": string,
   "is_stock_purchase": boolean,
   "items": [{"name": string, "quantity": number, "unitPrice": number, "total": number}]
 }
-الكلام المسجل من الموقع:
-"""${prompt}"""
+${optionalTranscript || textPrompt ? `\nتفريغ صوتي أولي أو نص إضافي:\n"""${optionalTranscript || textPrompt}"""` : ''}
 ${dynamicContextText}`;
+
+        const payload = { question };
+
+        if (audioBuffer) {
+            const extMatch = actualMime.includes('mp4') ? 'mp4'
+                : actualMime.includes('wav') ? 'wav'
+                : actualMime.includes('ogg') ? 'ogg'
+                : actualMime.includes('mpeg') || actualMime.includes('mp3') ? 'mp3'
+                : actualMime.includes('aac') ? 'aac'
+                : 'webm';
+
+            payload.uploads = [{
+                data: `data:${actualMime};base64,${audioBuffer.toString('base64')}`,
+                type: 'file',
+                name: `voice.${extMatch}`,
+                mime: actualMime
+            }];
+        }
+
+        logger.info({ apiUrl, hasAudio: !!audioBuffer, actualMime, bufferSize: audioBuffer?.length }, 'Calling MicroMind Voice Workflow');
 
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
-            logger.warn({ status: response.status }, 'MicroMind Voice API responded with non-200');
+            const errText = await response.text().catch(() => '');
+            logger.warn({ status: response.status, errText }, 'MicroMind Voice API responded with non-200');
             return null;
         }
 
         const data = await response.json();
-        const rawContent = data.json?.answer || data.text || data.response || data.answer || (typeof data === 'string' ? data : JSON.stringify(data));
-        const rawParsed = extractJsonFromText(rawContent);
+        
+        // MicroMind returns JSON directly in data.json or via text/answer fields
+        let rawParsed = null;
+        if (data.json && typeof data.json === 'object') {
+            if (data.json.answer) {
+                rawParsed = extractJsonFromText(data.json.answer);
+            } else {
+                rawParsed = data.json;
+            }
+        }
+        
+        if (!rawParsed) {
+            const rawContent = data.text || data.response || data.answer || (typeof data === 'string' ? data : JSON.stringify(data));
+            rawParsed = extractJsonFromText(rawContent);
+        }
+
         if (rawParsed) {
-            return normalizeExtractedData(rawParsed, prompt, context);
+            return normalizeExtractedData(rawParsed, optionalTranscript || textPrompt || rawParsed.cleanedTranscript || 'تسجيل صوتي من الموقع', context);
         }
     } catch (err) {
         logger.warn({ err }, 'Failed to call MicroMind Voice API');
@@ -918,16 +992,36 @@ export function buildWhisperPrompt(context = {}) {
  * @param {object} context - Company context (projects, suppliers, materials)
  * @returns {Promise<{raw_text: string, parsed_data: object}>}
  */
-export const processVoiceNote = async (filePath, clientTranscript = '', context = {}) => {
+export const processVoiceNote = async (filePath, clientTranscript = '', context = {}, mimeType = '') => {
+    logger.info({ filePath, hasClientTranscript: !!clientTranscript }, 'Processing voice note with AI pipeline');
+
+    // Step 1: Primary Option — Send raw audio directly to MicroMind Voice Workflow (prediction/5da17804-194a-4aad-a7af-9041e768426c)
+    // The MicroMind workflow has OpenAI Whisper + Gemini 3.8 Flash, processing Egyptian dialect accurately in one step.
+    if (filePath && fs.existsSync(filePath)) {
+        try {
+            const parsed = await callMicroMindVoiceExtraction(filePath, mimeType, context, clientTranscript);
+            if (parsed && (parsed.totalAmount !== null || parsed.vendor !== null || parsed.summary || parsed.cleanedTranscript)) {
+                logger.info({ totalAmount: parsed.totalAmount, vendor: parsed.vendor }, 'MicroMind Voice Workflow successfully parsed transaction from raw audio');
+                const finalTranscript = parsed.cleanedTranscript || parsed.summary || clientTranscript || 'تسجيل صوتي لموقع العمل';
+                return {
+                    raw_text: finalTranscript,
+                    parsed_data: parsed
+                };
+            }
+        } catch (err) {
+            logger.warn({ err }, 'MicroMind dedicated voice extraction failed, falling back to local Whisper/agent pipeline');
+        }
+    }
+
     let transcriptText = '';
 
-    // Step 1: Authoritative Server-side Whisper-1 transcription directly from raw audio file
+    // Step 2: Fallback — Server-side Whisper-1 transcription directly from raw audio file
     if (process.env.OPENAI_API_KEY && filePath && fs.existsSync(filePath)) {
         try {
             const client = getOpenAI();
             if (client) {
                 const whisperPrompt = buildWhisperPrompt(context);
-                logger.info({ filePath, promptLength: whisperPrompt.length }, 'Initiating Whisper-1 voice transcription on server');
+                logger.info({ filePath, promptLength: whisperPrompt.length }, 'Initiating fallback Whisper-1 voice transcription on server');
                 const transcription = await client.audio.transcriptions.create({
                     file: fs.createReadStream(filePath),
                     model: "whisper-1",
@@ -941,21 +1035,21 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
                 }
             }
         } catch (error) {
-            logger.warn({ err: error }, 'Whisper voice transcription failed, attempting client fallback');
+            logger.warn({ err: error }, 'Whisper voice transcription fallback failed, attempting client fallback');
         }
     }
 
-    // Step 1b: Fallback to client transcript only if Whisper failed or was unavailable
+    // Step 2b: Fallback to client transcript only if Whisper failed or was unavailable
     if (!transcriptText && typeof clientTranscript === 'string' && clientTranscript !== 'undefined' && clientTranscript !== 'null' && clientTranscript.trim()) {
         transcriptText = clientTranscript.trim();
     }
 
-    // Step 2: Primary Option: Call MicroMind Voice Workflow (prediction/5da17804-194a-4aad-a7af-9041e768426c)
+    // Step 3: If we have transcript text from fallback, try MicroMind text extraction
     if (transcriptText) {
         try {
-            const parsed = await callMicroMindVoiceExtraction(transcriptText, context);
+            const parsed = await callMicroMindVoiceExtraction(transcriptText, 'text/plain', context);
             if (parsed && (parsed.totalAmount !== null || parsed.vendor !== null || parsed.summary)) {
-                logger.info({ totalAmount: parsed.totalAmount, vendor: parsed.vendor }, 'MicroMind Voice Workflow successfully parsed transaction');
+                logger.info({ totalAmount: parsed.totalAmount, vendor: parsed.vendor }, 'MicroMind Voice Workflow text fallback parsed transaction');
                 const finalTranscript = parsed.cleanedTranscript || transcriptText;
                 return {
                     raw_text: finalTranscript,
@@ -963,63 +1057,61 @@ export const processVoiceNote = async (filePath, clientTranscript = '', context 
                 };
             }
         } catch (err) {
-            logger.warn({ err }, 'MicroMind dedicated voice extraction failed, falling back to agent extraction');
+            logger.warn({ err }, 'MicroMind Voice Workflow text fallback failed');
         }
-    }
 
-    // Step 2b: Fallback to general MicroMind Agent if available
-    if (process.env.MICROMIND_API_URL && transcriptText) {
-        try {
-            const parsed = await callMicroMindExtraction(transcriptText, context);
-            if (parsed) {
-                const finalTranscript = parsed.cleanedTranscript || transcriptText;
-                return {
-                    raw_text: finalTranscript,
-                    parsed_data: parsed
-                };
-            }
-        } catch (err) {
-            logger.warn({ err }, 'MicroMind general voice extraction fallback');
-        }
-    }
-
-    // Step 3: Secondary Option: OpenAI (defaulting to gpt-6-luna) with complete dynamic company context
-    if (process.env.OPENAI_API_KEY && transcriptText) {
-        try {
-            const client = getOpenAI();
-            if (client) {
-                const dynamicContextText = buildDynamicContext(context);
-                const extractionModel = process.env.OPENAI_EXTRACTION_MODEL || 'gpt-6-luna';
-                const completion = await client.chat.completions.create({
-                    model: extractionModel,
-                    messages: [
-                        { role: 'system', content: `${SYSTEM_PROMPT}\n${dynamicContextText}` },
-                        {
-                            role: 'user',
-                            content: `Extract structured construction transaction details and restore the verbatim spoken transcript from this site voice note:\n\n"${transcriptText}"`
-                        }
-                    ],
-                    response_format: { type: 'json_object' },
-                    temperature: 0.1
-                });
-
-                const parsed = JSON.parse(completion.choices[0].message.content);
-                const normalized = normalizeExtractedData(parsed, transcriptText, context);
-                if (normalized) {
-                    const finalTranscript = normalized.cleanedTranscript || transcriptText;
+        // Try general MicroMind agent if available
+        if (process.env.MICROMIND_API_URL) {
+            try {
+                const parsed = await callMicroMindExtraction(transcriptText, context);
+                if (parsed) {
+                    const finalTranscript = parsed.cleanedTranscript || transcriptText;
                     return {
                         raw_text: finalTranscript,
-                        parsed_data: normalized
+                        parsed_data: parsed
                     };
                 }
+            } catch (err) {
+                logger.warn({ err }, 'MicroMind general voice extraction fallback');
             }
-        } catch (aiErr) {
-            logger.warn({ err: aiErr }, 'OpenAI voice extraction fallback failed');
         }
-    }
 
-    // Step 4: Fallback: Heuristic extraction from transcript if available
-    if (transcriptText) {
+        // Secondary Option: OpenAI (defaulting to gpt-6-luna) with complete dynamic company context
+        if (process.env.OPENAI_API_KEY) {
+            try {
+                const client = getOpenAI();
+                if (client) {
+                    const dynamicContextText = buildDynamicContext(context);
+                    const extractionModel = process.env.OPENAI_EXTRACTION_MODEL || 'gpt-6-luna';
+                    const completion = await client.chat.completions.create({
+                        model: extractionModel,
+                        messages: [
+                            { role: 'system', content: `${SYSTEM_PROMPT}\n${dynamicContextText}` },
+                            {
+                                role: 'user',
+                                content: `Extract structured construction transaction details and restore the verbatim spoken transcript from this site voice note:\n\n"${transcriptText}"`
+                            }
+                        ],
+                        response_format: { type: 'json_object' },
+                        temperature: 0.1
+                    });
+
+                    const parsed = JSON.parse(completion.choices[0].message.content);
+                    const normalized = normalizeExtractedData(parsed, transcriptText, context);
+                    if (normalized) {
+                        const finalTranscript = normalized.cleanedTranscript || transcriptText;
+                        return {
+                            raw_text: finalTranscript,
+                            parsed_data: normalized
+                        };
+                    }
+                }
+            } catch (aiErr) {
+                logger.warn({ err: aiErr }, 'OpenAI voice extraction fallback failed');
+            }
+        }
+
+        // Heuristic extraction fallback
         const heuristic = extractHeuristicsFromText(transcriptText);
         if (heuristic) {
             return {

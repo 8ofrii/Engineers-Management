@@ -89,7 +89,7 @@ export const extractFromVoice = async (req, res) => {
 
         // Step 1 — AI: transcribe + extract with full company context
         const clientTranscript = req.body.transcript || '';
-        const aiResult = await aiService.processVoiceNote(filePath, clientTranscript, companyContext);
+        const aiResult = await aiService.processVoiceNote(filePath, clientTranscript, companyContext, req.file.mimetype);
 
         // Step 2 — Persist the audio so the user can replay it later
         const audioUrl = await uploadFile(filePath, req.file.mimetype, 'audio/voice-drafts');
@@ -175,7 +175,7 @@ export const extractFromReceipt = async (req, res) => {
             const tempAudioPath = path.join(os.tmpdir(), `clarify-${Date.now()}-${audioFile.originalname || 'voice.webm'}`);
             try {
                 fs.writeFileSync(tempAudioPath, audioFile.buffer);
-                const voiceRes = await aiService.processVoiceNote(tempAudioPath, '', companyContext);
+                const voiceRes = await aiService.processVoiceNote(tempAudioPath, '', companyContext, audioFile.mimetype);
                 if (voiceRes?.raw_text) {
                     clarificationText = voiceRes.raw_text;
                 }
