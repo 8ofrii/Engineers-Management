@@ -626,7 +626,23 @@ export async function callMicroMindVoiceExtraction(audioBufferOrPath, mimeType =
 ${optionalTranscript || textPrompt ? `\nتفريغ صوتي أولي أو نص إضافي:\n"""${optionalTranscript || textPrompt}"""` : ''}
 ${dynamicContextText}`;
 
-        const payload = { question };
+        const payload = {
+            question,
+            overrideConfig: {
+                vars: {
+                    masterData: dynamicContextText,
+                    companyContext: dynamicContextText
+                }
+            },
+            masterData: {
+                projects: (context.projects || []).map(p => ({ id: p.id, name: p.name, location: p.location, client: p.client?.name })),
+                clients: (context.clients || []).map(c => ({ id: c.id, name: c.name, company: c.company, phone: c.phone })),
+                suppliers: (context.suppliers || []).map(s => ({ id: s.id, name: s.name, company: s.company, phone: s.phone })),
+                materials: (context.materials || []).map(m => ({ id: m.id, name: m.name, nameAr: m.nameAr, unit: m.unit, unitPrice: m.unitPrice })),
+                workmen: (context.workmen || []).map(w => ({ id: w.id, name: w.name, trade: w.trade || w.customTrade, dailyRate: w.dailyRate })),
+                users: (context.users || []).map(u => ({ id: u.id, name: u.name, role: u.role }))
+            }
+        };
 
         if (audioBuffer) {
             const extMatch = actualMime.includes('mp4') ? 'mp4'
@@ -714,6 +730,20 @@ ${dynamicContextText}`;
         const base64Data = `data:${mimeType || 'image/jpeg'};base64,${imageBuffer.toString('base64')}`;
         const payload = {
             question,
+            overrideConfig: {
+                vars: {
+                    masterData: dynamicContextText,
+                    companyContext: dynamicContextText
+                }
+            },
+            masterData: {
+                projects: (context.projects || []).map(p => ({ id: p.id, name: p.name, location: p.location, client: p.client?.name })),
+                clients: (context.clients || []).map(c => ({ id: c.id, name: c.name, company: c.company, phone: c.phone })),
+                suppliers: (context.suppliers || []).map(s => ({ id: s.id, name: s.name, company: s.company, phone: s.phone })),
+                materials: (context.materials || []).map(m => ({ id: m.id, name: m.name, nameAr: m.nameAr, unit: m.unit, unitPrice: m.unitPrice })),
+                workmen: (context.workmen || []).map(w => ({ id: w.id, name: w.name, trade: w.trade || w.customTrade, dailyRate: w.dailyRate })),
+                users: (context.users || []).map(u => ({ id: u.id, name: u.name, role: u.role }))
+            },
             uploads: [{
                 data: base64Data,
                 type: 'file',
