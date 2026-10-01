@@ -794,6 +794,7 @@ enum WorkmanTrade {
   CONCRETE_CUTTING
   GUARD
   MUNICIPAL_EMPLOYEE
+  INSULATION_CONTRACTOR
 }
 
 enum WorkmanshipStatus {

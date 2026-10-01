@@ -129,7 +129,7 @@ export default function Workforce() {
     const baseTrades = [
         'CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER',
         'IRON_WORKER', 'STOCKING_WORKER', 'MARBLE_CRAFTSMAN', 'CONCRETE_CUTTING',
-        'GUARD', 'MUNICIPAL_EMPLOYEE', 'WELDER', 'LABORER', 'FOREMAN',
+        'GUARD', 'MUNICIPAL_EMPLOYEE', 'INSULATION_CONTRACTOR', 'WELDER', 'LABORER', 'FOREMAN',
         'CONCRETE', 'PLASTERER', 'FLOORING', 'GYPSUM', 'ALUMINUM'
     ];
     
@@ -172,6 +172,7 @@ export default function Workforce() {
         'CONCRETE_CUTTING': { bg: '#C62828', text: 'white', border: '#C62828' }, // Dark Red
         'GUARD': { bg: '#283593', text: 'white', border: '#283593' }, // Indigo Navy
         'MUNICIPAL_EMPLOYEE': { bg: '#00695C', text: 'white', border: '#00695C' }, // Dark Teal
+        'INSULATION_CONTRACTOR': { bg: '#0284C7', text: 'white', border: '#0284C7' }, // Sky Blue / Insulation Blue
         'WELDER': { bg: '#F57C00', text: 'white', border: '#F57C00' }, // Orange 700
         'LABORER': { bg: '#795548', text: 'white', border: '#795548' }, // Brown 500
         'FOREMAN': { bg: '#303F9F', text: 'white', border: '#303F9F' }, // Indigo 700

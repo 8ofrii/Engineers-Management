@@ -88,7 +88,7 @@ export default function AddWorkmanModal({ isOpen, onClose, onSave, initialData =
     const trades = [
         'CARPENTER', 'MASON', 'ELECTRICIAN', 'PLUMBER', 'PAINTER',
         'IRON_WORKER', 'STOCKING_WORKER', 'MARBLE_CRAFTSMAN', 'CONCRETE_CUTTING',
-        'GUARD', 'MUNICIPAL_EMPLOYEE', 'WELDER', 'LABORER', 'FOREMAN',
+        'GUARD', 'MUNICIPAL_EMPLOYEE', 'INSULATION_CONTRACTOR', 'WELDER', 'LABORER', 'FOREMAN',
         'CONCRETE', 'PLASTERER', 'FLOORING', 'GYPSUM', 'ALUMINUM', 'OTHER'
     ];
 

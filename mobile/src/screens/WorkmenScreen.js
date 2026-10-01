@@ -78,9 +78,11 @@ export default function WorkmenScreen({ navigation }) {
             'PLUMBER': 'سباك',
             'HELPER': 'عامل مساعد',
             'FOREMAN': 'معلم / مشرف عمال',
-            'SURVEYOR': 'مساح'
+            'SURVEYOR': 'مساح',
+            'INSULATION_CONTRACTOR': 'مقاول عزل'
         };
         if (isArabic && map[t]) return map[t];
+        if (!isArabic && t === 'INSULATION_CONTRACTOR') return 'Insulation Contractor';
         return trade || (isArabic ? 'صنايعي' : 'General');
     };
 
